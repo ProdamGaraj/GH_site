@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Canvas element styles */
+.canvas-element {
+  position: relative;
+  outline: 1px dashed transparent;
+  transition: outline 0.2s ease;
+  cursor: pointer;
+}
+
+.canvas-element:hover {
+  outline-color: #3b82f6;
+  outline-width: 2px;
+}
+
+.canvas-element--selected {
+  outline-color: #2563eb !important;
+  outline-width: 2px !important;
+  outline-style: solid !important;
+}
+
+.canvas-element--selected::before {
+  content: attr(data-element-name);
+  position: absolute;
+  top: -24px;
+  left: 0;
+  background: #2563eb;
+  color: white;
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 3px;
+  white-space: nowrap;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.canvas-element--drop-target {
+  outline-color: #10b981;
+  outline-width: 2px;
+  outline-style: dashed;
+  background-color: rgba(16, 185, 129, 0.05);
+}
+
+/* Drag preview */
+.drag-preview {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+/* Library item */
+.library-item {
+  cursor: grab;
+  transition: all 0.2s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.library-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.library-item:active {
+  cursor: grabbing;
+}
+
+/* Prevent text selection during drag */
+.is-dragging {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+/* Draggable items */
+[draggable="true"] {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Library panel slide-in animation */
+@keyframes slide-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
