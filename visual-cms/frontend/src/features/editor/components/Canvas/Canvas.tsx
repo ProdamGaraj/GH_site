@@ -39,6 +39,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         <DropIndicatorOverlay 
           indicator={dropIndicator} 
           containerRef={canvasRef as React.RefObject<HTMLElement>}
+          targetContainerRect={targetContainerRect}
         />
       )}
       

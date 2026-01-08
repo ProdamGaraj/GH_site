@@ -20,8 +20,6 @@ export const LibraryItem: React.FC<LibraryItemProps> = ({ item }) => {
     data: dragData,
   })
 
-  console.log(`LibraryItem ${item.label}: draggable setup`, { attributes, listeners, isDragging })
-
   const IconComponent = (Icons as any)[item.icon] || Icons.Box
 
   return (

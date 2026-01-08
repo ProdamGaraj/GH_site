@@ -440,6 +440,10 @@ const editorSlice = createSlice({
       
       const { nodeId, position } = action.payload
       
+      // Round to integers
+      const x = Math.round(position.x)
+      const y = Math.round(position.y)
+      
       const updateInNode = (current: BlockNode): BlockNode => {
         if (current.id === nodeId) {
           return {
@@ -449,8 +453,8 @@ const editorSlice = createSlice({
               properties: {
                 ...current.styles.properties,
                 position: 'absolute',
-                left: `${position.x}px`,
-                top: `${position.y}px`,
+                left: `${x}px`,
+                top: `${y}px`,
               },
             },
           }

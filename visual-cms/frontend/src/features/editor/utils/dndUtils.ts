@@ -20,9 +20,30 @@ export interface DraggedElement {
 
 /**
  * Determines the layout mode of a container
+ * First checks explicit layoutMode, then infers from CSS properties
  */
 export const getLayoutMode = (node: BlockNode): LayoutMode => {
-  return node.layoutMode || 'flex'
+  // Explicit layout mode takes priority
+  if (node.layoutMode) {
+    return node.layoutMode
+  }
+  
+  // Infer from CSS properties
+  const props = node.styles?.properties || {}
+  
+  // If container has position: relative/absolute and no display:flex/grid, treat as absolute layout
+  if ((props.position === 'relative' || props.position === 'absolute') && 
+      props.display !== 'flex' && props.display !== 'grid') {
+    return 'absolute'
+  }
+  
+  // Check display property
+  if (props.display === 'grid') {
+    return 'grid'
+  }
+  
+  // Default to flex
+  return 'flex'
 }
 
 /**
@@ -108,14 +129,19 @@ export const calculateFlowDropPosition = (
 
 /**
  * Calculate drop position for absolute layout
+ * @param containerRect - Rectangle of the target container
+ * @param mousePosition - Current mouse position
+ * @param dragOffset - Offset from cursor to element's top-left corner (optional)
  */
 export const calculateAbsoluteDropPosition = (
   containerRect: DOMRect,
-  mousePosition: { x: number; y: number }
+  mousePosition: { x: number; y: number },
+  dragOffset?: { x: number; y: number }
 ): { x: number; y: number } => {
+  const offset = dragOffset || { x: 0, y: 0 }
   return {
-    x: mousePosition.x - containerRect.left,
-    y: mousePosition.y - containerRect.top,
+    x: Math.max(0, mousePosition.x - containerRect.left - offset.x),
+    y: Math.max(0, mousePosition.y - containerRect.top - offset.y),
   }
 }
 
@@ -176,7 +202,8 @@ export const determineDropTarget = (
   root: BlockNode,
   mousePosition: { x: number; y: number },
   draggedNodeId: string,
-  elementRects: Map<string, DOMRect>
+  elementRects: Map<string, DOMRect>,
+  dragOffset?: { x: number; y: number }
 ): DropIndicator | null => {
   // Build hierarchy of elements under mouse (from root to deepest)
   const elementsUnderMouse: { node: BlockNode; rect: DOMRect; depth: number }[] = []
@@ -208,7 +235,7 @@ export const determineDropTarget = (
     // Fallback to root if nothing under mouse
     const rootRect = elementRects.get(root.id)
     if (!rootRect) return null
-    return createDropIndicator(root, root.id, rootRect, mousePosition, elementRects, root)
+    return createDropIndicator(root, root.id, rootRect, mousePosition, elementRects, root, dragOffset)
   }
   
   // Sort by depth (deepest first)
@@ -229,7 +256,7 @@ export const determineDropTarget = (
   if (containers.length === 0) {
     const rootRect = elementRects.get(root.id)
     if (!rootRect) return null
-    return createDropIndicator(root, root.id, rootRect, mousePosition, elementRects, root)
+    return createDropIndicator(root, root.id, rootRect, mousePosition, elementRects, root, dragOffset)
   }
   
   // Find the appropriate target based on edge zones
@@ -249,7 +276,7 @@ export const determineDropTarget = (
   
   const { node: targetNode, rect: targetRect } = targetContainer
   
-  return createDropIndicator(targetNode, targetNode.id, targetRect, mousePosition, elementRects, root)
+  return createDropIndicator(targetNode, targetNode.id, targetRect, mousePosition, elementRects, root, dragOffset)
 }
 
 /**
@@ -261,12 +288,13 @@ const createDropIndicator = (
   containerRect: DOMRect,
   mousePosition: { x: number; y: number },
   elementRects: Map<string, DOMRect>,
-  root: BlockNode
+  root: BlockNode,
+  dragOffset?: { x: number; y: number }
 ): DropIndicator => {
   const layoutMode = getLayoutMode(targetNode)
   
   if (layoutMode === 'absolute') {
-    const absoluteCoords = calculateAbsoluteDropPosition(containerRect, mousePosition)
+    const absoluteCoords = calculateAbsoluteDropPosition(containerRect, mousePosition, dragOffset)
     return {
       type: 'absolute-position',
       targetId: targetNode.id,

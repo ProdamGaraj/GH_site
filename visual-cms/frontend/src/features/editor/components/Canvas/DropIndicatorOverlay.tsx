@@ -4,16 +4,55 @@ import type { DropIndicator } from '../../utils/dndUtils'
 interface DropIndicatorOverlayProps {
   indicator: DropIndicator | null
   containerRef: React.RefObject<HTMLElement>
+  targetContainerRect?: DOMRect | null
 }
 
 export const DropIndicatorOverlay: React.FC<DropIndicatorOverlayProps> = ({ 
   indicator,
-  containerRef 
+  containerRef,
+  targetContainerRect 
 }) => {
-  if (!indicator || !indicator.rect || !containerRef.current) return null
+  if (!indicator || !containerRef.current) return null
 
   const container = containerRef.current
   const containerRect = container.getBoundingClientRect()
+
+  if (indicator.type === 'absolute-position' && indicator.absoluteCoords) {
+    // For absolute positioning, use targetContainerRect or indicator.rect
+    const parentRect = targetContainerRect || indicator.rect
+    if (!parentRect) return null
+    
+    const relativeParentRect = {
+      left: parentRect.left - containerRect.left + container.scrollLeft,
+      top: parentRect.top - containerRect.top + container.scrollTop,
+    }
+    
+    // Show crosshair for absolute positioning at exact position within parent
+    return (
+      <div 
+        className="pointer-events-none absolute z-50"
+        style={{
+          left: relativeParentRect.left + indicator.absoluteCoords.x,
+          top: relativeParentRect.top + indicator.absoluteCoords.y,
+        }}
+      >
+        {/* Crosshair */}
+        <div className="relative w-5 h-5" style={{ marginLeft: -10, marginTop: -10 }}>
+          <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-blue-500 -translate-x-1/2" />
+          <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-blue-500 -translate-y-1/2" />
+          <div className="absolute left-1/2 top-1/2 w-2 h-2 bg-blue-500 rounded-full -translate-x-1/2 -translate-y-1/2" />
+        </div>
+        {/* Position label */}
+        <div 
+          className="absolute left-3 -top-2 text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded whitespace-nowrap"
+        >
+          {indicator.absoluteCoords.x}, {indicator.absoluteCoords.y}
+        </div>
+      </div>
+    )
+  }
+  
+  if (!indicator.rect) return null
   
   // Calculate position relative to the canvas container, accounting for scroll
   const relativeRect = {
@@ -21,32 +60,6 @@ export const DropIndicatorOverlay: React.FC<DropIndicatorOverlayProps> = ({
     top: indicator.rect.top - containerRect.top + container.scrollTop,
     width: indicator.rect.width,
     height: indicator.rect.height,
-  }
-
-  if (indicator.type === 'absolute-position' && indicator.absoluteCoords) {
-    // Show crosshair for absolute positioning
-    return (
-      <div 
-        className="pointer-events-none absolute z-50"
-        style={{
-          left: relativeRect.left + indicator.absoluteCoords.x - 10,
-          top: relativeRect.top + indicator.absoluteCoords.y - 10,
-        }}
-      >
-        {/* Crosshair */}
-        <div className="relative w-5 h-5">
-          <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-blue-500 -translate-x-1/2" />
-          <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-blue-500 -translate-y-1/2" />
-          <div className="absolute left-1/2 top-1/2 w-2 h-2 bg-blue-500 rounded-full -translate-x-1/2 -translate-y-1/2" />
-        </div>
-        {/* Position label */}
-        <div 
-          className="absolute left-6 top-0 text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded whitespace-nowrap"
-        >
-          {Math.round(indicator.absoluteCoords.x)}, {Math.round(indicator.absoluteCoords.y)}
-        </div>
-      </div>
-    )
   }
 
   // Show line indicator for flex/grid layouts

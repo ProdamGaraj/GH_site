@@ -20,6 +20,7 @@ import {
   addNode, 
   moveNode,
   reorderNode,
+  updateNodePosition,
   startDrag,
   endDrag,
   selectDragState,
@@ -65,6 +66,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   const [activeNode, setActiveNode] = useState<BlockNode | null>(null)
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const dropIndicatorRef = useRef<DropIndicator | null>(null)
+  const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -91,14 +93,28 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   )
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    const { active } = event
+    const { active, activatorEvent } = event
     const dragData = active.data.current as DragItem
 
     if (dragData?.type === 'canvas-element' && dragData.node) {
       dispatch(startDrag({ nodeId: dragData.node.id }))
       setActiveNode(dragData.node)
+      
+      // Calculate offset from cursor to element's top-left corner
+      const mouseEvent = activatorEvent as MouseEvent
+      if (mouseEvent) {
+        const element = document.querySelector(`[data-element-id="${dragData.node.id}"]`)
+        if (element) {
+          const rect = element.getBoundingClientRect()
+          dragOffsetRef.current = {
+            x: mouseEvent.clientX - rect.left,
+            y: mouseEvent.clientY - rect.top,
+          }
+        }
+      }
     } else if (dragData?.type === 'library-item') {
-      // For library items, we don't have a node yet
+      // For library items, we don't have a node yet - use default offset
+      dragOffsetRef.current = { x: 20, y: 20 }
       setActiveNode(null)
     }
   }, [dispatch])
@@ -124,11 +140,61 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
 
     const elementRects = collectElementRects(canvasElement as HTMLElement)
     
-    // Determine drop target
-    const draggedId = dragData?.type === 'canvas-element' ? dragData.node?.id : undefined
-    const indicator = determineDropTarget(rootNode, mousePosition, draggedId || '', elementRects)
+    // Check if dragged element has position: absolute
+    const draggedNode = dragData?.type === 'canvas-element' ? dragData.node : null
+    const isAbsoluteElement = draggedNode?.styles?.properties?.position === 'absolute'
     
-    console.log('🔄 DragMove - indicator:', indicator?.targetParentId, 'position:', indicator?.position)
+    // Determine drop target (pass drag offset for absolute positioning)
+    const draggedId = draggedNode?.id
+    let indicator = determineDropTarget(
+      rootNode, 
+      mousePosition, 
+      draggedId || '', 
+      elementRects,
+      dragOffsetRef.current
+    )
+    
+    // If element has position: absolute, check if it's within parent bounds
+    if (isAbsoluteElement && indicator && draggedNode) {
+      // Get the element's current parent
+      const sourceParentId = dragState.sourceParentId
+      const sourceParentRect = sourceParentId ? elementRects.get(sourceParentId) : null
+      const draggedRect = elementRects.get(draggedNode.id)
+      
+      if (sourceParentRect && draggedRect) {
+        const offset = dragOffsetRef.current
+        const elementWidth = draggedRect.width
+        const elementHeight = draggedRect.height
+        
+        // Calculate potential position relative to source parent
+        const potentialX = mousePosition.x - sourceParentRect.left - offset.x
+        const potentialY = mousePosition.y - sourceParentRect.top - offset.y
+        
+        // Check if element would stay within parent bounds
+        const isWithinParent = 
+          potentialX >= -elementWidth / 2 &&
+          potentialY >= -elementHeight / 2 &&
+          potentialX <= sourceParentRect.width - elementWidth / 2 &&
+          potentialY <= sourceParentRect.height - elementHeight / 2
+        
+        if (isWithinParent) {
+          // Clamp coordinates to parent bounds (integer values)
+          const clampedX = Math.round(Math.max(0, Math.min(potentialX, sourceParentRect.width - elementWidth)))
+          const clampedY = Math.round(Math.max(0, Math.min(potentialY, sourceParentRect.height - elementHeight)))
+          
+          indicator = {
+            ...indicator,
+            type: 'absolute-position',
+            targetParentId: sourceParentId,
+            absoluteCoords: {
+              x: clampedX,
+              y: clampedY,
+            }
+          }
+        }
+        // If outside parent bounds, keep the indicator as-is (will trigger parent change mode)
+      }
+    }
     
     if (indicator) {
       setDropIndicator(indicator)
@@ -143,7 +209,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
         setTargetLayoutMode(getLayoutMode(targetParent))
       }
     }
-  }, [rootNode])
+  }, [rootNode, dragState.sourceParentId])
 
   const handleDragOver = useCallback((_event: DragOverEvent) => {
     // This is handled by DragMove for more precise control
@@ -216,12 +282,36 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
     } else if (dragData?.type === 'canvas-element' && dragData.node) {
       // Moving existing element
       const nodeId = dragData.node.id
+      const draggedNode = dragData.node
       const sourceParentId = dragState.sourceParentId
       
+      // Check if the dragged element itself has position: absolute
+      const isAbsoluteElement = draggedNode.styles?.properties?.position === 'absolute'
+      
+      console.log('🔧 Move logic:', {
+        nodeId,
+        sourceParentId,
+        targetParentId,
+        indicatorType,
+        absoluteCoords,
+        isAbsoluteElement,
+        sameParent: sourceParentId === targetParentId
+      })
+      
+      // If element has position: absolute, just update its coordinates
+      if (isAbsoluteElement && absoluteCoords) {
+        console.log('📍 Updating absolute element position:', absoluteCoords)
+        dispatch(updateNodePosition({
+          nodeId,
+          position: absoluteCoords,
+        }))
+        return
+      }
+      
       // Check if it's a reorder within the same parent
-      if (sourceParentId === targetParentId && indicatorType !== 'absolute-position') {
-        // Reorder within same container
+      if (sourceParentId === targetParentId) {
         if (position !== undefined) {
+          // Reorder within same flex/grid container
           dispatch(reorderNode({
             nodeId,
             parentId: targetParentId,
