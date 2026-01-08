@@ -493,6 +493,10 @@ const editorSlice = createSlice({
         sourceIndex: null,
       }
     },
+    
+    markAsSaved: (state) => {
+      state.isDirty = false
+    },
   },
 })
 
@@ -512,6 +516,7 @@ export const {
   setDragState,
   startDrag,
   endDrag,
+  markAsSaved,
 } = editorSlice.actions
 
 // Selectors

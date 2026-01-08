@@ -64,6 +64,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   const [targetContainerRect, setTargetContainerRect] = useState<DOMRect | null>(null)
   const [targetLayoutMode, setTargetLayoutMode] = useState<'flex' | 'grid' | 'absolute' | 'table'>('flex')
   const [activeNode, setActiveNode] = useState<BlockNode | null>(null)
+  const [loading, setLoading] = useState(false)
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const dropIndicatorRef = useRef<DropIndicator | null>(null)
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
@@ -74,10 +75,29 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   }, [dropIndicator])
 
   useEffect(() => {
-    if (!id || id === 'new') {
-      dispatch(createNewEditor())
+    const loadEditor = async () => {
+      if (!id || id === 'new') {
+        dispatch(createNewEditor())
+      } else if (type === 'block') {
+        // Load existing block
+        setLoading(true)
+        try {
+          const { fetchBlockById } = await import('@/features/blocks/blocksSlice')
+          const result = await dispatch(fetchBlockById(id)).unwrap()
+          
+          // Load the block structure into editor
+          const { loadEditor: loadEditorAction } = await import('@/features/editor/editorSlice')
+          dispatch(loadEditorAction(result.structure))
+        } catch (error) {
+          console.error('Failed to load block:', error)
+        } finally {
+          setLoading(false)
+        }
+      }
     }
-  }, [id, dispatch])
+    
+    loadEditor()
+  }, [id, type, dispatch])
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -337,12 +357,21 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
     setTargetContainerRect(null)
   }, [dispatch])
 
-  if (!rootNode) {
+  if (!rootNode || loading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <p className="text-gray-500">Загрузка редактора...</p>
-          <p className="text-xs text-gray-400 mt-2">id: {id || 'new'}</p>
+          {loading ? (
+            <>
+              <div className="inline-block w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+              <p className="text-gray-500">Загрузка блока...</p>
+            </>
+          ) : (
+            <>
+              <p className="text-gray-500">Инициализация редактора...</p>
+              <p className="text-xs text-gray-400 mt-2">id: {id || 'new'}</p>
+            </>
+          )}
         </div>
       </div>
     )
