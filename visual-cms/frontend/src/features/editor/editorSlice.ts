@@ -3,6 +3,13 @@ import type { BlockNode, LayoutMode, CSSProperties } from '@/shared/types'
 import { generateId } from '@/shared/utils'
 import type { RootState } from '@/app/store'
 
+interface DragState {
+  isDragging: boolean
+  draggedNodeId: string | null
+  sourceParentId: string | null
+  sourceIndex: number | null
+}
+
 interface EditorState {
   rootNode: BlockNode | null
   selectedNodeId: string | null
@@ -10,6 +17,7 @@ interface EditorState {
   history: BlockNode[]
   historyIndex: number
   isDirty: boolean
+  drag: DragState
 }
 
 const initialState: EditorState = {
@@ -19,6 +27,86 @@ const initialState: EditorState = {
   history: [],
   historyIndex: -1,
   isDirty: false,
+  drag: {
+    isDragging: false,
+    draggedNodeId: null,
+    sourceParentId: null,
+    sourceIndex: null,
+  },
+}
+
+// Helper functions for tree operations
+const findNodeById = (node: BlockNode, id: string): BlockNode | null => {
+  if (node.id === id) return node
+  for (const child of node.children) {
+    const found = findNodeById(child, id)
+    if (found) return found
+  }
+  return null
+}
+
+const findParentNode = (node: BlockNode, childId: string): BlockNode | null => {
+  for (const child of node.children) {
+    if (child.id === childId) return node
+    const found = findParentNode(child, childId)
+    if (found) return found
+  }
+  return null
+}
+
+const getNodePath = (node: BlockNode, targetId: string, path: string[] = []): string[] | null => {
+  if (node.id === targetId) return [...path, node.id]
+  for (const child of node.children) {
+    const found = getNodePath(child, targetId, [...path, node.id])
+    if (found) return found
+  }
+  return null
+}
+
+const isDescendantOf = (root: BlockNode, ancestorId: string, descendantId: string): boolean => {
+  const ancestorPath = getNodePath(root, ancestorId)
+  const descendantPath = getNodePath(root, descendantId)
+  if (!ancestorPath || !descendantPath) return false
+  return descendantPath.includes(ancestorId) && descendantPath.indexOf(ancestorId) < descendantPath.indexOf(descendantId)
+}
+
+const removeNodeFromTree = (node: BlockNode, nodeIdToRemove: string): { tree: BlockNode; removed: BlockNode | null } => {
+  let removed: BlockNode | null = null
+  
+  const traverse = (current: BlockNode): BlockNode => {
+    const newChildren: BlockNode[] = []
+    for (const child of current.children) {
+      if (child.id === nodeIdToRemove) {
+        removed = child
+      } else {
+        newChildren.push(traverse(child))
+      }
+    }
+    return { ...current, children: newChildren }
+  }
+  
+  return { tree: traverse(node), removed }
+}
+
+const insertNodeIntoTree = (
+  node: BlockNode,
+  parentId: string,
+  nodeToInsert: BlockNode,
+  position?: number
+): BlockNode => {
+  const traverse = (current: BlockNode): BlockNode => {
+    if (current.id === parentId) {
+      const newChildren = [...current.children]
+      if (position !== undefined && position >= 0) {
+        newChildren.splice(position, 0, nodeToInsert)
+      } else {
+        newChildren.push(nodeToInsert)
+      }
+      return { ...current, children: newChildren }
+    }
+    return { ...current, children: current.children.map(traverse) }
+  }
+  return traverse(node)
 }
 
 const editorSlice = createSlice({
@@ -42,9 +130,11 @@ const editorSlice = createSlice({
             display: 'flex',
             flexDirection: 'column',
             width: '100%',
+            minWidth: '50px',
             minHeight: '100vh',
             padding: '20px',
             border: '2px solid #94a3b8',
+            color: '#000000',
           },
         },
         layoutMode: 'flex',
@@ -81,7 +171,12 @@ const editorSlice = createSlice({
       const { parentId, node, position } = action.payload
       
       // Prepare default styles based on element type
-      const defaultStyles: any = {}
+      const defaultStyles: any = {
+        color: '#000000', // Default text color for all elements
+        minWidth: '50px',
+        minHeight: '50px',
+        backgroundColor: 'transparent', // Transparent background by default
+      }
       if (node.elementType === 'container') {
         defaultStyles.display = 'flex'
         defaultStyles.flexDirection = 'row'
@@ -90,6 +185,23 @@ const editorSlice = createSlice({
         defaultStyles.height = 'auto'
         defaultStyles.border = '2px solid #94a3b8'
       }
+      
+      // Prepare default content for text elements
+      let defaultContent = node.content
+      if (!defaultContent) {
+        const textElements = ['text', 'button', 'link', 'input']
+        const textTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'a', 'button', 'label', 'textarea']
+        const tagName = node.tagName || 'div'
+        
+        if (textElements.includes(node.elementType || '') || textTags.includes(tagName.toLowerCase())) {
+          // Format: "button text", "heading text", etc.
+          const elementName = typeof node.metadata?.name === 'string' ? node.metadata.name : tagName
+          defaultContent = `${elementName.toLowerCase()} text`
+        }
+      }
+      
+      // Create a copy of node without content and metadata to avoid overriding defaults
+      const { content: _content, metadata: _metadata, ...restNode } = node
       
       const newNode: BlockNode = {
         id: generateId(),
@@ -103,8 +215,9 @@ const editorSlice = createSlice({
         },
         children: [],
         attributes: node.attributes || {},
+        content: defaultContent,
         metadata: node.metadata || {},
-        ...node,
+        ...restNode,
       }
       
       const addToNode = (current: BlockNode): BlockNode => {
@@ -232,13 +345,149 @@ const editorSlice = createSlice({
       state.selectedNodeId = null
     },
     
-    moveNode: (state, _action: PayloadAction<{
+    moveNode: (state, action: PayloadAction<{
       nodeId: string
-      targetId: string
+      targetParentId: string
       position?: number
+      absolutePosition?: { x: number; y: number }
     }>) => {
-      // TODO: Implement node moving logic
+      if (!state.rootNode) return
+      
+      const { nodeId, targetParentId, position, absolutePosition } = action.payload
+      
+      // Cannot move root node
+      if (state.rootNode.id === nodeId) return
+      
+      // Cannot move node into itself or its descendants
+      if (isDescendantOf(state.rootNode, nodeId, targetParentId) || nodeId === targetParentId) {
+        console.warn('Cannot move node into itself or its descendants')
+        return
+      }
+      
+      // Find target parent to check its layout mode
+      const targetParent = findNodeById(state.rootNode, targetParentId)
+      if (!targetParent) return
+      
+      // Remove node from current location
+      const { tree: treeWithoutNode, removed } = removeNodeFromTree(state.rootNode, nodeId)
+      if (!removed) return
+      
+      // If target is absolute positioned, update the node's position styles
+      let nodeToInsert = removed
+      if (targetParent.layoutMode === 'absolute' && absolutePosition) {
+        nodeToInsert = {
+          ...removed,
+          styles: {
+            ...removed.styles,
+            properties: {
+              ...removed.styles.properties,
+              position: 'absolute',
+              left: `${absolutePosition.x}px`,
+              top: `${absolutePosition.y}px`,
+            },
+          },
+        }
+      } else if (targetParent.layoutMode === 'flex' || targetParent.layoutMode === 'grid') {
+        // Remove absolute positioning when moving to flex/grid container
+        const { position: _pos, left: _l, top: _t, right: _r, bottom: _b, ...restProperties } = removed.styles.properties
+        nodeToInsert = {
+          ...removed,
+          styles: {
+            ...removed.styles,
+            properties: restProperties,
+          },
+        }
+      }
+      
+      // Insert node at new location
+      state.rootNode = insertNodeIntoTree(treeWithoutNode, targetParentId, nodeToInsert, position)
       state.isDirty = true
+    },
+    
+    reorderNode: (state, action: PayloadAction<{
+      nodeId: string
+      parentId: string
+      newIndex: number
+    }>) => {
+      if (!state.rootNode) return
+      
+      const { nodeId, parentId, newIndex } = action.payload
+      
+      const updateParent = (current: BlockNode): BlockNode => {
+        if (current.id === parentId) {
+          const children = [...current.children]
+          const currentIndex = children.findIndex(c => c.id === nodeId)
+          if (currentIndex === -1) return current
+          
+          const [movedNode] = children.splice(currentIndex, 1)
+          const adjustedIndex = currentIndex < newIndex ? newIndex - 1 : newIndex
+          children.splice(adjustedIndex, 0, movedNode)
+          
+          return { ...current, children }
+        }
+        return { ...current, children: current.children.map(updateParent) }
+      }
+      
+      state.rootNode = updateParent(state.rootNode)
+      state.isDirty = true
+    },
+    
+    updateNodePosition: (state, action: PayloadAction<{
+      nodeId: string
+      position: { x: number; y: number }
+    }>) => {
+      if (!state.rootNode) return
+      
+      const { nodeId, position } = action.payload
+      
+      const updateInNode = (current: BlockNode): BlockNode => {
+        if (current.id === nodeId) {
+          return {
+            ...current,
+            styles: {
+              ...current.styles,
+              properties: {
+                ...current.styles.properties,
+                position: 'absolute',
+                left: `${position.x}px`,
+                top: `${position.y}px`,
+              },
+            },
+          }
+        }
+        return { ...current, children: current.children.map(updateInNode) }
+      }
+      
+      state.rootNode = updateInNode(state.rootNode)
+      state.isDirty = true
+    },
+    
+    setDragState: (state, action: PayloadAction<Partial<DragState>>) => {
+      state.drag = { ...state.drag, ...action.payload }
+    },
+    
+    startDrag: (state, action: PayloadAction<{ nodeId: string }>) => {
+      if (!state.rootNode) return
+      
+      const { nodeId } = action.payload
+      const parent = findParentNode(state.rootNode, nodeId)
+      const sourceIndex = parent?.children.findIndex(c => c.id === nodeId) ?? null
+      
+      state.drag = {
+        isDragging: true,
+        draggedNodeId: nodeId,
+        sourceParentId: parent?.id ?? null,
+        sourceIndex,
+      }
+    },
+    
+    endDrag: (state) => {
+      state.drag = {
+        isDragging: false,
+        draggedNodeId: null,
+        sourceParentId: null,
+        sourceIndex: null,
+      }
     },
   },
 })
@@ -254,6 +503,11 @@ export const {
   updateLayoutMode,
   deleteNode,
   moveNode,
+  reorderNode,
+  updateNodePosition,
+  setDragState,
+  startDrag,
+  endDrag,
 } = editorSlice.actions
 
 // Selectors
@@ -275,5 +529,26 @@ export const selectSelectedNode = (state: RootState) => {
   return findNode(rootNode)
 }
 export const selectIsDirty = (state: RootState) => state.editor.isDirty
+export const selectDragState = (state: RootState) => state.editor.drag
+
+// Helper selector to find a node by id
+export const selectNodeById = (state: RootState, nodeId: string): BlockNode | null => {
+  const { rootNode } = state.editor
+  if (!rootNode) return null
+  return findNodeById(rootNode, nodeId)
+}
+
+// Selector to get parent of a node
+export const selectParentNode = (state: RootState, nodeId: string): BlockNode | null => {
+  const { rootNode } = state.editor
+  if (!rootNode) return null
+  return findParentNode(rootNode, nodeId)
+}
+
+// Selector to get layout mode of a container
+export const selectNodeLayoutMode = (state: RootState, nodeId: string): LayoutMode | undefined => {
+  const node = selectNodeById(state, nodeId)
+  return node?.layoutMode
+}
 
 export default editorSlice.reducer

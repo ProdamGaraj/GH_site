@@ -38,7 +38,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
             value={node.content || ''}
             onChange={(e) => handleContentChange(e.target.value)}
             placeholder="Введите текст..."
-            className="w-full px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 min-h-[80px]"
+            className="w-full px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 min-h-[80px] bg-white"
           />
         </div>
       )}

@@ -99,7 +99,7 @@ export const ColorsTab: React.FC<ColorsTabProps> = ({ node }) => {
         <div className="flex gap-2">
           <Input
             label="Цвет текста"
-            value={node.styles.properties?.color || ''}
+            value={node.styles.properties?.color || '#000000'}
             onChange={(e) => handleStyleChange('color', e.target.value)}
             placeholder="#000000"
 

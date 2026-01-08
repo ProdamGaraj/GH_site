@@ -36,7 +36,7 @@ body {
 .canvas-element {
   position: relative;
   outline: 1px dashed transparent;
-  transition: outline 0.2s ease;
+  transition: outline 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
   cursor: pointer;
 }
 
@@ -67,10 +67,45 @@ body {
 }
 
 .canvas-element--drop-target {
-  outline-color: #10b981;
+  outline-color: #10b981 !important;
   outline-width: 2px;
-  outline-style: dashed;
-  background-color: rgba(16, 185, 129, 0.05);
+  outline-style: dashed !important;
+  background-color: rgba(16, 185, 129, 0.08) !important;
+}
+
+.canvas-element--dragging {
+  opacity: 0.4;
+  outline-color: #f59e0b !important;
+  outline-style: dashed !important;
+}
+
+.canvas-element--root {
+  min-height: 400px;
+}
+
+/* Layout mode indicators */
+.canvas-element[data-layout-mode="absolute"] {
+  position: relative;
+}
+
+.canvas-element[data-layout-mode="absolute"]::after {
+  content: "Absolute";
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(245, 158, 11, 0.9);
+  color: white;
+  padding: 1px 6px;
+  font-size: 9px;
+  border-radius: 2px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.canvas-element[data-layout-mode="absolute"]:hover::after,
+.canvas-element[data-layout-mode="absolute"].canvas-element--selected::after {
+  opacity: 1;
 }
 
 /* Drag preview */

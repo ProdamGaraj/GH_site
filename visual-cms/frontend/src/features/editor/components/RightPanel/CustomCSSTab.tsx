@@ -68,7 +68,7 @@ export const CustomCSSTab: React.FC<CustomCSSTabProps> = ({ node }) => {
           value={cssText}
           onChange={(e) => setCssText(e.target.value)}
           placeholder="width: 100%;\nheight: auto;\nbackground-color: #ffffff;"
-          className="w-full px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 font-mono min-h-[400px]"
+          className="w-full px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 font-mono min-h-[400px] bg-white"
           spellCheck={false}
         />
         <p className="text-xs text-gray-500 mt-2">

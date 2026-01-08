@@ -1,101 +1,251 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { 
   DndContext, 
   DragEndEvent, 
   DragStartEvent,
   DragOverEvent,
+  DragMoveEvent,
   useSensor, 
   useSensors, 
   PointerSensor, 
   MouseSensor,
   pointerWithin,
+  MeasuringStrategy,
 } from '@dnd-kit/core'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { createNewEditor, selectRootNode, addNode } from '@/features/editor/editorSlice'
+import { 
+  createNewEditor, 
+  selectRootNode, 
+  addNode, 
+  moveNode,
+  reorderNode,
+  startDrag,
+  endDrag,
+  selectDragState,
+} from '@/features/editor/editorSlice'
 import { Header } from '@/shared/components/Header'
 import { EditorToolbar } from '@/features/editor/components/EditorToolbar'
 import { Canvas } from '@/features/editor/components/Canvas/Canvas'
 import { LeftPanel } from '@/features/editor/components/LeftPanel/LeftPanel'
 import { RightPanel } from '@/features/editor/components/RightPanel/RightPanel'
 import { LibraryPanel } from '@/features/editor/components/LibraryPanel/LibraryPanel'
-import type { DragItem } from '@/shared/types'
+import { DragOverlay } from '@/features/editor/components/Canvas/DragOverlay'
+import type { DragItem, BlockNode } from '@/shared/types'
+import { 
+  DropIndicator, 
+  collectElementRects, 
+  determineDropTarget,
+  getLayoutMode,
+} from '@/features/editor/utils/dndUtils'
 
 interface EditorProps {
   type: 'page' | 'block'
+}
+
+// Helper to find node by id
+const findNodeById = (node: BlockNode, id: string): BlockNode | null => {
+  if (node.id === id) return node
+  for (const child of node.children) {
+    const found = findNodeById(child, id)
+    if (found) return found
+  }
+  return null
 }
 
 export const Editor: React.FC<EditorProps> = ({ type }) => {
   const { id } = useParams()
   const dispatch = useAppDispatch()
   const rootNode = useAppSelector(selectRootNode)
+  const dragState = useAppSelector(selectDragState)
   const [isLibraryOpen, setIsLibraryOpen] = useState(true)
+  const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null)
+  const [targetContainerRect, setTargetContainerRect] = useState<DOMRect | null>(null)
+  const [targetLayoutMode, setTargetLayoutMode] = useState<'flex' | 'grid' | 'absolute' | 'table'>('flex')
+  const [activeNode, setActiveNode] = useState<BlockNode | null>(null)
+  const canvasContainerRef = useRef<HTMLDivElement>(null)
+  const dropIndicatorRef = useRef<DropIndicator | null>(null)
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    dropIndicatorRef.current = dropIndicator
+  }, [dropIndicator])
 
   useEffect(() => {
-    console.log('Editor mounted, id:', id, 'type:', type)
-    // Если id === 'new' или id === undefined, создаем новый редактор
     if (!id || id === 'new') {
-      console.log('Creating new editor')
       dispatch(createNewEditor())
-    } else {
-      // TODO: Загрузить существующую страницу/блок по ID
-      console.log('Loading existing editor with id:', id)
-      // dispatch(loadEditor(id))
     }
   }, [id, dispatch])
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 10,
+        distance: 8,
       },
     }),
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 10,
+        distance: 8,
       },
     })
   )
 
-  const handleDragStart = (event: DragStartEvent) => {
-    console.log('🎯 Drag START:', event.active.id, event.active.data.current)
-  }
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const { active } = event
+    const dragData = active.data.current as DragItem
 
-  const handleDragOver = (event: DragOverEvent) => {
-    console.log('🔄 Drag OVER:', event.over?.id)
-  }
+    if (dragData?.type === 'canvas-element' && dragData.node) {
+      dispatch(startDrag({ nodeId: dragData.node.id }))
+      setActiveNode(dragData.node)
+    } else if (dragData?.type === 'library-item') {
+      // For library items, we don't have a node yet
+      setActiveNode(null)
+    }
+  }, [dispatch])
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    console.log('✅ Drag END:', event)
+  const handleDragMove = useCallback((event: DragMoveEvent) => {
+    if (!rootNode) return
+
+    const { active, activatorEvent } = event
+    const dragData = active.data.current as DragItem
+    
+    // Get mouse position
+    const mouseEvent = activatorEvent as MouseEvent
+    if (!mouseEvent) return
+    
+    const mousePosition = {
+      x: mouseEvent.clientX + (event.delta?.x || 0),
+      y: mouseEvent.clientY + (event.delta?.y || 0),
+    }
+
+    // Collect all element rects
+    const canvasElement = document.querySelector('[data-canvas="true"]')
+    if (!canvasElement) return
+
+    const elementRects = collectElementRects(canvasElement as HTMLElement)
+    
+    // Determine drop target
+    const draggedId = dragData?.type === 'canvas-element' ? dragData.node?.id : undefined
+    const indicator = determineDropTarget(rootNode, mousePosition, draggedId || '', elementRects)
+    
+    console.log('🔄 DragMove - indicator:', indicator?.targetParentId, 'position:', indicator?.position)
+    
+    if (indicator) {
+      setDropIndicator(indicator)
+      
+      // Get target container rect for highlight
+      const targetParentRect = elementRects.get(indicator.targetParentId)
+      setTargetContainerRect(targetParentRect || null)
+      
+      // Get layout mode
+      const targetParent = findNodeById(rootNode, indicator.targetParentId)
+      if (targetParent) {
+        setTargetLayoutMode(getLayoutMode(targetParent))
+      }
+    }
+  }, [rootNode])
+
+  const handleDragOver = useCallback((_event: DragOverEvent) => {
+    // This is handled by DragMove for more precise control
+  }, [])
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
+    const dragData = active.data.current as DragItem
 
-    if (!over) {
-      console.log('❌ No drop target')
+    // Use ref to get the latest indicator value
+    const currentIndicator = dropIndicatorRef.current
+    
+    console.log('🎯 DragEnd - dropIndicator:', currentIndicator)
+    console.log('🎯 DragEnd - over:', over?.id)
+    console.log('🎯 DragEnd - dragData:', dragData)
+
+    // Clear drag state
+    dispatch(endDrag())
+    setActiveNode(null)
+    setDropIndicator(null)
+    setTargetContainerRect(null)
+
+    if (!currentIndicator) {
+      // Fallback to simple drop logic if no indicator
+      if (!over) return
+      
+      const dropTargetId = (over.id as string).replace('drop-', '')
+      console.log('🎯 Fallback - dropTargetId:', dropTargetId)
+      
+      if (dragData?.type === 'library-item') {
+        dispatch(addNode({
+          parentId: dropTargetId,
+          node: {
+            elementType: dragData.elementType,
+            tagName: dragData.tagName,
+            metadata: { name: dragData.label },
+          },
+        }))
+      }
       return
     }
 
-    const draggedData = active.data.current as DragItem
-    const dropTargetId = over.id as string
+    const { targetParentId, position, absoluteCoords, type: indicatorType } = currentIndicator
+    console.log('🎯 Using indicator - targetParentId:', targetParentId, 'position:', position)
 
-    console.log('📦 Dragged data:', draggedData)
-    console.log('🎯 Drop target:', dropTargetId)
+    if (dragData?.type === 'library-item') {
+      // Adding new element from library
+      const newNodeProps: Partial<BlockNode> = {
+        elementType: dragData.elementType,
+        tagName: dragData.tagName,
+        metadata: { name: dragData.label },
+      }
 
-    if (draggedData?.type === 'library-item') {
-      console.log('➕ Adding node to parent:', dropTargetId)
-      dispatch(addNode({
-        parentId: dropTargetId,
-        node: {
-          elementType: draggedData.elementType,
-          tagName: draggedData.tagName,
-          metadata: {
-            name: draggedData.label,
+      // If dropping into absolute container, set position
+      if (indicatorType === 'absolute-position' && absoluteCoords) {
+        newNodeProps.styles = {
+          properties: {
+            position: 'absolute',
+            left: `${absoluteCoords.x}px`,
+            top: `${absoluteCoords.y}px`,
           },
-        },
-      }))
-    }
-  }
+        }
+      }
 
-  console.log('Editor render, rootNode:', rootNode)
+      dispatch(addNode({
+        parentId: targetParentId,
+        node: newNodeProps,
+        position: position,
+      }))
+    } else if (dragData?.type === 'canvas-element' && dragData.node) {
+      // Moving existing element
+      const nodeId = dragData.node.id
+      const sourceParentId = dragState.sourceParentId
+      
+      // Check if it's a reorder within the same parent
+      if (sourceParentId === targetParentId && indicatorType !== 'absolute-position') {
+        // Reorder within same container
+        if (position !== undefined) {
+          dispatch(reorderNode({
+            nodeId,
+            parentId: targetParentId,
+            newIndex: position,
+          }))
+        }
+      } else {
+        // Move to different parent
+        dispatch(moveNode({
+          nodeId,
+          targetParentId,
+          position: indicatorType === 'absolute-position' ? undefined : position,
+          absolutePosition: absoluteCoords,
+        }))
+      }
+    }
+  }, [dispatch, dragState.sourceParentId])
+
+  const handleDragCancel = useCallback(() => {
+    dispatch(endDrag())
+    setActiveNode(null)
+    setDropIndicator(null)
+    setTargetContainerRect(null)
+  }, [dispatch])
 
   if (!rootNode) {
     return (
@@ -113,10 +263,17 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       sensors={sensors}
       collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
+      onDragMove={handleDragMove}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+      measuring={{
+        droppable: {
+          strategy: MeasuringStrategy.Always,
+        },
+      }}
     >
-      <div className="h-screen flex flex-col bg-gray-100">
+      <div className="h-screen flex flex-col bg-gray-100" ref={canvasContainerRef}>
         <Header showActions={<EditorToolbar type={type} />} />
         
         <div className="flex-1 flex overflow-hidden">
@@ -125,10 +282,17 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
             isOpen={isLibraryOpen} 
             onToggle={() => setIsLibraryOpen(!isLibraryOpen)} 
           />
-          <Canvas />
+          <Canvas 
+            dropIndicator={dropIndicator}
+            targetContainerRect={targetContainerRect}
+            targetLayoutMode={targetLayoutMode}
+          />
           <RightPanel />
         </div>
       </div>
+      
+      {/* Drag overlay */}
+      <DragOverlay activeNode={activeNode} />
     </DndContext>
   )
 }
