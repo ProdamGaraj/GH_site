@@ -18,6 +18,7 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level }) => {
   const isSelected = selectedNodeId === node.id
   const hasChildren = node.children && node.children.length > 0
   const isContainer = node.elementType === 'container'
+  const isLocked = node.metadata?.locked || false
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -31,6 +32,12 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level }) => {
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
+    
+    // Don't allow deletion of locked elements
+    if (isLocked) {
+      return
+    }
+    
     const hasChildren = node.children && node.children.length > 0
     
     if (hasChildren) {
@@ -111,8 +118,13 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level }) => {
           {node.metadata.name || node.tagName}
         </span>
 
-        {/* Delete button - hidden for root */}
-        {level > 0 && (
+        {/* Lock indicator */}
+        {isLocked && (
+          <Icons.Lock size={12} className="text-orange-500" aria-label="Заблокированный блок" />
+        )}
+
+        {/* Delete button - hidden for root and locked elements */}
+        {level > 0 && !isLocked && (
           <button
             onClick={handleDelete}
             className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 rounded transition-opacity"

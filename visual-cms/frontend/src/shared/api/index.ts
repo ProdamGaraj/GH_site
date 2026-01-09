@@ -1,6 +1,6 @@
 // Ensure API URL always ends with /api
 const getApiBaseUrl = (): string => {
-  const envUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+  const envUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000'
   return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`
 }
 
@@ -110,6 +110,7 @@ export interface CreatePageDto {
     title: string
     description?: string
     keywords?: string[]
+    ogImage?: string
   }
 }
 
@@ -122,6 +123,7 @@ export interface UpdatePageDto {
     title?: string
     description?: string
     keywords?: string[]
+    ogImage?: string
   }
   status?: 'draft' | 'published' | 'archived'
 }

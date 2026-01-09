@@ -13,6 +13,7 @@ import {
   pointerWithin,
   MeasuringStrategy,
 } from '@dnd-kit/core'
+import { ChevronRight, ChevronLeft } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { 
   createNewEditor, 
@@ -21,9 +22,16 @@ import {
   moveNode,
   reorderNode,
   updateNodePosition,
+  updateNodeStyles,
   startDrag,
   endDrag,
   selectDragState,
+  setViewport,
+  selectViewport,
+  selectActiveLeftPanel,
+  selectActiveRightPanel,
+  setActiveLeftPanel,
+  setActiveRightPanel,
 } from '@/features/editor/editorSlice'
 import { Header } from '@/shared/components/Header'
 import { EditorToolbar } from '@/features/editor/components/EditorToolbar'
@@ -31,6 +39,11 @@ import { Canvas } from '@/features/editor/components/Canvas/Canvas'
 import { LeftPanel } from '@/features/editor/components/LeftPanel/LeftPanel'
 import { RightPanel } from '@/features/editor/components/RightPanel/RightPanel'
 import { LibraryPanel } from '@/features/editor/components/LibraryPanel/LibraryPanel'
+import { PageSettingsPanel } from '@/features/editor/components/PageSettings/PageSettingsPanel'
+import { LeftSidebar } from '@/features/editor/components/Sidebar/LeftSidebar'
+import { RightSidebar } from '@/features/editor/components/Sidebar/RightSidebar'
+import { SavedBlocksLibrary } from '@/features/editor/components/SavedBlocksLibrary/SavedBlocksLibrary'
+import { LayersPanel } from '@/features/editor/components/LeftPanel/LayersPanel'
 import { DragOverlay } from '@/features/editor/components/Canvas/DragOverlay'
 import type { DragItem, BlockNode } from '@/shared/types'
 import { 
@@ -59,15 +72,34 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   const dispatch = useAppDispatch()
   const rootNode = useAppSelector(selectRootNode)
   const dragState = useAppSelector(selectDragState)
+  const viewport = useAppSelector(selectViewport) as 'desktop' | 'tablet' | 'mobile'
+  const activeLeftPanel = useAppSelector(selectActiveLeftPanel)
+  const activeRightPanel = useAppSelector(selectActiveRightPanel)
   const [isLibraryOpen, setIsLibraryOpen] = useState(true)
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null)
   const [targetContainerRect, setTargetContainerRect] = useState<DOMRect | null>(null)
   const [targetLayoutMode, setTargetLayoutMode] = useState<'flex' | 'grid' | 'absolute' | 'table'>('flex')
   const [activeNode, setActiveNode] = useState<BlockNode | null>(null)
   const [loading, setLoading] = useState(false)
+  const [pageSettings, setPageSettings] = useState({
+    name: '',
+    slug: '',
+    status: 'draft' as 'draft' | 'published' | 'archived',
+    metaTitle: '',
+    metaDescription: '',
+    keywords: '',
+    ogImage: '',
+  })
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const dropIndicatorRef = useRef<DropIndicator | null>(null)
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  
+  // Viewport widths
+  const viewportWidths = {
+    desktop: '1440px',
+    tablet: '768px',
+    mobile: '375px',
+  }
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -93,11 +125,64 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
         } finally {
           setLoading(false)
         }
+      } else if (type === 'page') {
+        // Load existing page
+        setLoading(true)
+        try {
+          const { fetchPageById } = await import('@/features/pages/pagesSlice')
+          const result = await dispatch(fetchPageById(id)).unwrap()
+          
+          // Load the page structure into editor
+          const { loadEditor: loadEditorAction } = await import('@/features/editor/editorSlice')
+          dispatch(loadEditorAction(result.structure))
+          
+          // Load page settings
+          setPageSettings({
+            name: result.name,
+            slug: result.slug,
+            status: result.status || 'draft',
+            metaTitle: result.metadata?.title || '',
+            metaDescription: result.metadata?.description || '',
+            keywords: result.metadata?.keywords?.join(', ') || '',
+            ogImage: result.metadata?.ogImage || '',
+          })
+        } catch (error) {
+          console.error('Failed to load page:', error)
+        } finally {
+          setLoading(false)
+        }
       }
     }
     
     loadEditor()
   }, [id, type, dispatch])
+
+  // Update root container styles based on editor type and viewport
+  useEffect(() => {
+    if (!rootNode) return
+    
+    if (type === 'page') {
+      // Page editor: fixed width by viewport, height by content
+      dispatch(updateNodeStyles({
+        nodeId: rootNode.id,
+        properties: {
+          width: viewportWidths[viewport],
+          minHeight: '100px',
+          height: 'auto',
+        }
+      }))
+    } else {
+      // Block editor: fit-content
+      dispatch(updateNodeStyles({
+        nodeId: rootNode.id,
+        properties: {
+          width: 'fit-content',
+          minWidth: '200px',
+          minHeight: '100px',
+        }
+      }))
+    }
+  }, [type, viewport, rootNode?.id, dispatch])
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -205,7 +290,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
           indicator = {
             ...indicator,
             type: 'absolute-position',
-            targetParentId: sourceParentId,
+            targetParentId: sourceParentId || '',
             absoluteCoords: {
               x: clampedX,
               y: clampedY,
@@ -277,10 +362,33 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
 
     if (dragData?.type === 'library-item') {
       // Adding new element from library
-      const newNodeProps: Partial<BlockNode> = {
-        elementType: dragData.elementType,
-        tagName: dragData.tagName,
-        metadata: { name: dragData.label },
+      let newNodeProps: Partial<BlockNode>
+      
+      // If dragging a saved block (with structure), clone it
+      if (dragData.node) {
+        // Clone the entire block structure with new IDs
+        // Lock only children, not the root container
+        const cloneNodeWithNewIds = (node: BlockNode, isRoot = true): BlockNode => {
+          return {
+            ...node,
+            id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            metadata: {
+              ...node.metadata,
+              locked: !isRoot, // Lock children but not root
+              name: isRoot ? `${node.metadata?.name || 'Блок'} (копия)` : node.metadata?.name,
+            },
+            children: node.children.map(child => cloneNodeWithNewIds(child, false)),
+          }
+        }
+        
+        newNodeProps = cloneNodeWithNewIds(dragData.node, true)
+      } else {
+        // Regular library item
+        newNodeProps = {
+          elementType: dragData.elementType,
+          tagName: dragData.tagName,
+          metadata: { name: dragData.label },
+        }
       }
 
       // If dropping into absolute container, set position
@@ -393,20 +501,103 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       }}
     >
       <div className="h-screen flex flex-col bg-gray-100" ref={canvasContainerRef}>
-        <Header showActions={<EditorToolbar type={type} />} />
+        <Header showActions={
+          <EditorToolbar 
+            type={type} 
+            viewport={viewport}
+            onViewportChange={(newViewport) => dispatch(setViewport(newViewport))}
+            pageSettings={type === 'page' ? pageSettings : undefined} 
+          />
+        } />
         
         <div className="flex-1 flex overflow-hidden">
-          <LeftPanel />
-          <LibraryPanel 
-            isOpen={isLibraryOpen} 
-            onToggle={() => setIsLibraryOpen(!isLibraryOpen)} 
-          />
+          {/* Left Sidebar with Icons */}
+          <LeftSidebar mode={type} />
+          
+          {/* Left Panel Content */}
+          {activeLeftPanel && (
+            <div className="w-64 bg-white border-r border-gray-200 flex flex-col relative">
+              <button
+                onClick={() => dispatch(setActiveLeftPanel(null))}
+                className="absolute -right-3 top-4 z-10 w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors shadow-sm"
+                title="Скрыть панель"
+              >
+                <ChevronLeft size={14} className="text-gray-600" />
+              </button>
+              
+              {activeLeftPanel === 'layers' && (
+                <>
+                  <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 className="font-semibold text-gray-900 text-sm">
+                      {type === 'page' ? 'Структура страницы' : 'Структура блока'}
+                    </h3>
+                  </div>
+                  <div className="flex-1 overflow-y-auto">
+                    <LayersPanel />
+                  </div>
+                </>
+              )}
+              
+              {activeLeftPanel === 'library' && (
+                <>
+                  <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 className="font-semibold text-gray-900 text-sm">Библиотека элементов</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">Перетащите элементы на холст</p>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-3">
+                    <LibraryPanel isOpen={true} onToggle={() => {}} />
+                  </div>
+                </>
+              )}
+              
+              {activeLeftPanel === 'savedBlocks' && type === 'page' && (
+                <>
+                  <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                    <h3 className="font-semibold text-gray-900 text-sm">Сохраненные блоки</h3>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-3">
+                    <SavedBlocksLibrary />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          
           <Canvas 
             dropIndicator={dropIndicator}
             targetContainerRect={targetContainerRect}
             targetLayoutMode={targetLayoutMode}
+            editorType={type}
           />
-          <RightPanel />
+          
+          {/* Right Panel Content */}
+          {activeRightPanel && (
+            <div className="w-80 bg-white border-l border-gray-200 flex flex-col relative">
+              <button
+                onClick={() => dispatch(setActiveRightPanel(null))}
+                className="absolute -left-3 top-4 z-10 w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors shadow-sm"
+                title="Скрыть панель"
+              >
+                <ChevronRight size={14} className="text-gray-600" />
+              </button>
+              
+              <div className="flex-1 overflow-y-auto">
+                {type === 'page' && activeRightPanel === 'pageSettings' && (
+                  <PageSettingsPanel 
+                    settings={pageSettings}
+                    onChange={setPageSettings}
+                  />
+                )}
+                
+                {type === 'block' && activeRightPanel === 'properties' && (
+                  <RightPanel />
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* Right Sidebar with Icons */}
+          <RightSidebar mode={type} />
         </div>
       </div>
       

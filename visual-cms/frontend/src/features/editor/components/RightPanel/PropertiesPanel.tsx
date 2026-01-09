@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
-import { useAppDispatch } from '@/app/hooks'
-import { updateNode, deleteNode } from '@/features/editor/editorSlice'
+import { useAppDispatch, useAppSelector } from '@/app/hooks'
+import { updateNode, deleteNode, selectViewport, selectBreakpoints } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
 import { Button } from '@/shared/components/Button'
-import { Trash2, Move, Palette, Type, Code } from 'lucide-react'
+import { Trash2, Move, Palette, Type, Code, Monitor, Tablet, Smartphone, Laptop, Watch } from 'lucide-react'
 import type { BlockNode } from '@/shared/types'
 import { PositioningTab } from './PositioningTab'
 import { ColorsTab } from './ColorsTab'
@@ -19,7 +19,24 @@ type TabType = 'positioning' | 'colors' | 'content' | 'css'
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
   const dispatch = useAppDispatch()
+  const viewport = useAppSelector(selectViewport)
+  const breakpoints = useAppSelector(selectBreakpoints)
   const [activeTab, setActiveTab] = useState<TabType>('positioning')
+  
+  const currentBreakpoint = breakpoints.find(bp => bp.id === viewport)
+  
+  const getIcon = (iconName?: string) => {
+    switch (iconName) {
+      case 'monitor': return Monitor
+      case 'laptop': return Laptop
+      case 'tablet': return Tablet
+      case 'smartphone': return Smartphone
+      case 'watch': return Watch
+      default: return Monitor
+    }
+  }
+  
+  const ViewportIcon = currentBreakpoint ? getIcon(currentBreakpoint.icon) : Monitor
 
   const handleNameChange = (name: string) => {
     dispatch(updateNode({
@@ -62,6 +79,19 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
               <Trash2 size={16} className="text-red-600" />
             </Button>
           )}
+        </div>
+        
+        {/* Viewport indicator */}
+        <div className="mb-3 px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg">
+          <div className="flex items-center gap-2 text-sm">
+            <ViewportIcon size={16} className="text-primary-600" />
+            <span className="text-primary-700 font-medium">
+              {currentBreakpoint ? `${currentBreakpoint.name} (${currentBreakpoint.width}px)` : 'Unknown viewport'}
+            </span>
+          </div>
+          <p className="text-xs text-primary-600 mt-1">
+            Изменения применяются для {currentBreakpoint?.name || 'этого экрана'}
+          </p>
         </div>
 
         {/* Basic Info */}

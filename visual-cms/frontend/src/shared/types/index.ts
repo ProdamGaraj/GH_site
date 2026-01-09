@@ -106,6 +106,17 @@ export interface CSSProperties {
   [key: string]: string | undefined
 }
 
+// Responsive breakpoints
+export type Breakpoint = 'desktop' | 'tablet' | 'mobile' | string
+
+export interface CustomBreakpoint {
+  id: string
+  name: string
+  width: number
+  height?: number
+  icon?: 'monitor' | 'tablet' | 'smartphone' | 'laptop' | 'watch'
+}
+
 // Block Node structure
 export interface BlockNode {
   id: string
@@ -115,6 +126,8 @@ export interface BlockNode {
   styles: {
     properties: CSSProperties
     customCSS?: string
+    // Responsive styles for different breakpoints (key is breakpoint id)
+    responsive?: Record<string, Partial<CSSProperties>>
   }
   
   layoutMode?: LayoutMode
@@ -145,6 +158,7 @@ export interface Page {
   }
   rootBlockId: string
   rootBlock?: BlockNode
+  structure: BlockNode  // Added for compatibility with API
   createdAt: string
   updatedAt: string
   status: 'draft' | 'published' | 'archived'

@@ -7,7 +7,7 @@ export const RightPanel: React.FC = () => {
   const selectedNode = useAppSelector(selectSelectedNode)
 
   return (
-    <div className="w-80 bg-white border-l border-gray-200 overflow-y-auto">
+    <>
       {selectedNode ? (
         <PropertiesPanel node={selectedNode} />
       ) : (
@@ -17,6 +17,6 @@ export const RightPanel: React.FC = () => {
           </p>
         </div>
       )}
-    </div>
+    </>
   )
 }

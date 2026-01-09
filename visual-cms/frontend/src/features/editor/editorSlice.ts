@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import type { BlockNode, LayoutMode, CSSProperties } from '@/shared/types'
+import type { BlockNode, LayoutMode, CSSProperties, CustomBreakpoint } from '@/shared/types'
 import { generateId } from '@/shared/utils'
 import type { RootState } from '@/app/store'
 
@@ -18,6 +18,13 @@ interface EditorState {
   historyIndex: number
   isDirty: boolean
   drag: DragState
+  viewport: string
+  breakpoints: CustomBreakpoint[]
+  zoom: number
+  activeLeftPanel: string | null
+  activeRightPanel: string | null
+  panOffset: { x: number; y: number }
+  blockAlignment: 'left' | 'center' | 'right'
 }
 
 const initialState: EditorState = {
@@ -33,6 +40,17 @@ const initialState: EditorState = {
     sourceParentId: null,
     sourceIndex: null,
   },
+  viewport: 'desktop',
+  breakpoints: [
+    { id: 'desktop', name: 'Desktop', width: 1440, height: 900, icon: 'monitor' },
+    { id: 'tablet', name: 'Tablet', width: 768, height: 1024, icon: 'tablet' },
+    { id: 'mobile', name: 'Mobile', width: 375, height: 667, icon: 'smartphone' },
+  ],
+  zoom: 100,
+  activeLeftPanel: 'layers',
+  activeRightPanel: 'properties',
+  panOffset: { x: 0, y: 0 },
+  blockAlignment: 'center',
 }
 
 // Helper functions for tree operations
@@ -129,10 +147,10 @@ const editorSlice = createSlice({
           properties: {
             display: 'flex',
             flexDirection: 'column',
-            width: '100%',
-            minWidth: '50px',
-            minHeight: '100vh',
-            padding: '20px',
+            width: 'fit-content',
+            minWidth: '200px',
+            minHeight: '100px',
+            padding: '0px',
             border: '2px solid #94a3b8',
             color: '#000000',
           },
@@ -264,16 +282,17 @@ const editorSlice = createSlice({
     },
     
     updateNodeStyles: (state, action: PayloadAction<{
-      id: string
+      nodeId: string
       properties?: Partial<CSSProperties>
       customCSS?: string
+      breakpoint?: string
     }>) => {
       if (!state.rootNode) return
       
-      const { id, properties, customCSS } = action.payload
+      const { nodeId, properties, customCSS, breakpoint } = action.payload
       
       const updateInNode = (current: BlockNode): BlockNode => {
-        if (current.id === id) {
+        if (current.id === nodeId) {
           // Фильтруем пустые значения из properties
           const filteredProperties = properties 
             ? Object.entries({ ...current.styles.properties, ...properties })
@@ -286,13 +305,40 @@ const editorSlice = createSlice({
                 }, {} as any)
             : current.styles.properties
           
+          // Handle responsive styles
+          if (breakpoint && breakpoint !== 'desktop' && properties) {
+            // Update responsive styles for specific breakpoint
+            const currentResponsive = current.styles.responsive || {}
+            const currentBreakpointStyles = currentResponsive[breakpoint] || {}
+            
+            const filteredBreakpointProperties = Object.entries({ ...currentBreakpointStyles, ...properties })
+              .reduce((acc, [key, value]) => {
+                if (value !== '' && value !== null && value !== undefined) {
+                  acc[key] = value
+                }
+                return acc
+              }, {} as any)
+            
+            return {
+              ...current,
+              styles: {
+                ...current.styles,
+                responsive: {
+                  ...currentResponsive,
+                  [breakpoint]: filteredBreakpointProperties,
+                },
+                customCSS: customCSS !== undefined ? customCSS : current.styles.customCSS,
+              },
+            }
+          }
+          
+          // Update base (desktop) styles
           return {
             ...current,
             styles: {
+              ...current.styles,
               properties: filteredProperties,
-              customCSS: customCSS !== undefined 
-                ? customCSS 
-                : current.styles.customCSS,
+              customCSS: customCSS !== undefined ? customCSS : current.styles.customCSS,
             },
           }
         }
@@ -494,8 +540,51 @@ const editorSlice = createSlice({
       }
     },
     
+    setViewport: (state, action: PayloadAction<string>) => {
+      state.viewport = action.payload
+    },
+    
+    addBreakpoint: (state, action: PayloadAction<CustomBreakpoint>) => {
+      state.breakpoints.push(action.payload)
+    },
+    
+    removeBreakpoint: (state, action: PayloadAction<string>) => {
+      state.breakpoints = state.breakpoints.filter(bp => bp.id !== action.payload)
+      // If removed breakpoint was active, switch to desktop
+      if (state.viewport === action.payload) {
+        state.viewport = 'desktop'
+      }
+    },
+    
+    updateBreakpoint: (state, action: PayloadAction<CustomBreakpoint>) => {
+      const index = state.breakpoints.findIndex(bp => bp.id === action.payload.id)
+      if (index !== -1) {
+        state.breakpoints[index] = action.payload
+      }
+    },
+    
     markAsSaved: (state) => {
       state.isDirty = false
+    },
+    
+    setZoom: (state, action: PayloadAction<number>) => {
+      state.zoom = Math.max(25, Math.min(200, action.payload))
+    },
+    
+    setActiveLeftPanel: (state, action: PayloadAction<string | null>) => {
+      state.activeLeftPanel = action.payload
+    },
+    
+    setActiveRightPanel: (state, action: PayloadAction<string | null>) => {
+      state.activeRightPanel = action.payload
+    },
+    
+    setPanOffset: (state, action: PayloadAction<{ x: number; y: number }>) => {
+      state.panOffset = action.payload
+    },
+    
+    setBlockAlignment: (state, action: PayloadAction<'left' | 'center' | 'right'>) => {
+      state.blockAlignment = action.payload
     },
   },
 })
@@ -516,7 +605,16 @@ export const {
   setDragState,
   startDrag,
   endDrag,
+  setViewport,
+  addBreakpoint,
+  removeBreakpoint,
+  updateBreakpoint,
   markAsSaved,
+  setZoom,
+  setActiveLeftPanel,
+  setActiveRightPanel,
+  setPanOffset,
+  setBlockAlignment,
 } = editorSlice.actions
 
 // Selectors
@@ -539,6 +637,13 @@ export const selectSelectedNode = (state: RootState) => {
 }
 export const selectIsDirty = (state: RootState) => state.editor.isDirty
 export const selectDragState = (state: RootState) => state.editor.drag
+export const selectViewport = (state: RootState) => state.editor.viewport
+export const selectBreakpoints = (state: RootState) => state.editor.breakpoints
+export const selectZoom = (state: RootState) => state.editor.zoom
+export const selectActiveLeftPanel = (state: RootState) => state.editor.activeLeftPanel
+export const selectActiveRightPanel = (state: RootState) => state.editor.activeRightPanel
+export const selectPanOffset = (state: RootState) => state.editor.panOffset
+export const selectBlockAlignment = (state: RootState) => state.editor.blockAlignment
 
 // Helper selector to find a node by id
 export const selectNodeById = (state: RootState, nodeId: string): BlockNode | null => {

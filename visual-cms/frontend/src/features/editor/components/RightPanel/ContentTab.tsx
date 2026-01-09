@@ -1,6 +1,6 @@
 import React from 'react'
-import { useAppDispatch } from '@/app/hooks'
-import { updateNode, updateNodeStyles } from '@/features/editor/editorSlice'
+import { useAppDispatch, useAppSelector } from '@/app/hooks'
+import { updateNode, updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
 import type { BlockNode } from '@/shared/types'
 
@@ -10,6 +10,7 @@ interface ContentTabProps {
 
 export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
   const dispatch = useAppDispatch()
+  const viewport = useAppSelector(selectViewport)
 
   const handleContentChange = (content: string) => {
     dispatch(updateNode({
@@ -20,8 +21,9 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
 
   const handleStyleChange = (property: string, value: string) => {
     dispatch(updateNodeStyles({
-      id: node.id,
+      nodeId: node.id,
       properties: { [property]: value },
+      breakpoint: viewport,
     }))
   }
 

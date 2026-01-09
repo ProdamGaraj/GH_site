@@ -32,6 +32,9 @@ export class Page {
   @Column('jsonb', { nullable: true })
   rootBlock?: any
 
+  @Column('jsonb', { nullable: true })
+  structure?: any
+
   @Column({ default: 'draft' })
   status!: 'draft' | 'published' | 'archived'
 

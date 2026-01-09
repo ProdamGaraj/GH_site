@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { useAppDispatch } from '@/app/hooks'
-import { updateNodeStyles } from '@/features/editor/editorSlice'
+import { useAppDispatch, useAppSelector } from '@/app/hooks'
+import { updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
 import type { BlockNode } from '@/shared/types'
 
 interface CustomCSSTabProps {
@@ -9,6 +9,7 @@ interface CustomCSSTabProps {
 
 export const CustomCSSTab: React.FC<CustomCSSTabProps> = ({ node }) => {
   const dispatch = useAppDispatch()
+  const viewport = useAppSelector(selectViewport)
   const [cssText, setCssText] = useState('')
 
   // Convert styles object to CSS text
@@ -43,8 +44,9 @@ export const CustomCSSTab: React.FC<CustomCSSTabProps> = ({ node }) => {
       })
 
       dispatch(updateNodeStyles({
-        id: node.id,
-        properties: newStyles,
+        nodeId: node.id,
+        properties: newStyles as any,
+        breakpoint: viewport,
       }))
     } catch (error) {
       console.error('Error parsing CSS:', error)

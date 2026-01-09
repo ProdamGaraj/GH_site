@@ -1,0 +1,163 @@
+import React, { useState } from 'react'
+import { Input } from '@/shared/components/Input'
+import { Settings, Globe, Search, FileText } from 'lucide-react'
+
+export interface PageSettings {
+  name: string
+  slug: string
+  status: 'draft' | 'published' | 'archived'
+  metaTitle: string
+  metaDescription: string
+  keywords: string
+  ogImage: string
+}
+
+interface PageSettingsPanelProps {
+  settings: PageSettings
+  onChange: (settings: PageSettings) => void
+}
+
+export const PageSettingsPanel: React.FC<PageSettingsPanelProps> = ({ 
+  settings, 
+  onChange 
+}) => {
+  const [activeTab, setActiveTab] = useState<'general' | 'seo'>('general')
+
+  const handleChange = (field: keyof PageSettings, value: string) => {
+    onChange({
+      ...settings,
+      [field]: value,
+    })
+  }
+
+  return (
+    <>
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-gray-200">
+        <div className="flex items-center gap-2 text-gray-700">
+          <Settings size={18} />
+          <h3 className="font-medium">Настройки страницы</h3>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200">
+        <button
+          className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+            activeTab === 'general'
+              ? 'text-primary-600 border-b-2 border-primary-600'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+          onClick={() => setActiveTab('general')}
+        >
+          <FileText size={16} className="inline mr-1.5" />
+          Основное
+        </button>
+        <button
+          className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+            activeTab === 'seo'
+              ? 'text-primary-600 border-b-2 border-primary-600'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+          onClick={() => setActiveTab('seo')}
+        >
+          <Search size={16} className="inline mr-1.5" />
+          SEO
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {activeTab === 'general' && (
+          <>
+            <Input
+              label="Название страницы"
+              value={settings.name || ''}
+              onChange={(e) => handleChange('name', e.target.value)}
+              placeholder="Главная страница"
+            />
+
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-2 block">
+                URL Slug
+              </label>
+              <div className="flex items-center gap-2">
+                <Globe size={16} className="text-gray-400" />
+                <Input
+                  value={settings.slug || ''}
+                  onChange={(e) => handleChange('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
+                  placeholder="home"
+                  className="flex-1"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                URL: /{settings.slug || 'home'}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-2 block">
+                Статус
+              </label>
+              <select
+                value={settings.status || 'draft'}
+                onChange={(e) => handleChange('status', e.target.value as PageSettings['status'])}
+                className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm text-gray-900"
+              >
+                <option value="draft">Черновик</option>
+                <option value="published">Опубликовано</option>
+                <option value="archived">Архив</option>
+              </select>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'seo' && (
+          <>
+            <Input
+              label="Meta Title"
+              value={settings.metaTitle || ''}
+              onChange={(e) => handleChange('metaTitle', e.target.value)}
+              placeholder="Заголовок страницы для поисковиков"
+            />
+
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-2 block">
+                Meta Description
+              </label>
+              <textarea
+                value={settings.metaDescription || ''}
+                onChange={(e) => handleChange('metaDescription', e.target.value)}
+                placeholder="Описание страницы (до 160 символов)"
+                className="w-full px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 resize-none bg-white"
+                rows={3}
+                maxLength={160}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {settings.metaDescription?.length || 0} / 160
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-2 block">
+                Keywords (через запятую)
+              </label>
+              <Input
+                value={settings.keywords || ''}
+                onChange={(e) => handleChange('keywords', e.target.value)}
+                placeholder="ключевое, слово, список"
+              />
+            </div>
+
+            <Input
+              label="OG Image URL"
+              value={settings.ogImage || ''}
+              onChange={(e) => handleChange('ogImage', e.target.value)}
+              placeholder="https://example.com/image.jpg"
+            />
+          </>
+        )}
+      </div>
+    </>
+  )
+}

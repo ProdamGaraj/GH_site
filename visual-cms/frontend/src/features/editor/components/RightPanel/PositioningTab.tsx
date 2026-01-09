@@ -1,6 +1,6 @@
 import React from 'react'
-import { useAppDispatch } from '@/app/hooks'
-import { updateNodeStyles } from '@/features/editor/editorSlice'
+import { useAppDispatch, useAppSelector } from '@/app/hooks'
+import { updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
 import type { BlockNode } from '@/shared/types'
 
@@ -10,11 +10,13 @@ interface PositioningTabProps {
 
 export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
   const dispatch = useAppDispatch()
+  const viewport = useAppSelector(selectViewport)
 
   const handleStyleChange = (property: string, value: string) => {
     dispatch(updateNodeStyles({
-      id: node.id,
+      nodeId: node.id,
       properties: { [property]: value },
+      breakpoint: viewport,
     }))
   }
 
