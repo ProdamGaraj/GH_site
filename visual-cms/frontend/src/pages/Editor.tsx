@@ -36,7 +36,7 @@ import {
 import { Header } from '@/shared/components/Header'
 import { EditorToolbar } from '@/features/editor/components/EditorToolbar'
 import { Canvas } from '@/features/editor/components/Canvas/Canvas'
-import { LeftPanel } from '@/features/editor/components/LeftPanel/LeftPanel'
+// import { LeftPanel } from '@/features/editor/components/LeftPanel/LeftPanel'
 import { RightPanel } from '@/features/editor/components/RightPanel/RightPanel'
 import { LibraryPanel } from '@/features/editor/components/LibraryPanel/LibraryPanel'
 import { PageSettingsPanel } from '@/features/editor/components/PageSettings/PageSettingsPanel'
@@ -75,7 +75,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   const viewport = useAppSelector(selectViewport) as 'desktop' | 'tablet' | 'mobile'
   const activeLeftPanel = useAppSelector(selectActiveLeftPanel)
   const activeRightPanel = useAppSelector(selectActiveRightPanel)
-  const [isLibraryOpen, setIsLibraryOpen] = useState(true)
+  // const [isLibraryOpen, setIsLibraryOpen] = useState(true)
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null)
   const [targetContainerRect, setTargetContainerRect] = useState<DOMRect | null>(null)
   const [targetLayoutMode, setTargetLayoutMode] = useState<'flex' | 'grid' | 'absolute' | 'table'>('flex')

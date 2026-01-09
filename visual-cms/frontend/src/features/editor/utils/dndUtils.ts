@@ -190,9 +190,9 @@ const findParentInTree = (root: BlockNode, childId: string): BlockNode | null =>
 /**
  * Get index of child in parent
  */
-const getChildIndex = (parent: BlockNode, childId: string): number => {
-  return parent.children.findIndex(c => c.id === childId)
-}
+// const getChildIndex = (parent: BlockNode, childId: string): number => {
+//   return parent.children.findIndex(c => c.id === childId)
+// }
 
 /**
  * Determines the best drop target based on mouse position
@@ -235,7 +235,7 @@ export const determineDropTarget = (
     // Fallback to root if nothing under mouse
     const rootRect = elementRects.get(root.id)
     if (!rootRect) return null
-    return createDropIndicator(root, root.id, rootRect, mousePosition, elementRects, root, dragOffset)
+    return createDropIndicator(root, root.id, rootRect, mousePosition, elementRects, /* root, */ dragOffset)
   }
   
   // Sort by depth (deepest first)
@@ -256,7 +256,7 @@ export const determineDropTarget = (
   if (containers.length === 0) {
     const rootRect = elementRects.get(root.id)
     if (!rootRect) return null
-    return createDropIndicator(root, root.id, rootRect, mousePosition, elementRects, root, dragOffset)
+    return createDropIndicator(root, root.id, rootRect, mousePosition, elementRects, /* root, */ dragOffset)
   }
   
   // Find the appropriate target based on edge zones
@@ -276,7 +276,7 @@ export const determineDropTarget = (
   
   const { node: targetNode, rect: targetRect } = targetContainer
   
-  return createDropIndicator(targetNode, targetNode.id, targetRect, mousePosition, elementRects, root, dragOffset)
+  return createDropIndicator(targetNode, targetNode.id, targetRect, mousePosition, elementRects, /* root, */ dragOffset)
 }
 
 /**
@@ -288,7 +288,8 @@ const createDropIndicator = (
   containerRect: DOMRect,
   mousePosition: { x: number; y: number },
   elementRects: Map<string, DOMRect>,
-  root: BlockNode,
+
+//   root: BlockNode,
   dragOffset?: { x: number; y: number }
 ): DropIndicator => {
   const layoutMode = getLayoutMode(targetNode)

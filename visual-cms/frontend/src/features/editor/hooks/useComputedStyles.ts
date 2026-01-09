@@ -12,7 +12,7 @@ export const useComputedStyles = (node: BlockNode): React.CSSProperties => {
 
     // Apply responsive styles based on viewport
     // Sort breakpoints by width descending to apply correct cascade
-    const sortedBreakpoints = [...breakpoints].sort((a, b) => b.width - a.width)
+    // const sortedBreakpoints = [...breakpoints].sort((a, b) => b.width - a.width)
     const currentBreakpoint = breakpoints.find(bp => bp.id === viewport)
     
     if (currentBreakpoint && viewport !== 'desktop' && node.styles.responsive) {

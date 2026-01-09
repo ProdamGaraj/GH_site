@@ -1,5 +1,5 @@
 import React from 'react'
-import { ChevronLeft } from 'lucide-react'
+// import { ChevronLeft } from 'lucide-react'
 import { LibraryCategory } from '../LeftPanel/LibraryCategory'
 import type { LibraryCategory as LibraryCategoryType } from '@/shared/types'
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectBreakpoints, addBreakpoint, removeBreakpoint, updateBreakpoint } from '../editorSlice'
+import { selectBreakpoints, addBreakpoint, removeBreakpoint} from '../editorSlice'
+// import {updateBreakpoint} from '../editorSlice'
 import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
 import { Plus, Trash2, Monitor, Tablet, Smartphone, Laptop, Watch, X } from 'lucide-react'
