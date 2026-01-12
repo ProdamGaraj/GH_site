@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import type { BlockNode, LayoutMode, CSSProperties, CustomBreakpoint } from '@/shared/types'
 import { generateId } from '@/shared/utils'
 import type { RootState } from '@/app/store'
+import { findNodeInTree } from '@/features/editor/utils/variationUtils'
 
 interface DragState {
   isDragging: boolean
@@ -25,6 +26,10 @@ interface EditorState {
   activeRightPanel: string | null
   panOffset: { x: number; y: number }
   blockAlignment: 'left' | 'center' | 'right'
+  // Режим редактирования
+  editMode: 'base' | 'responsive'
+  // При editMode = 'responsive', какой брейкпоинт редактируем
+  activeEditBreakpoint: string | null
 }
 
 const initialState: EditorState = {
@@ -40,17 +45,19 @@ const initialState: EditorState = {
     sourceParentId: null,
     sourceIndex: null,
   },
-  viewport: 'desktop',
+  viewport: 'base',
   breakpoints: [
-    { id: 'desktop', name: 'Desktop', width: 1440, height: 900, icon: 'monitor' },
-    { id: 'tablet', name: 'Tablet', width: 768, height: 1024, icon: 'tablet' },
-    { id: 'mobile', name: 'Mobile', width: 375, height: 667, icon: 'smartphone' },
+    { id: 'desktop', name: 'Desktop', width: 1440, height: 900, icon: 'monitor', color: '#3b82f6' },
+    { id: 'tablet', name: 'Tablet', width: 768, height: 1024, icon: 'tablet', color: '#8b5cf6' },
+    { id: 'mobile', name: 'Mobile', width: 375, height: 667, icon: 'smartphone', color: '#10b981' },
   ],
   zoom: 100,
   activeLeftPanel: 'layers',
   activeRightPanel: 'properties',
   panOffset: { x: 0, y: 0 },
   blockAlignment: 'center',
+  editMode: 'base',
+  activeEditBreakpoint: null,
 }
 
 // Helper functions for tree operations
@@ -238,23 +245,120 @@ const editorSlice = createSlice({
         ...restNode,
       }
       
-      const addToNode = (current: BlockNode): BlockNode => {
-        if (current.id === parentId) {
-          const newChildren = [...current.children]
-          if (position !== undefined) {
-            newChildren.splice(position, 0, newNode)
-          } else {
-            newChildren.push(newNode)
+      // В режиме responsive добавляем в specificChildren вариации
+      if (state.editMode === 'responsive' && state.activeEditBreakpoint) {
+        const breakpointId = state.activeEditBreakpoint
+        
+        console.log('addNode in responsive mode:', { parentId, breakpointId, newNodeId: newNode.id })
+        
+        // Функция для добавления элемента в children (для элементов внутри specificChildren)
+        const addToChildren = (node: BlockNode): BlockNode => {
+          if (node.id === parentId) {
+            console.log('addToChildren found parent:', parentId)
+            const newChildren = [...(node.children || [])]
+            if (position !== undefined) {
+              newChildren.splice(position, 0, newNode)
+            } else {
+              newChildren.push(newNode)
+            }
+            return { ...node, children: newChildren }
           }
-          return { ...current, children: newChildren }
+          return {
+            ...node,
+            children: (node.children || []).map(addToChildren)
+          }
         }
-        return {
-          ...current,
-          children: current.children.map(addToNode),
+        
+        const addToVariation = (current: BlockNode): BlockNode => {
+          // Проверяем, есть ли родитель в specificChildren этого узла
+          if (current.variations?.[breakpointId]?.specificChildren) {
+            const specificChildren = current.variations[breakpointId].specificChildren!
+            
+            // Проверяем, является ли один из specificChildren родителем
+            const parentInSpecific = specificChildren.some(child => {
+              const findParent = (node: BlockNode): boolean => {
+                if (node.id === parentId) return true
+                return (node.children || []).some(findParent)
+              }
+              return findParent(child)
+            })
+            
+            if (parentInSpecific) {
+              // Добавляем в children элемента внутри specificChildren
+              const updatedSpecificChildren = specificChildren.map(child => addToChildren(child))
+              
+              return {
+                ...current,
+                variations: {
+                  ...current.variations,
+                  [breakpointId]: {
+                    ...current.variations[breakpointId],
+                    specificChildren: updatedSpecificChildren,
+                  },
+                },
+                children: (current.children || []).map(addToVariation),
+              }
+            }
+          }
+          
+          if (current.id === parentId) {
+            // Родитель найден - добавляем в его specificChildren
+            if (!current.variations) {
+              current.variations = {}
+            }
+            if (!current.variations[breakpointId]) {
+              current.variations[breakpointId] = {}
+            }
+            
+            const variation = current.variations[breakpointId]
+            const specificChildren = variation.specificChildren || []
+            
+            if (position !== undefined) {
+              specificChildren.splice(position, 0, newNode)
+            } else {
+              specificChildren.push(newNode)
+            }
+            
+            return {
+              ...current,
+              variations: {
+                ...current.variations,
+                [breakpointId]: {
+                  ...variation,
+                  specificChildren,
+                },
+              },
+            }
+          }
+          
+          return {
+            ...current,
+            children: (current.children || []).map(addToVariation),
+          }
         }
+        
+        state.rootNode = addToVariation(state.rootNode)
+      } else {
+        // В base режиме добавляем в обычное дерево
+        const addToNode = (current: BlockNode): BlockNode => {
+          if (current.id === parentId) {
+            const newChildren = [...current.children]
+            if (position !== undefined) {
+              newChildren.splice(position, 0, newNode)
+            } else {
+              newChildren.push(newNode)
+            }
+            return { ...current, children: newChildren }
+          }
+          return {
+            ...current,
+            children: current.children.map(addToNode),
+          }
+        }
+        
+        state.rootNode = addToNode(state.rootNode)
       }
       
-      state.rootNode = addToNode(state.rootNode)
       state.isDirty = true
       state.selectedNodeId = newNode.id
     },
@@ -291,11 +395,15 @@ const editorSlice = createSlice({
       
       const { nodeId, properties, customCSS, breakpoint } = action.payload
       
+      // Определяем режим обновления
+      const isResponsiveMode = state.editMode === 'responsive' && state.activeEditBreakpoint
+      const targetBreakpoint = breakpoint || (isResponsiveMode ? state.activeEditBreakpoint : null)
+      
       const updateInNode = (current: BlockNode): BlockNode => {
         if (current.id === nodeId) {
           // Фильтруем пустые значения из properties
           const filteredProperties = properties 
-            ? Object.entries({ ...current.styles.properties, ...properties })
+            ? Object.entries(properties)
                 .reduce((acc, [key, value]) => {
                   // Удаляем свойства с пустыми значениями (пустая строка, null, undefined)
                   if (value !== '' && value !== null && value !== undefined) {
@@ -303,41 +411,45 @@ const editorSlice = createSlice({
                   }
                   return acc
                 }, {} as any)
-            : current.styles.properties
+            : {}
           
-          // Handle responsive styles
-          if (breakpoint && breakpoint !== 'desktop' && properties) {
-            // Update responsive styles for specific breakpoint
-            const currentResponsive = current.styles.responsive || {}
-            const currentBreakpointStyles = currentResponsive[breakpoint] || {}
-            
-            const filteredBreakpointProperties = Object.entries({ ...currentBreakpointStyles, ...properties })
-              .reduce((acc, [key, value]) => {
-                if (value !== '' && value !== null && value !== undefined) {
-                  acc[key] = value
-                }
-                return acc
-              }, {} as any)
+          // Режим responsive - добавляем в inheritedOverrides
+          if (targetBreakpoint && isResponsiveMode) {
+            const variations = current.variations || {}
+            const variation = variations[targetBreakpoint] || {}
+            const inheritedOverrides = variation.inheritedOverrides || {}
+            const currentOverride = inheritedOverrides[nodeId] || {}
             
             return {
               ...current,
-              styles: {
-                ...current.styles,
-                responsive: {
-                  ...currentResponsive,
-                  [breakpoint]: filteredBreakpointProperties,
+              variations: {
+                ...variations,
+                [targetBreakpoint]: {
+                  ...variation,
+                  inheritedOverrides: {
+                    ...inheritedOverrides,
+                    [nodeId]: {
+                      ...currentOverride,
+                      styles: {
+                        ...currentOverride.styles,
+                        ...filteredProperties,
+                      },
+                    },
+                  },
                 },
-                customCSS: customCSS !== undefined ? customCSS : current.styles.customCSS,
               },
             }
           }
           
-          // Update base (desktop) styles
+          // Базовый режим - обновляем base стили
           return {
             ...current,
             styles: {
               ...current.styles,
-              properties: filteredProperties,
+              properties: {
+                ...current.styles.properties,
+                ...filteredProperties,
+              },
               customCSS: customCSS !== undefined ? customCSS : current.styles.customCSS,
             },
           }
@@ -375,13 +487,180 @@ const editorSlice = createSlice({
     },
     
     deleteNode: (state, action: PayloadAction<string>) => {
-      if (!state.rootNode) return
+      console.log('=== deleteNode reducer START ===')
+      if (!state.rootNode) {
+        console.log('No rootNode, returning')
+        return
+      }
       
+      const nodeId = action.payload
+      console.log('Deleting nodeId:', nodeId)
+      console.log('editMode:', state.editMode)
+      console.log('activeEditBreakpoint:', state.activeEditBreakpoint)
+      
+      // В responsive режиме удаляем только из вариации
+      if (state.editMode === 'responsive' && state.activeEditBreakpoint) {
+        const breakpointId = state.activeEditBreakpoint
+        console.log('Responsive mode, breakpointId:', breakpointId)
+        
+        // Флаг, был ли найден и удалён элемент
+        let wasDeleted = false
+        
+        // Рекурсивная функция удаления из любого дерева
+        const deleteFromTree = (node: BlockNode): BlockNode | null => {
+          if (node.id === nodeId) {
+            console.log('Found node to delete:', node.id)
+            wasDeleted = true
+            return null
+          }
+          
+          const nodeChildren = node.children || []
+          const newChildren = nodeChildren
+            .map(ch => deleteFromTree(ch))
+            .filter((ch): ch is BlockNode => ch !== null)
+          
+          return {
+            ...node,
+            children: newChildren
+          }
+        }
+        
+        // Рекурсивная функция для обработки всего дерева включая variations
+        const processNode = (node: BlockNode): BlockNode => {
+          let updatedNode = { ...node }
+          
+          // Обрабатываем specificChildren в variations для ВСЕХ breakpoint'ов
+          // (элемент мог быть добавлен для этого breakpoint, но в другом месте дерева)
+          if (node.variations?.[breakpointId]?.specificChildren) {
+            const specificChildren = node.variations[breakpointId].specificChildren!
+            
+            const updatedSpecificChildren = specificChildren
+              .map(child => deleteFromTree(child))
+              .filter((ch): ch is BlockNode => ch !== null)
+            
+            updatedNode = {
+              ...updatedNode,
+              variations: {
+                ...updatedNode.variations,
+                [breakpointId]: {
+                  ...updatedNode.variations![breakpointId],
+                  specificChildren: updatedSpecificChildren
+                }
+              }
+            }
+          }
+          
+          // Рекурсивно обрабатываем обычных детей
+          const nodeChildren = node.children || []
+          if (nodeChildren.length > 0) {
+            updatedNode = {
+              ...updatedNode,
+              children: nodeChildren.map(child => processNode(child))
+            }
+          }
+          
+          return updatedNode
+        }
+        
+        // Обрабатываем всё дерево
+        state.rootNode = processNode(state.rootNode)
+        
+        if (wasDeleted) {
+          state.isDirty = true
+          state.selectedNodeId = null
+          return
+        }
+        
+        // Элемент не найден в specificChildren - проверяем, может он в обычных children
+        // (был добавлен неправильно или это унаследованный элемент)
+        // Ищем элемент в базовом дереве
+        const findInBaseTree = (node: BlockNode): boolean => {
+          if (node.id === nodeId) return true
+          return (node.children || []).some(findInBaseTree)
+        }
+        
+        if (findInBaseTree(state.rootNode)) {
+          // Элемент в базовом дереве - скрываем его через override
+          if (!state.rootNode.variations) {
+            state.rootNode.variations = {}
+          }
+          if (!state.rootNode.variations[breakpointId]) {
+            state.rootNode.variations[breakpointId] = {}
+          }
+          if (!state.rootNode.variations[breakpointId].inheritedOverrides) {
+            state.rootNode.variations[breakpointId].inheritedOverrides = {}
+          }
+          
+          state.rootNode.variations[breakpointId].inheritedOverrides![nodeId] = {
+            hidden: true
+          }
+          
+          state.isDirty = true
+          state.selectedNodeId = null
+          return
+        }
+      }
+      
+      // В базовом режиме удаляем из дерева полностью
+      // Сначала ищем в variations (specificChildren)
+      let foundInVariations = false
+      
+      const deleteFromVariations = (node: BlockNode): BlockNode => {
+        let updatedNode = { ...node }
+        
+        // Удаляем из specificChildren всех variations
+        if (node.variations) {
+          const updatedVariations = { ...node.variations }
+          
+          for (const [bpId, variation] of Object.entries(node.variations)) {
+            if (variation.specificChildren) {
+              const findAndDelete = (n: BlockNode): BlockNode | null => {
+                if (n.id === nodeId) {
+                  foundInVariations = true
+                  return null
+                }
+                return {
+                  ...n,
+                  children: (n.children || [])
+                    .map(ch => findAndDelete(ch))
+                    .filter((ch): ch is BlockNode => ch !== null)
+                }
+              }
+              
+              const newSpecificChildren = variation.specificChildren
+                .map(ch => findAndDelete(ch))
+                .filter((ch): ch is BlockNode => ch !== null)
+              
+              updatedVariations[bpId] = {
+                ...variation,
+                specificChildren: newSpecificChildren
+              }
+            }
+          }
+          
+          updatedNode.variations = updatedVariations
+        }
+        
+        // Рекурсивно обрабатываем детей
+        updatedNode.children = (node.children || []).map(deleteFromVariations)
+        
+        return updatedNode
+      }
+      
+      state.rootNode = deleteFromVariations(state.rootNode)
+      
+      if (foundInVariations) {
+        state.isDirty = true
+        state.selectedNodeId = null
+        return
+      }
+      
+      // Если не нашли в variations, удаляем из базового дерева
       const deleteFromNode = (current: BlockNode): BlockNode => {
         return {
           ...current,
-          children: current.children
-            .filter(child => child.id !== action.payload)
+          children: (current.children || [])
+            .filter(child => child.id !== nodeId)
             .map(deleteFromNode),
         }
       }
@@ -568,7 +847,7 @@ const editorSlice = createSlice({
     },
     
     setZoom: (state, action: PayloadAction<number>) => {
-      state.zoom = Math.max(25, Math.min(200, action.payload))
+      state.zoom = Math.max(25, Math.min(500, action.payload))
     },
     
     setActiveLeftPanel: (state, action: PayloadAction<string | null>) => {
@@ -585,6 +864,152 @@ const editorSlice = createSlice({
     
     setBlockAlignment: (state, action: PayloadAction<'left' | 'center' | 'right'>) => {
       state.blockAlignment = action.payload
+    },
+    
+    setEditMode: (state, action: PayloadAction<'base' | 'responsive'>) => {
+      state.editMode = action.payload
+      // При переключении на base режим, сбрасываем activeEditBreakpoint
+      if (action.payload === 'base') {
+        state.activeEditBreakpoint = null
+      } else {
+        // При переключении на responsive, используем текущий viewport (если не 'base')
+        state.activeEditBreakpoint = state.viewport !== 'base' ? state.viewport : 'desktop'
+      }
+    },
+    
+    setActiveEditBreakpoint: (state, action: PayloadAction<string | null>) => {
+      state.activeEditBreakpoint = action.payload
+    },
+    
+    // Перенести элемент в другой viewport
+    moveNodeToViewport: (state, action: PayloadAction<{
+      nodeId: string
+      targetBreakpoint: string | null  // null = перенести в базовое дерево (все viewport'ы)
+    }>) => {
+      if (!state.rootNode) return
+      
+      const { nodeId, targetBreakpoint } = action.payload
+      
+      // Находим элемент и его текущее местоположение
+      let foundNode: BlockNode | null = null
+      let sourceBreakpoint: string | null = null
+      
+      // Ищем в базовом дереве
+      const findInBaseTree = (node: BlockNode): BlockNode | null => {
+        if (node.id === nodeId) return node
+        for (const child of (node.children || [])) {
+          const found = findInBaseTree(child)
+          if (found) return found
+        }
+        return null
+      }
+      
+      // Ищем в specificChildren всех variations
+      const findInVariations = (node: BlockNode): { found: BlockNode | null; breakpoint: string | null } => {
+        if (node.variations) {
+          for (const [bpId, variation] of Object.entries(node.variations)) {
+            if (variation.specificChildren) {
+              for (const child of variation.specificChildren) {
+                if (child.id === nodeId) {
+                  return { found: child, breakpoint: bpId }
+                }
+                // Рекурсивно ищем в children
+                const foundInChildren = findInBaseTree(child)
+                if (foundInChildren) {
+                  return { found: foundInChildren, breakpoint: bpId }
+                }
+              }
+            }
+          }
+        }
+        // Рекурсивно проверяем детей
+        for (const child of (node.children || [])) {
+          const result = findInVariations(child)
+          if (result.found) return result
+        }
+        return { found: null, breakpoint: null }
+      }
+      
+      // Сначала ищем в базовом дереве
+      foundNode = findInBaseTree(state.rootNode)
+      if (foundNode) {
+        sourceBreakpoint = null // в базовом дереве
+      } else {
+        // Ищем в variations
+        const result = findInVariations(state.rootNode)
+        foundNode = result.found
+        sourceBreakpoint = result.breakpoint
+      }
+      
+      if (!foundNode) {
+        console.warn('Node not found for moveNodeToViewport:', nodeId)
+        return
+      }
+      
+      // Если источник и цель одинаковы - ничего не делаем
+      if (sourceBreakpoint === targetBreakpoint) {
+        return
+      }
+      
+      // Копируем элемент (глубокое копирование)
+      const nodeCopy = JSON.parse(JSON.stringify(foundNode))
+      
+      // Удаляем из текущего местоположения
+      if (sourceBreakpoint === null) {
+        // Удаляем из базового дерева
+        const removeFromBase = (node: BlockNode): BlockNode => ({
+          ...node,
+          children: (node.children || [])
+            .filter(child => child.id !== nodeId)
+            .map(removeFromBase)
+        })
+        state.rootNode = removeFromBase(state.rootNode)
+      } else {
+        // Удаляем из specificChildren
+        const removeFromVariation = (node: BlockNode): BlockNode => {
+          let updatedNode = { ...node }
+          
+          if (node.variations?.[sourceBreakpoint]?.specificChildren) {
+            updatedNode = {
+              ...updatedNode,
+              variations: {
+                ...updatedNode.variations,
+                [sourceBreakpoint]: {
+                  ...updatedNode.variations![sourceBreakpoint],
+                  specificChildren: updatedNode.variations![sourceBreakpoint].specificChildren!
+                    .filter(child => child.id !== nodeId)
+                }
+              }
+            }
+          }
+          
+          return {
+            ...updatedNode,
+            children: (updatedNode.children || []).map(removeFromVariation)
+          }
+        }
+        state.rootNode = removeFromVariation(state.rootNode)
+      }
+      
+      // Добавляем в новое местоположение
+      if (targetBreakpoint === null) {
+        // Добавляем в базовое дерево (в root children)
+        state.rootNode.children = [...(state.rootNode.children || []), nodeCopy]
+      } else {
+        // Добавляем в specificChildren целевого breakpoint
+        if (!state.rootNode.variations) {
+          state.rootNode.variations = {}
+        }
+        if (!state.rootNode.variations[targetBreakpoint]) {
+          state.rootNode.variations[targetBreakpoint] = {}
+        }
+        if (!state.rootNode.variations[targetBreakpoint].specificChildren) {
+          state.rootNode.variations[targetBreakpoint].specificChildren = []
+        }
+        state.rootNode.variations[targetBreakpoint].specificChildren!.push(nodeCopy)
+      }
+      
+      state.isDirty = true
     },
   },
 })
@@ -615,25 +1040,21 @@ export const {
   setActiveRightPanel,
   setPanOffset,
   setBlockAlignment,
+  setEditMode,
+  setActiveEditBreakpoint,
+  moveNodeToViewport,
 } = editorSlice.actions
 
 // Selectors
 export const selectRootNode = (state: RootState) => state.editor.rootNode
 export const selectSelectedNodeId = (state: RootState) => state.editor.selectedNodeId
 export const selectSelectedNode = (state: RootState) => {
-  const { rootNode, selectedNodeId } = state.editor
+  const { rootNode, selectedNodeId, viewport, editMode } = state.editor
   if (!rootNode || !selectedNodeId) return null
   
-  const findNode = (node: BlockNode): BlockNode | null => {
-    if (node.id === selectedNodeId) return node
-    for (const child of node.children) {
-      const found = findNode(child)
-      if (found) return found
-    }
-    return null
-  }
-  
-  return findNode(rootNode)
+  // Ищем узел в эффективном дереве (с учётом вариаций)
+  const breakpoint = viewport === 'base' ? null : viewport
+  return findNodeInTree(rootNode, selectedNodeId, breakpoint, editMode)
 }
 export const selectIsDirty = (state: RootState) => state.editor.isDirty
 export const selectDragState = (state: RootState) => state.editor.drag
@@ -644,6 +1065,8 @@ export const selectActiveLeftPanel = (state: RootState) => state.editor.activeLe
 export const selectActiveRightPanel = (state: RootState) => state.editor.activeRightPanel
 export const selectPanOffset = (state: RootState) => state.editor.panOffset
 export const selectBlockAlignment = (state: RootState) => state.editor.blockAlignment
+export const selectEditMode = (state: RootState) => state.editor.editMode
+export const selectActiveEditBreakpoint = (state: RootState) => state.editor.activeEditBreakpoint
 
 // Helper selector to find a node by id
 export const selectNodeById = (state: RootState, nodeId: string): BlockNode | null => {

@@ -1,9 +1,10 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { useAppSelector, useAppDispatch } from '@/app/hooks'
-import { selectRootNode, selectDragState, selectViewport, selectBreakpoints, selectZoom, selectPanOffset, selectBlockAlignment, setZoom, setPanOffset } from '@/features/editor/editorSlice'
+import { selectRootNode, selectDragState, selectViewport, selectBreakpoints, selectZoom, selectPanOffset, selectBlockAlignment, selectEditMode, setZoom, setPanOffset } from '@/features/editor/editorSlice'
 import { CanvasRenderer } from './CanvasRenderer'
 import type { DropIndicator } from '../../utils/dndUtils'
 import { DropIndicatorOverlay, DropTargetHighlight } from './DropIndicatorOverlay'
+import { getEffectiveTree } from '../../utils/variationUtils'
 
 interface CanvasProps {
   dropIndicator?: DropIndicator | null
@@ -26,12 +27,21 @@ export const Canvas: React.FC<CanvasProps> = ({
   const zoom = useAppSelector(selectZoom)
   const panOffset = useAppSelector(selectPanOffset)
   const blockAlignment = useAppSelector(selectBlockAlignment)
+  const editMode = useAppSelector(selectEditMode)
   const canvasRef = useRef<HTMLDivElement>(null)
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
   const [isSpacePressed, setIsSpacePressed] = useState(false)
   
   const currentBreakpoint = breakpoints.find(bp => bp.id === viewport)
+  
+  // Получаем эффективное дерево с учетом вариаций
+  // В base режиме viewport может быть 'base', используем editMode для определения
+  const effectiveTree = rootNode ? getEffectiveTree(
+    rootNode, 
+    viewport === 'base' ? null : viewport, 
+    editMode
+  ) : null
 
   // Zoom with Ctrl + Mouse Wheel
   useEffect(() => {
@@ -39,7 +49,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault()
         const delta = -e.deltaY
-        const newZoom = Math.max(25, Math.min(200, zoom + delta * 0.1))
+        const newZoom = Math.max(25, Math.min(500, zoom + delta * 0.1))
         dispatch(setZoom(Math.round(newZoom)))
       }
     }
@@ -123,10 +133,13 @@ export const Canvas: React.FC<CanvasProps> = ({
       }}
     >
       <div 
-        className="w-full min-h-full p-8 flex justify-center"
+        className="w-full min-h-full p-8 flex"
         style={{
           transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
-          transition: isPanning ? 'none' : 'transform 0.1s ease-out'
+          transition: isPanning ? 'none' : 'transform 0.1s ease-out',
+          // В base режиме центрируем по обеим осям, в responsive - только по горизонтали
+          justifyContent: 'center',
+          alignItems: editMode === 'base' ? 'center' : 'flex-start'
         }}
       >
         {/* Drop indicator overlay - positioned relative to canvas container */}
@@ -150,25 +163,33 @@ export const Canvas: React.FC<CanvasProps> = ({
         <div 
           className="relative"
           style={{ 
-            width: currentBreakpoint ? `${currentBreakpoint.width}px` : 'auto',
-            minHeight: currentBreakpoint?.height ? `${currentBreakpoint.height}px` : '100vh',
+            // В responsive режиме показываем viewport с границами
+            width: editMode === 'responsive' && currentBreakpoint ? `${currentBreakpoint.width}px` : 'auto',
+            minHeight: editMode === 'responsive' && currentBreakpoint?.height ? `${currentBreakpoint.height}px` : 'auto',
             transform: `scale(${zoom / 100})`,
-            transformOrigin: 'top center',
-            boxShadow: currentBreakpoint ? '0 0 0 2px #3b82f6' : 'none',
+            transformOrigin: editMode === 'base' ? 'center center' : 'top center',
+            // Синяя рамка только в responsive режиме
+            boxShadow: editMode === 'responsive' && currentBreakpoint ? '0 0 0 2px #3b82f6' : 'none',
             background: 'white'
           }}
         >
-          {/* Breakpoint size indicator */}
-          {currentBreakpoint && (
+          {/* Breakpoint size indicator - только в responsive режиме */}
+          {editMode === 'responsive' && currentBreakpoint && (
             <div className="absolute -top-8 left-0 right-0 flex items-center justify-center gap-2 text-xs text-gray-500">
-              <div className="bg-white px-2 py-1 rounded shadow-sm border border-gray-200">
-                <span className="font-medium">{currentBreakpoint.name}:</span>
-                <span className="ml-1">{currentBreakpoint.width}px</span>
-                {currentBreakpoint.height && <span> × {currentBreakpoint.height}px</span>}
+              <div className="bg-purple-100 px-3 py-1.5 rounded shadow-sm border border-purple-300">
+                <span className="font-medium text-purple-700">Режим {currentBreakpoint.name}:</span>
+                <span className="ml-1 text-purple-600">{currentBreakpoint.width}px</span>
+                {currentBreakpoint.height && <span className="text-purple-600"> × {currentBreakpoint.height}px</span>}
               </div>
             </div>
           )}
-          <CanvasRenderer node={rootNode} isRoot editorType={editorType} blockAlignment={blockAlignment} />
+          <CanvasRenderer 
+            node={effectiveTree || rootNode} 
+            isRoot 
+            editorType={editorType} 
+            blockAlignment={blockAlignment}
+            rootNode={rootNode || undefined}
+          />
         </div>
       </div>
     </div>

@@ -28,6 +28,7 @@ export const BreakpointManager: React.FC<BreakpointManagerProps> = ({ onClose })
     width: '',
     height: '',
     icon: 'monitor' as 'monitor' | 'tablet' | 'smartphone' | 'laptop' | 'watch',
+    color: '#10b981', // Цвет по умолчанию (зеленый)
   })
 
   const handleAddBreakpoint = () => {
@@ -42,10 +43,11 @@ export const BreakpointManager: React.FC<BreakpointManagerProps> = ({ onClose })
       width: parseInt(newBreakpoint.width),
       height: newBreakpoint.height ? parseInt(newBreakpoint.height) : undefined,
       icon: newBreakpoint.icon,
+      color: newBreakpoint.color,
     }
 
     dispatch(addBreakpoint(breakpoint))
-    setNewBreakpoint({ name: '', width: '', height: '', icon: 'monitor' })
+    setNewBreakpoint({ name: '', width: '', height: '', icon: 'monitor', color: '#10b981' })
   }
 
   const handleRemoveBreakpoint = (id: string) => {
@@ -151,6 +153,18 @@ export const BreakpointManager: React.FC<BreakpointManagerProps> = ({ onClose })
                       <Icon size={20} className={newBreakpoint.icon === value ? 'text-primary-600' : 'text-gray-600'} />
                     </button>
                   ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Цвет выделения</label>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={newBreakpoint.color}
+                    onChange={(e) => setNewBreakpoint({ ...newBreakpoint, color: e.target.value })}
+                    className="h-10 w-20 border rounded cursor-pointer"
+                  />
+                  <span className="text-sm text-gray-600">{newBreakpoint.color}</span>
                 </div>
               </div>
               <Button

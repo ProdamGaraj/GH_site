@@ -115,6 +115,23 @@ export interface CustomBreakpoint {
   width: number
   height?: number
   icon?: 'monitor' | 'tablet' | 'smartphone' | 'laptop' | 'watch'
+  color?: string // Цвет выделения для viewport-специфичных элементов
+}
+
+// Variation for responsive breakpoints
+export interface BlockNodeVariation {
+  // Переопределения для унаследованных элементов
+  inheritedOverrides?: {
+    [nodeId: string]: {
+      hidden?: boolean  // Скрыть унаследованный элемент
+      styles?: Partial<CSSProperties>
+      attributes?: Record<string, string>
+      content?: string
+    }
+  }
+  
+  // Специфичные дочерние элементы (только для этого брейкпоинта)
+  specificChildren?: BlockNode[]
 }
 
 // Block Node structure
@@ -141,6 +158,11 @@ export interface BlockNode {
     locked?: boolean
     hidden?: boolean
     name?: string
+  }
+  
+  // Вариации для разных брейкпоинтов (независимые DOM деревья)
+  variations?: {
+    [breakpointId: string]: BlockNodeVariation
   }
 }
 

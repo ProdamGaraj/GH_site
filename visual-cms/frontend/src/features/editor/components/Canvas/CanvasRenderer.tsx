@@ -1,26 +1,54 @@
 import React from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectNode, selectSelectedNodeId, selectDragState } from '@/features/editor/editorSlice'
+import { selectNode, selectSelectedNodeId, selectDragState, selectViewport, selectEditMode, selectBreakpoints, selectRootNode } from '@/features/editor/editorSlice'
 import { useComputedStyles } from '../../hooks/useComputedStyles'
 import { cn } from '@/shared/utils'
 import type { BlockNode } from '@/shared/types'
 import { CSS } from '@dnd-kit/utilities'
+import { getNodeStatus, getNodeBreakpoint, BlockNodeWithViewport } from '../../utils/variationUtils'
 
 interface CanvasRendererProps {
-  node: BlockNode
+  node: BlockNodeWithViewport
   isRoot?: boolean
   editorType?: 'page' | 'block'
   blockAlignment?: 'left' | 'center' | 'right'
+  rootNode?: BlockNode  // Передаем root для проверки вариаций
 }
 
-export const CanvasRenderer: React.FC<CanvasRendererProps> = ({ node, isRoot = false, editorType = 'block', blockAlignment = 'center' }) => {
+export const CanvasRenderer: React.FC<CanvasRendererProps> = ({ 
+  node, 
+  isRoot = false, 
+  editorType = 'block', 
+  blockAlignment = 'center',
+  rootNode 
+}) => {
   const dispatch = useAppDispatch()
   const selectedNodeId = useAppSelector(selectSelectedNodeId)
   const dragState = useAppSelector(selectDragState)
+  const viewport = useAppSelector(selectViewport)
+  const editMode = useAppSelector(selectEditMode)
+  const breakpoints = useAppSelector(selectBreakpoints)
+  const storeRootNode = useAppSelector(selectRootNode)
+  const actualRootNode = rootNode || storeRootNode
   const isSelected = selectedNodeId === node.id
   const isDragged = dragState.draggedNodeId === node.id
   const isLocked = node.metadata?.locked || false
+  
+  // Определяем статус элемента (base, overridden, specific, hidden)
+  const nodeStatus = actualRootNode && editMode === 'responsive' 
+    ? getNodeStatus(node.id, actualRootNode, viewport) 
+    : 'base'
+  
+  // В базовом режиме определяем к какому брейкпоинту принадлежит элемент
+  // Используем _viewportId из эффективного дерева или ищем через getNodeBreakpoint
+  const nodeBreakpointId = editMode === 'base' 
+    ? (node._viewportId || (actualRootNode ? getNodeBreakpoint(node.id, actualRootNode) : null))
+    : null
+  
+  const nodeBreakpoint = nodeBreakpointId 
+    ? breakpoints.find(bp => bp.id === nodeBreakpointId)
+    : null
 
   const computedStyles = useComputedStyles(node)
 
@@ -95,10 +123,23 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({ node, isRoot = f
       ...computedStyles,
       ...dragStyle,
       opacity: isDragging ? 0.5 : undefined,
-      // Apply alignment to root element in block editor
-      ...(isRoot && editorType === 'block' ? {
+      // Apply alignment to root element in block editor ONLY in responsive mode
+      ...(isRoot && editorType === 'block' && editMode === 'responsive' ? {
         marginLeft: blockAlignment === 'center' ? 'auto' : blockAlignment === 'right' ? 'auto' : '0',
         marginRight: blockAlignment === 'center' ? 'auto' : blockAlignment === 'left' ? 'auto' : '0'
+      } : {}),
+      // Визуальная индикация статуса элемента в responsive режиме
+      ...(nodeStatus === 'overridden' ? {
+        outline: '2px dashed rgba(139, 92, 246, 0.6)',
+        outlineOffset: '2px'
+      } : nodeStatus === 'specific' ? {
+        outline: '2px solid rgba(16, 185, 129, 0.6)',
+        outlineOffset: '2px'
+      } : {}),
+      // Визуальная индикация специфичных элементов в базовом режиме с цветом брейкпоинта
+      ...(editMode === 'base' && nodeBreakpoint ? {
+        outline: `2px solid ${nodeBreakpoint.color || '#10b981'}`,
+        outlineOffset: '2px'
       } : {})
     },
     className: cn(
@@ -152,7 +193,13 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({ node, isRoot = f
     <>
       {node.content && <span>{node.content}</span>}
       {node.children.map((child) => (
-        <CanvasRenderer key={child.id} node={child} editorType={editorType} blockAlignment={blockAlignment} />
+        <CanvasRenderer 
+          key={child.id} 
+          node={child} 
+          editorType={editorType} 
+          blockAlignment={blockAlignment}
+          rootNode={actualRootNode || undefined}
+        />
       ))}
       {/* Empty state indicator for containers */}
       {isContainer && node.children.length === 0 && !node.content && !isRoot && (

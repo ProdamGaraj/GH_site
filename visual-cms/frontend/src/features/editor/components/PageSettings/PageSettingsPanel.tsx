@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
+import { useAppSelector } from '@/app/hooks'
+import { selectViewport, selectBreakpoints } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
-import { Settings, Globe, Search, FileText } from 'lucide-react'
+import { Settings, Globe, Search, FileText, Monitor, Tablet, Smartphone, Laptop, Watch, Settings2 } from 'lucide-react'
 
 export interface PageSettings {
   name: string
@@ -22,6 +24,31 @@ export const PageSettingsPanel: React.FC<PageSettingsPanelProps> = ({
   onChange 
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'seo'>('general')
+  const viewport = useAppSelector(selectViewport)
+  const breakpoints = useAppSelector(selectBreakpoints)
+  
+  const currentBreakpoint = breakpoints.find(bp => bp.id === viewport)
+  
+  const getIcon = (iconName?: string) => {
+    switch (iconName) {
+      case 'monitor': return Monitor
+      case 'laptop': return Laptop
+      case 'tablet': return Tablet
+      case 'smartphone': return Smartphone
+      case 'watch': return Watch
+      default: return Monitor
+    }
+  }
+  
+  const ViewportIcon = viewport === 'base' ? Settings2 : (currentBreakpoint ? getIcon(currentBreakpoint.icon) : Monitor)
+  
+  const viewportName = viewport === 'base' 
+    ? 'Общий' 
+    : (currentBreakpoint ? `${currentBreakpoint.name} (${currentBreakpoint.width}px)` : 'Unknown viewport')
+  
+  const viewportDescription = viewport === 'base'
+    ? 'Изменения применяются для всех viewport'
+    : `Изменения применяются для ${currentBreakpoint?.name || 'этого экрана'}`
 
   const handleChange = (field: keyof PageSettings, value: string) => {
     onChange({
@@ -68,6 +95,19 @@ export const PageSettingsPanel: React.FC<PageSettingsPanelProps> = ({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Viewport indicator */}
+        <div className="mb-3 px-3 py-2 bg-primary-50 border border-primary-200 rounded-lg">
+          <div className="flex items-center gap-2 text-sm">
+            <ViewportIcon size={16} className="text-primary-600" />
+            <span className="text-primary-700 font-medium">
+              {viewportName}
+            </span>
+          </div>
+          <p className="text-xs text-primary-600 mt-1">
+            {viewportDescription}
+          </p>
+        </div>
+        
         {activeTab === 'general' && (
           <>
             <Input

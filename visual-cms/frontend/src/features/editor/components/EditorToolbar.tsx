@@ -2,9 +2,9 @@ import React, { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
-import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight } from 'lucide-react'
+import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, markAsSaved, setZoom, setBlockAlignment } from '@/features/editor/editorSlice'
+import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint } from '@/features/editor/editorSlice'
 import { createBlock, updateBlock, selectBlocksSaving } from '@/features/blocks/blocksSlice'
 import { createPage, updatePage, selectPagesSaving } from '@/features/pages/pagesSlice'
 import { BreakpointManager } from './BreakpointManager'
@@ -45,6 +45,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const breakpoints = useAppSelector(selectBreakpoints)
   const zoom = useAppSelector(selectZoom)
   const blockAlignment = useAppSelector(selectBlockAlignment)
+  const editMode = useAppSelector(selectEditMode)
   
   const isNewBlock = id === 'new' || !id
   const isPageEditor = _type === 'page'
@@ -55,6 +56,28 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const [showBreakpointManager, setShowBreakpointManager] = useState(false)
   const [blockName, setBlockName] = useState(initialBlockName || '')
   const [isReusable, setIsReusable] = useState(true)
+  const [zoomInput, setZoomInput] = useState(String(zoom))
+
+  // Sync zoomInput with redux zoom when it changes externally
+  React.useEffect(() => {
+    setZoomInput(String(zoom))
+  }, [zoom])
+
+  const handleViewportChange = (newViewport: string) => {
+    // При выборе 'base' переключаемся в base режим, иначе в responsive
+    if (newViewport === 'base') {
+      dispatch(setEditMode('base'))
+    } else {
+      dispatch(setEditMode('responsive'))
+      // Явно устанавливаем activeEditBreakpoint на новый viewport
+      dispatch(setActiveEditBreakpoint(newViewport))
+    }
+    
+    // Вызываем родительский обработчик
+    if (onViewportChange) {
+      onViewportChange(newViewport)
+    }
+  }
 
   const handleSave = async () => {
     if (!rootNode) return
@@ -191,17 +214,39 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <ZoomOut size={16} className="text-gray-600" />
         </button>
         
-        <button
-          onClick={handleZoomReset}
-          className="px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 rounded transition-colors min-w-[50px]"
-          title="Сбросить масштаб"
-        >
-          {zoom}%
-        </button>
+        <div className="flex items-center">
+          <input
+            type="text"
+            value={zoomInput}
+            onChange={(e) => setZoomInput(e.target.value)}
+            onBlur={() => {
+              const val = parseInt(zoomInput, 10)
+              if (isNaN(val) || val < 25) {
+                dispatch(setZoom(25))
+                setZoomInput('25')
+              } else if (val > 500) {
+                dispatch(setZoom(500))
+                setZoomInput('500')
+              } else {
+                dispatch(setZoom(val))
+                setZoomInput(String(val))
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.currentTarget.blur()
+              }
+            }}
+            onDoubleClick={handleZoomReset}
+            className="px-1 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200 rounded-l transition-colors w-[32px] text-right bg-transparent border-none outline-none focus:bg-gray-200 cursor-text"
+            title="Введите масштаб или дважды кликните для сброса"
+          />
+          <span className="text-xs font-medium text-gray-700">%</span>
+        </div>
         
         <button
           onClick={handleZoomIn}
-          disabled={zoom >= 200}
+          disabled={zoom >= 500}
           className="p-1.5 rounded hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           title="Увеличить"
         >
@@ -217,8 +262,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <Redo size={16} />
         </Button>
         
-        {/* Block alignment (only for block editor) */}
-        {!isPageEditor && (
+        {/* Block alignment (only for block editor in responsive mode) */}
+        {!isPageEditor && editMode === 'responsive' && (
           <>
             <div className="h-6 w-px bg-gray-300 mx-2" />
             
@@ -256,10 +301,22 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         
         <div className="h-6 w-px bg-gray-300 mx-2" />
         
-        {/* Viewport switcher for pages and blocks */}
+        {/* Viewport switcher with Base mode */}
         {onViewportChange && (
           <>
             <div className="flex items-center gap-1 bg-gray-100 rounded p-1">
+              {/* Base/Общий mode */}
+              <button
+                onClick={() => handleViewportChange('base')}
+                className={`p-1.5 rounded transition-colors ${
+                  viewport === 'base' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
+                }`}
+                title="Общий режим - изменения для всех экранов"
+              >
+                <Settings2 size={16} className={viewport === 'base' ? 'text-primary-600' : 'text-gray-600'} />
+              </button>
+              
+              {/* Breakpoint icons */}
               {breakpoints.map((bp) => {
                 const IconComponent = bp.icon === 'monitor' ? Monitor
                   : bp.icon === 'laptop' ? Laptop
@@ -271,7 +328,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 return (
                   <button
                     key={bp.id}
-                    onClick={() => onViewportChange(bp.id)}
+                    onClick={() => handleViewportChange(bp.id)}
                     className={`p-1.5 rounded transition-colors ${
                       viewport === bp.id ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
                     }`}
@@ -421,10 +478,130 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onCl
   const [isManualMode, setIsManualMode] = useState(false)
   const [manualWidth, setManualWidth] = useState(1440)
   const [manualHeight, setManualHeight] = useState(900)
+  const [isResizing, setIsResizing] = useState(false)
+  const [resizeDirection, setResizeDirection] = useState<string | null>(null)
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 })
+  const [startSize, setStartSize] = useState({ width: 0, height: 0 })
+  const [zoom, setZoomState] = useState(100)
+  const [zoomInput, setZoomInput] = useState('100')
+  const [ctrlPressed, setCtrlPressed] = useState(false)
+  const previewRef = React.useRef<HTMLDivElement>(null)
+
+  // Sync zoomInput with zoom state
+  React.useEffect(() => {
+    setZoomInput(String(zoom))
+  }, [zoom])
   
   const currentBreakpoint = breakpoints.find(bp => bp.id === selectedBreakpoint)
   const displayWidth = isManualMode ? manualWidth : (currentBreakpoint?.width || 1440)
   const displayHeight = isManualMode ? manualHeight : (currentBreakpoint?.height || 900)
+
+  const handleBreakpointSelect = (breakpointId: string) => {
+    setSelectedBreakpoint(breakpointId)
+    setIsManualMode(false)
+    const bp = breakpoints.find(b => b.id === breakpointId)
+    if (bp) {
+      setManualWidth(bp.width)
+      setManualHeight(bp.height || 900)
+    }
+  }
+
+  const handleManualModeToggle = (enabled: boolean) => {
+    setIsManualMode(enabled)
+    if (enabled && currentBreakpoint) {
+      setManualWidth(currentBreakpoint.width)
+      setManualHeight(currentBreakpoint.height || 900)
+    }
+  }
+
+  const handleResizeStart = (e: React.MouseEvent, direction: string) => {
+    if (!isManualMode) return
+    e.preventDefault()
+    setIsResizing(true)
+    setResizeDirection(direction)
+    setStartPos({ x: e.clientX, y: e.clientY })
+    setStartSize({ width: manualWidth, height: manualHeight })
+  }
+
+  React.useEffect(() => {
+    if (!isResizing || !resizeDirection) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - startPos.x
+      const deltaY = e.clientY - startPos.y
+
+      let newWidth = startSize.width
+      let newHeight = startSize.height
+
+      // Handle horizontal resizing
+      if (resizeDirection.includes('right')) {
+        newWidth = Math.max(320, Math.min(3840, startSize.width + deltaX))
+      }
+
+      // Handle vertical resizing
+      if (resizeDirection.includes('bottom')) {
+        newHeight = Math.max(400, Math.min(2160, startSize.height + deltaY))
+      }
+
+      setManualWidth(Math.round(newWidth))
+      setManualHeight(Math.round(newHeight))
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+      setResizeDirection(null)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isResizing, resizeDirection, startPos, startSize])
+
+  // Track Ctrl key to disable iframe pointer-events for wheel zoom
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        setCtrlPressed(true)
+      }
+    }
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        setCtrlPressed(false)
+      }
+    }
+    // Also reset on blur (in case user releases key outside window)
+    const handleBlur = () => setCtrlPressed(false)
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    window.addEventListener('blur', handleBlur)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+      window.removeEventListener('blur', handleBlur)
+    }
+  }, [])
+
+  // Handle Ctrl + Wheel zoom - capture at document level when preview is open
+  React.useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        const delta = -e.deltaY
+        const newZoom = Math.max(25, Math.min(500, zoom + delta * 0.1))
+        setZoomState(Math.round(newZoom))
+      }
+    }
+
+    // Add listener to document with capture phase to intercept before browser zoom
+    document.addEventListener('wheel', handleWheel, { passive: false, capture: true })
+    return () => document.removeEventListener('wheel', handleWheel, { capture: true })
+  }, [zoom])
 
   // Generate HTML from BlockNode tree
   const generateHTML = (node: import('@/shared/types').BlockNode): string => {
@@ -450,92 +627,256 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onCl
   const previewHTML = generateHTML(rootNode)
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex flex-col z-[100]">
+    <div 
+      className="fixed inset-0 bg-black/80 flex flex-col z-[100]"
+    >
       {/* Header */}
       <div className="bg-gray-900 text-white px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <h2 className="font-medium">Предпросмотр</h2>
           
+          {/* Zoom controls */}
+          <div className="flex items-center gap-1 bg-gray-800 rounded-lg p-1">
+            <button
+              onClick={() => setZoomState(Math.max(25, zoom - 10))}
+              disabled={zoom <= 25}
+              className="p-1.5 rounded hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Уменьшить масштаб"
+            >
+              <ZoomOut size={16} className="text-gray-300" />
+            </button>
+            
+            <div className="flex items-center">
+              <input
+                type="text"
+                value={zoomInput}
+                onChange={(e) => setZoomInput(e.target.value)}
+                onBlur={() => {
+                  const val = parseInt(zoomInput, 10)
+                  if (isNaN(val) || val < 25) {
+                    setZoomState(25)
+                    setZoomInput('25')
+                  } else if (val > 500) {
+                    setZoomState(500)
+                    setZoomInput('500')
+                  } else {
+                    setZoomState(val)
+                    setZoomInput(String(val))
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur()
+                  }
+                }}
+                onDoubleClick={() => setZoomState(100)}
+                className="px-1 py-1 text-xs font-medium text-gray-300 hover:bg-gray-700 rounded-l transition-colors w-[32px] text-right bg-transparent border-none outline-none focus:bg-gray-700 cursor-text"
+                title="Введите масштаб или дважды кликните для сброса"
+              />
+              <span className="text-xs font-medium text-gray-300">%</span>
+            </div>
+            
+            
+            <button
+              onClick={() => setZoomState(Math.min(500, zoom + 10))}
+              disabled={zoom >= 500}
+              className="p-1.5 rounded hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Увеличить масштаб"
+            >
+              <ZoomIn size={16} className="text-gray-300" />
+            </button>
+          </div>
+          
+          {/* Breakpoint buttons - always visible */}
+          <div className="flex items-center gap-1 bg-gray-800 rounded-lg p-1">
+            {breakpoints.map((bp) => (
+              <button
+                key={bp.id}
+                className={`px-3 py-1 rounded text-sm transition-colors ${
+                  selectedBreakpoint === bp.id && !isManualMode ? 'bg-gray-700' : 'hover:bg-gray-700/50'
+                }`}
+                onClick={() => handleBreakpointSelect(bp.id)}
+                title={`${bp.name} (${bp.width}px)`}
+              >
+                {bp.name}
+              </button>
+            ))}
+          </div>
+          
           {/* Manual mode toggle */}
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-2 cursor-pointer bg-gray-800 px-3 py-1.5 rounded-lg">
             <input
               type="checkbox"
               checked={isManualMode}
-              onChange={(e) => setIsManualMode(e.target.checked)}
+              onChange={(e) => handleManualModeToggle(e.target.checked)}
               className="w-4 h-4 rounded"
             />
             <span className="text-sm">Ручной режим</span>
           </label>
           
-          {!isManualMode && (
-            <div className="flex items-center gap-1 bg-gray-800 rounded-lg p-1">
-              {breakpoints.map((bp) => (
-                <button
-                  key={bp.id}
-                  className={`px-3 py-1 rounded text-sm transition-colors ${
-                    selectedBreakpoint === bp.id ? 'bg-gray-700' : 'hover:bg-gray-700/50'
-                  }`}
-                  onClick={() => setSelectedBreakpoint(bp.id)}
-                >
-                  {bp.name}
-                </button>
-              ))}
-            </div>
-          )}
-          
-          {/* Size display */}
-          <div className="text-sm text-gray-400">
-            {displayWidth} × {displayHeight}px
+          {/* Size display and controls */}
+          <div className="flex items-center gap-3 bg-gray-800 px-3 py-1.5 rounded-lg">
+            {isManualMode ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400">Ширина:</span>
+                  <input
+                    type="number"
+                    value={manualWidth}
+                    onChange={(e) => setManualWidth(Math.max(320, Math.min(3840, parseInt(e.target.value) || 320)))}
+                    className="w-20 px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                    min="320"
+                    max="3840"
+                    step="1"
+                  />
+                  <input
+                    type="range"
+                    value={manualWidth}
+                    onChange={(e) => setManualWidth(parseInt(e.target.value))}
+                    className="w-32"
+                    min="320"
+                    max="3840"
+                    step="1"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400">Высота:</span>
+                  <input
+                    type="number"
+                    value={manualHeight}
+                    onChange={(e) => setManualHeight(Math.max(400, Math.min(2160, parseInt(e.target.value) || 400)))}
+                    className="w-20 px-2 py-1 bg-gray-700 text-white text-sm rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                    min="400"
+                    max="2160"
+                    step="1"
+                  />
+                  <input
+                    type="range"
+                    value={manualHeight}
+                    onChange={(e) => setManualHeight(parseInt(e.target.value))}
+                    className="w-32"
+                    min="400"
+                    max="2160"
+                    step="1"
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-gray-300">
+                {displayWidth} × {displayHeight}px
+              </div>
+            )}
           </div>
         </div>
         
         <button 
           onClick={onClose}
-          className="p-2 hover:bg-gray-800 rounded"
+          className="p-2 hover:bg-gray-800 rounded transition-colors"
         >
           <X size={20} />
         </button>
       </div>
       
       {/* Preview Content */}
-      <div className="flex-1 overflow-auto p-8 flex justify-center items-center">
+      <div 
+        ref={previewRef}
+        className="flex-1 overflow-auto p-8 flex justify-center items-center bg-gray-800"
+      >
         <div 
-          className="bg-white shadow-2xl transition-all duration-300 overflow-auto relative"
+          className="relative" 
           style={{ 
-            width: `${displayWidth}px`,
-            height: `${displayHeight}px`,
-            maxWidth: '100%',
-            maxHeight: '100%',
-            resize: isManualMode ? 'both' : 'none',
-            border: isManualMode ? '2px solid #3b82f6' : '2px solid #e5e7eb',
-            minHeight: '400px',
-          }}
-          onMouseUp={(e) => {
-            if (isManualMode) {
-              const target = e.currentTarget
-              setManualWidth(target.offsetWidth)
-              setManualHeight(target.offsetHeight)
-            }
+            display: 'inline-block',
+            transform: `scale(${zoom / 100})`,
+            transformOrigin: 'center center',
           }}
         >
-          <iframe
-            srcDoc={`
-              <!DOCTYPE html>
-              <html>
-                <head>
-                  <meta charset="utf-8">
-                  <meta name="viewport" content="width=device-width, initial-scale=1">
-                  <style>
-                    * { margin: 0; padding: 0; box-sizing: border-box; }
-                    body { font-family: system-ui, -apple-system, sans-serif; }
-                  </style>
-                </head>
-                <body>${previewHTML}</body>
-              </html>
-            `}
-            className="w-full h-full min-h-[600px] border-0"
-            title="Preview"
-          />
+          <div 
+            className="bg-white shadow-2xl overflow-auto"
+            style={{ 
+              width: `${displayWidth}px`,
+              height: `${displayHeight}px`,
+              border: isManualMode ? '2px solid #3b82f6' : '2px solid #e5e7eb',
+              userSelect: isResizing ? 'none' : 'auto',
+            }}
+          >
+            <iframe
+              srcDoc={`
+                <!DOCTYPE html>
+                <html>
+                  <head>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <style>
+                      * { margin: 0; padding: 0; box-sizing: border-box; }
+                      body { font-family: system-ui, -apple-system, sans-serif; }
+                    </style>
+                  </head>
+                  <body>${previewHTML}</body>
+                </html>
+              `}
+              className="w-full h-full border-0"
+              title="Preview"
+              style={{ pointerEvents: (isResizing || ctrlPressed) ? 'none' : 'auto' }}
+            />
+          </div>
+          
+          {/* Resize handles - positioned outside the iframe container (DevTools style) */}
+          {isManualMode && (
+            <>
+              {/* Bottom-right corner handle (main) */}
+              <div
+                onMouseDown={(e) => handleResizeStart(e, 'bottom-right')}
+                className="absolute w-4 h-4 bg-blue-500 cursor-nwse-resize hover:bg-blue-600 z-10"
+                style={{ 
+                  bottom: '0',
+                  right: '0',
+                  transform: 'translate(50%, 50%)',
+                  boxShadow: '0 0 0 1px white, 0 2px 4px rgba(0,0,0,0.3)',
+                }}
+              />
+              
+              {/* Bottom edge handle */}
+              <div
+                onMouseDown={(e) => handleResizeStart(e, 'bottom')}
+                className="absolute cursor-ns-resize hover:bg-blue-500/20 z-10"
+                style={{ 
+                  bottom: '0',
+                  left: '0',
+                  right: '0',
+                  height: '8px',
+                  transform: 'translateY(50%)',
+                  borderBottom: '2px solid #3b82f6',
+                }}
+              />
+              
+              {/* Right edge handle */}
+              <div
+                onMouseDown={(e) => handleResizeStart(e, 'right')}
+                className="absolute cursor-ew-resize hover:bg-blue-500/20 z-10"
+                style={{ 
+                  right: '0',
+                  top: '0',
+                  bottom: '0',
+                  width: '8px',
+                  transform: 'translateX(50%)',
+                  borderRight: '2px solid #3b82f6',
+                }}
+              />
+              
+              {/* Size indicator overlay */}
+              <div
+                className="absolute bg-blue-500 text-white text-xs font-mono px-2 py-1 pointer-events-none z-20"
+                style={{
+                  top: '-28px',
+                  left: '0',
+                  opacity: isResizing ? 1 : 0,
+                  transition: 'opacity 0.15s',
+                }}
+              >
+                {manualWidth} × {manualHeight}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

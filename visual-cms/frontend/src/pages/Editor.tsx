@@ -156,6 +156,13 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
     
     loadEditor()
   }, [id, type, dispatch])
+  
+  // Set default right panel for page editor
+  useEffect(() => {
+    if (type === 'page') {
+      dispatch(setActiveRightPanel('pageSettings'))
+    }
+  }, [type, dispatch])
 
   // Update root container styles based on editor type and viewport
   useEffect(() => {

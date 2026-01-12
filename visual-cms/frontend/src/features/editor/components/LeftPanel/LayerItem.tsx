@@ -1,24 +1,34 @@
 import React, { useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectNode, selectSelectedNodeId, deleteNode } from '@/features/editor/editorSlice'
+import { selectNode, selectSelectedNodeId, deleteNode, selectBreakpoints, selectRootNode } from '@/features/editor/editorSlice'
 import * as Icons from 'lucide-react'
-import type { BlockNode } from '@/shared/types'
 import { cn } from '@/shared/utils'
+import { getNodeBreakpoint, BlockNodeWithViewport } from '../../utils/variationUtils'
 
 interface LayerItemProps {
-  node: BlockNode
+  node: BlockNodeWithViewport
   level: number
 }
 
 export const LayerItem: React.FC<LayerItemProps> = ({ node, level }) => {
   const dispatch = useAppDispatch()
   const selectedNodeId = useAppSelector(selectSelectedNodeId)
+  const breakpoints = useAppSelector(selectBreakpoints)
+  const rootNode = useAppSelector(selectRootNode)
   const [isExpanded, setIsExpanded] = useState(true)
   
   const isSelected = selectedNodeId === node.id
   const hasChildren = node.children && node.children.length > 0
   const isContainer = node.elementType === 'container'
   const isLocked = node.metadata?.locked || false
+  
+  // Определяем к какому breakpoint принадлежит элемент (если он специфичный)
+  // Используем _viewportId из эффективного дерева, если есть, иначе ищем через getNodeBreakpoint
+  const nodeBreakpointId = node._viewportId || (rootNode ? getNodeBreakpoint(node.id, rootNode) : null)
+  const nodeBreakpoint = nodeBreakpointId ? breakpoints.find(bp => bp.id === nodeBreakpointId) : null
+  
+  // Элемент является viewport-специфичным если у него есть nodeBreakpoint
+  const isViewportSpecific = !!nodeBreakpoint
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -115,8 +125,23 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level }) => {
           'flex-1 truncate',
           isSelected ? 'text-primary-900 font-medium' : 'text-gray-700'
         )}>
-          {node.metadata.name || node.tagName}
+          {node.metadata?.name || node.tagName}
         </span>
+        
+        {/* Viewport-specific indicator */}
+        {isViewportSpecific && nodeBreakpoint && (
+          <span 
+            className="px-1.5 py-0.5 text-xs rounded font-medium"
+            style={{ 
+              backgroundColor: `${nodeBreakpoint.color}20` || '#10b98120',
+              color: nodeBreakpoint.color || '#10b981',
+              border: `1px solid ${nodeBreakpoint.color || '#10b981'}`
+            }}
+            title={`Только для ${nodeBreakpoint.name}`}
+          >
+            {nodeBreakpoint.name.slice(0, 3)}
+          </span>
+        )}
 
         {/* Lock indicator */}
         {isLocked && (

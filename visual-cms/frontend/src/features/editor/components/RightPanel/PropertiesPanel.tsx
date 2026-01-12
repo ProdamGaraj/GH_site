@@ -1,15 +1,16 @@
 import React, { useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { updateNode, deleteNode, selectViewport, selectBreakpoints } from '@/features/editor/editorSlice'
+import { updateNode, deleteNode, selectViewport, selectBreakpoints, selectRootNode, selectEditMode, moveNodeToViewport } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
 import { Button } from '@/shared/components/Button'
-import { Trash2, Move, Palette, Type, Code, Monitor, Tablet, Smartphone, Laptop, Watch } from 'lucide-react'
+import { Trash2, Move, Palette, Type, Code, Monitor, Tablet, Smartphone, Laptop, Watch, Settings2, ArrowRightLeft, Globe } from 'lucide-react'
 import type { BlockNode } from '@/shared/types'
 import { PositioningTab } from './PositioningTab'
 import { ColorsTab } from './ColorsTab'
 import { ContentTab } from './ContentTab'
 import { CustomCSSTab } from './CustomCSSTab'
 import { cn } from '@/shared/utils'
+import { getNodeBreakpoint } from '../../utils/variationUtils'
 
 interface PropertiesPanelProps {
   node: BlockNode
@@ -21,9 +22,18 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
   const dispatch = useAppDispatch()
   const viewport = useAppSelector(selectViewport)
   const breakpoints = useAppSelector(selectBreakpoints)
+  const rootNode = useAppSelector(selectRootNode)
+  const editMode = useAppSelector(selectEditMode)
   const [activeTab, setActiveTab] = useState<TabType>('positioning')
+  const [showMoveMenu, setShowMoveMenu] = useState(false)
   
   const currentBreakpoint = breakpoints.find(bp => bp.id === viewport)
+  
+  // Определяем, к какому viewport принадлежит текущий элемент
+  const nodeBreakpointId = rootNode ? getNodeBreakpoint(node.id, rootNode) : null
+  const nodeBreakpoint = nodeBreakpointId ? breakpoints.find(bp => bp.id === nodeBreakpointId) : null
+  const isBaseElement = nodeBreakpointId === null
+  const isViewportSpecific = nodeBreakpointId !== null
   
   const getIcon = (iconName?: string) => {
     switch (iconName) {
@@ -36,7 +46,16 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
     }
   }
   
-  const ViewportIcon = currentBreakpoint ? getIcon(currentBreakpoint.icon) : Monitor
+  const ViewportIcon = viewport === 'base' ? Settings2 : (currentBreakpoint ? getIcon(currentBreakpoint.icon) : Monitor)
+  
+  // Определяем название и описание viewport
+  const viewportName = viewport === 'base' 
+    ? 'Общий' 
+    : (currentBreakpoint ? `${currentBreakpoint.name} (${currentBreakpoint.width}px)` : 'Unknown viewport')
+  
+  const viewportDescription = viewport === 'base'
+    ? 'Изменения применяются для всех viewport'
+    : `Изменения применяются для ${currentBreakpoint?.name || 'этого экрана'}`
 
   const handleNameChange = (name: string) => {
     dispatch(updateNode({
@@ -48,6 +67,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
   }
 
   const handleDelete = () => {
+    console.log('handleDelete called for node:', node.id)
     const hasChildren = node.children && node.children.length > 0
     
     if (hasChildren) {
@@ -59,7 +79,14 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
     }
   }
 
-  const isRootElement = !node.id.includes('-') || node.metadata.name === 'Root Container'
+  const isRootElement = !node.id.includes('-') || node.metadata?.name === 'Root Container'
+  
+  console.log('PropertiesPanel render:', { nodeId: node.id, isRootElement, metadataName: node.metadata?.name })
+
+  const handleMoveToViewport = (targetBreakpoint: string | null) => {
+    dispatch(moveNodeToViewport({ nodeId: node.id, targetBreakpoint }))
+    setShowMoveMenu(false)
+  }
 
   const tabs = [
     { id: 'positioning' as TabType, label: 'Позиция', icon: Move },
@@ -86,13 +113,97 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
           <div className="flex items-center gap-2 text-sm">
             <ViewportIcon size={16} className="text-primary-600" />
             <span className="text-primary-700 font-medium">
-              {currentBreakpoint ? `${currentBreakpoint.name} (${currentBreakpoint.width}px)` : 'Unknown viewport'}
+              {viewportName}
             </span>
           </div>
           <p className="text-xs text-primary-600 mt-1">
-            Изменения применяются для {currentBreakpoint?.name || 'этого экрана'}
+            {viewportDescription}
           </p>
         </div>
+        
+        {/* Element viewport ownership */}
+        {!isRootElement && (
+          <div className="mb-3 px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg relative">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm">
+                {isBaseElement ? (
+                  <>
+                    <Globe size={14} className="text-gray-600" />
+                    <span className="text-gray-700 font-medium">Все viewport'ы</span>
+                  </>
+                ) : (
+                  <>
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: nodeBreakpoint?.color || '#6b7280' }}
+                    />
+                    <span className="text-gray-700 font-medium">
+                      Только {nodeBreakpoint?.name}
+                    </span>
+                  </>
+                )}
+              </div>
+              
+              {/* Move button */}
+              <button
+                onClick={() => setShowMoveMenu(!showMoveMenu)}
+                className="p-1 hover:bg-gray-200 rounded transition-colors"
+                title="Перенести в другой viewport"
+              >
+                <ArrowRightLeft size={14} className="text-gray-600" />
+              </button>
+            </div>
+            
+            {/* Move menu */}
+            {showMoveMenu && (
+              <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[180px]">
+                <div className="p-2 border-b border-gray-100">
+                  <span className="text-xs font-medium text-gray-500">Перенести в:</span>
+                </div>
+                <div className="p-1">
+                  {/* Move to base (all viewports) */}
+                  {isViewportSpecific && (
+                    <button
+                      onClick={() => handleMoveToViewport(null)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-100 rounded transition-colors"
+                    >
+                      <Globe size={14} className="text-gray-600" />
+                      <span>Все viewport'ы</span>
+                    </button>
+                  )}
+                  
+                  {/* Move to specific viewport */}
+                  {breakpoints.map(bp => {
+                    // Skip current viewport if already specific to it
+                    if (nodeBreakpointId === bp.id) return null
+                    
+                    const BpIcon = getIcon(bp.icon)
+                    return (
+                      <button
+                        key={bp.id}
+                        onClick={() => handleMoveToViewport(bp.id)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-100 rounded transition-colors"
+                      >
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: bp.color || '#6b7280' }}
+                        />
+                        <span>Только {bp.name}</span>
+                        <span className="text-xs text-gray-400 ml-auto">{bp.width}px</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+            
+            <p className="text-xs text-gray-500 mt-1">
+              {isBaseElement 
+                ? 'Элемент виден на всех размерах экрана' 
+                : `Элемент виден только на ${nodeBreakpoint?.name}`}
+            </p>
+          </div>
+        )}
 
         {/* Basic Info */}
         <div className="space-y-2">
