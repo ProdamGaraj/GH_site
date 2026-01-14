@@ -1,10 +1,26 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Header } from '@/shared/components/Header'
-import { FileText, Box, Plus } from 'lucide-react'
+import { FileText, Box, Plus, Loader2 } from 'lucide-react'
+import { useAppDispatch, useAppSelector } from '@/app/hooks'
+import { fetchBlocks, selectBlocks, selectBlocksLoading } from '@/features/blocks/blocksSlice'
+import { fetchPages, selectPages, selectPagesLoading } from '@/features/pages/pagesSlice'
 
 export const Dashboard: React.FC = () => {
+  const dispatch = useAppDispatch()
+  const blocks = useAppSelector(selectBlocks)
+  const blocksLoading = useAppSelector(selectBlocksLoading)
+  const pages = useAppSelector(selectPages)
+  const pagesLoading = useAppSelector(selectPagesLoading)
+
+  useEffect(() => {
+    dispatch(fetchBlocks())
+    dispatch(fetchPages())
+  }, [dispatch])
+
+  const publishedPages = pages.filter(p => p.status === 'published')
+
   return (
     <div className="h-screen flex flex-col">
       <Header />
@@ -76,15 +92,27 @@ export const Dashboard: React.FC = () => {
       <div className="mt-8 grid grid-cols-3 gap-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <p className="text-sm text-gray-600 mb-1">Всего страниц</p>
-          <p className="text-3xl font-bold text-gray-900">0</p>
+          {pagesLoading ? (
+            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+          ) : (
+            <p className="text-3xl font-bold text-gray-900">{pages.length}</p>
+          )}
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <p className="text-sm text-gray-600 mb-1">Всего блоков</p>
-          <p className="text-3xl font-bold text-gray-900">0</p>
+          {blocksLoading ? (
+            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+          ) : (
+            <p className="text-3xl font-bold text-gray-900">{blocks.length}</p>
+          )}
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <p className="text-sm text-gray-600 mb-1">Опубликовано</p>
-          <p className="text-3xl font-bold text-gray-900">0</p>
+          {pagesLoading ? (
+            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+          ) : (
+            <p className="text-3xl font-bold text-gray-900">{publishedPages.length}</p>
+          )}
         </div>
       </div>
       </div>

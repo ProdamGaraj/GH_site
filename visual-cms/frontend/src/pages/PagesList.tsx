@@ -1,15 +1,19 @@
-import React, { useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Header } from '@/shared/components/Header'
-import { Plus, Edit, Trash2, ExternalLink } from 'lucide-react'
+import { ImportModal } from '@/shared/components/ImportModal'
+import { Plus, Edit, Trash2, ExternalLink, Upload } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { fetchPages, deletePage, selectPages, selectPagesLoading } from '@/features/pages/pagesSlice'
+import type { BlockNode } from '@/shared/types'
 
 export const PagesList: React.FC = () => {
   const dispatch = useAppDispatch()
+  const navigate = useNavigate()
   const pages = useAppSelector(selectPages)
   const loading = useAppSelector(selectPagesLoading)
+  const [showImportModal, setShowImportModal] = useState(false)
 
   useEffect(() => {
     dispatch(fetchPages())
@@ -52,12 +56,18 @@ export const PagesList: React.FC = () => {
             <h1 className="text-3xl font-bold text-gray-900">Страницы</h1>
             <p className="text-gray-600 mt-1">Управление страницами сайта</p>
           </div>
-          <Link to="/editor/page/new">
-            <Button>
-              <Plus size={16} className="mr-2" />
-              Создать страницу
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setShowImportModal(true)}>
+              <Upload size={16} className="mr-2" />
+              Импорт
             </Button>
-          </Link>
+            <Link to="/editor/page/new">
+              <Button>
+                <Plus size={16} className="mr-2" />
+                Создать страницу
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {loading ? (
@@ -150,6 +160,18 @@ export const PagesList: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Import Modal */}
+      <ImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        type="page"
+        onImport={(node: BlockNode, name: string) => {
+          // Сохраняем импортированную структуру в sessionStorage и переходим в редактор
+          sessionStorage.setItem('importedContent', JSON.stringify({ node, name, type: 'page' }))
+          navigate('/editor/page/new')
+        }}
+      />
     </div>
   )
 }

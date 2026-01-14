@@ -2,12 +2,14 @@ import React, { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
-import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight } from 'lucide-react'
+import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, Rocket, ExternalLink } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint } from '@/features/editor/editorSlice'
+import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode } from '@/features/editor/editorSlice'
 import { createBlock, updateBlock, selectBlocksSaving } from '@/features/blocks/blocksSlice'
 import { createPage, updatePage, selectPagesSaving } from '@/features/pages/pagesSlice'
 import { BreakpointManager } from './BreakpointManager'
+import { ExportImportModal } from './ExportImportModal'
+import { deployApi } from '@/shared/api'
 
 interface EditorToolbarProps {
   type: 'page' | 'block'
@@ -54,9 +56,13 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [showBreakpointManager, setShowBreakpointManager] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [importTabActive, setImportTabActive] = useState(false)
   const [blockName, setBlockName] = useState(initialBlockName || '')
   const [isReusable, setIsReusable] = useState(true)
   const [zoomInput, setZoomInput] = useState(String(zoom))
+  const [isDeploying, setIsDeploying] = useState(false)
+  const [deployResult, setDeployResult] = useState<{ success: boolean; message: string; url?: string } | null>(null)
 
   // Sync zoomInput with redux zoom when it changes externally
   React.useEffect(() => {
@@ -187,6 +193,37 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
   const handleClosePreview = () => {
     setShowPreview(false)
+  }
+
+  const handleDeploy = async () => {
+    if (!id || isNewBlock) {
+      setDeployResult({ success: false, message: 'Сначала сохраните страницу' })
+      setTimeout(() => setDeployResult(null), 3000)
+      return
+    }
+
+    setIsDeploying(true)
+    setDeployResult(null)
+
+    try {
+      const result = await deployApi.deployPage(id)
+      setDeployResult({
+        success: result.success,
+        message: result.message,
+        url: result.publicUrl
+      })
+      
+      // Автоматически скрываем сообщение через 5 секунд
+      setTimeout(() => setDeployResult(null), 5000)
+    } catch (error: any) {
+      setDeployResult({
+        success: false,
+        message: error.message || 'Ошибка при публикации'
+      })
+      setTimeout(() => setDeployResult(null), 5000)
+    } finally {
+      setIsDeploying(false)
+    }
   }
   
   const handleZoomIn = () => {
@@ -355,6 +392,17 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <Eye size={16} className="mr-2" />
           Предпросмотр
         </Button>
+        
+        <Button variant="secondary" size="sm" onClick={() => { setShowExportModal(true); setImportTabActive(false) }}>
+          <Download size={16} className="mr-2" />
+          Экспорт
+        </Button>
+        
+        <Button variant="secondary" size="sm" onClick={() => { setShowExportModal(true); setImportTabActive(true) }}>
+          <Upload size={16} className="mr-2" />
+          Импорт
+        </Button>
+        
         <Button 
           size="sm" 
           onClick={handleSave}
@@ -367,7 +415,63 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           )}
           Сохранить
         </Button>
+
+        {/* Deploy button - only for page editor */}
+        {isPageEditor && !isNewBlock && (
+          <Button 
+            size="sm" 
+            variant="secondary"
+            onClick={handleDeploy}
+            disabled={isDeploying || isDirty}
+            title={isDirty ? 'Сначала сохраните изменения' : 'Опубликовать страницу на сайт'}
+            className="bg-green-600 hover:bg-green-700 text-white border-green-600"
+          >
+            {isDeploying ? (
+              <Loader2 size={16} className="mr-2 animate-spin" />
+            ) : (
+              <Rocket size={16} className="mr-2" />
+            )}
+            Опубликовать
+          </Button>
+        )}
+
+        {/* Deploy result notification */}
+        {deployResult && (
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
+            deployResult.success 
+              ? 'bg-green-100 text-green-800' 
+              : 'bg-red-100 text-red-800'
+          }`}>
+            {deployResult.success ? <Check size={16} /> : <X size={16} />}
+            <span>{deployResult.message}</span>
+            {deployResult.url && (
+              <a 
+                href={deployResult.url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 underline hover:no-underline"
+              >
+                Открыть <ExternalLink size={14} />
+              </a>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Export/Import Modal */}
+      {showExportModal && rootNode && (
+        <ExportImportModal
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          node={rootNode}
+          name={isPageEditor ? (pageSettings?.name || 'Page') : (blockName || 'Block')}
+          type={isPageEditor ? 'page' : 'block'}
+          defaultTab={importTabActive ? 'import' : 'export'}
+          onImport={(importedNode) => {
+            dispatch(loadRootNode(importedNode))
+          }}
+        />
+      )}
 
       {/* Save Dialog */}
       {showSaveDialog && (

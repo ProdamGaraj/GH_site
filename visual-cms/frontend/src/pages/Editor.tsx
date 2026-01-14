@@ -108,6 +108,32 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
 
   useEffect(() => {
     const loadEditor = async () => {
+      // Проверяем есть ли импортированный контент
+      const importedContentStr = sessionStorage.getItem('importedContent')
+      if (importedContentStr && (!id || id === 'new')) {
+        try {
+          const importedContent = JSON.parse(importedContentStr)
+          sessionStorage.removeItem('importedContent') // Очищаем после использования
+          
+          // Загружаем импортированную структуру
+          const { loadEditor: loadEditorAction } = await import('@/features/editor/editorSlice')
+          dispatch(loadEditorAction(importedContent.node))
+          
+          // Устанавливаем имя для страницы
+          if (type === 'page' && importedContent.name) {
+            setPageSettings(prev => ({
+              ...prev,
+              name: importedContent.name,
+              slug: importedContent.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            }))
+          }
+          return
+        } catch (e) {
+          console.error('Failed to load imported content:', e)
+          sessionStorage.removeItem('importedContent')
+        }
+      }
+      
       if (!id || id === 'new') {
         dispatch(createNewEditor())
       } else if (type === 'block') {

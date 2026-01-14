@@ -2,8 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Muller Font Family */
+@font-face {
+  font-family: 'Muller';
+  src: url('./shared/fonts/muller-light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Muller';
+  src: url('./shared/fonts/ofont.ru_Muller.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Muller';
+  src: url('./shared/fonts/muller-medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Muller';
+  src: url('./shared/fonts/muller-bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Muller';
+  src: url('./shared/fonts/muller-extrabold.otf') format('opentype');
+  font-weight: 800;
+  font-style: normal;
+}
+
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Muller', Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
@@ -77,15 +113,15 @@ body {
 
 /* Canvas element styles */
 .canvas-element {
-  position: relative;
+  /* НЕ переопределяем position - используем из стилей элемента */
   outline: 1px dashed transparent;
   transition: outline 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
   cursor: pointer;
 }
 
 .canvas-element:hover {
-  outline-color: #3b82f6;
-  outline-width: 2px;
+  outline-color: rgba(59, 130, 246, 0.5);
+  outline-width: 1px;
 }
 
 .canvas-element--selected {
@@ -123,32 +159,34 @@ body {
 }
 
 .canvas-element--root {
-  min-height: 400px;
+  min-height: 100px;
 }
 
-/* Layout mode indicators */
-.canvas-element[data-layout-mode="absolute"] {
-  position: relative;
+/* Preview mode - чистый режим без outline */
+.canvas-preview-mode .canvas-element {
+  outline: none !important;
+  cursor: default;
 }
 
+.canvas-preview-mode .canvas-element:hover {
+  outline: none !important;
+}
+
+.canvas-preview-mode .canvas-element--selected {
+  outline: none !important;
+}
+
+.canvas-preview-mode .canvas-element--selected::before {
+  display: none;
+}
+
+.canvas-preview-mode .canvas-element[data-layout-mode]::after {
+  display: none !important;
+}
+
+/* Layout mode indicators - убираем, т.к. это мешает видеть реальный результат */
 .canvas-element[data-layout-mode="absolute"]::after {
-  content: "Absolute";
-  position: absolute;
-  bottom: 4px;
-  right: 4px;
-  background: rgba(245, 158, 11, 0.9);
-  color: white;
-  padding: 1px 6px;
-  font-size: 9px;
-  border-radius: 2px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.canvas-element[data-layout-mode="absolute"]:hover::after,
-.canvas-element[data-layout-mode="absolute"].canvas-element--selected::after {
-  opacity: 1;
+  display: none;
 }
 
 /* Drag preview */

@@ -5,6 +5,7 @@ import { PagesList } from '@/pages/PagesList'
 import { BlocksList } from '@/pages/BlocksList'
 import { Settings } from '@/pages/Settings'
 import { Editor } from '@/pages/Editor'
+import { GoldenHouseHome } from '@/pages/GoldenHouseHome'
 
 export const router = createBrowserRouter([
   {
@@ -44,5 +45,9 @@ export const router = createBrowserRouter([
         element: <Editor type="block" />,
       },
     ],
+  },
+  {
+    path: '/golden-house',
+    element: <GoldenHouseHome />,
   },
 ])

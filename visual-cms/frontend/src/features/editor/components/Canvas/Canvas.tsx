@@ -122,7 +122,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   return (
     <div 
       ref={canvasRef}
-      className="flex-1 bg-gray-100 overflow-auto relative"
+      className="flex-1 bg-gray-200 overflow-auto relative"
       data-canvas="true"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -133,13 +133,10 @@ export const Canvas: React.FC<CanvasProps> = ({
       }}
     >
       <div 
-        className="w-full min-h-full p-8 flex"
+        className="min-h-full p-6 flex justify-center"
         style={{
           transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
           transition: isPanning ? 'none' : 'transform 0.1s ease-out',
-          // В base режиме центрируем по обеим осям, в responsive - только по горизонтали
-          justifyContent: 'center',
-          alignItems: editMode === 'base' ? 'center' : 'flex-start'
         }}
       >
         {/* Drop indicator overlay - positioned relative to canvas container */}
@@ -163,14 +160,19 @@ export const Canvas: React.FC<CanvasProps> = ({
         <div 
           className="relative"
           style={{ 
-            // В responsive режиме показываем viewport с границами
-            width: editMode === 'responsive' && currentBreakpoint ? `${currentBreakpoint.width}px` : 'auto',
-            minHeight: editMode === 'responsive' && currentBreakpoint?.height ? `${currentBreakpoint.height}px` : 'auto',
+            // Фиксированная ширина viewport (как экран)
+            width: editMode === 'responsive' && currentBreakpoint 
+              ? `${currentBreakpoint.width}px` 
+              : editorType === 'page' ? '1280px' : '800px',
+            // Высота автоматическая - страница скроллится вертикально
+            minHeight: 'auto',
             transform: `scale(${zoom / 100})`,
-            transformOrigin: editMode === 'base' ? 'center center' : 'top center',
-            // Синяя рамка только в responsive режиме
-            boxShadow: editMode === 'responsive' && currentBreakpoint ? '0 0 0 2px #3b82f6' : 'none',
-            background: 'white'
+            transformOrigin: 'top center',
+            // Тень для визуального выделения страницы
+            boxShadow: '0 4px 40px rgba(0,0,0,0.15)',
+            background: 'white',
+            // Применяем базовый шрифт для страницы
+            fontFamily: 'Muller, sans-serif',
           }}
         >
           {/* Breakpoint size indicator - только в responsive режиме */}

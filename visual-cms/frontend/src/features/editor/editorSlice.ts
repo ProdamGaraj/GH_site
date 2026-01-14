@@ -846,6 +846,13 @@ const editorSlice = createSlice({
       state.isDirty = false
     },
     
+    // Загрузить структуру из импорта
+    loadRootNode: (state, action: PayloadAction<BlockNode>) => {
+      state.rootNode = action.payload
+      state.isDirty = true
+      state.selectedNodeId = null
+    },
+    
     setZoom: (state, action: PayloadAction<number>) => {
       state.zoom = Math.max(25, Math.min(500, action.payload))
     },
@@ -1035,6 +1042,7 @@ export const {
   removeBreakpoint,
   updateBreakpoint,
   markAsSaved,
+  loadRootNode,
   setZoom,
   setActiveLeftPanel,
   setActiveRightPanel,

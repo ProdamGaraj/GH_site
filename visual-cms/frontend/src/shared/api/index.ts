@@ -127,3 +127,26 @@ export interface UpdatePageDto {
   }
   status?: 'draft' | 'published' | 'archived'
 }
+
+// Deploy API
+export interface DeployResult {
+  success: boolean
+  message: string
+  deployedPages: string[]
+  errors: string[]
+  publicUrl?: string
+}
+
+export const deployApi = {
+  // Деплой одной страницы
+  deployPage: (pageId: string) => api.post<DeployResult>(`/deploy/${pageId}`),
+  
+  // Деплой всех опубликованных страниц
+  deployAll: () => api.post<DeployResult>('/deploy'),
+  
+  // Получить список опубликованных файлов
+  getDeployedFiles: () => api.get<{ files: string[], publicUrl: string }>('/deploy'),
+  
+  // Удалить страницу из публикации
+  undeploy: (slug: string) => api.delete<{ message: string }>(`/deploy/${slug}`),
+}

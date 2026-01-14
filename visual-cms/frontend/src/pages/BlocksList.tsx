@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Header } from '@/shared/components/Header'
-import { Plus, Loader2, Box, Calendar, Pencil, Trash2 } from 'lucide-react'
+import { ImportModal } from '@/shared/components/ImportModal'
+import { Plus, Loader2, Box, Calendar, Pencil, Trash2, Upload } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { 
   fetchBlocks, 
@@ -11,12 +12,15 @@ import {
   selectBlocksLoading,
   selectBlocksError 
 } from '@/features/blocks/blocksSlice'
+import type { BlockNode } from '@/shared/types'
 
 export const BlocksList: React.FC = () => {
   const dispatch = useAppDispatch()
+  const navigate = useNavigate()
   const blocks = useAppSelector(selectBlocks)
   const loading = useAppSelector(selectBlocksLoading)
   const error = useAppSelector(selectBlocksError)
+  const [showImportModal, setShowImportModal] = useState(false)
 
   useEffect(() => {
     dispatch(fetchBlocks())
@@ -45,12 +49,18 @@ export const BlocksList: React.FC = () => {
             <h1 className="text-3xl font-bold text-gray-900">Блоки</h1>
             <p className="text-gray-600 mt-1">Библиотека переиспользуемых компонентов</p>
           </div>
-          <Link to="/editor/block/new">
-            <Button>
-              <Plus size={16} className="mr-2" />
-              Создать блок
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={() => setShowImportModal(true)}>
+              <Upload size={16} className="mr-2" />
+              Импорт
             </Button>
-          </Link>
+            <Link to="/editor/block/new">
+              <Button>
+                <Plus size={16} className="mr-2" />
+                Создать блок
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {loading && (
@@ -141,6 +151,18 @@ export const BlocksList: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Import Modal */}
+      <ImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        type="block"
+        onImport={(node: BlockNode, name: string) => {
+          // Сохраняем импортированную структуру в sessionStorage и переходим в редактор
+          sessionStorage.setItem('importedContent', JSON.stringify({ node, name, type: 'block' }))
+          navigate('/editor/block/new')
+        }}
+      />
     </div>
   )
 }
