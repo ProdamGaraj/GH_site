@@ -117,7 +117,7 @@ export const RightPanel: React.FC = () => {
           <Button
             onClick={handleCancel}
             disabled={isSaving}
-            variant="outline"
+            // variant="outline"
             className="w-full bg-red-600 hover:bg-red-700 text-white"
             size="sm"
           >

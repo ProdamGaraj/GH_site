@@ -41,10 +41,10 @@ class ApiClient {
     return this.request<T>(endpoint, { method: 'GET' })
   }
 
-  post<T>(endpoint: string, data: unknown): Promise<T> {
+  post<T>(endpoint: string, data?: unknown): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data !== undefined ? JSON.stringify(data) : undefined,
     })
   }
 

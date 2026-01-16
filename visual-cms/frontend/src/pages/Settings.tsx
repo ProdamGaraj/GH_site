@@ -12,10 +12,11 @@ import {
   removeStandardMonitor,
   updateStandardMonitor,
   addBreakpoint,
-  removeBreakpoint
+  removeBreakpoint,
+  updateBreakpoint
 } from '@/features/editor/editorSlice'
 import { Browser, StandardMonitor } from '@/shared/types'
-import { Plus, Trash2, Monitor, Laptop, Tablet, Smartphone, Watch } from 'lucide-react'
+import { Plus, Trash2, Monitor, Laptop, Tablet, Smartphone, Watch, Check, X } from 'lucide-react'
 import { Button } from '@/shared/components/Button'
 
 export const Settings: React.FC = () => {
@@ -23,6 +24,22 @@ export const Settings: React.FC = () => {
   const browsers = useAppSelector(selectBrowsers)
   const standardMonitors = useAppSelector(selectStandardMonitors)
   const breakpoints = useAppSelector(selectBreakpoints)
+
+  // Edit state for browsers
+  const [editingBrowser, setEditingBrowser] = useState<string | null>(null)
+  const [editBrowserData, setEditBrowserData] = useState<Partial<Browser>>({})
+
+  // Edit state for viewports
+  const [editingViewport, setEditingViewport] = useState<string | null>(null)
+  const [editViewportData, setEditViewportData] = useState<Partial<{
+    id: string
+    name: string
+    width: number
+    height?: number
+    browserId?: string
+    icon: 'monitor' | 'tablet' | 'smartphone' | 'laptop' | 'watch'
+    color: string
+  }>>({})
 
   // Browser form state
   const [newBrowser, setNewBrowser] = useState<Partial<Browser>>({
@@ -41,11 +58,17 @@ export const Settings: React.FC = () => {
   })
 
   // Viewport form state
-  const [newViewport, setNewViewport] = useState({
+  const [newViewport, setNewViewport] = useState<{
+    name: string
+    width: string
+    height: string
+    icon: 'monitor' | 'tablet' | 'smartphone' | 'laptop' | 'watch'
+    color: string
+  }>({
     name: '',
     width: '',
     height: '',
-    icon: 'monitor' as const,
+    icon: 'monitor',
     color: '#3b82f6'
   })
 
@@ -89,6 +112,40 @@ export const Settings: React.FC = () => {
     }
   }
 
+  const handleEditBrowser = (browser: Browser) => {
+    setEditingBrowser(browser.id)
+    setEditBrowserData(browser)
+  }
+
+  const handleSaveBrowser = () => {
+    if (editingBrowser && editBrowserData.id) {
+      dispatch(updateBrowser(editBrowserData as Browser))
+      setEditingBrowser(null)
+      setEditBrowserData({})
+    }
+  }
+
+  const handleEditViewport = (bp: any) => {
+    setEditingViewport(bp.id)
+    setEditViewportData(bp)
+  }
+
+  const handleSaveViewport = () => {
+    if (editingViewport && editViewportData.id && editViewportData.name && editViewportData.width && editViewportData.icon && editViewportData.color) {
+      dispatch(updateBreakpoint({
+        id: editViewportData.id,
+        name: editViewportData.name,
+        width: editViewportData.width,
+        height: editViewportData.height,
+        browserId: editViewportData.browserId,
+        icon: editViewportData.icon,
+        color: editViewportData.color
+      }))
+      setEditingViewport(null)
+      setEditViewportData({})
+    }
+  }
+
   const iconOptions = [
     { value: 'monitor' as const, Icon: Monitor, label: 'Monitor' },
     { value: 'laptop' as const, Icon: Laptop, label: 'Laptop' },
@@ -123,21 +180,64 @@ export const Settings: React.FC = () => {
               <div className="space-y-2 mb-4">
                 {browsers.map(browser => (
                   <div key={browser.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded border">
-                    <span className="text-2xl">{browser.icon}</span>
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">{browser.name}</div>
-                      <div className="text-sm text-gray-500">Offset: {browser.viewportHeightOffset}px</div>
-                    </div>
-                    {browser.isDefault && (
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">По умолчанию</span>
-                    )}
-                    {!browser.isDefault && (
-                      <button
-                        onClick={() => dispatch(removeBrowser(browser.id))}
-                        className="p-1 hover:bg-red-50 rounded text-red-600"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                    {editingBrowser === browser.id ? (
+                      <>
+                        <input
+                          type="text"
+                          value={editBrowserData.icon || ''}
+                          onChange={(e) => setEditBrowserData({ ...editBrowserData, icon: e.target.value })}
+                          className="w-12 px-2 py-1 text-center border border-gray-300 rounded"
+                        />
+                        <input
+                          type="text"
+                          value={editBrowserData.name || ''}
+                          onChange={(e) => setEditBrowserData({ ...editBrowserData, name: e.target.value })}
+                          className="flex-1 px-3 py-1 border border-gray-300 rounded"
+                        />
+                        <input
+                          type="number"
+                          value={editBrowserData.viewportHeightOffset || 0}
+                          onChange={(e) => setEditBrowserData({ ...editBrowserData, viewportHeightOffset: Number(e.target.value) })}
+                          className="w-24 px-3 py-1 border border-gray-300 rounded"
+                        />
+                        <button
+                          onClick={handleSaveBrowser}
+                          className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+                        >
+                          <Check size={16} />
+                        </button>
+                        <button
+                          onClick={() => { setEditingBrowser(null); setEditBrowserData({}) }}
+                          className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
+                        >
+                          <X size={16} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-2xl">{browser.icon}</span>
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">{browser.name}</div>
+                          <div className="text-sm text-gray-500">Offset: {browser.viewportHeightOffset}px</div>
+                        </div>
+                        {browser.isDefault && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">По умолчанию</span>
+                        )}
+                        <button
+                          onClick={() => handleEditBrowser(browser)}
+                          className="p-1 hover:bg-blue-50 rounded text-blue-600"
+                        >
+                          ✏️
+                        </button>
+                        {!browser.isDefault && (
+                          <button
+                            onClick={() => dispatch(removeBrowser(browser.id))}
+                            className="p-1 hover:bg-red-50 rounded text-red-600"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 ))}
@@ -258,26 +358,87 @@ export const Settings: React.FC = () => {
                   
                   return (
                     <div key={bp.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded border">
-                      <Icon size={20} className="text-gray-600" />
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-900">{bp.name}</div>
-                        <div className="text-sm text-gray-500">
-                          {bp.width}px{bp.height ? ` × ${bp.height}px` : ''}
-                        </div>
-                      </div>
-                      <div 
-                        className="w-6 h-6 rounded border"
-                        style={{ backgroundColor: bp.color }}
-                      />
-                      {isDefault ? (
-                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Системный</span>
+                      {editingViewport === bp.id ? (
+                        <>
+                          <select
+                            value={editViewportData.icon || 'monitor'}
+                            onChange={(e) => setEditViewportData({ ...editViewportData, icon: e.target.value as 'monitor' | 'tablet' | 'smartphone' | 'laptop' | 'watch' })}
+                            className="px-2 py-1 border border-gray-300 rounded"
+                          >
+                            {iconOptions.map(opt => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            value={editViewportData.name || ''}
+                            onChange={(e) => setEditViewportData({ ...editViewportData, name: e.target.value })}
+                            className="flex-1 px-3 py-1 border border-gray-300 rounded"
+                          />
+                          <input
+                            type="number"
+                            value={editViewportData.width || ''}
+                            onChange={(e) => setEditViewportData({ ...editViewportData, width: Number(e.target.value) })}
+                            className="w-24 px-3 py-1 border border-gray-300 rounded"
+                            placeholder="Width"
+                          />
+                          <input
+                            type="number"
+                            value={editViewportData.height || ''}
+                            onChange={(e) => setEditViewportData({ ...editViewportData, height: Number(e.target.value) || undefined })}
+                            className="w-24 px-3 py-1 border border-gray-300 rounded"
+                            placeholder="Height"
+                          />
+                          <input
+                            type="color"
+                            value={editViewportData.color || '#3b82f6'}
+                            onChange={(e) => setEditViewportData({ ...editViewportData, color: e.target.value })}
+                            className="w-12 h-8 border rounded cursor-pointer"
+                          />
+                          <button
+                            onClick={handleSaveViewport}
+                            className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+                          >
+                            <Check size={16} />
+                          </button>
+                          <button
+                            onClick={() => { setEditingViewport(null); setEditViewportData({}) }}
+                            className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
+                          >
+                            <X size={16} />
+                          </button>
+                        </>
                       ) : (
-                        <button
-                          onClick={() => dispatch(removeBreakpoint(bp.id))}
-                          className="p-1 hover:bg-red-50 rounded text-red-600"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <>
+                          <Icon size={20} className="text-gray-600" />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{bp.name}</div>
+                            <div className="text-sm text-gray-500">
+                              {bp.width}px{bp.height ? ` × ${bp.height}px` : ''}
+                            </div>
+                          </div>
+                          <div 
+                            className="w-6 h-6 rounded border"
+                            style={{ backgroundColor: bp.color }}
+                          />
+                          {isDefault && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Системный</span>
+                          )}
+                          <button
+                            onClick={() => handleEditViewport(bp)}
+                            className="p-1 hover:bg-blue-50 rounded text-blue-600"
+                          >
+                            ✏️
+                          </button>
+                          {!isDefault && (
+                            <button
+                              onClick={() => dispatch(removeBreakpoint(bp.id))}
+                              className="p-1 hover:bg-red-50 rounded text-red-600"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   )
@@ -361,11 +522,11 @@ export const Settings: React.FC = () => {
 
             {/* Info about editing defaults */}
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <h4 className="font-medium text-amber-900 mb-2">💡 Редактирование по умолчанию</h4>
+              <h4 className="font-medium text-amber-900 mb-2">💡 Редактирование настроек</h4>
               <p className="text-sm text-amber-800">
-                <strong>Браузеры:</strong> Можно удалять все кроме помеченных "По умолчанию". Для изменения offset создайте новый браузер.<br/>
-                <strong>Мониторы:</strong> Все можно удалять и добавлять. Используются как пресеты для быстрого создания viewports.<br/>
-                <strong>Viewports:</strong> Системные нельзя удалить, но можно редактировать их параметры в редакторе.
+                <strong>Браузеры:</strong> Все браузеры можно редактировать (✏️), системные нельзя удалить.<br/>
+                <strong>Мониторы:</strong> Все можно редактировать и удалять. Используются как пресеты для быстрого создания viewports.<br/>
+                <strong>Viewports:</strong> Все можно редактировать (✏️), системные (Desktop HD/FHD, Tablet, Mobile) нельзя удалить.
               </p>
             </div>
           </div>

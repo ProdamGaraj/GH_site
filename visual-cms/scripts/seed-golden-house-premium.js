@@ -50,6 +50,9 @@ const createHeader = () => createNode({
       padding: '0 80px',
       backgroundColor: 'rgba(255,255,255,0.98)',
       borderBottom: '1px solid rgba(0,0,0,0.06)',
+      position: 'sticky',
+      top: '0',
+      zIndex: '1000',
     },
   },
   children: [

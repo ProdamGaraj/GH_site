@@ -175,6 +175,7 @@ export interface BlockNode {
     locked?: boolean
     hidden?: boolean
     name?: string
+    linkedBlockId?: string
   }
   
   // Вариации для разных брейкпоинтов (независимые DOM деревья)
