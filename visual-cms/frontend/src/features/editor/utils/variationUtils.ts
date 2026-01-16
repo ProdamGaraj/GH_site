@@ -226,14 +226,6 @@ export function findNodeInTree(
   // Получаем эффективное дерево
   const effectiveNode = getEffectiveTree(node, breakpointId, editMode)
   
-  console.log('findNodeInTree:', { 
-    searchingFor: nodeId, 
-    currentNode: effectiveNode.id,
-    breakpointId,
-    editMode,
-    childrenIds: effectiveNode.children.map(c => c.id)
-  })
-  
   if (effectiveNode.id === nodeId) return effectiveNode
   
   for (const child of effectiveNode.children) {

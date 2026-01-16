@@ -1,6 +1,35 @@
 /**
  * Сервис генерации HTML из структуры страницы
  */
+import { styleGenerator } from './StyleGenerator'
+
+interface CSSProperties {
+  [key: string]: string | undefined
+}
+
+interface StateStyles {
+  hover?: CSSProperties
+  active?: CSSProperties
+  focus?: CSSProperties
+  disabled?: CSSProperties
+}
+
+interface StateTransition {
+  duration: number
+  easing: string
+  properties: string[]
+}
+
+interface Animation {
+  id: string
+  preset?: string
+  trigger: 'load' | 'scroll-into-view' | 'click' | 'loop'
+  duration: number
+  delay: number
+  easing: string
+  iterationCount: number | 'infinite'
+  keyframes?: { offset: number; properties: CSSProperties }[]
+}
 
 interface BlockNode {
   id: string
@@ -10,11 +39,14 @@ interface BlockNode {
   attributes?: Record<string, string>
   styles: {
     properties: Record<string, string>
+    states?: StateStyles
+    stateTransition?: StateTransition
   }
   children: BlockNode[]
   metadata: {
     name?: string
   }
+  animations?: Animation[]
 }
 
 interface PageMetadata {
@@ -30,6 +62,9 @@ export class HtmlGenerator {
    */
   generatePage(structure: BlockNode, metadata: PageMetadata, slug: string): string {
     const bodyContent = this.renderNode(structure)
+    
+    // Генерируем CSS для hover, анимаций и т.д.
+    const { css: dynamicCSS, keyframes, scripts } = styleGenerator.generateNodeTreeStyles(structure as any)
     
     return `<!DOCTYPE html>
 <html lang="ru">
@@ -113,10 +148,17 @@ export class HtmlGenerator {
     input, textarea {
       font-family: inherit;
     }
+    
+    /* Keyframes for animations */
+    ${keyframes}
+    
+    /* Dynamic styles (hover, animations, etc.) */
+    ${dynamicCSS}
   </style>
 </head>
 <body>
 ${bodyContent}
+${scripts ? `<script>\n${scripts}\n</script>` : ''}
 </body>
 </html>`
   }
@@ -131,11 +173,14 @@ ${bodyContent}
     const styles = this.renderStyles(node.styles?.properties || {})
     const attributes = this.renderAttributes(node.attributes || {})
     
+    // Добавляем data-element-id для CSS селекторов (hover, анимации)
+    const dataAttr = ` data-element-id="${node.id}"`
+    
     // Void elements (самозакрывающиеся)
     const voidElements = ['input', 'img', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr']
     
     if (voidElements.includes(tagName.toLowerCase())) {
-      return `${indent}<${tagName}${styles}${attributes} />\n`
+      return `${indent}<${tagName}${styles}${dataAttr}${attributes} />\n`
     }
     
     // Текстовый контент
@@ -148,15 +193,15 @@ ${bodyContent}
     
     // Если нет контента и детей - короткая запись
     if (!textContent && !childrenHtml) {
-      return `${indent}<${tagName}${styles}${attributes}></${tagName}>\n`
+      return `${indent}<${tagName}${styles}${dataAttr}${attributes}></${tagName}>\n`
     }
     
     // Полная запись с контентом
     if (textContent && !childrenHtml) {
-      return `${indent}<${tagName}${styles}${attributes}>${textContent}</${tagName}>\n`
+      return `${indent}<${tagName}${styles}${dataAttr}${attributes}>${textContent}</${tagName}>\n`
     }
     
-    return `${indent}<${tagName}${styles}${attributes}>\n${textContent ? indent + '  ' + textContent + '\n' : ''}${childrenHtml}${indent}</${tagName}>\n`
+    return `${indent}<${tagName}${styles}${dataAttr}${attributes}>\n${textContent ? indent + '  ' + textContent + '\n' : ''}${childrenHtml}${indent}</${tagName}>\n`
   }
 
   /**

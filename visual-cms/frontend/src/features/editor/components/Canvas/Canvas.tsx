@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react'
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useAppSelector, useAppDispatch } from '@/app/hooks'
 import { selectRootNode, selectDragState, selectViewport, selectBreakpoints, selectZoom, selectPanOffset, selectBlockAlignment, selectEditMode, setZoom, setPanOffset } from '@/features/editor/editorSlice'
 import { CanvasRenderer } from './CanvasRenderer'
@@ -25,23 +25,33 @@ export const Canvas: React.FC<CanvasProps> = ({
   const viewport = useAppSelector(selectViewport)
   const breakpoints = useAppSelector(selectBreakpoints)
   const zoom = useAppSelector(selectZoom)
-  const panOffset = useAppSelector(selectPanOffset)
+  const storedPanOffset = useAppSelector(selectPanOffset)
   const blockAlignment = useAppSelector(selectBlockAlignment)
   const editMode = useAppSelector(selectEditMode)
   const canvasRef = useRef<HTMLDivElement>(null)
+  const panContainerRef = useRef<HTMLDivElement>(null)
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
   const [isSpacePressed, setIsSpacePressed] = useState(false)
+  // Локальный pan offset для плавности (без Redux при drag)
+  const localPanRef = useRef({ x: storedPanOffset.x, y: storedPanOffset.y })
   
   const currentBreakpoint = breakpoints.find(bp => bp.id === viewport)
   
-  // Получаем эффективное дерево с учетом вариаций
-  // В base режиме viewport может быть 'base', используем editMode для определения
-  const effectiveTree = rootNode ? getEffectiveTree(
-    rootNode, 
-    viewport === 'base' ? null : viewport, 
-    editMode
-  ) : null
+  // Мемоизируем эффективное дерево - пересчитывается только при изменении rootNode, viewport или editMode
+  const effectiveTree = useMemo(() => {
+    if (!rootNode) return null
+    return getEffectiveTree(
+      rootNode, 
+      viewport === 'base' ? null : viewport, 
+      editMode
+    )
+  }, [rootNode, viewport, editMode])
+
+  // Синхронизируем localPanRef с Redux при внешних изменениях
+  useEffect(() => {
+    localPanRef.current = { x: storedPanOffset.x, y: storedPanOffset.y }
+  }, [storedPanOffset])
 
   // Zoom with Ctrl + Mouse Wheel
   useEffect(() => {
@@ -67,22 +77,27 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (e.button === 1 || (e.button === 0 && isSpacePressed)) {
       e.preventDefault()
       setIsPanning(true)
-      setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y })
+      setPanStart({ x: e.clientX - localPanRef.current.x, y: e.clientY - localPanRef.current.y })
     }
-  }, [panOffset, isSpacePressed])
+  }, [isSpacePressed])
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (isPanning) {
-      dispatch(setPanOffset({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y
-      }))
+    if (isPanning && panContainerRef.current) {
+      // Обновляем через DOM напрямую - без React state/Redux
+      const newX = e.clientX - panStart.x
+      const newY = e.clientY - panStart.y
+      localPanRef.current = { x: newX, y: newY }
+      panContainerRef.current.style.transform = `translate(${newX}px, ${newY}px)`
     }
-  }, [isPanning, panStart, dispatch])
+  }, [isPanning, panStart])
 
   const handleMouseUp = useCallback(() => {
+    if (isPanning) {
+      // Сохраняем в Redux только когда закончили pan
+      dispatch(setPanOffset(localPanRef.current))
+    }
     setIsPanning(false)
-  }, [])
+  }, [isPanning, dispatch])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -133,9 +148,10 @@ export const Canvas: React.FC<CanvasProps> = ({
       }}
     >
       <div 
+        ref={panContainerRef}
         className="min-h-full p-6 flex justify-center"
         style={{
-          transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+          transform: `translate(${storedPanOffset.x}px, ${storedPanOffset.y}px)`,
           transition: isPanning ? 'none' : 'transform 0.1s ease-out',
         }}
       >

@@ -1,17 +1,41 @@
 import React, { useState } from 'react'
 import { useAppSelector, useAppDispatch } from '@/app/hooks'
-import { selectSelectedNode, selectInlineBlockEdit, finishInlineBlockEdit, cancelInlineBlockEdit, updateNode } from '@/features/editor/editorSlice'
+import { selectSelectedNode, selectInlineBlockEdit, selectRootNode, finishInlineBlockEdit, cancelInlineBlockEdit, updateNode } from '@/features/editor/editorSlice'
 import { PropertiesPanel } from './PropertiesPanel'
 import { Button } from '@/shared/components/Button'
 import { Save, Copy, X } from 'lucide-react'
-import { blockApi, CreateBlockDto, UpdateBlockDto } from '@/shared/api'
-import type { BlockNode } from '@/shared/types'
+import { blockApi, CreateBlockDto } from '@/shared/api'
+import type { BlockNode, EditorPageSettings } from '@/shared/types'
 
-export const RightPanel: React.FC = () => {
+interface RightPanelProps {
+  pageSettings?: EditorPageSettings
+  onPageSettingsChange?: (settings: EditorPageSettings) => void
+}
+
+// Рекурсивный поиск узла по id
+const findNodeById = (node: BlockNode, id: string): BlockNode | null => {
+  if (node.id === id) return node
+  for (const child of node.children) {
+    const found = findNodeById(child, id)
+    if (found) return found
+  }
+  return null
+}
+
+export const RightPanel: React.FC<RightPanelProps> = ({ pageSettings, onPageSettingsChange }) => {
   const selectedNode = useAppSelector(selectSelectedNode)
+  const rootNode = useAppSelector(selectRootNode)
   const inlineBlockEdit = useAppSelector(selectInlineBlockEdit)
   const dispatch = useAppDispatch()
   const [isSaving, setIsSaving] = useState(false)
+  
+  // Check if selected node is the root element
+  const isPageRoot = selectedNode?.id === rootNode?.id
+  
+  // Находим редактируемый блок (не выбранный элемент, а сам блок)
+  const editingBlock = inlineBlockEdit.nodeId && rootNode 
+    ? findNodeById(rootNode, inlineBlockEdit.nodeId) 
+    : null
 
   // Функция для очистки _viewportId из структуры блока
   const cleanNode = (n: BlockNode): BlockNode => {
@@ -23,17 +47,18 @@ export const RightPanel: React.FC = () => {
   }
 
   const handleSaveToLibrary = async () => {
-    if (!selectedNode || !inlineBlockEdit.nodeId) return
+    // Сохраняем весь редактируемый блок, а не выбранный элемент
+    if (!editingBlock || !inlineBlockEdit.nodeId) return
     
     try {
       setIsSaving(true)
       
-      const blockName = selectedNode.metadata?.name || selectedNode.tagName || 'Блок'
+      const blockName = editingBlock.metadata?.name || editingBlock.tagName || 'Блок'
       
       const blockData: CreateBlockDto = {
         name: `${blockName} (обновлён)`,
         type: 'section',
-        structure: cleanNode(selectedNode),
+        structure: cleanNode(editingBlock),
         isReusable: true,
         tags: ['edited-inline']
       }
@@ -43,10 +68,10 @@ export const RightPanel: React.FC = () => {
       
       // Обновляем metadata блока, чтобы отметить связь с библиотекой
       dispatch(updateNode({
-        id: selectedNode.id,
+        id: editingBlock.id,
         updates: {
           metadata: {
-            ...selectedNode.metadata,
+            ...editingBlock.metadata,
             linkedBlockId: createdBlock.id
           }
         }
@@ -63,7 +88,7 @@ export const RightPanel: React.FC = () => {
   }
 
   const handleSaveForPageOnly = async () => {
-    if (!selectedNode || !inlineBlockEdit.nodeId) return
+    if (!inlineBlockEdit.nodeId) return
     
     try {
       setIsSaving(true)
@@ -88,10 +113,13 @@ export const RightPanel: React.FC = () => {
   return (
     <>
       {/* Кнопки сохранения при inline-редактировании */}
-      {inlineBlockEdit.nodeId && selectedNode && (
+      {inlineBlockEdit.nodeId && editingBlock && (
         <div className="p-4 border-b border-gray-200 bg-blue-50 space-y-2">
-          <div className="text-sm font-medium text-blue-900 mb-3">
+          <div className="text-sm font-medium text-blue-900 mb-1">
             Режим редактирования блока
+          </div>
+          <div className="text-xs text-blue-700 mb-3">
+            Блок: {editingBlock.metadata?.name || editingBlock.tagName || 'Без имени'}
           </div>
           
           <Button
@@ -111,7 +139,7 @@ export const RightPanel: React.FC = () => {
             size="sm"
           >
             <Copy size={14} className="mr-2" />
-            Сохранить только для страницы
+            Сохранить для этой страницы
           </Button>
           
           <Button
@@ -128,7 +156,12 @@ export const RightPanel: React.FC = () => {
       )}
     
       {selectedNode ? (
-        <PropertiesPanel node={selectedNode} />
+        <PropertiesPanel 
+          node={selectedNode} 
+          isPageRoot={isPageRoot}
+          pageSettings={pageSettings}
+          onPageSettingsChange={onPageSettingsChange}
+        />
       ) : (
         <div className="p-8 text-center">
           <p className="text-sm text-gray-500">

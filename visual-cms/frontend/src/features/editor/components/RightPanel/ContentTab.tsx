@@ -99,7 +99,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
             <button
               key={align}
               onClick={() => handleStyleChange('textAlign', align)}
-              className={`flex-1 px-3 py-2 text-xs border rounded ${
+              className={`flex-1 px-3 py-2 text-xs border rounded text-gray-700 ${
                 node.styles.properties?.textAlign === align
                   ? 'bg-primary-100 border-primary-300'
                   : 'bg-white border-gray-300 hover:bg-gray-50'
@@ -119,7 +119,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
             <button
               key={decoration}
               onClick={() => handleStyleChange('textDecoration', decoration)}
-              className={`flex-1 px-3 py-2 text-xs border rounded ${
+              className={`flex-1 px-3 py-2 text-xs border rounded text-gray-700 ${
                 node.styles.properties?.textDecoration === decoration
                   ? 'bg-primary-100 border-primary-300'
                   : 'bg-white border-gray-300 hover:bg-gray-50'

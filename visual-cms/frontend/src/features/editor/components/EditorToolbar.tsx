@@ -1,15 +1,16 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
-import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, Rocket, ExternalLink } from 'lucide-react'
+import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, Rocket, ExternalLink, ChevronDown, Menu } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser } from '@/features/editor/editorSlice'
+import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo } from '@/features/editor/editorSlice'
 import { createBlock, updateBlock, selectBlocksSaving } from '@/features/blocks/blocksSlice'
 import { createPage, updatePage, selectPagesSaving } from '@/features/pages/pagesSlice'
 import { BreakpointManager } from './BreakpointManager'
 import { ExportImportModal } from './ExportImportModal'
 import { deployApi } from '@/shared/api'
+import { generateNodeTreeCSS } from '../utils/styleGenerator'
 
 interface EditorToolbarProps {
   type: 'page' | 'block'
@@ -50,6 +51,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const editMode = useAppSelector(selectEditMode)
   const browsers = useAppSelector(selectBrowsers)
   const selectedBrowser = useAppSelector(selectSelectedBrowser)
+  const canUndo = useAppSelector(selectCanUndo)
+  const canRedo = useAppSelector(selectCanRedo)
   
   const isNewBlock = id === 'new' || !id
   const isPageEditor = _type === 'page'
@@ -65,11 +68,35 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const [zoomInput, setZoomInput] = useState(String(zoom))
   const [isDeploying, setIsDeploying] = useState(false)
   const [deployResult, setDeployResult] = useState<{ success: boolean; message: string; url?: string } | null>(null)
+  const [showViewportDropdown, setShowViewportDropdown] = useState(false)
+  const [showNavModal, setShowNavModal] = useState(false)
 
   // Sync zoomInput with redux zoom when it changes externally
   React.useEffect(() => {
     setZoomInput(String(zoom))
   }, [zoom])
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if user is typing in input/textarea
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return
+      }
+      
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        if (canUndo) dispatch(undo())
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault()
+        if (canRedo) dispatch(redo())
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [dispatch, canUndo, canRedo])
 
   const handleViewportChange = (newViewport: string) => {
     // При выборе 'base' переключаемся в base режим, иначе в responsive
@@ -294,11 +321,23 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         
         <div className="h-6 w-px bg-gray-300 mx-2" />
         
-        <Button variant="ghost" size="sm" disabled>
-          <Undo size={16} />
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          disabled={!canUndo} 
+          onClick={() => dispatch(undo())}
+          title="Отменить (Ctrl+Z)"
+        >
+          <Undo size={16} className="text-gray-600" />
         </Button>
-        <Button variant="ghost" size="sm" disabled>
-          <Redo size={16} />
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          disabled={!canRedo} 
+          onClick={() => dispatch(redo())}
+          title="Повторить (Ctrl+Y)"
+        >
+          <Redo size={16} className="text-gray-600" />
         </Button>
         
         {/* Block alignment (only for block editor in responsive mode) */}
@@ -355,28 +394,68 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 <Settings2 size={16} className={viewport === 'base' ? 'text-primary-600' : 'text-gray-600'} />
               </button>
               
-              {/* Breakpoint icons */}
-              {breakpoints.map((bp) => {
-                const IconComponent = bp.icon === 'monitor' ? Monitor
-                  : bp.icon === 'laptop' ? Laptop
-                  : bp.icon === 'tablet' ? Tablet
-                  : bp.icon === 'smartphone' ? Smartphone
-                  : bp.icon === 'watch' ? Watch
-                  : Monitor
+              {/* Breakpoints dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowViewportDropdown(!showViewportDropdown)}
+                  className={`flex items-center gap-1 p-1.5 rounded transition-colors ${
+                    viewport !== 'base' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
+                  }`}
+                  title="Выбрать размер экрана"
+                >
+                  {(() => {
+                    const currentBp = breakpoints.find(bp => bp.id === viewport)
+                    if (!currentBp) return <Monitor size={16} className="text-gray-600" />
+                    const IconComponent = currentBp.icon === 'monitor' ? Monitor
+                      : currentBp.icon === 'laptop' ? Laptop
+                      : currentBp.icon === 'tablet' ? Tablet
+                      : currentBp.icon === 'smartphone' ? Smartphone
+                      : currentBp.icon === 'watch' ? Watch
+                      : Monitor
+                    return <IconComponent size={16} className={viewport !== 'base' ? 'text-primary-600' : 'text-gray-600'} />
+                  })()}
+                  <ChevronDown size={12} className="text-gray-500" />
+                </button>
                 
-                return (
-                  <button
-                    key={bp.id}
-                    onClick={() => handleViewportChange(bp.id)}
-                    className={`p-1.5 rounded transition-colors ${
-                      viewport === bp.id ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
-                    }`}
-                    title={`${bp.name} (${bp.width}px)`}
-                  >
-                    <IconComponent size={16} className={viewport === bp.id ? 'text-primary-600' : 'text-gray-600'} />
-                  </button>
-                )
-              })}
+                {showViewportDropdown && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setShowViewportDropdown(false)}
+                    />
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[240px]">
+                      {breakpoints.map((bp) => {
+                        const IconComponent = bp.icon === 'monitor' ? Monitor
+                          : bp.icon === 'laptop' ? Laptop
+                          : bp.icon === 'tablet' ? Tablet
+                          : bp.icon === 'smartphone' ? Smartphone
+                          : bp.icon === 'watch' ? Watch
+                          : Monitor
+                        
+                        return (
+                          <button
+                            key={bp.id}
+                            onClick={() => {
+                              handleViewportChange(bp.id)
+                              setShowViewportDropdown(false)
+                            }}
+                            className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                              viewport === bp.id 
+                                ? 'bg-primary-50 text-primary-700' 
+                                : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            <IconComponent size={16} />
+                            <span>{bp.name}</span>
+                            <span className="text-xs text-gray-400 ml-auto">{bp.width}px</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+              
               <button
                 onClick={() => setShowBreakpointManager(true)}
                 className="p-1.5 rounded hover:bg-gray-200 transition-colors border-l border-gray-300 ml-1 pl-2"
@@ -402,7 +481,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 ))}
               </select>
               {selectedBrowser && browsers.find(b => b.id === selectedBrowser) && (
-                <span className="text-xs text-gray-600'">
+                <span className="text-xs text-gray-800">
                   (offset: {browsers.find(b => b.id === selectedBrowser)?.viewportHeightOffset}px)
                 </span>
               )}
@@ -745,14 +824,20 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onCl
     const attrs = Object.entries(node.attributes)
       .map(([key, value]) => `${key}="${value}"`)
       .join(' ')
+    
+    // Add data-element-id for state styles and animations
+    const dataAttr = `data-element-id="${node.id}"`
 
     const childrenHTML = node.children.map(child => generateHTML(child)).join('')
     const content = node.content || ''
 
-    return `<${node.tagName} style="${styleString}" ${attrs}>${content}${childrenHTML}</${node.tagName}>`
+    return `<${node.tagName} style="${styleString}" ${dataAttr} ${attrs}>${content}${childrenHTML}</${node.tagName}>`
   }
 
   const previewHTML = generateHTML(rootNode)
+  
+  // Generate CSS for states (hover, etc.) and animations
+  const { css: stateAnimCSS, keyframes, scripts: animScripts } = generateNodeTreeCSS(rootNode)
 
   return (
     <div 
@@ -937,9 +1022,11 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onCl
                     <style>
                       * { margin: 0; padding: 0; box-sizing: border-box; }
                       body { font-family: system-ui, -apple-system, sans-serif; }
+                      ${keyframes}
+                      ${stateAnimCSS}
                     </style>
                   </head>
-                  <body>${previewHTML}</body>
+                  <body>${previewHTML}${animScripts ? `<script>${animScripts}</script>` : ''}</body>
                 </html>
               `}
               className="w-full h-full border-0"

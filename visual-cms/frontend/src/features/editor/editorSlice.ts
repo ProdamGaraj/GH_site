@@ -38,6 +38,8 @@ interface EditorState {
     nodeId: string | null
     originalStructure: BlockNode | null
   }
+  // Режим превью состояния элемента (hover, active, focus, disabled)
+  statePreviewMode: 'none' | 'hover' | 'active' | 'focus' | 'disabled'
 }
 
 const initialState: EditorState = {
@@ -97,6 +99,7 @@ const initialState: EditorState = {
     nodeId: null,
     originalStructure: null,
   },
+  statePreviewMode: 'none',
 }
 
 // Helper functions for tree operations
@@ -171,6 +174,31 @@ const insertNodeIntoTree = (
     return { ...current, children: current.children.map(traverse) }
   }
   return traverse(node)
+}
+
+// Helper to push to history (call after modifying rootNode)
+const MAX_HISTORY_SIZE = 50
+
+const pushToHistory = (state: EditorState) => {
+  if (!state.rootNode) return
+  
+  // Deep clone rootNode to avoid reference issues
+  const snapshot = JSON.parse(JSON.stringify(state.rootNode))
+  
+  // If we're not at the end of history, truncate future states
+  if (state.historyIndex < state.history.length - 1) {
+    state.history = state.history.slice(0, state.historyIndex + 1)
+  }
+  
+  // Add new state
+  state.history.push(snapshot)
+  state.historyIndex = state.history.length - 1
+  
+  // Limit history size
+  if (state.history.length > MAX_HISTORY_SIZE) {
+    state.history = state.history.slice(state.history.length - MAX_HISTORY_SIZE)
+    state.historyIndex = state.history.length - 1
+  }
 }
 
 const editorSlice = createSlice({
@@ -398,6 +426,7 @@ const editorSlice = createSlice({
         state.rootNode = addToNode(state.rootNode)
       }
       
+      pushToHistory(state)
       state.isDirty = true
       state.selectedNodeId = newNode.id
     },
@@ -615,6 +644,7 @@ const editorSlice = createSlice({
         state.rootNode = processNode(state.rootNode)
         
         if (wasDeleted) {
+          pushToHistory(state)
           state.isDirty = true
           state.selectedNodeId = null
           return
@@ -699,6 +729,7 @@ const editorSlice = createSlice({
       state.rootNode = deleteFromVariations(state.rootNode)
       
       if (foundInVariations) {
+        pushToHistory(state)
         state.isDirty = true
         state.selectedNodeId = null
         return
@@ -715,6 +746,7 @@ const editorSlice = createSlice({
       }
       
       state.rootNode = deleteFromNode(state.rootNode)
+      pushToHistory(state)
       state.isDirty = true
       state.selectedNodeId = null
     },
@@ -775,6 +807,7 @@ const editorSlice = createSlice({
       
       // Insert node at new location
       state.rootNode = insertNodeIntoTree(treeWithoutNode, targetParentId, nodeToInsert, position)
+      pushToHistory(state)
       state.isDirty = true
     },
     
@@ -803,6 +836,7 @@ const editorSlice = createSlice({
       }
       
       state.rootNode = updateParent(state.rootNode)
+      pushToHistory(state)
       state.isDirty = true
     },
     
@@ -1151,6 +1185,34 @@ const editorSlice = createSlice({
         originalStructure: null,
       }
     },
+    
+    // Установить режим превью состояния
+    setStatePreviewMode: (state, action: PayloadAction<'none' | 'hover' | 'active' | 'focus' | 'disabled'>) => {
+      state.statePreviewMode = action.payload
+    },
+    
+    // Undo - вернуться к предыдущему состоянию
+    undo: (state) => {
+      if (state.historyIndex > 0) {
+        state.historyIndex -= 1
+        state.rootNode = JSON.parse(JSON.stringify(state.history[state.historyIndex]))
+        state.isDirty = true
+      }
+    },
+    
+    // Redo - вернуться к следующему состоянию
+    redo: (state) => {
+      if (state.historyIndex < state.history.length - 1) {
+        state.historyIndex += 1
+        state.rootNode = JSON.parse(JSON.stringify(state.history[state.historyIndex]))
+        state.isDirty = true
+      }
+    },
+    
+    // Сохранить текущее состояние в историю (вызывать после значимых изменений)
+    saveToHistory: (state) => {
+      pushToHistory(state)
+    },
   },
 })
 
@@ -1194,6 +1256,10 @@ export const {
   startInlineBlockEdit,
   cancelInlineBlockEdit,
   finishInlineBlockEdit,
+  setStatePreviewMode,
+  undo,
+  redo,
+  saveToHistory,
 } = editorSlice.actions
 
 // Selectors
@@ -1208,6 +1274,8 @@ export const selectSelectedNode = (state: RootState) => {
   return findNodeInTree(rootNode, selectedNodeId, breakpoint, editMode)
 }
 export const selectIsDirty = (state: RootState) => state.editor.isDirty
+export const selectCanUndo = (state: RootState) => state.editor.historyIndex > 0
+export const selectCanRedo = (state: RootState) => state.editor.historyIndex < state.editor.history.length - 1
 export const selectDragState = (state: RootState) => state.editor.drag
 export const selectViewport = (state: RootState) => state.editor.viewport
 export const selectBreakpoints = (state: RootState) => state.editor.breakpoints
@@ -1222,6 +1290,7 @@ export const selectBlockAlignment = (state: RootState) => state.editor.blockAlig
 export const selectEditMode = (state: RootState) => state.editor.editMode
 export const selectActiveEditBreakpoint = (state: RootState) => state.editor.activeEditBreakpoint
 export const selectInlineBlockEdit = (state: RootState) => state.editor.inlineBlockEdit
+export const selectStatePreviewMode = (state: RootState) => state.editor.statePreviewMode
 
 // Helper selector to find a node by id
 export const selectNodeById = (state: RootState, nodeId: string): BlockNode | null => {

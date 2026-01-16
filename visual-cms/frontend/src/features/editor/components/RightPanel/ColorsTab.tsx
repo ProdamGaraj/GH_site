@@ -2,6 +2,7 @@ import React from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
+import { ColorPicker } from '@/shared/components/ColorPicker'
 import type { BlockNode } from '@/shared/types'
 
 interface ColorsTabProps {
@@ -26,12 +27,13 @@ export const ColorsTab: React.FC<ColorsTabProps> = ({ node }) => {
       <div>
         <h4 className="text-xs font-medium text-gray-700 mb-2">Фон</h4>
         <div className="space-y-2">
-          <div className="flex gap-2">
-            <Input
-              label="Цвет фона"
+          <div>
+            <label className="text-xs text-gray-600 mb-1 block">Цвет фона</label>
+            <ColorPicker
               value={node.styles.properties?.backgroundColor || ''}
-              onChange={(e) => handleStyleChange('backgroundColor', e.target.value)}
-              placeholder="rgba(255, 255, 255, 1) или #ffffff"
+              onChange={(value: string) => handleStyleChange('backgroundColor', value)}
+              previewElementId={node.id}
+              previewProperty="backgroundColor"
             />
           </div>
           <Input
@@ -39,7 +41,6 @@ export const ColorsTab: React.FC<ColorsTabProps> = ({ node }) => {
             value={node.styles.properties?.backgroundImage || ''}
             onChange={(e) => handleStyleChange('backgroundImage', e.target.value)}
             placeholder="url()"
-
           />
         </div>
       </div>
@@ -53,7 +54,6 @@ export const ColorsTab: React.FC<ColorsTabProps> = ({ node }) => {
             value={node.styles.properties?.borderWidth || node.styles.properties?.border?.split(' ')[0] || ''}
             onChange={(e) => handleStyleChange('borderWidth', e.target.value)}
             placeholder="1px"
-
           />
           <Input
             label="Border Style"
@@ -62,12 +62,13 @@ export const ColorsTab: React.FC<ColorsTabProps> = ({ node }) => {
             placeholder="solid"
           />
         </div>
-        <div className="flex gap-2 mt-2">
-          <Input
-            label="Border Color"
+        <div className="mt-2">
+          <label className="text-xs text-gray-600 mb-1 block">Border Color</label>
+          <ColorPicker
             value={node.styles.properties?.borderColor || ''}
-            onChange={(e) => handleStyleChange('borderColor', e.target.value)}
-            placeholder="rgba(0, 0, 0, 1) или #000000"
+            onChange={(value: string) => handleStyleChange('borderColor', value)}
+            previewElementId={node.id}
+            previewProperty="borderColor"
           />
         </div>
         <Input
@@ -75,7 +76,6 @@ export const ColorsTab: React.FC<ColorsTabProps> = ({ node }) => {
           value={node.styles.properties?.borderRadius || ''}
           onChange={(e) => handleStyleChange('borderRadius', e.target.value)}
           placeholder="0"
-
           className="mt-2"
         />
       </div>
@@ -83,12 +83,13 @@ export const ColorsTab: React.FC<ColorsTabProps> = ({ node }) => {
       {/* Text Color */}
       <div>
         <h4 className="text-xs font-medium text-gray-700 mb-2">Текст</h4>
-        <div className="flex gap-2">
-          <Input
-            label="Цвет текста"
+        <div>
+          <label className="text-xs text-gray-600 mb-1 block">Цвет текста</label>
+          <ColorPicker
             value={node.styles.properties?.color || ''}
-            onChange={(e) => handleStyleChange('color', e.target.value)}
-            placeholder="rgba(0, 0, 0, 1) или #000000"
+            onChange={(value: string) => handleStyleChange('color', value)}
+            previewElementId={node.id}
+            previewProperty="color"
           />
         </div>
       </div>

@@ -3,22 +3,28 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { updateNode, deleteNode, selectViewport, selectBreakpoints, selectRootNode, selectEditMode, moveNodeToViewport } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
 import { Button } from '@/shared/components/Button'
-import { Trash2, Move, Palette, Type, Code, Monitor, Tablet, Smartphone, Laptop, Watch, Settings2, ArrowRightLeft, Globe } from 'lucide-react'
-import type { BlockNode } from '@/shared/types'
+import { Trash2, Move, Palette, Type, Code, Monitor, Tablet, Smartphone, Laptop, Watch, Settings2, ArrowRightLeft, Globe, MousePointer, Sparkles, FileCode } from 'lucide-react'
+import type { BlockNode, EditorPageSettings } from '@/shared/types'
 import { PositioningTab } from './PositioningTab'
 import { ColorsTab } from './ColorsTab'
 import { ContentTab } from './ContentTab'
 import { CustomCSSTab } from './CustomCSSTab'
+import { StatesTab } from './StatesTab'
+import { AnimationsTab } from './AnimationsTab'
+import { ScriptsTab } from './ScriptsTab'
 import { cn } from '@/shared/utils'
 import { getNodeBreakpoint } from '../../utils/variationUtils'
 
 interface PropertiesPanelProps {
   node: BlockNode
+  isPageRoot?: boolean
+  pageSettings?: EditorPageSettings
+  onPageSettingsChange?: (settings: EditorPageSettings) => void
 }
 
-type TabType = 'positioning' | 'colors' | 'content' | 'css'
+type TabType = 'positioning' | 'colors' | 'content' | 'states' | 'animations' | 'scripts' | 'css'
 
-export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
+export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRoot, pageSettings, onPageSettingsChange }) => {
   const dispatch = useAppDispatch()
   const viewport = useAppSelector(selectViewport)
   const breakpoints = useAppSelector(selectBreakpoints)
@@ -67,7 +73,6 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
   }
 
   const handleDelete = () => {
-    console.log('handleDelete called for node:', node.id)
     const hasChildren = node.children && node.children.length > 0
     
     if (hasChildren) {
@@ -80,8 +85,6 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
   }
 
   const isRootElement = !node.id.includes('-') || node.metadata?.name === 'Root Container'
-  
-  console.log('PropertiesPanel render:', { nodeId: node.id, isRootElement, metadataName: node.metadata?.name })
 
   const handleMoveToViewport = (targetBreakpoint: string | null) => {
     dispatch(moveNodeToViewport({ nodeId: node.id, targetBreakpoint }))
@@ -92,6 +95,9 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
     { id: 'positioning' as TabType, label: 'Позиция', icon: Move },
     { id: 'colors' as TabType, label: 'Цвета', icon: Palette },
     { id: 'content' as TabType, label: 'Контент', icon: Type },
+    { id: 'states' as TabType, label: 'Hover', icon: MousePointer },
+    { id: 'animations' as TabType, label: 'Анимации', icon: Sparkles },
+    { id: 'scripts' as TabType, label: 'Скрипты', icon: FileCode },
     { id: 'css' as TabType, label: 'CSS', icon: Code },
   ]
 
@@ -223,7 +229,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200 bg-white">
+      <div className="flex border-b border-gray-200 bg-white overflow-x-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon
           return (
@@ -231,14 +237,15 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors',
+                'flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors',
                 activeTab === tab.id
                   ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
               )}
+              title={tab.label}
             >
               <Icon size={14} />
-              {tab.label}
+              <span className="truncate w-full text-center">{tab.label}</span>
             </button>
           )
         })}
@@ -249,6 +256,16 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
         {activeTab === 'positioning' && <PositioningTab node={node} />}
         {activeTab === 'colors' && <ColorsTab node={node} />}
         {activeTab === 'content' && <ContentTab node={node} />}
+        {activeTab === 'states' && <StatesTab node={node} />}
+        {activeTab === 'animations' && <AnimationsTab node={node} />}
+        {activeTab === 'scripts' && (
+          <ScriptsTab 
+            node={node} 
+            isPageRoot={isPageRoot} 
+            pageSettings={pageSettings}
+            onPageSettingsChange={onPageSettingsChange}
+          />
+        )}
         {activeTab === 'css' && <CustomCSSTab node={node} />}
       </div>
     </div>

@@ -95,6 +95,19 @@ export interface CSSProperties {
   boxShadow?: string
   transform?: string
   transition?: string
+  filter?: string
+  backdropFilter?: string
+  
+  // Animation
+  animation?: string
+  animationName?: string
+  animationDuration?: string
+  animationTimingFunction?: string
+  animationDelay?: string
+  animationIterationCount?: string
+  animationDirection?: string
+  animationFillMode?: string
+  animationPlayState?: string
   
   // Misc
   zIndex?: string
@@ -102,8 +115,87 @@ export interface CSSProperties {
   overflowX?: string
   overflowY?: string
   cursor?: string
+  pointerEvents?: string
+  userSelect?: string
   
   [key: string]: string | undefined
+}
+
+// Hover/State Styles
+export interface StateStyles {
+  hover?: Partial<CSSProperties>
+  active?: Partial<CSSProperties>
+  focus?: Partial<CSSProperties>
+  disabled?: Partial<CSSProperties>
+}
+
+// Animation Types
+export type AnimationTrigger = 'load' | 'scroll-into-view' | 'hover' | 'click' | 'loop'
+export type AnimationPreset = 
+  | 'fade-in' | 'fade-out'
+  | 'slide-up' | 'slide-down' | 'slide-left' | 'slide-right'
+  | 'zoom-in' | 'zoom-out'
+  | 'bounce' | 'shake' | 'pulse' | 'spin'
+  | 'flip-x' | 'flip-y'
+  | 'custom'
+
+export interface Animation {
+  id: string
+  name: string
+  trigger: AnimationTrigger
+  preset?: AnimationPreset
+  // Timing
+  duration: number // ms
+  delay: number // ms
+  easing: string // CSS easing function
+  iterationCount: number | 'infinite'
+  direction: 'normal' | 'reverse' | 'alternate' | 'alternate-reverse'
+  fillMode: 'none' | 'forwards' | 'backwards' | 'both'
+  // Custom keyframes (for preset: 'custom')
+  keyframes?: AnimationKeyframe[]
+  // Scroll trigger options
+  scrollTrigger?: {
+    threshold: number // 0-1, how much of element should be visible
+    once: boolean // trigger only once or every time
+    offset: number // px offset from viewport edge
+  }
+}
+
+export interface AnimationKeyframe {
+  offset: number // 0-100 (percentage)
+  properties: Partial<CSSProperties>
+}
+
+// Script types
+export interface PageScript {
+  id: string
+  name: string
+  code: string
+  position: 'head' | 'body-start' | 'body-end'
+  enabled: boolean
+  loadType: 'sync' | 'async' | 'defer'
+}
+
+export interface BlockScript {
+  id: string
+  name: string
+  code: string
+  trigger: 'load' | 'click' | 'hover' | 'scroll' | 'custom'
+  customTrigger?: string // CSS selector or event name
+  enabled: boolean
+}
+
+// Page settings for editor
+export interface EditorPageSettings {
+  name: string
+  slug: string
+  status: 'draft' | 'published' | 'archived'
+  metaTitle: string
+  metaDescription: string
+  keywords: string
+  ogImage: string
+  scripts?: PageScript[]
+  globalCSS?: string
 }
 
 // Responsive breakpoints
@@ -162,7 +254,21 @@ export interface BlockNode {
     customCSS?: string
     // Responsive styles for different breakpoints (key is breakpoint id)
     responsive?: Record<string, Partial<CSSProperties>>
+    // State styles (hover, active, focus, disabled)
+    states?: StateStyles
+    // Transition for state changes
+    stateTransition?: {
+      duration: number // ms
+      easing: string
+      properties: string[] // which properties to transition, or ['all']
+    }
   }
+  
+  // Animations
+  animations?: Animation[]
+  
+  // Scripts attached to this element
+  scripts?: BlockScript[]
   
   layoutMode?: LayoutMode
   children: BlockNode[]
@@ -199,6 +305,10 @@ export interface Page {
   rootBlockId: string
   rootBlock?: BlockNode
   structure: BlockNode  // Added for compatibility with API
+  // Page-level scripts
+  scripts?: PageScript[]
+  // Global CSS for this page
+  globalCSS?: string
   createdAt: string
   updatedAt: string
   status: 'draft' | 'published' | 'archived'

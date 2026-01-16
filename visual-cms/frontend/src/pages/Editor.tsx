@@ -46,7 +46,7 @@ import { RightSidebar } from '@/features/editor/components/Sidebar/RightSidebar'
 import { SavedBlocksLibrary } from '@/features/editor/components/SavedBlocksLibrary/SavedBlocksLibrary'
 import { LayersPanel } from '@/features/editor/components/LeftPanel/LayersPanel'
 import { DragOverlay } from '@/features/editor/components/Canvas/DragOverlay'
-import type { DragItem, BlockNode } from '@/shared/types'
+import type { DragItem, BlockNode, EditorPageSettings } from '@/shared/types'
 import { 
   DropIndicator, 
   collectElementRects, 
@@ -79,13 +79,15 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   const inlineBlockEdit = useAppSelector(selectInlineBlockEdit)
   const [leftPanelWidth, setLeftPanelWidth] = useState(280)
   const [isResizingLeft, setIsResizingLeft] = useState(false)
+  const [rightPanelWidth, setRightPanelWidth] = useState(320)
+  const [isResizingRight, setIsResizingRight] = useState(false)
   // const [isLibraryOpen, setIsLibraryOpen] = useState(true)
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null)
   const [targetContainerRect, setTargetContainerRect] = useState<DOMRect | null>(null)
   const [targetLayoutMode, setTargetLayoutMode] = useState<'flex' | 'grid' | 'absolute' | 'table'>('flex')
   const [activeNode, setActiveNode] = useState<BlockNode | null>(null)
   const [loading, setLoading] = useState(false)
-  const [pageSettings, setPageSettings] = useState({
+  const [pageSettings, setPageSettings] = useState<EditorPageSettings>({
     name: '',
     slug: '',
     status: 'draft' as 'draft' | 'published' | 'archived',
@@ -93,6 +95,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
     metaDescription: '',
     keywords: '',
     ogImage: '',
+    scripts: [],
   })
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const dropIndicatorRef = useRef<DropIndicator | null>(null)
@@ -138,6 +141,35 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       document.body.style.userSelect = ''
     }
   }, [isResizingLeft])
+
+  // Handle right panel resize
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingRight) return
+      const newWidth = window.innerWidth - e.clientX
+      if (newWidth >= 280 && newWidth <= 600) {
+        setRightPanelWidth(newWidth)
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizingRight(false)
+    }
+
+    if (isResizingRight) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizingRight])
 
   useEffect(() => {
     const loadEditor = async () => {
@@ -392,10 +424,6 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
 
     // Use ref to get the latest indicator value
     const currentIndicator = dropIndicatorRef.current
-    
-    console.log('🎯 DragEnd - dropIndicator:', currentIndicator)
-    console.log('🎯 DragEnd - over:', over?.id)
-    console.log('🎯 DragEnd - dragData:', dragData)
 
     // Clear drag state
     dispatch(endDrag())
@@ -408,7 +436,6 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       if (!over) return
       
       const dropTargetId = (over.id as string).replace('drop-', '')
-      console.log('🎯 Fallback - dropTargetId:', dropTargetId)
       
       if (dragData?.type === 'library-item') {
         dispatch(addNode({
@@ -424,7 +451,6 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
     }
 
     const { targetParentId, position, absoluteCoords, type: indicatorType } = currentIndicator
-    console.log('🎯 Using indicator - targetParentId:', targetParentId, 'position:', position)
 
     if (dragData?.type === 'library-item') {
       // Adding new element from library
@@ -482,19 +508,8 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       // Check if the dragged element itself has position: absolute
       const isAbsoluteElement = draggedNode.styles?.properties?.position === 'absolute'
       
-      console.log('🔧 Move logic:', {
-        nodeId,
-        sourceParentId,
-        targetParentId,
-        indicatorType,
-        absoluteCoords,
-        isAbsoluteElement,
-        sameParent: sourceParentId === targetParentId
-      })
-      
       // If element has position: absolute, just update its coordinates
       if (isAbsoluteElement && absoluteCoords) {
-        console.log('📍 Updating absolute element position:', absoluteCoords)
         dispatch(updateNodePosition({
           nodeId,
           position: absoluteCoords,
@@ -648,7 +663,17 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
           
           {/* Right Panel Content */}
           {activeRightPanel && (
-            <div className="w-80 bg-white border-l border-gray-200 flex flex-col relative">
+            <div 
+              className="bg-white border-l border-gray-200 flex flex-col relative"
+              style={{ width: `${rightPanelWidth}px` }}
+            >
+              {/* Resize handle on left edge */}
+              <div
+                onMouseDown={() => setIsResizingRight(true)}
+                className="absolute left-0 top-0 bottom-0 w-1 hover:w-2 bg-transparent hover:bg-blue-400 cursor-col-resize transition-all z-20"
+                title="Изменить ширину"
+              />
+              
               <button
                 onClick={() => dispatch(setActiveRightPanel(null))}
                 className="absolute -left-3 top-4 z-10 w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors shadow-sm"
@@ -657,7 +682,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                 <ChevronRight size={14} className="text-gray-600" />
               </button>
               
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto overflow-x-auto">
                 {type === 'page' && activeRightPanel === 'pageSettings' && !inlineBlockEdit.nodeId && (
                   <PageSettingsPanel 
                     settings={pageSettings}
@@ -665,9 +690,12 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                   />
                 )}
                 
-                {/* Показываем панель блока если: 1) тип редактора = block ИЛИ 2) активен режим inline-редактирования */}
-                {((type === 'block' && activeRightPanel === 'properties') || inlineBlockEdit.nodeId) && (
-                  <RightPanel />
+                {/* Показываем панель свойств элемента */}
+                {(activeRightPanel === 'properties' || inlineBlockEdit.nodeId) && (
+                  <RightPanel 
+                    pageSettings={type === 'page' ? pageSettings : undefined}
+                    onPageSettingsChange={type === 'page' ? setPageSettings : undefined}
+                  />
                 )}
               </div>
             </div>

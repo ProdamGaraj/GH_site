@@ -1,7 +1,7 @@
 import React from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectNode, selectSelectedNodeId, selectDragState, selectEditMode, selectRootNode } from '@/features/editor/editorSlice'
+import { selectNode, selectSelectedNodeId, selectDragState, selectEditMode, selectRootNode, selectStatePreviewMode } from '@/features/editor/editorSlice'
 import { useComputedStyles } from '../../hooks/useComputedStyles'
 import { cn } from '@/shared/utils'
 import type { BlockNode } from '@/shared/types'
@@ -16,7 +16,7 @@ interface CanvasRendererProps {
   rootNode?: BlockNode  // Передаем root для проверки вариаций
 }
 
-export const CanvasRenderer: React.FC<CanvasRendererProps> = ({ 
+const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({ 
   node, 
   isRoot = false, 
   editorType = 'block', 
@@ -28,12 +28,26 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({
   const dragState = useAppSelector(selectDragState)
   const editMode = useAppSelector(selectEditMode)
   const storeRootNode = useAppSelector(selectRootNode)
+  const statePreviewMode = useAppSelector(selectStatePreviewMode)
   const actualRootNode = rootNode || storeRootNode
   const isSelected = selectedNodeId === node.id
   const isDragged = dragState.draggedNodeId === node.id
   const isLocked = node.metadata?.locked || false
 
   const computedStyles = useComputedStyles(node)
+  
+  // Применяем стили состояния если режим превью активен
+  const getStateStyles = (): React.CSSProperties => {
+    if (statePreviewMode === 'none') return {}
+    
+    const stateStyles = node.styles?.states?.[statePreviewMode]
+    if (!stateStyles) return {}
+    
+    // Конвертируем стили состояния в React.CSSProperties
+    return stateStyles as React.CSSProperties
+  }
+  
+  const stateStyles = getStateStyles()
 
   // Only root and container elements should be droppable
   const isContainer = node.elementType === 'container' || 
@@ -105,7 +119,8 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({
     style: {
       ...computedStyles,
       ...dragStyle,
-      opacity: isDragging ? 0.5 : computedStyles.opacity,
+      ...stateStyles, // Применяем стили состояния поверх базовых
+      opacity: isDragging ? 0.5 : (stateStyles.opacity ?? computedStyles.opacity),
       // Для root элемента в responsive режиме добавляем min-height: 100%
       ...(isRoot && editMode === 'responsive' ? {
         minHeight: '100%',
@@ -115,6 +130,10 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({
       ...(isRoot && editorType === 'block' && editMode === 'responsive' ? {
         marginLeft: blockAlignment === 'center' ? 'auto' : blockAlignment === 'right' ? 'auto' : '0',
         marginRight: blockAlignment === 'center' ? 'auto' : blockAlignment === 'left' ? 'auto' : '0'
+      } : {}),
+      // Добавляем transition для плавности
+      ...(statePreviewMode !== 'none' && node.styles?.stateTransition ? {
+        transition: `${node.styles.stateTransition.properties.join(', ')} ${node.styles.stateTransition.duration}ms ${node.styles.stateTransition.easing}`,
       } : {}),
     },
     className: cn(
@@ -189,3 +208,12 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({
     </>
   )
 }
+
+// Мемоизируем компонент - ререндер только если node.id или selectedNodeId изменились
+export const CanvasRenderer = React.memo(CanvasRendererComponent, (prevProps, nextProps) => {
+  // Ререндерим только если изменился сам node или его id
+  return prevProps.node === nextProps.node && 
+         prevProps.isRoot === nextProps.isRoot &&
+         prevProps.editorType === nextProps.editorType &&
+         prevProps.blockAlignment === nextProps.blockAlignment
+})
