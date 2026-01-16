@@ -40,6 +40,8 @@ interface EditorState {
   }
   // Режим превью состояния элемента (hover, active, focus, disabled)
   statePreviewMode: 'none' | 'hover' | 'active' | 'focus' | 'disabled'
+  // Цвет фона холста
+  canvasColor: string
 }
 
 const initialState: EditorState = {
@@ -100,6 +102,7 @@ const initialState: EditorState = {
     originalStructure: null,
   },
   statePreviewMode: 'none',
+  canvasColor: '#ffffff',
 }
 
 // Helper functions for tree operations
@@ -1213,6 +1216,11 @@ const editorSlice = createSlice({
     saveToHistory: (state) => {
       pushToHistory(state)
     },
+    
+    // Установить цвет фона холста
+    setCanvasColor: (state, action: PayloadAction<string>) => {
+      state.canvasColor = action.payload
+    },
   },
 })
 
@@ -1260,6 +1268,7 @@ export const {
   undo,
   redo,
   saveToHistory,
+  setCanvasColor,
 } = editorSlice.actions
 
 // Selectors
@@ -1288,6 +1297,7 @@ export const selectActiveRightPanel = (state: RootState) => state.editor.activeR
 export const selectPanOffset = (state: RootState) => state.editor.panOffset
 export const selectBlockAlignment = (state: RootState) => state.editor.blockAlignment
 export const selectEditMode = (state: RootState) => state.editor.editMode
+export const selectCanvasColor = (state: RootState) => state.editor.canvasColor
 export const selectActiveEditBreakpoint = (state: RootState) => state.editor.activeEditBreakpoint
 export const selectInlineBlockEdit = (state: RootState) => state.editor.inlineBlockEdit
 export const selectStatePreviewMode = (state: RootState) => state.editor.statePreviewMode

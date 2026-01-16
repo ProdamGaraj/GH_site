@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useAppSelector, useAppDispatch } from '@/app/hooks'
-import { selectRootNode, selectDragState, selectViewport, selectBreakpoints, selectZoom, selectPanOffset, selectBlockAlignment, selectEditMode, setZoom, setPanOffset } from '@/features/editor/editorSlice'
+import { selectRootNode, selectDragState, selectViewport, selectBreakpoints, selectZoom, selectPanOffset, selectBlockAlignment, selectEditMode, setZoom, setPanOffset, selectCanvasColor } from '@/features/editor/editorSlice'
 import { CanvasRenderer } from './CanvasRenderer'
 import type { DropIndicator } from '../../utils/dndUtils'
 import { DropIndicatorOverlay, DropTargetHighlight } from './DropIndicatorOverlay'
@@ -28,6 +28,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const storedPanOffset = useAppSelector(selectPanOffset)
   const blockAlignment = useAppSelector(selectBlockAlignment)
   const editMode = useAppSelector(selectEditMode)
+  const canvasColor = useAppSelector(selectCanvasColor)
   const canvasRef = useRef<HTMLDivElement>(null)
   const panContainerRef = useRef<HTMLDivElement>(null)
   const [isPanning, setIsPanning] = useState(false)
@@ -144,7 +145,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       style={{
-        cursor: isPanning ? 'grabbing' : 'default'
+        cursor: isPanning ? 'grabbing' : 'default',
       }}
     >
       <div 
@@ -190,7 +191,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             transformOrigin: 'top center',
             // Тень для визуального выделения страницы
             boxShadow: '0 4px 40px rgba(0,0,0,0.15)',
-            background: 'white',
+            background: canvasColor,
             // Применяем базовый шрифт для страницы
             fontFamily: 'Muller, sans-serif',
           }}

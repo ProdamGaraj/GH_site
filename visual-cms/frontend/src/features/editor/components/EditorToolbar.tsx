@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
-import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, Rocket, ExternalLink, ChevronDown, Menu } from 'lucide-react'
+import { ColorPicker } from '@/shared/components/ColorPicker'
+import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, Rocket, ExternalLink, ChevronDown, Menu, Palette } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo } from '@/features/editor/editorSlice'
+import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor } from '@/features/editor/editorSlice'
 import { createBlock, updateBlock, selectBlocksSaving } from '@/features/blocks/blocksSlice'
 import { createPage, updatePage, selectPagesSaving } from '@/features/pages/pagesSlice'
 import { BreakpointManager } from './BreakpointManager'
@@ -53,6 +54,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const selectedBrowser = useAppSelector(selectSelectedBrowser)
   const canUndo = useAppSelector(selectCanUndo)
   const canRedo = useAppSelector(selectCanRedo)
+  const canvasColor = useAppSelector(selectCanvasColor)
   
   const isNewBlock = id === 'new' || !id
   const isPageEditor = _type === 'page'
@@ -269,6 +271,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
   const toolbarContent = (
     <>
+      {/* Canvas color - отдельный блок слева */}
+      <div className="flex items-center gap-1 mr-2" title="Цвет фона холста">
+        <Palette size={14} className="text-gray-500" />
+        <ColorPicker
+          value={canvasColor}
+          onChange={(value) => dispatch(setCanvasColor(value))}
+        />
+      </div>
+      
       <div className="flex items-center gap-2">
         {/* Zoom controls */}
         <button
