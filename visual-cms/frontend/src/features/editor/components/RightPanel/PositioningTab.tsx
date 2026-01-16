@@ -20,7 +20,7 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
     }))
   }
 
-  const currentDisplay = node.styles.properties?.display || 'flex'
+  const currentDisplay = node.styles.properties?.display || ''
 
   return (
     <div className="space-y-4">
@@ -32,6 +32,7 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
           onChange={(e) => handleStyleChange('display', e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm text-gray-900"
         >
+          <option value="">(не задано)</option>
           <option value="flex">Flex</option>
           <option value="grid">Grid</option>
           <option value="block">Block</option>
@@ -49,10 +50,11 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
           <div>
             <label className="text-xs text-gray-600 mb-1 block">Flex Direction</label>
             <select
-              value={node.styles.properties?.flexDirection || 'row'}
+              value={node.styles.properties?.flexDirection || ''}
               onChange={(e) => handleStyleChange('flexDirection', e.target.value)}
               className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
             >
+              <option value="">(не задано)</option>
               <option value="row">Row</option>
               <option value="row-reverse">Row Reverse</option>
               <option value="column">Column</option>
@@ -63,10 +65,11 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
           <div>
             <label className="text-xs text-gray-600 mb-1 block">Justify Content</label>
             <select
-              value={node.styles.properties?.justifyContent || 'flex-start'}
+              value={node.styles.properties?.justifyContent || ''}
               onChange={(e) => handleStyleChange('justifyContent', e.target.value)}
               className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
             >
+              <option value="">(не задано)</option>
               <option value="flex-start">Flex Start</option>
               <option value="flex-end">Flex End</option>
               <option value="center">Center</option>
@@ -79,10 +82,11 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
           <div>
             <label className="text-xs text-gray-600 mb-1 block">Align Items</label>
             <select
-              value={node.styles.properties?.alignItems || 'stretch'}
+              value={node.styles.properties?.alignItems || ''}
               onChange={(e) => handleStyleChange('alignItems', e.target.value)}
               className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
             >
+              <option value="">(не задано)</option>
               <option value="stretch">Stretch</option>
               <option value="flex-start">Flex Start</option>
               <option value="flex-end">Flex End</option>
@@ -94,10 +98,11 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
           <div>
             <label className="text-xs text-gray-600 mb-1 block">Align Content</label>
             <select
-              value={node.styles.properties?.alignContent || 'normal'}
+              value={node.styles.properties?.alignContent || ''}
               onChange={(e) => handleStyleChange('alignContent', e.target.value)}
               className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
             >
+              <option value="">(не задано)</option>
               <option value="normal">Normal</option>
               <option value="flex-start">Flex Start</option>
               <option value="flex-end">Flex End</option>
@@ -111,10 +116,11 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
           <div>
             <label className="text-xs text-gray-600 mb-1 block">Flex Wrap</label>
             <select
-              value={node.styles.properties?.flexWrap || 'nowrap'}
+              value={node.styles.properties?.flexWrap || ''}
               onChange={(e) => handleStyleChange('flexWrap', e.target.value)}
               className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
             >
+              <option value="">(не задано)</option>
               <option value="nowrap">No Wrap</option>
               <option value="wrap">Wrap</option>
               <option value="wrap-reverse">Wrap Reverse</option>
@@ -159,10 +165,11 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
           <div>
             <label className="text-xs text-gray-600 mb-1 block">Justify Items</label>
             <select
-              value={node.styles.properties?.justifyItems || 'stretch'}
+              value={node.styles.properties?.justifyItems || ''}
               onChange={(e) => handleStyleChange('justifyItems', e.target.value)}
               className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
             >
+              <option value="">(не задано)</option>
               <option value="stretch">Stretch</option>
               <option value="start">Start</option>
               <option value="end">End</option>
@@ -173,10 +180,11 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
           <div>
             <label className="text-xs text-gray-600 mb-1 block">Align Items</label>
             <select
-              value={node.styles.properties?.alignItems || 'stretch'}
+              value={node.styles.properties?.alignItems || ''}
               onChange={(e) => handleStyleChange('alignItems', e.target.value)}
               className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
             >
+              <option value="">(не задано)</option>
               <option value="stretch">Stretch</option>
               <option value="start">Start</option>
               <option value="end">End</option>
@@ -187,10 +195,11 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
           <div>
             <label className="text-xs text-gray-600 mb-1 block">Grid Auto Flow</label>
             <select
-              value={node.styles.properties?.gridAutoFlow || 'row'}
+              value={node.styles.properties?.gridAutoFlow || ''}
               onChange={(e) => handleStyleChange('gridAutoFlow', e.target.value)}
               className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
             >
+              <option value="">(не задано)</option>
               <option value="row">Row</option>
               <option value="column">Column</option>
               <option value="dense">Dense</option>
@@ -223,10 +232,11 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
           <div>
             <label className="text-xs text-gray-600 mb-1 block">Text Align</label>
             <select
-              value={node.styles.properties?.textAlign || 'left'}
+              value={node.styles.properties?.textAlign || ''}
               onChange={(e) => handleStyleChange('textAlign', e.target.value)}
               className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
             >
+              <option value="">(не задано)</option>
               <option value="left">Left</option>
               <option value="center">Center</option>
               <option value="right">Right</option>
@@ -238,10 +248,11 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
             <div>
               <label className="text-xs text-gray-600 mb-1 block">Vertical Align</label>
               <select
-                value={node.styles.properties?.verticalAlign || 'baseline'}
+                value={node.styles.properties?.verticalAlign || ''}
                 onChange={(e) => handleStyleChange('verticalAlign', e.target.value)}
                 className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
               >
+                <option value="">(не задано)</option>
                 <option value="baseline">Baseline</option>
                 <option value="top">Top</option>
                 <option value="middle">Middle</option>
@@ -262,10 +273,11 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
           <div>
             <label className="text-xs text-gray-600 mb-1 block">Vertical Align</label>
             <select
-              value={node.styles.properties?.verticalAlign || 'baseline'}
+              value={node.styles.properties?.verticalAlign || ''}
               onChange={(e) => handleStyleChange('verticalAlign', e.target.value)}
               className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
             >
+              <option value="">(не задано)</option>
               <option value="baseline">Baseline</option>
               <option value="top">Top</option>
               <option value="middle">Middle</option>
@@ -283,10 +295,11 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
       <div>
         <label className="text-xs font-medium text-gray-700 mb-2 block">Position</label>
         <select
-          value={node.styles.properties?.position || 'relative'}
+          value={node.styles.properties?.position || ''}
           onChange={(e) => handleStyleChange('position', e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm text-gray-900"
         >
+          <option value="">(не задано)</option>
           <option value="static">Static</option>
           <option value="relative">Relative</option>
           <option value="absolute">Absolute</option>

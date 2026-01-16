@@ -106,6 +106,10 @@ export const CanvasRenderer: React.FC<CanvasRendererProps> = ({
       ...computedStyles,
       ...dragStyle,
       opacity: isDragging ? 0.5 : computedStyles.opacity,
+      // Для root элемента в responsive режиме добавляем min-height: 100%
+      ...(isRoot && editMode === 'responsive' ? {
+        minHeight: '100%',
+      } : {}),
       // Не переопределяем стили в page редакторе для точного отображения
       // Только для block редактора в responsive режиме применяем выравнивание
       ...(isRoot && editorType === 'block' && editMode === 'responsive' ? {

@@ -4,7 +4,7 @@ import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
 import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, Rocket, ExternalLink } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode } from '@/features/editor/editorSlice'
+import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser } from '@/features/editor/editorSlice'
 import { createBlock, updateBlock, selectBlocksSaving } from '@/features/blocks/blocksSlice'
 import { createPage, updatePage, selectPagesSaving } from '@/features/pages/pagesSlice'
 import { BreakpointManager } from './BreakpointManager'
@@ -48,6 +48,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const zoom = useAppSelector(selectZoom)
   const blockAlignment = useAppSelector(selectBlockAlignment)
   const editMode = useAppSelector(selectEditMode)
+  const browsers = useAppSelector(selectBrowsers)
+  const selectedBrowser = useAppSelector(selectSelectedBrowser)
   
   const isNewBlock = id === 'new' || !id
   const isPageEditor = _type === 'page'
@@ -384,7 +386,29 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               </button>
             </div>
             
-            <div className="h-6 w-px bg-gray-300 mx-2" />
+            {/* Browser Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Браузер:</span>
+              <select
+                value={selectedBrowser || ''}
+                onChange={(e) => dispatch(setSelectedBrowser(e.target.value || null))}
+                className="px-2 py-1 text-sm text-gray-900 border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="" className='text-xs text-gray-600'>Не выбран</option>
+                {browsers.map(browser => (
+                  <option key={browser.id} value={browser.id} className='text-sm text-black-600'>
+                    {browser.icon} {browser.name}
+                  </option>
+                ))}
+              </select>
+              {selectedBrowser && browsers.find(b => b.id === selectedBrowser) && (
+                <span className="text-xs text-gray-600'">
+                  (offset: {browsers.find(b => b.id === selectedBrowser)?.viewportHeightOffset}px)
+                </span>
+              )}
+            </div>
+            
+            <div className="h-6 w-px bg-gray-300 mx-2 text-gray-600" />
           </>
         )}
         

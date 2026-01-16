@@ -11,19 +11,22 @@ export const CustomCSSTab: React.FC<CustomCSSTabProps> = ({ node }) => {
   const dispatch = useAppDispatch()
   const viewport = useAppSelector(selectViewport)
   const [cssText, setCssText] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
 
-  // Convert styles object to CSS text
+  // Синхронизация CustomCSS с полями - показываем текущие стили
   useEffect(() => {
-    const styles = node.styles.properties || {}
-    const cssString = Object.entries(styles)
-      .map(([key, value]) => {
-        // Convert camelCase to kebab-case
-        const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase()
-        return `${cssKey}: ${value};`
-      })
-      .join('\n')
-    setCssText(cssString)
-  }, [node.styles.properties])
+    if (!isEditing) {
+      const styles = node.styles.properties || {}
+      const cssString = Object.entries(styles)
+        .map(([key, value]) => {
+          // Convert camelCase to kebab-case
+          const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase()
+          return `${cssKey}: ${value};`
+        })
+        .join('\n')
+      setCssText(cssString)
+    }
+  }, [node.styles.properties, isEditing])
 
   const handleApplyCSS = () => {
     try {
@@ -37,17 +40,45 @@ export const CustomCSSTab: React.FC<CustomCSSTabProps> = ({ node }) => {
           const key = match[1].trim()
           const value = match[2].trim()
           
+          // Skip empty values
+          if (!value) {
+            return
+          }
+          
           // Convert kebab-case to camelCase
           const camelKey = key.replace(/-([a-z])/g, (g) => g[1].toUpperCase())
           newStyles[camelKey] = value
         }
       })
 
+      // Получаем все текущие ключи, чтобы удалить те, которых нет в новом CSS
+      const currentKeys = Object.keys(node.styles.properties || {})
+      const newKeys = Object.keys(newStyles)
+      
+      // Создаем объект для удаления старых ключей
+      const keysToDelete = currentKeys.filter(key => !newKeys.includes(key))
+      const deleteStyles: Record<string, string> = {}
+      keysToDelete.forEach(key => {
+        deleteStyles[key] = '' // Пустое значение удалит свойство
+      })
+
+      // Сначала удаляем старые свойства, затем устанавливаем новые
+      if (Object.keys(deleteStyles).length > 0) {
+        dispatch(updateNodeStyles({
+          nodeId: node.id,
+          properties: deleteStyles as any,
+          breakpoint: viewport,
+        }))
+      }
+
       dispatch(updateNodeStyles({
         nodeId: node.id,
         properties: newStyles as any,
         breakpoint: viewport,
       }))
+      
+      // Stop editing mode after successful apply
+      setIsEditing(false)
     } catch (error) {
       console.error('Error parsing CSS:', error)
       alert('Ошибка в CSS синтаксисе')
@@ -68,7 +99,10 @@ export const CustomCSSTab: React.FC<CustomCSSTabProps> = ({ node }) => {
         </div>
         <textarea
           value={cssText}
-          onChange={(e) => setCssText(e.target.value)}
+          onChange={(e) => {
+            setCssText(e.target.value)
+            setIsEditing(true)
+          }}
           placeholder="width: 100%;\nheight: auto;\nbackground-color: #ffffff;"
           className="w-full px-3 py-2 border border-gray-300 rounded text-sm text-gray-900 font-mono min-h-[400px] bg-white"
           spellCheck={false}

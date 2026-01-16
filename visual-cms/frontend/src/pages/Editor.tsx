@@ -32,6 +32,7 @@ import {
   selectActiveRightPanel,
   setActiveLeftPanel,
   setActiveRightPanel,
+  selectInlineBlockEdit,
 } from '@/features/editor/editorSlice'
 import { Header } from '@/shared/components/Header'
 import { EditorToolbar } from '@/features/editor/components/EditorToolbar'
@@ -75,6 +76,9 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   const viewport = useAppSelector(selectViewport) as 'desktop' | 'tablet' | 'mobile'
   const activeLeftPanel = useAppSelector(selectActiveLeftPanel)
   const activeRightPanel = useAppSelector(selectActiveRightPanel)
+  const inlineBlockEdit = useAppSelector(selectInlineBlockEdit)
+  const [leftPanelWidth, setLeftPanelWidth] = useState(280)
+  const [isResizingLeft, setIsResizingLeft] = useState(false)
   // const [isLibraryOpen, setIsLibraryOpen] = useState(true)
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null)
   const [targetContainerRect, setTargetContainerRect] = useState<DOMRect | null>(null)
@@ -105,6 +109,35 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   useEffect(() => {
     dropIndicatorRef.current = dropIndicator
   }, [dropIndicator])
+
+  // Handle left panel resize
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingLeft) return
+      const newWidth = e.clientX
+      if (newWidth >= 200 && newWidth <= 600) {
+        setLeftPanelWidth(newWidth)
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizingLeft(false)
+    }
+
+    if (isResizingLeft) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizingLeft])
 
   useEffect(() => {
     const loadEditor = async () => {
@@ -549,7 +582,10 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
           
           {/* Left Panel Content */}
           {activeLeftPanel && (
-            <div className="w-64 bg-white border-r border-gray-200 flex flex-col relative">
+            <div 
+              className="bg-white border-r border-gray-200 flex flex-col relative"
+              style={{ width: `${leftPanelWidth}px` }}
+            >
               <button
                 onClick={() => dispatch(setActiveLeftPanel(null))}
                 className="absolute -right-3 top-4 z-10 w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors shadow-sm"
@@ -558,6 +594,13 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                 <ChevronLeft size={14} className="text-gray-600" />
               </button>
               
+              {/* Resize handle */}
+              <div
+                onMouseDown={() => setIsResizingLeft(true)}
+                className="absolute right-0 top-0 bottom-0 w-1 hover:w-2 bg-transparent hover:bg-blue-400 cursor-col-resize transition-all z-20"
+                title="Изменить ширину"
+              />
+              
               {activeLeftPanel === 'layers' && (
                 <>
                   <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
@@ -565,7 +608,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                       {type === 'page' ? 'Структура страницы' : 'Структура блока'}
                     </h3>
                   </div>
-                  <div className="flex-1 overflow-y-auto">
+                  <div className="flex-1 overflow-y-auto overflow-x-auto">
                     <LayersPanel />
                   </div>
                 </>
@@ -615,14 +658,15 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
               </button>
               
               <div className="flex-1 overflow-y-auto">
-                {type === 'page' && activeRightPanel === 'pageSettings' && (
+                {type === 'page' && activeRightPanel === 'pageSettings' && !inlineBlockEdit.nodeId && (
                   <PageSettingsPanel 
                     settings={pageSettings}
                     onChange={setPageSettings}
                   />
                 )}
                 
-                {type === 'block' && activeRightPanel === 'properties' && (
+                {/* Показываем панель блока если: 1) тип редактора = block ИЛИ 2) активен режим inline-редактирования */}
+                {((type === 'block' && activeRightPanel === 'properties') || inlineBlockEdit.nodeId) && (
                   <RightPanel />
                 )}
               </div>

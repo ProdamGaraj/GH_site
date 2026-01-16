@@ -158,14 +158,18 @@ export const Canvas: React.FC<CanvasProps> = ({
         )}
         
         <div 
-          className="relative"
+          className="relative canvas-viewport"
           style={{ 
             // Фиксированная ширина viewport (как экран)
             width: editMode === 'responsive' && currentBreakpoint 
               ? `${currentBreakpoint.width}px` 
               : editorType === 'page' ? '1280px' : '800px',
-            // Высота автоматическая - страница скроллится вертикально
-            minHeight: 'auto',
+            // Высота фиксированная, если задана в breakpoint (для правильных пропорций)
+            ...(editMode === 'responsive' && currentBreakpoint?.height ? {
+              height: `${currentBreakpoint.height}px`,
+              minHeight: `${currentBreakpoint.height}px`,
+              maxHeight: `${currentBreakpoint.height}px`,
+            } : {}),
             transform: `scale(${zoom / 100})`,
             transformOrigin: 'top center',
             // Тень для визуального выделения страницы

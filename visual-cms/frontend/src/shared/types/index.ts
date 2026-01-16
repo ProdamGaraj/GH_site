@@ -109,15 +109,32 @@ export interface CSSProperties {
 // Responsive breakpoints
 export type Breakpoint = 'desktop' | 'tablet' | 'mobile' | string
 
+// Browser configuration
+export interface Browser {
+  id: string
+  name: string
+  viewportHeightOffset: number // Высота панелей браузера + UI (в пикселях)
+  icon?: string
+  isDefault?: boolean
+}
+
 export interface CustomBreakpoint {
   id: string
   name: string
   width: number
   height?: number
+  browserId?: string // ID выбранного браузера для этого breakpoint
   icon?: 'monitor' | 'tablet' | 'smartphone' | 'laptop' | 'watch'
   color?: string // Цвет выделения для viewport-специфичных элементов
 }
 
+export interface StandardMonitor {
+  id: string
+  name: string
+  width: number
+  height: number
+  icon?: string
+}
 // Variation for responsive breakpoints
 export interface BlockNodeVariation {
   // Переопределения для унаследованных элементов

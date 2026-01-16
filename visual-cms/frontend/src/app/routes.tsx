@@ -6,6 +6,9 @@ import { BlocksList } from '@/pages/BlocksList'
 import { Settings } from '@/pages/Settings'
 import { Editor } from '@/pages/Editor'
 import { GoldenHouseHome } from '@/pages/GoldenHouseHome'
+import { GoldenHouseModern } from '@/pages/GoldenHouseModern'
+import { GoldenHousePremium } from '@/pages/GoldenHousePremium'
+import GoldenHouseElite from '@/pages/GoldenHouseElite'
 
 export const router = createBrowserRouter([
   {
@@ -49,5 +52,17 @@ export const router = createBrowserRouter([
   {
     path: '/golden-house',
     element: <GoldenHouseHome />,
+  },
+  {
+    path: '/golden-house-modern',
+    element: <GoldenHouseModern />,
+  },
+  {
+    path: '/golden-house-premium',
+    element: <GoldenHousePremium />,
+  },
+  {
+    path: '/golden-house-elite',
+    element: <GoldenHouseElite />,
   },
 ])

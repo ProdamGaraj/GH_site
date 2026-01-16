@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import type { BlockNode, LayoutMode, CSSProperties, CustomBreakpoint } from '@/shared/types'
+import type { BlockNode, LayoutMode, CSSProperties, CustomBreakpoint, Browser, StandardMonitor } from '@/shared/types'
 import { generateId } from '@/shared/utils'
 import type { RootState } from '@/app/store'
 import { findNodeInTree } from '@/features/editor/utils/variationUtils'
@@ -21,6 +21,9 @@ interface EditorState {
   drag: DragState
   viewport: string
   breakpoints: CustomBreakpoint[]
+  browsers: Browser[]
+  standardMonitors: StandardMonitor[]
+  selectedBrowser: string | null  // ID выбранного браузера
   zoom: number
   activeLeftPanel: string | null
   activeRightPanel: string | null
@@ -30,6 +33,11 @@ interface EditorState {
   editMode: 'base' | 'responsive'
   // При editMode = 'responsive', какой брейкпоинт редактируем
   activeEditBreakpoint: string | null
+  // Inline-редактирование блока на странице
+  inlineBlockEdit: {
+    nodeId: string | null
+    originalStructure: BlockNode | null
+  }
 }
 
 const initialState: EditorState = {
@@ -47,10 +55,37 @@ const initialState: EditorState = {
   },
   viewport: 'base',
   breakpoints: [
-    { id: 'desktop', name: 'Desktop', width: 1440, height: 900, icon: 'monitor', color: '#3b82f6' },
-    { id: 'tablet', name: 'Tablet', width: 768, height: 1024, icon: 'tablet', color: '#8b5cf6' },
-    { id: 'mobile', name: 'Mobile', width: 375, height: 667, icon: 'smartphone', color: '#10b981' },
+    { id: 'desktop-hd', name: 'Desktop HD', width: 1440, height: 900, browserId: 'chrome', icon: 'monitor', color: '#3b82f6' },
+    { id: 'desktop-fhd', name: 'Desktop FHD', width: 1920, height: 1080, browserId: 'chrome', icon: 'laptop', color: '#06b6d4' },
+    { id: 'tablet', name: 'Tablet', width: 768, height: 1024, browserId: 'safari-mobile', icon: 'tablet', color: '#8b5cf6' },
+    { id: 'mobile', name: 'Mobile', width: 375, height: 667, browserId: 'safari-mobile', icon: 'smartphone', color: '#10b981' },
   ],
+  browsers: [
+    { id: 'chrome', name: 'Google Chrome', viewportHeightOffset: 160, icon: '🌐', isDefault: true },
+    { id: 'edge', name: 'Microsoft Edge', viewportHeightOffset: 165, icon: '🔷' },
+    { id: 'firefox', name: 'Mozilla Firefox', viewportHeightOffset: 155, icon: '🦊' },
+    { id: 'opera', name: 'Opera', viewportHeightOffset: 170, icon: '🎭' },
+    { id: 'safari', name: 'Safari (macOS)', viewportHeightOffset: 145, icon: '🧭' },
+    { id: 'safari-mobile', name: 'Safari (iOS)', viewportHeightOffset: 90, icon: '📱' },
+    { id: 'chrome-mobile', name: 'Chrome (Android)', viewportHeightOffset: 100, icon: '📱' },
+  ],
+  standardMonitors: [
+    { id: 'hd', name: 'HD (1366x768)', width: 1366, height: 768, icon: '🖥️' },
+    { id: 'hd-plus', name: 'HD+ (1600x900)', width: 1600, height: 900, icon: '🖥️' },
+    { id: 'fhd', name: 'FHD (1920x1080)', width: 1920, height: 1080, icon: '🖥️' },
+    { id: 'qhd', name: 'QHD (2560x1440)', width: 2560, height: 1440, icon: '🖥️' },
+    { id: '4k', name: '4K (3840x2160)', width: 3840, height: 2160, icon: '🖥️' },
+    { id: 'macbook-air-13', name: 'MacBook Air 13"', width: 1440, height: 900, icon: '💻' },
+    { id: 'macbook-pro-14', name: 'MacBook Pro 14"', width: 1512, height: 982, icon: '💻' },
+    { id: 'macbook-pro-16', name: 'MacBook Pro 16"', width: 1728, height: 1117, icon: '💻' },
+    { id: 'ipad-pro-12', name: 'iPad Pro 12.9"', width: 1024, height: 1366, icon: '📱' },
+    { id: 'ipad-pro-11', name: 'iPad Pro 11"', width: 834, height: 1194, icon: '📱' },
+    { id: 'ipad-air', name: 'iPad Air', width: 820, height: 1180, icon: '📱' },
+    { id: 'iphone-15-pro-max', name: 'iPhone 15 Pro Max', width: 430, height: 932, icon: '📱' },
+    { id: 'iphone-15-pro', name: 'iPhone 15 Pro', width: 393, height: 852, icon: '📱' },
+    { id: 'iphone-se', name: 'iPhone SE', width: 375, height: 667, icon: '📱' },
+  ],
+  selectedBrowser: 'chrome',  // По умолчанию Chrome
   zoom: 100,
   activeLeftPanel: 'layers',
   activeRightPanel: 'properties',
@@ -58,6 +93,10 @@ const initialState: EditorState = {
   blockAlignment: 'center',
   editMode: 'base',
   activeEditBreakpoint: null,
+  inlineBlockEdit: {
+    nodeId: null,
+    originalStructure: null,
+  },
 }
 
 // Helper functions for tree operations
@@ -401,17 +440,20 @@ const editorSlice = createSlice({
       
       const updateInNode = (current: BlockNode): BlockNode => {
         if (current.id === nodeId) {
-          // Фильтруем пустые значения из properties
-          const filteredProperties = properties 
-            ? Object.entries(properties)
-                .reduce((acc, [key, value]) => {
-                  // Удаляем свойства с пустыми значениями (пустая строка, null, undefined)
-                  if (value !== '' && value !== null && value !== undefined) {
-                    acc[key] = value
-                  }
-                  return acc
-                }, {} as any)
-            : {}
+          // Обрабатываем properties: удаляем свойства с пустыми значениями
+          let updatedProperties = properties ? { ...(current.styles.properties || {}) } : undefined
+          
+          if (properties && updatedProperties) {
+            Object.entries(properties).forEach(([key, value]) => {
+              if (value === '' || value === null || value === undefined) {
+                // Удаляем свойство, если значение пустое
+                delete updatedProperties[key]
+              } else {
+                // Обновляем свойство новым значением
+                updatedProperties[key] = value
+              }
+            })
+          }
           
           // Режим responsive - добавляем в inheritedOverrides
           if (targetBreakpoint && isResponsiveMode) {
@@ -419,6 +461,19 @@ const editorSlice = createSlice({
             const variation = variations[targetBreakpoint] || {}
             const inheritedOverrides = variation.inheritedOverrides || {}
             const currentOverride = inheritedOverrides[nodeId] || {}
+            const currentOverrideStyles = currentOverride.styles || {}
+            
+            // Для responsive режима также обрабатываем удаление пустых значений
+            let updatedOverrideStyles = { ...currentOverrideStyles }
+            if (properties) {
+              Object.entries(properties).forEach(([key, value]) => {
+                if (value === '' || value === null || value === undefined) {
+                  delete updatedOverrideStyles[key]
+                } else {
+                  updatedOverrideStyles[key] = value
+                }
+              })
+            }
             
             return {
               ...current,
@@ -430,10 +485,7 @@ const editorSlice = createSlice({
                     ...inheritedOverrides,
                     [nodeId]: {
                       ...currentOverride,
-                      styles: {
-                        ...currentOverride.styles,
-                        ...filteredProperties,
-                      },
+                      styles: updatedOverrideStyles,
                     },
                   },
                 },
@@ -446,10 +498,7 @@ const editorSlice = createSlice({
             ...current,
             styles: {
               ...current.styles,
-              properties: {
-                ...current.styles.properties,
-                ...filteredProperties,
-              },
+              properties: updatedProperties || current.styles.properties,
               customCSS: customCSS !== undefined ? customCSS : current.styles.customCSS,
             },
           }
@@ -842,6 +891,38 @@ const editorSlice = createSlice({
       }
     },
     
+    // Browser management
+    addBrowser: (state, action: PayloadAction<Browser>) => {
+      state.browsers.push(action.payload)
+    },
+    
+    removeBrowser: (state, action: PayloadAction<string>) => {
+      state.browsers = state.browsers.filter(b => b.id !== action.payload)
+    },
+    
+    updateBrowser: (state, action: PayloadAction<Browser>) => {
+      const index = state.browsers.findIndex(b => b.id === action.payload.id)
+      if (index !== -1) {
+        state.browsers[index] = action.payload
+      }
+    },
+    
+    // Standard monitors management
+    addStandardMonitor: (state, action: PayloadAction<StandardMonitor>) => {
+      state.standardMonitors.push(action.payload)
+    },
+    
+    removeStandardMonitor: (state, action: PayloadAction<string>) => {
+      state.standardMonitors = state.standardMonitors.filter(m => m.id !== action.payload)
+    },
+    
+    updateStandardMonitor: (state, action: PayloadAction<StandardMonitor>) => {
+      const index = state.standardMonitors.findIndex(m => m.id === action.payload.id)
+      if (index !== -1) {
+        state.standardMonitors[index] = action.payload
+      }
+    },
+    
     markAsSaved: (state) => {
       state.isDirty = false
     },
@@ -855,6 +936,10 @@ const editorSlice = createSlice({
     
     setZoom: (state, action: PayloadAction<number>) => {
       state.zoom = Math.max(25, Math.min(500, action.payload))
+    },
+    
+    setSelectedBrowser: (state, action: PayloadAction<string | null>) => {
+      state.selectedBrowser = action.payload
     },
     
     setActiveLeftPanel: (state, action: PayloadAction<string | null>) => {
@@ -1018,6 +1103,54 @@ const editorSlice = createSlice({
       
       state.isDirty = true
     },
+    
+    // Начать inline-редактирование блока
+    startInlineBlockEdit: (state, action: PayloadAction<string>) => {
+      const nodeId = action.payload
+      const node = findNodeById(state.rootNode!, nodeId)
+      
+      if (node) {
+        state.inlineBlockEdit = {
+          nodeId,
+          originalStructure: JSON.parse(JSON.stringify(node)), // Глубокая копия
+        }
+        state.selectedNodeId = nodeId
+        state.activeRightPanel = 'properties' // Переключаем на панель свойств блока
+      }
+    },
+    
+    // Отменить inline-редактирование
+    cancelInlineBlockEdit: (state) => {
+      if (state.inlineBlockEdit.nodeId && state.inlineBlockEdit.originalStructure) {
+        // Восстанавливаем оригинальную структуру
+        const replaceNode = (node: BlockNode): BlockNode => {
+          if (node.id === state.inlineBlockEdit.nodeId) {
+            return state.inlineBlockEdit.originalStructure!
+          }
+          return {
+            ...node,
+            children: node.children.map(replaceNode)
+          }
+        }
+        
+        if (state.rootNode) {
+          state.rootNode = replaceNode(state.rootNode)
+        }
+      }
+      
+      state.inlineBlockEdit = {
+        nodeId: null,
+        originalStructure: null,
+      }
+    },
+    
+    // Завершить inline-редактирование (принять изменения)
+    finishInlineBlockEdit: (state) => {
+      state.inlineBlockEdit = {
+        nodeId: null,
+        originalStructure: null,
+      }
+    },
   },
 })
 
@@ -1041,9 +1174,16 @@ export const {
   addBreakpoint,
   removeBreakpoint,
   updateBreakpoint,
+  addBrowser,
+  removeBrowser,
+  updateBrowser,
+  addStandardMonitor,
+  removeStandardMonitor,
+  updateStandardMonitor,
   markAsSaved,
   loadRootNode,
   setZoom,
+  setSelectedBrowser,
   setActiveLeftPanel,
   setActiveRightPanel,
   setPanOffset,
@@ -1051,6 +1191,9 @@ export const {
   setEditMode,
   setActiveEditBreakpoint,
   moveNodeToViewport,
+  startInlineBlockEdit,
+  cancelInlineBlockEdit,
+  finishInlineBlockEdit,
 } = editorSlice.actions
 
 // Selectors
@@ -1068,6 +1211,9 @@ export const selectIsDirty = (state: RootState) => state.editor.isDirty
 export const selectDragState = (state: RootState) => state.editor.drag
 export const selectViewport = (state: RootState) => state.editor.viewport
 export const selectBreakpoints = (state: RootState) => state.editor.breakpoints
+export const selectBrowsers = (state: RootState) => state.editor.browsers
+export const selectStandardMonitors = (state: RootState) => state.editor.standardMonitors
+export const selectSelectedBrowser = (state: RootState) => state.editor.selectedBrowser
 export const selectZoom = (state: RootState) => state.editor.zoom
 export const selectActiveLeftPanel = (state: RootState) => state.editor.activeLeftPanel
 export const selectActiveRightPanel = (state: RootState) => state.editor.activeRightPanel
@@ -1075,6 +1221,7 @@ export const selectPanOffset = (state: RootState) => state.editor.panOffset
 export const selectBlockAlignment = (state: RootState) => state.editor.blockAlignment
 export const selectEditMode = (state: RootState) => state.editor.editMode
 export const selectActiveEditBreakpoint = (state: RootState) => state.editor.activeEditBreakpoint
+export const selectInlineBlockEdit = (state: RootState) => state.editor.inlineBlockEdit
 
 // Helper selector to find a node by id
 export const selectNodeById = (state: RootState, nodeId: string): BlockNode | null => {

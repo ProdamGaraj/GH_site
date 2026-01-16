@@ -31,14 +31,7 @@ export const ColorsTab: React.FC<ColorsTabProps> = ({ node }) => {
               label="Цвет фона"
               value={node.styles.properties?.backgroundColor || ''}
               onChange={(e) => handleStyleChange('backgroundColor', e.target.value)}
-              placeholder="#ffffff"
-
-            />
-            <input
-              type="color"
-              value={node.styles.properties?.backgroundColor || '#ffffff'}
-              onChange={(e) => handleStyleChange('backgroundColor', e.target.value)}
-              className="w-12 h-9 mt-5 border border-gray-300 rounded cursor-pointer"
+              placeholder="rgba(255, 255, 255, 1) или #ffffff"
             />
           </div>
           <Input
@@ -64,10 +57,9 @@ export const ColorsTab: React.FC<ColorsTabProps> = ({ node }) => {
           />
           <Input
             label="Border Style"
-            value={node.styles.properties?.borderStyle || 'solid'}
+            value={node.styles.properties?.borderStyle || ''}
             onChange={(e) => handleStyleChange('borderStyle', e.target.value)}
             placeholder="solid"
-
           />
         </div>
         <div className="flex gap-2 mt-2">
@@ -75,14 +67,7 @@ export const ColorsTab: React.FC<ColorsTabProps> = ({ node }) => {
             label="Border Color"
             value={node.styles.properties?.borderColor || ''}
             onChange={(e) => handleStyleChange('borderColor', e.target.value)}
-            placeholder="#000000"
-
-          />
-          <input
-            type="color"
-            value={node.styles.properties?.borderColor || '#000000'}
-            onChange={(e) => handleStyleChange('borderColor', e.target.value)}
-            className="w-12 h-9 mt-5 border border-gray-300 rounded cursor-pointer"
+            placeholder="rgba(0, 0, 0, 1) или #000000"
           />
         </div>
         <Input
@@ -101,16 +86,9 @@ export const ColorsTab: React.FC<ColorsTabProps> = ({ node }) => {
         <div className="flex gap-2">
           <Input
             label="Цвет текста"
-            value={node.styles.properties?.color || '#000000'}
+            value={node.styles.properties?.color || ''}
             onChange={(e) => handleStyleChange('color', e.target.value)}
-            placeholder="#000000"
-
-          />
-          <input
-            type="color"
-            value={node.styles.properties?.color || '#000000'}
-            onChange={(e) => handleStyleChange('color', e.target.value)}
-            className="w-12 h-9 mt-5 border border-gray-300 rounded cursor-pointer"
+            placeholder="rgba(0, 0, 0, 1) или #000000"
           />
         </div>
       </div>
@@ -123,11 +101,11 @@ export const ColorsTab: React.FC<ColorsTabProps> = ({ node }) => {
           min="0"
           max="1"
           step="0.1"
-          value={node.styles.properties?.opacity || '1'}
+          value={node.styles.properties?.opacity || ''}
           onChange={(e) => handleStyleChange('opacity', e.target.value)}
           className="w-full"
         />
-        <div className="text-xs text-gray-500 text-center">{node.styles.properties?.opacity || '1'}</div>
+        <div className="text-xs text-gray-500 text-center">{node.styles.properties?.opacity || ''}</div>
       </div>
     </div>
   )

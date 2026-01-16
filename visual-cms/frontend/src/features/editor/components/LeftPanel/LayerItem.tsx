@@ -1,21 +1,38 @@
 import React, { useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectNode, selectSelectedNodeId, deleteNode, selectBreakpoints, selectRootNode } from '@/features/editor/editorSlice'
+import { selectNode, selectSelectedNodeId, deleteNode, selectBreakpoints, selectRootNode, startInlineBlockEdit } from '@/features/editor/editorSlice'
 import * as Icons from 'lucide-react'
 import { cn } from '@/shared/utils'
 import { getNodeBreakpoint, BlockNodeWithViewport } from '../../utils/variationUtils'
+import { useNavigate } from 'react-router-dom'
+import { blockApi, CreateBlockDto } from '@/shared/api'
+import type { BlockNode } from '@/shared/types'
 
 interface LayerItemProps {
   node: BlockNodeWithViewport
   level: number
+  expandedNodes: Set<string>
+  onToggle: (nodeId: string) => void
 }
 
-export const LayerItem: React.FC<LayerItemProps> = ({ node, level }) => {
+// Функция для проверки, является ли узел предком или потомком выбранного узла
+const isNodeInPath = (node: BlockNodeWithViewport, targetId: string): boolean => {
+  if (node.id === targetId) return true
+  if (node.children) {
+    return node.children.some(child => isNodeInPath(child, targetId))
+  }
+  return false
+}
+
+export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes, onToggle }) => {
   const dispatch = useAppDispatch()
   const selectedNodeId = useAppSelector(selectSelectedNodeId)
   const breakpoints = useAppSelector(selectBreakpoints)
   const rootNode = useAppSelector(selectRootNode)
-  const [isExpanded, setIsExpanded] = useState(true)
+  const navigate = useNavigate()
+  const [isConverting, setIsConverting] = useState(false)
+  
+  const isExpanded = expandedNodes.has(node.id)
   
   const isSelected = selectedNodeId === node.id
   const hasChildren = node.children && node.children.length > 0
@@ -37,7 +54,7 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level }) => {
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation()
-    setIsExpanded(!isExpanded)
+    onToggle(node.id)
   }
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -57,6 +74,53 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level }) => {
     } else {
       dispatch(deleteNode(node.id))
     }
+  }
+
+  const handleConvertToBlock = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    
+    if (isConverting) return
+    
+    try {
+      setIsConverting(true)
+      
+      // Подготовить структуру блока (удалить специфичные для viewport поля)
+      const cleanNode = (n: BlockNodeWithViewport): BlockNode => {
+        const { _viewportId, ...rest } = n
+        return {
+          ...rest,
+          children: n.children?.map(cleanNode) || []
+        }
+      }
+      
+      const blockName = node.metadata?.name || node.tagName || 'Блок'
+      
+      const blockData: CreateBlockDto = {
+        name: blockName,
+        type: 'section',
+        structure: cleanNode(node),
+        isReusable: true,
+        tags: ['converted-from-page']
+      }
+      
+      // Создать блок через API
+      const createdBlock = await blockApi.create(blockData)
+      
+      // Перейти в редактор блока
+      navigate(`/editor/block/${createdBlock.id}`)
+    } catch (error) {
+      console.error('Ошибка создания блока:', error)
+      alert('Не удалось создать блок: ' + (error as Error).message)
+    } finally {
+      setIsConverting(false)
+    }
+  }
+
+  const handleEditInline = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    
+    // Запускаем режим inline-редактирования блока
+    dispatch(startInlineBlockEdit(node.id))
   }
 
   // Get icon based on element type
@@ -88,28 +152,28 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level }) => {
     <div>
       <div
         className={cn(
-          'group flex items-center gap-1.5 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-100 transition-colors text-sm',
+          'group flex items-center gap-1.5 py-1.5 pr-1 rounded cursor-pointer hover:bg-gray-100 transition-colors text-sm min-h-[28px] relative',
           isSelected && 'bg-primary-50 hover:bg-primary-100'
         )}
-        style={{ paddingLeft: `${level * 16 + 8}px` }}
+        style={{ paddingLeft: `${level * 12 + 8}px` }}
         onClick={handleClick}
       >
         {/* Expand/Collapse Arrow */}
-        {hasChildren && (
+        {hasChildren ? (
           <button
             onClick={handleToggle}
-            className="p-0.5 hover:bg-gray-200 rounded transition-transform"
+            className="flex-shrink-0 w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded transition-all"
             style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
           >
-            <Icons.ChevronRight size={14} />
+            <Icons.ChevronRight size={12} className="text-gray-900" />
           </button>
+        ) : (
+          <div className="w-4 flex-shrink-0" />
         )}
-        
-        {!hasChildren && <div className="w-5" />}
 
         {/* Icon */}
         <div className={cn(
-          'p-1 rounded',
+          'flex-shrink-0 w-6 h-6 flex items-center justify-center rounded',
           isContainer ? 'bg-primary-100' : 'bg-gray-100'
         )}>
           <IconComponent 
@@ -122,48 +186,84 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level }) => {
 
         {/* Name */}
         <span className={cn(
-          'flex-1 truncate',
+          'flex-1 truncate min-w-0',
           isSelected ? 'text-primary-900 font-medium' : 'text-gray-700'
         )}>
           {node.metadata?.name || node.tagName}
         </span>
         
-        {/* Viewport-specific indicator */}
-        {isViewportSpecific && nodeBreakpoint && (
-          <span 
-            className="px-1.5 py-0.5 text-xs rounded font-medium"
-            style={{ 
-              backgroundColor: `${nodeBreakpoint.color}20` || '#10b98120',
-              color: nodeBreakpoint.color || '#10b981',
-              border: `1px solid ${nodeBreakpoint.color || '#10b981'}`
-            }}
-            title={`Только для ${nodeBreakpoint.name}`}
-          >
-            {nodeBreakpoint.name.slice(0, 3)}
-          </span>
-        )}
+        {/* Правая часть - абсолютное позиционирование с прозрачностью */}
+        <div className="absolute right-1 top-0 bottom-0 flex items-center gap-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white">
+          {/* Viewport-specific indicator */}
+          {isViewportSpecific && nodeBreakpoint && (
+            <span 
+              className="flex-shrink-0 px-1.5 py-0.5 text-xs rounded font-medium"
+              style={{ 
+                backgroundColor: `${nodeBreakpoint.color}20` || '#10b98120',
+                color: nodeBreakpoint.color || '#10b981',
+                border: `1px solid ${nodeBreakpoint.color || '#10b981'}`
+              }}
+              title={`Только для ${nodeBreakpoint.name}`}
+            >
+              {nodeBreakpoint.name.slice(0, 3)}
+            </span>
+          )}
 
-        {/* Lock indicator */}
-        {isLocked && (
-          <Icons.Lock size={12} className="text-orange-500" aria-label="Заблокированный блок" />
-        )}
+          {/* Lock indicator */}
+          {isLocked && (
+            <Icons.Lock size={12} className="flex-shrink-0 text-orange-500" aria-label="Заблокированный блок" />
+          )}
 
-        {/* Delete button - hidden for root and locked elements */}
-        {level > 0 && !isLocked && (
-          <button
-            onClick={handleDelete}
-            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 rounded transition-opacity"
-          >
-            <Icons.Trash2 size={12} className="text-red-600" />
-          </button>
-        )}
+          {/* Action buttons */}
+          {!isLocked && (
+            <>
+              <button
+                onClick={handleEditInline}
+                className="flex-shrink-0 p-1 hover:bg-blue-50 rounded transition-colors"
+                title="Редактировать свойства"
+              >
+                <Icons.Pencil size={12} className="text-blue-600" />
+              </button>
+
+              {level > 0 && (
+                <button
+                  onClick={handleConvertToBlock}
+                  className="flex-shrink-0 p-1 hover:bg-green-50 rounded transition-colors"
+                  disabled={isConverting}
+                  title="Преобразовать в блок"
+                >
+                  {isConverting ? (
+                    <Icons.Loader2 size={12} className="text-green-600 animate-spin" />
+                  ) : (
+                    <Icons.Package size={12} className="text-green-600" />
+                  )}
+                </button>
+              )}
+
+              {level > 0 && (
+                <button
+                  onClick={handleDelete}
+                  className="flex-shrink-0 p-1 hover:bg-red-50 rounded transition-colors"
+                >
+                  <Icons.Trash2 size={12} className="text-red-600" />
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Children */}
       {hasChildren && isExpanded && (
         <div>
           {node.children.map((child) => (
-            <LayerItem key={child.id} node={child} level={level + 1} />
+            <LayerItem 
+              key={child.id} 
+              node={child} 
+              level={level + 1} 
+              expandedNodes={expandedNodes}
+              onToggle={onToggle}
+            />
           ))}
         </div>
       )}

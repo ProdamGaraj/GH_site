@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { selectBreakpoints, addBreakpoint, removeBreakpoint} from '../editorSlice'
-// import {updateBreakpoint} from '../editorSlice'
 import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
 import { Plus, Trash2, Monitor, Tablet, Smartphone, Laptop, Watch, X } from 'lucide-react'
@@ -85,7 +84,7 @@ export const BreakpointManager: React.FC<BreakpointManagerProps> = ({ onClose })
             {sortedBreakpoints.map((bp) => {
               const iconOption = iconOptions.find(opt => opt.value === bp.icon) || iconOptions[0]
               const Icon = iconOption.Icon
-              const isDefault = ['desktop', 'tablet', 'mobile'].includes(bp.id)
+              const isDefault = ['desktop-hd', 'desktop-fhd', 'tablet', 'mobile'].includes(bp.id)
               
               return (
                 <div key={bp.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded border">
