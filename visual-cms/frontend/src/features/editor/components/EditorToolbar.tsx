@@ -163,6 +163,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         setShowSaveDialog(true)
       } else {
         try {
+          // 1. Сохраняем блок в библиотеке
           await dispatch(updateBlock({
             id: id!,
             data: {
@@ -170,11 +171,86 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             }
           })).unwrap()
           
+          // 2. Синхронизируем все страницы, которые используют этот блок
+          await syncBlockToPages(id!, rootNode)
+          
           dispatch(markAsSaved())
         } catch (error) {
           console.error('Failed to save block:', error)
         }
       }
+    }
+  }
+  
+  // Функция синхронизации блока со всеми страницами, где он используется
+  const syncBlockToPages = async (blockId: string, blockStructure: BlockNode) => {
+    try {
+      // Получаем все страницы
+      const allPages = await pageApi.getAll()
+      
+      // Для каждой страницы проверяем, есть ли в ней этот блок
+      for (const page of allPages) {
+        if (!page.structure) continue
+        
+        // Ищем узлы с linkedBlockId === blockId
+        const hasBlock = findNodesWithLinkedBlockId(page.structure, blockId)
+        
+        if (hasBlock.length > 0) {
+          console.log(`Синхронизация блока ${blockId} на странице ${page.name}`)
+          
+          // Обновляем структуру страницы, заменяя блоки
+          const updatedStructure = updateBlocksInStructure(page.structure, blockId, blockStructure)
+          
+          // Сохраняем страницу
+          await pageApi.update(page.id, {
+            structure: updatedStructure,
+            name: page.name,
+            slug: page.slug,
+          })
+          
+          console.log(`Страница ${page.name} обновлена`)
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка синхронизации блока со страницами:', error)
+    }
+  }
+  
+  // Найти все узлы с определённым linkedBlockId
+  const findNodesWithLinkedBlockId = (node: BlockNode, blockId: string): BlockNode[] => {
+    const results: BlockNode[] = []
+    
+    if (node.metadata?.linkedBlockId === blockId) {
+      results.push(node)
+    }
+    
+    for (const child of node.children || []) {
+      results.push(...findNodesWithLinkedBlockId(child, blockId))
+    }
+    
+    return results
+  }
+  
+  // Обновить все блоки с определённым linkedBlockId новой структурой
+  const updateBlocksInStructure = (pageStructure: BlockNode, blockId: string, newBlockStructure: BlockNode): BlockNode => {
+    // Если это нужный блок - заменяем его содержимое, сохраняя id и linkedBlockId
+    if (pageStructure.metadata?.linkedBlockId === blockId) {
+      return {
+        ...newBlockStructure,
+        id: pageStructure.id, // Сохраняем оригинальный id на странице
+        metadata: {
+          ...newBlockStructure.metadata,
+          linkedBlockId: blockId, // Сохраняем связь с библиотекой
+        },
+      }
+    }
+    
+    // Рекурсивно обрабатываем детей
+    return {
+      ...pageStructure,
+      children: pageStructure.children.map(child => 
+        updateBlocksInStructure(child, blockId, newBlockStructure)
+      ),
     }
   }
 
