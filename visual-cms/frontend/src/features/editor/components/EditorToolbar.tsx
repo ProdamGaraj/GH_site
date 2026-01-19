@@ -393,7 +393,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     try {
       const linkedBlocks = collectLinkedBlocks(rootNode)
       let updatedCount = 0
-      let createdCount = 0
+      let skippedCount = 0
       
       for (const { blockId, structure } of linkedBlocks) {
         try {
@@ -405,21 +405,11 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             updatedCount++
           } catch (err: any) {
             if (err.message?.includes('404')) {
-              // Блок удалён - создаём новый
-              const blockName = structure.metadata?.name || structure.tagName || 'Блок'
-              const newBlock = await blockApi.create({
-                name: blockName,
-                type: 'section',
-                structure: cleanNode(structure),
-                isReusable: true,
-                tags: ['restored']
-              })
-              // Обновляем linkedBlockId
-              dispatch(updateNode({
-                id: structure.id,
-                updates: { metadata: { ...structure.metadata, linkedBlockId: newBlock.id } }
-              }))
-              createdCount++
+              // Блок не найден в библиотеке - пропускаем (не создаём новые!)
+              console.warn(`Блок ${blockId} не найден в библиотеке, пропускаем`)
+              skippedCount++
+            } else {
+              throw err
             }
           }
         } catch (err) {
@@ -439,7 +429,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       
       let message = ''
       if (updatedCount > 0) message += `Обновлено ${updatedCount} блок(ов)`
-      if (createdCount > 0) message += (message ? ', ' : '') + `создано ${createdCount}`
+      if (skippedCount > 0) message += (message ? ', ' : '') + `пропущено ${skippedCount} (не найдены в библиотеке)`
       message += '. Страница сохранена.'
       
       setBlockSaveResult({ success: true, message })

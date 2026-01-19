@@ -693,7 +693,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
               </button>
               
               <div className="flex-1 overflow-y-auto overflow-x-auto">
-                {type === 'page' && activeRightPanel === 'pageSettings' && !inlineBlockEdit.nodeId && (
+                {type === 'page' && activeRightPanel === 'pageSettings' && !inlineBlockEdit.active && (
                   <PageSettingsPanel 
                     settings={pageSettings}
                     onChange={setPageSettings}
@@ -701,7 +701,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                 )}
                 
                 {/* Показываем панель свойств элемента */}
-                {(activeRightPanel === 'properties' || inlineBlockEdit.nodeId) && (
+                {(activeRightPanel === 'properties' || inlineBlockEdit.active) && (
                   <RightPanel 
                     pageSettings={type === 'page' ? pageSettings : undefined}
                     onPageSettingsChange={type === 'page' ? setPageSettings : undefined}

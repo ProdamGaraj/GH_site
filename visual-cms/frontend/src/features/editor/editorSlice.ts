@@ -35,7 +35,6 @@ interface EditorState {
   activeEditBreakpoint: string | null
   // Inline-редактирование блока на странице
   inlineBlockEdit: {
-    nodeId: boolean
     active: boolean // Режим редактирования блоков активен
     originalStructures: Record<string, BlockNode> // Оригинальные структуры изменённых блоков для отмены
   }
@@ -101,7 +100,6 @@ const initialState: EditorState = {
   inlineBlockEdit: {
     active: false,
     originalStructures: {},
-    nodeId: false
   },
   statePreviewMode: 'none',
   canvasColor: '#ffffff',
@@ -1185,19 +1183,22 @@ const editorSlice = createSlice({
       }
       
       state.inlineBlockEdit = {
-        nodeId: false,
         active: false,
         originalStructures: {},
       }
+      
+      // Возвращаем панель на настройки страницы при выходе из режима редактирования блока
+      state.activeRightPanel = 'pageSettings'
     },
     
     // Завершить inline-редактирование (принять изменения)
     finishInlineBlockEdit: (state) => {
       state.inlineBlockEdit = {
-        nodeId: false,
         active: false,
         originalStructures: {},
       }
+      // Возвращаем панель на настройки страницы при выходе из режима редактирования блока
+      state.activeRightPanel = 'pageSettings'
     },
     
     // Установить режим превью состояния
