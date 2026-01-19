@@ -372,6 +372,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     return null
   }
 
+  // Собирает блоки с linkedBlockId (связанные с библиотекой)
   const collectLinkedBlocks = (node: BlockNode): { blockId: string, structure: BlockNode }[] => {
     const results: { blockId: string, structure: BlockNode }[] = []
     if (node.metadata?.linkedBlockId) {
@@ -383,6 +384,17 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     return results
   }
 
+  // Собирает потенциальные блоки верхнего уровня для добавления в библиотеку
+  // (прямые дочерние элементы страницы, которые являются секциями/контейнерами)
+  const collectTopLevelBlocks = (node: BlockNode): BlockNode[] => {
+    // Возвращаем прямых детей корневого узла, у которых есть имя
+    return node.children.filter(child => 
+      child.metadata?.name && 
+      !child.metadata?.linkedBlockId && // ещё не связаны с библиотекой
+      (child.elementType === 'container' || child.tagName === 'section' || child.tagName === 'header' || child.tagName === 'footer' || child.tagName === 'nav')
+    )
+  }
+
   // Сохранить все изменённые блоки в библиотеку
   const handleSaveAllToLibrary = async () => {
     if (!rootNode) return
@@ -392,8 +404,14 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     
     try {
       const linkedBlocks = collectLinkedBlocks(rootNode)
+      const topLevelBlocks = collectTopLevelBlocks(rootNode)
+      
+      console.log('Найдено блоков с linkedBlockId:', linkedBlocks.length, linkedBlocks.map(b => ({ id: b.blockId, name: b.structure.metadata?.name })))
+      console.log('Найдено блоков верхнего уровня без linkedBlockId:', topLevelBlocks.length, topLevelBlocks.map(b => b.metadata?.name))
+      
       let updatedCount = 0
-      let skippedCount = 0
+      let createdCount = 0
+      let updatedRootNode = rootNode
       
       for (const { blockId, structure } of linkedBlocks) {
         try {
@@ -403,11 +421,41 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             // Блок существует - обновляем
             await blockApi.update(blockId, { structure: cleanNode(structure) })
             updatedCount++
+            console.log(`Блок ${blockId} обновлён`)
           } catch (err: any) {
+            console.log(`Ошибка при проверке блока ${blockId}:`, err.message)
             if (err.message?.includes('404')) {
-              // Блок не найден в библиотеке - пропускаем (не создаём новые!)
-              console.warn(`Блок ${blockId} не найден в библиотеке, пропускаем`)
-              skippedCount++
+              // Блок не найден в библиотеке - создаём новый
+              const blockName = structure.metadata?.name || structure.tagName || 'Новый блок'
+              console.log(`Создаём новый блок: "${blockName}"`)
+              const newBlock = await blockApi.create({
+                name: blockName,
+                type: structure.elementType || 'container',
+                structure: cleanNode(structure),
+                isReusable: true
+              })
+              console.log(`Создан блок с ID: ${newBlock.id}`)
+              
+              // Обновляем linkedBlockId в структуре страницы
+              const updateLinkedBlockId = (node: BlockNode): BlockNode => {
+                if (node.metadata?.linkedBlockId === blockId) {
+                  return {
+                    ...node,
+                    metadata: {
+                      ...node.metadata,
+                      linkedBlockId: newBlock.id
+                    }
+                  }
+                }
+                return {
+                  ...node,
+                  children: node.children.map(updateLinkedBlockId)
+                }
+              }
+              updatedRootNode = updateLinkedBlockId(updatedRootNode)
+              
+              createdCount++
+              console.log(`Создан новый блок "${blockName}" с ID ${newBlock.id}`)
             } else {
               throw err
             }
@@ -417,20 +465,61 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         }
       }
       
-      // Сохраняем страницу
+      // Создаём блоки из секций верхнего уровня, у которых нет linkedBlockId
+      for (const topLevelBlock of topLevelBlocks) {
+        try {
+          const blockName = topLevelBlock.metadata?.name || topLevelBlock.tagName || 'Новый блок'
+          console.log(`Создаём блок из секции верхнего уровня: "${blockName}"`)
+          
+          const newBlock = await blockApi.create({
+            name: blockName,
+            type: topLevelBlock.elementType || 'container',
+            structure: cleanNode(topLevelBlock),
+            isReusable: true
+          })
+          
+          // Обновляем структуру страницы - добавляем linkedBlockId
+          const addLinkedBlockId = (node: BlockNode): BlockNode => {
+            if (node.id === topLevelBlock.id) {
+              return {
+                ...node,
+                metadata: {
+                  ...node.metadata,
+                  linkedBlockId: newBlock.id
+                }
+              }
+            }
+            return {
+              ...node,
+              children: node.children.map(addLinkedBlockId)
+            }
+          }
+          updatedRootNode = addLinkedBlockId(updatedRootNode)
+          
+          createdCount++
+          console.log(`Создан блок "${blockName}" с ID ${newBlock.id}`)
+        } catch (err) {
+          console.error(`Ошибка создания блока из секции:`, err)
+        }
+      }
+      
+      // Сохраняем страницу с обновлёнными linkedBlockId
       if (id && pageSettings) {
         await pageApi.update(id, {
-          structure: cleanNode(rootNode),
+          structure: cleanNode(updatedRootNode),
           name: pageSettings.name,
           slug: pageSettings.slug,
         })
+        // Обновляем rootNode в Redux с новыми linkedBlockId
+        dispatch(loadRootNode(updatedRootNode))
         dispatch(markAsSaved())
       }
       
       let message = ''
       if (updatedCount > 0) message += `Обновлено ${updatedCount} блок(ов)`
-      if (skippedCount > 0) message += (message ? ', ' : '') + `пропущено ${skippedCount} (не найдены в библиотеке)`
-      message += '. Страница сохранена.'
+      if (createdCount > 0) message += (message ? ', ' : '') + `создано ${createdCount} новых`
+      if (updatedCount === 0 && createdCount === 0) message = 'Нет блоков для сохранения в библиотеку'
+      else message += '. Страница сохранена.'
       
       setBlockSaveResult({ success: true, message })
       setTimeout(() => setBlockSaveResult(null), 3000)
