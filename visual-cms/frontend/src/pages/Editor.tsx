@@ -460,6 +460,9 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       if (dragData.node) {
         // Clone the entire block structure with new IDs
         // Lock only children, not the root container
+        // dragData.id contains the library block ID
+        const libraryBlockId = dragData.id
+        
         const cloneNodeWithNewIds = (node: BlockNode, isRoot = true): BlockNode => {
           return {
             ...node,
@@ -468,6 +471,8 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
               ...node.metadata,
               locked: !isRoot, // Lock children but not root
               name: isRoot ? `${node.metadata?.name || 'Блок'} (копия)` : node.metadata?.name,
+              // Сохраняем связь с блоком в библиотеке для корневого элемента
+              linkedBlockId: isRoot ? libraryBlockId : node.metadata?.linkedBlockId,
             },
             children: node.children.map(child => cloneNodeWithNewIds(child, false)),
           }
@@ -582,14 +587,19 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       }}
     >
       <div className="h-screen flex flex-col bg-gray-100" ref={canvasContainerRef}>
-        <Header showActions={
-          <EditorToolbar 
-            type={type} 
-            viewport={viewport}
-            onViewportChange={(newViewport) => dispatch(setViewport(newViewport))}
-            pageSettings={type === 'page' ? pageSettings : undefined} 
-          />
-        } />
+        <EditorToolbar 
+          type={type} 
+          viewport={viewport}
+          onViewportChange={(newViewport) => dispatch(setViewport(newViewport))}
+          pageSettings={type === 'page' ? pageSettings : undefined}
+        >
+          {({ centerContent, rightContent }) => (
+            <Header 
+              centerActions={centerContent}
+              rightActions={rightContent}
+            />
+          )}
+        </EditorToolbar>
         
         <div className="flex-1 flex overflow-hidden">
           {/* Left Sidebar with Icons */}
@@ -695,6 +705,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                   <RightPanel 
                     pageSettings={type === 'page' ? pageSettings : undefined}
                     onPageSettingsChange={type === 'page' ? setPageSettings : undefined}
+                    pageId={id}
                   />
                 )}
               </div>

@@ -4,9 +4,11 @@ import { Home, FileText, Box, Settings, Menu } from 'lucide-react'
 
 interface HeaderProps {
   showActions?: React.ReactNode
+  centerActions?: React.ReactNode  // Действия на странице (масштаб, цвета)
+  rightActions?: React.ReactNode   // Действия со страницей (сохранить, экспорт)
 }
 
-export const Header: React.FC<HeaderProps> = ({ showActions }) => {
+export const Header: React.FC<HeaderProps> = ({ showActions, centerActions, rightActions }) => {
   const location = useLocation()
   const [showNavDropdown, setShowNavDropdown] = useState(false)
 
@@ -25,8 +27,12 @@ export const Header: React.FC<HeaderProps> = ({ showActions }) => {
   // Check if we're in the editor
   const isInEditor = location.pathname.includes('/editor/')
 
+  // Если есть centerActions или rightActions - используем 3-колоночную структуру
+  const hasThreeColumns = centerActions || rightActions
+
   return (
     <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4">
+      {/* 1. Лого и меню */}
       <div className="flex items-center gap-6">
         {/* Logo */}
         <div className="font-bold text-lg text-gray-900">Visual CMS</div>
@@ -99,11 +105,25 @@ export const Header: React.FC<HeaderProps> = ({ showActions }) => {
         )}
       </div>
 
-      {/* Actions (optional, for editor toolbar buttons) */}
-      {showActions && (
-        <div className="flex items-center gap-2">
-          {showActions}
-        </div>
+      {/* 2. Центр - действия на странице (масштаб, цвета, viewport и т.д.) */}
+      {hasThreeColumns ? (
+        <>
+          <div className="flex items-center gap-2">
+            {centerActions}
+          </div>
+
+          {/* 3. Справа - действия со страницей (сохранить, экспорт, публикация) */}
+          <div className="flex items-center gap-2">
+            {rightActions}
+          </div>
+        </>
+      ) : (
+        /* Fallback для старого API с showActions */
+        showActions && (
+          <div className="flex items-center gap-2">
+            {showActions}
+          </div>
+        )
       )}
     </header>
   )

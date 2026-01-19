@@ -35,8 +35,9 @@ interface EditorState {
   activeEditBreakpoint: string | null
   // Inline-редактирование блока на странице
   inlineBlockEdit: {
-    nodeId: string | null
-    originalStructure: BlockNode | null
+    nodeId: boolean
+    active: boolean // Режим редактирования блоков активен
+    originalStructures: Record<string, BlockNode> // Оригинальные структуры изменённых блоков для отмены
   }
   // Режим превью состояния элемента (hover, active, focus, disabled)
   statePreviewMode: 'none' | 'hover' | 'active' | 'focus' | 'disabled'
@@ -98,8 +99,9 @@ const initialState: EditorState = {
   editMode: 'base',
   activeEditBreakpoint: null,
   inlineBlockEdit: {
-    nodeId: null,
-    originalStructure: null,
+    active: false,
+    originalStructures: {},
+    nodeId: false
   },
   statePreviewMode: 'none',
   canvasColor: '#ffffff',
@@ -1141,28 +1143,35 @@ const editorSlice = createSlice({
       state.isDirty = true
     },
     
-    // Начать inline-редактирование блока
-    startInlineBlockEdit: (state, action: PayloadAction<string>) => {
+    // Включить/выключить режим редактирования блоков
+    startInlineBlockEdit: (state, action: PayloadAction<string | undefined>) => {
+      state.inlineBlockEdit.active = true
+      // Если передан nodeId, выбираем этот блок
+      if (action.payload) {
+        state.selectedNodeId = action.payload
+      }
+      state.activeRightPanel = 'properties'
+    },
+    
+    // Сохранить оригинальную структуру блока перед изменением (для возможности отмены)
+    saveOriginalBlockStructure: (state, action: PayloadAction<string>) => {
       const nodeId = action.payload
-      const node = findNodeById(state.rootNode!, nodeId)
-      
-      if (node) {
-        state.inlineBlockEdit = {
-          nodeId,
-          originalStructure: JSON.parse(JSON.stringify(node)), // Глубокая копия
+      // Сохраняем только если ещё не сохраняли
+      if (!state.inlineBlockEdit.originalStructures[nodeId]) {
+        const node = findNodeById(state.rootNode!, nodeId)
+        if (node) {
+          state.inlineBlockEdit.originalStructures[nodeId] = JSON.parse(JSON.stringify(node))
         }
-        state.selectedNodeId = nodeId
-        state.activeRightPanel = 'properties' // Переключаем на панель свойств блока
       }
     },
     
-    // Отменить inline-редактирование
+    // Отменить inline-редактирование - восстановить все оригинальные структуры
     cancelInlineBlockEdit: (state) => {
-      if (state.inlineBlockEdit.nodeId && state.inlineBlockEdit.originalStructure) {
-        // Восстанавливаем оригинальную структуру
+      // Восстанавливаем все изменённые блоки
+      for (const [nodeId, originalStructure] of Object.entries(state.inlineBlockEdit.originalStructures)) {
         const replaceNode = (node: BlockNode): BlockNode => {
-          if (node.id === state.inlineBlockEdit.nodeId) {
-            return state.inlineBlockEdit.originalStructure!
+          if (node.id === nodeId) {
+            return originalStructure
           }
           return {
             ...node,
@@ -1176,16 +1185,18 @@ const editorSlice = createSlice({
       }
       
       state.inlineBlockEdit = {
-        nodeId: null,
-        originalStructure: null,
+        nodeId: false,
+        active: false,
+        originalStructures: {},
       }
     },
     
     // Завершить inline-редактирование (принять изменения)
     finishInlineBlockEdit: (state) => {
       state.inlineBlockEdit = {
-        nodeId: null,
-        originalStructure: null,
+        nodeId: false,
+        active: false,
+        originalStructures: {},
       }
     },
     
@@ -1262,6 +1273,7 @@ export const {
   setActiveEditBreakpoint,
   moveNodeToViewport,
   startInlineBlockEdit,
+  saveOriginalBlockStructure,
   cancelInlineBlockEdit,
   finishInlineBlockEdit,
   setStatePreviewMode,

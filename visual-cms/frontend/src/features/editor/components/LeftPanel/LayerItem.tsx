@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectNode, selectSelectedNodeId, deleteNode, selectBreakpoints, selectRootNode, startInlineBlockEdit } from '@/features/editor/editorSlice'
+import { selectNode, selectSelectedNodeId, deleteNode, selectBreakpoints, selectRootNode } from '@/features/editor/editorSlice'
 import * as Icons from 'lucide-react'
 import { cn } from '@/shared/utils'
 import { getNodeBreakpoint, BlockNodeWithViewport } from '../../utils/variationUtils'
@@ -116,13 +116,6 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
     }
   }
 
-  const handleEditInline = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    
-    // Запускаем режим inline-редактирования блока
-    dispatch(startInlineBlockEdit(node.id))
-  }
-
   // Get icon based on element type
   const getIcon = () => {
     const iconMap: Record<string, keyof typeof Icons> = {
@@ -217,14 +210,6 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
           {/* Action buttons */}
           {!isLocked && (
             <>
-              <button
-                onClick={handleEditInline}
-                className="flex-shrink-0 p-1 hover:bg-blue-50 rounded transition-colors"
-                title="Редактировать свойства"
-              >
-                <Icons.Pencil size={12} className="text-blue-600" />
-              </button>
-
               {level > 0 && (
                 <button
                   onClick={handleConvertToBlock}

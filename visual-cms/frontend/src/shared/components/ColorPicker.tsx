@@ -266,7 +266,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
           onBlur={handleTextBlur}
           onKeyDown={handleTextKeyDown}
           placeholder={placeholder}
-          className="flex-1 px-2 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-mono"
+          className="flex-1 px-2 py-1.5 text-sm bg-white text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-mono h-9"
         />
         
         {/* Format selector */}
@@ -274,7 +274,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
           <button
             type="button"
             onClick={() => setShowFormatMenu(!showFormatMenu)}
-            className="px-2 py-1.5 text-xs bg-gray-100 text-gray-700 border border-gray-300 rounded hover:bg-gray-200 transition-colors flex items-center gap-1 min-w-[60px] justify-between"
+            className="px-2 py-1.5 text-xs bg-gray-100 text-gray-700 border border-gray-300 rounded hover:bg-gray-200 transition-colors flex items-center gap-1 min-w-[60px] justify-between h-9"
           >
             {FORMAT_LABELS[format]}
             <ChevronDown size={12} />

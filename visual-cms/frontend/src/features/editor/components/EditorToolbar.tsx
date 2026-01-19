@@ -3,15 +3,17 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
 import { ColorPicker } from '@/shared/components/ColorPicker'
-import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, Rocket, ExternalLink, ChevronDown, Menu, Palette } from 'lucide-react'
+import { ExpandableButton } from '@/shared/components/ExpandableButton'
+import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, Rocket, ExternalLink, ChevronDown, Palette, Pencil, FileText, Library, FileDown } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor } from '@/features/editor/editorSlice'
+import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor, selectInlineBlockEdit, startInlineBlockEdit, cancelInlineBlockEdit, finishInlineBlockEdit, selectSelectedNodeId, updateNode } from '@/features/editor/editorSlice'
 import { createBlock, updateBlock, selectBlocksSaving } from '@/features/blocks/blocksSlice'
 import { createPage, updatePage, selectPagesSaving } from '@/features/pages/pagesSlice'
 import { BreakpointManager } from './BreakpointManager'
 import { ExportImportModal } from './ExportImportModal'
-import { deployApi } from '@/shared/api'
+import { deployApi, blockApi, pageApi } from '@/shared/api'
 import { generateNodeTreeCSS } from '../utils/styleGenerator'
+import type { BlockNode } from '@/shared/types'
 
 interface EditorToolbarProps {
   type: 'page' | 'block'
@@ -28,6 +30,8 @@ interface EditorToolbarProps {
     keywords: string
     ogImage: string
   }
+  // Render props для разделения на части
+  children?: (parts: { centerContent: React.ReactNode; rightContent: React.ReactNode }) => React.ReactNode
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({ 
@@ -36,7 +40,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   blockName: initialBlockName,
   viewport = 'desktop',
   onViewportChange,
-  pageSettings
+  pageSettings,
+  children
 }) => {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -55,10 +60,13 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const canUndo = useAppSelector(selectCanUndo)
   const canRedo = useAppSelector(selectCanRedo)
   const canvasColor = useAppSelector(selectCanvasColor)
+  const inlineBlockEdit = useAppSelector(selectInlineBlockEdit)
+  const selectedNodeId = useAppSelector(selectSelectedNodeId)
   
   const isNewBlock = id === 'new' || !id
   const isPageEditor = _type === 'page'
   const isSaving = isPageEditor ? isSavingPages : isSavingBlocks
+  const isBlockEditMode = inlineBlockEdit.active
   
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
@@ -71,7 +79,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const [isDeploying, setIsDeploying] = useState(false)
   const [deployResult, setDeployResult] = useState<{ success: boolean; message: string; url?: string } | null>(null)
   const [showViewportDropdown, setShowViewportDropdown] = useState(false)
-  const [showNavModal, setShowNavModal] = useState(false)
+  const [isSavingToLibrary, setIsSavingToLibrary] = useState(false)
+  const [blockSaveResult, setBlockSaveResult] = useState<{ success: boolean; message: string } | null>(null)
 
   // Sync zoomInput with redux zoom when it changes externally
   React.useEffect(() => {
@@ -269,9 +278,182 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     dispatch(setZoom(100))
   }
 
-  const toolbarContent = (
+  // Вспомогательные функции для сохранения блоков
+  const cleanNode = (n: BlockNode): BlockNode => {
+    const { _viewportId, ...rest } = n as any
+    return {
+      ...rest,
+      children: n.children?.map(cleanNode) || []
+    }
+  }
+
+  const findNodeById = (node: BlockNode, id: string): BlockNode | null => {
+    if (node.id === id) return node
+    for (const child of node.children) {
+      const found = findNodeById(child, id)
+      if (found) return found
+    }
+    return null
+  }
+
+  const collectLinkedBlocks = (node: BlockNode): { blockId: string, structure: BlockNode }[] => {
+    const results: { blockId: string, structure: BlockNode }[] = []
+    if (node.metadata?.linkedBlockId) {
+      results.push({ blockId: node.metadata.linkedBlockId, structure: node })
+    }
+    for (const child of node.children || []) {
+      results.push(...collectLinkedBlocks(child))
+    }
+    return results
+  }
+
+  // Сохранить все изменённые блоки в библиотеку
+  const handleSaveAllToLibrary = async () => {
+    if (!rootNode) return
+    
+    setIsSavingToLibrary(true)
+    setBlockSaveResult(null)
+    
+    try {
+      const linkedBlocks = collectLinkedBlocks(rootNode)
+      let updatedCount = 0
+      let createdCount = 0
+      
+      for (const { blockId, structure } of linkedBlocks) {
+        try {
+          // Проверяем существует ли блок
+          try {
+            await blockApi.getById(blockId)
+            // Блок существует - обновляем
+            await blockApi.update(blockId, { structure: cleanNode(structure) })
+            updatedCount++
+          } catch (err: any) {
+            if (err.message?.includes('404')) {
+              // Блок удалён - создаём новый
+              const blockName = structure.metadata?.name || structure.tagName || 'Блок'
+              const newBlock = await blockApi.create({
+                name: blockName,
+                type: 'section',
+                structure: cleanNode(structure),
+                isReusable: true,
+                tags: ['restored']
+              })
+              // Обновляем linkedBlockId
+              dispatch(updateNode({
+                id: structure.id,
+                updates: { metadata: { ...structure.metadata, linkedBlockId: newBlock.id } }
+              }))
+              createdCount++
+            }
+          }
+        } catch (err) {
+          console.error(`Ошибка сохранения блока ${blockId}:`, err)
+        }
+      }
+      
+      // Сохраняем страницу
+      if (id && pageSettings) {
+        await pageApi.update(id, {
+          structure: cleanNode(rootNode),
+          name: pageSettings.name,
+          slug: pageSettings.slug,
+        })
+        dispatch(markAsSaved())
+      }
+      
+      let message = ''
+      if (updatedCount > 0) message += `Обновлено ${updatedCount} блок(ов)`
+      if (createdCount > 0) message += (message ? ', ' : '') + `создано ${createdCount}`
+      message += '. Страница сохранена.'
+      
+      setBlockSaveResult({ success: true, message })
+      setTimeout(() => setBlockSaveResult(null), 3000)
+      
+      // Выходим из режима редактирования блоков
+      dispatch(finishInlineBlockEdit())
+    } catch (error) {
+      console.error('Ошибка сохранения:', error)
+      setBlockSaveResult({ success: false, message: 'Ошибка сохранения: ' + (error as Error).message })
+      setTimeout(() => setBlockSaveResult(null), 5000)
+    } finally {
+      setIsSavingToLibrary(false)
+    }
+  }
+
+  // Сохранить изменения только для этой страницы (не трогать библиотеку)
+  const handleSaveForPageOnly = async () => {
+    if (!rootNode || !id || !pageSettings) return
+    
+    setIsSavingToLibrary(true)
+    setBlockSaveResult(null)
+    
+    try {
+      // Просто сохраняем страницу с текущей структурой
+      await pageApi.update(id, {
+        structure: cleanNode(rootNode),
+        name: pageSettings.name,
+        slug: pageSettings.slug,
+      })
+      dispatch(markAsSaved())
+      
+      setBlockSaveResult({ success: true, message: 'Страница сохранена (библиотека не изменена)' })
+      setTimeout(() => setBlockSaveResult(null), 3000)
+      
+      // Выходим из режима редактирования блоков
+      dispatch(finishInlineBlockEdit())
+    } catch (error) {
+      console.error('Ошибка сохранения страницы:', error)
+      setBlockSaveResult({ success: false, message: 'Ошибка: ' + (error as Error).message })
+      setTimeout(() => setBlockSaveResult(null), 5000)
+    } finally {
+      setIsSavingToLibrary(false)
+    }
+  }
+
+  // Центральная часть - действия НА странице (масштаб, цвета, viewport и т.д.)
+  const centerContent = (
     <>
-      {/* Canvas color - отдельный блок слева */}
+      {/* Edit Mode Toggle - переключатель режимов */}
+      {isPageEditor && (
+        <>
+          <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+            <button
+              onClick={() => {
+                if (isBlockEditMode) {
+                  dispatch(cancelInlineBlockEdit())
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                !isBlockEditMode
+                  ? 'bg-white shadow-sm text-primary-700'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+              title="Редактирование настроек страницы"
+            >
+              <FileText size={16} />
+              <span className="hidden sm:inline">Страница</span>
+            </button>
+            <button
+              onClick={() => {
+                // Включаем режим редактирования блоков
+                dispatch(startInlineBlockEdit())
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                isBlockEditMode
+                  ? 'bg-white shadow-sm text-primary-700'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+              title="Режим редактирования блоков"
+            >
+              <Pencil size={16} />
+              <span className="hidden sm:inline">Блок</span>
+            </button>
+          </div>
+          <div className="h-6 w-px bg-gray-300 mx-2" />
+        </>
+      )}
+      
+      {/* Canvas color */}
       <div className="flex items-center gap-1 mr-2" title="Цвет фона холста">
         <Palette size={14} className="text-gray-500" />
         <ColorPicker
@@ -493,85 +675,121 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               </select>
               {selectedBrowser && browsers.find(b => b.id === selectedBrowser) && (
                 <span className="text-xs text-gray-800">
-                  (offset: {browsers.find(b => b.id === selectedBrowser)?.viewportHeightOffset}px)
+                  {browsers.find(b => b.id === selectedBrowser)?.viewportHeightOffset}px
                 </span>
               )}
             </div>
-            
-            <div className="h-6 w-px bg-gray-300 mx-2 text-gray-600" />
           </>
         )}
-        
-        <Button variant="secondary" size="sm" onClick={handlePreview}>
-          <Eye size={16} className="mr-2" />
-          Предпросмотр
-        </Button>
-        
-        <Button variant="secondary" size="sm" onClick={() => { setShowExportModal(true); setImportTabActive(false) }}>
-          <Download size={16} className="mr-2" />
-          Экспорт
-        </Button>
-        
-        <Button variant="secondary" size="sm" onClick={() => { setShowExportModal(true); setImportTabActive(true) }}>
-          <Upload size={16} className="mr-2" />
-          Импорт
-        </Button>
-        
-        <Button 
-          size="sm" 
+      </div>
+    </>
+  )
+
+  // Правая часть - действия СО страницей (сохранить, экспорт, публикация)
+  const rightContent = (
+    <>
+      <ExpandableButton
+        icon={<Eye size={16} />}
+        label="Предпросмотр"
+        onClick={handlePreview}
+        variant="secondary"
+      />
+      
+      <ExpandableButton
+        icon={<Download size={16} />}
+        label="Экспорт"
+        onClick={() => { setShowExportModal(true); setImportTabActive(false) }}
+        variant="secondary"
+      />
+      
+      <ExpandableButton
+        icon={<Upload size={16} />}
+        label="Импорт"
+        onClick={() => { setShowExportModal(true); setImportTabActive(true) }}
+        variant="secondary"
+      />
+      
+      {/* Conditional save buttons based on edit mode */}
+      {isBlockEditMode ? (
+        <>
+          <ExpandableButton
+            icon={isSavingToLibrary ? <Loader2 size={16} className="animate-spin" /> : <Library size={16} />}
+            label="В библиотеку"
+            onClick={handleSaveAllToLibrary}
+            disabled={isSavingToLibrary || !isDirty}
+            variant="primary"
+            title="Сохранить изменения блоков в библиотеку и на страницу"
+          />
+          <ExpandableButton
+            icon={isSavingToLibrary ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+            label="Только страница"
+            onClick={handleSaveForPageOnly}
+            disabled={isSavingToLibrary || !isDirty}
+            variant="secondary"
+            title="Сохранить только для этой страницы (библиотека не изменится)"
+          />
+        </>
+      ) : (
+        <ExpandableButton
+          icon={isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          label="Сохранить"
           onClick={handleSave}
           disabled={isSaving || !isDirty}
-        >
-          {isSaving ? (
-            <Loader2 size={16} className="mr-2 animate-spin" />
-          ) : (
-            <Save size={16} className="mr-2" />
+          variant="primary"
+        />
+      )}
+
+      {/* Deploy button - only for page editor */}
+      {isPageEditor && !isNewBlock && (
+        <ExpandableButton
+          icon={isDeploying ? <Loader2 size={16} className="animate-spin" /> : <Rocket size={16} />}
+          label="Опубликовать"
+          onClick={handleDeploy}
+          disabled={isDeploying || isDirty}
+          title={isDirty ? 'Сначала сохраните изменения' : 'Опубликовать страницу на сайт'}
+          variant="success"
+        />
+      )}
+
+      {/* Deploy result notification */}
+      {deployResult && (
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
+          deployResult.success 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-red-100 text-red-800'
+        }`}>
+          {deployResult.success ? <Check size={16} /> : <X size={16} />}
+          <span>{deployResult.message}</span>
+          {deployResult.url && (
+            <a 
+              href={deployResult.url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 underline hover:no-underline"
+            >
+              Открыть <ExternalLink size={14} />
+            </a>
           )}
-          Сохранить
-        </Button>
+        </div>
+      )}
 
-        {/* Deploy button - only for page editor */}
-        {isPageEditor && !isNewBlock && (
-          <Button 
-            size="sm" 
-            variant="secondary"
-            onClick={handleDeploy}
-            disabled={isDeploying || isDirty}
-            title={isDirty ? 'Сначала сохраните изменения' : 'Опубликовать страницу на сайт'}
-            className="bg-green-600 hover:bg-green-700 text-white border-green-600"
-          >
-            {isDeploying ? (
-              <Loader2 size={16} className="mr-2 animate-spin" />
-            ) : (
-              <Rocket size={16} className="mr-2" />
-            )}
-            Опубликовать
-          </Button>
-        )}
+      {/* Block save result notification */}
+      {blockSaveResult && (
+        <div className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
+          blockSaveResult.success 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-red-100 text-red-800'
+        }`}>
+          {blockSaveResult.success ? <Check size={16} /> : <X size={16} />}
+          <span>{blockSaveResult.message}</span>
+        </div>
+      )}
+    </>
+  )
 
-        {/* Deploy result notification */}
-        {deployResult && (
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
-            deployResult.success 
-              ? 'bg-green-100 text-green-800' 
-              : 'bg-red-100 text-red-800'
-          }`}>
-            {deployResult.success ? <Check size={16} /> : <X size={16} />}
-            <span>{deployResult.message}</span>
-            {deployResult.url && (
-              <a 
-                href={deployResult.url} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 underline hover:no-underline"
-              >
-                Открыть <ExternalLink size={14} />
-              </a>
-            )}
-          </div>
-        )}
-      </div>
-
+  // Модальные окна и диалоги
+  const modalsContent = (
+    <>
       {/* Export/Import Modal */}
       {showExportModal && rootNode && (
         <ExportImportModal
@@ -671,15 +889,29 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           onClose={handleClosePreview} 
         />
       )}
-    </>
-  )
 
-  return (
-    <>
-      {toolbarContent}
       {showBreakpointManager && (
         <BreakpointManager onClose={() => setShowBreakpointManager(false)} />
       )}
+    </>
+  )
+
+  // Если children передан - используем render props паттерн
+  if (children) {
+    return (
+      <>
+        {children({ centerContent, rightContent })}
+        {modalsContent}
+      </>
+    )
+  }
+
+  // Иначе - обычный рендер (для обратной совместимости)
+  return (
+    <>
+      {centerContent}
+      {rightContent}
+      {modalsContent}
     </>
   )
 }
