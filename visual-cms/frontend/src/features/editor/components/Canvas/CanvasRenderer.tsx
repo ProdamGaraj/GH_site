@@ -280,9 +280,9 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
   )
 }
 
-// РњРµРјРѕРёР·РёСЂСѓРµРј РєРѕРјРїРѕРЅРµРЅС‚ - СЂРµСЂРµРЅРґРµСЂ С‚РѕР»СЊРєРѕ РµСЃР»Рё node.id РёР»Рё selectedNodeId РёР·РјРµРЅРёР»РёСЃСЊ
+// Memoize component - re-render only if node.id or selectedNodeId changed
 export const CanvasRenderer = React.memo(CanvasRendererComponent, (prevProps, nextProps) => {
-  // Р РµСЂРµРЅРґРµСЂРёРј С‚РѕР»СЊРєРѕ РµСЃР»Рё РёР·РјРµРЅРёР»СЃСЏ СЃР°Рј node РёР»Рё РµРіРѕ id
+  // Re-render only if node itself or its id changed
   return prevProps.node === nextProps.node && 
          prevProps.isRoot === nextProps.isRoot &&
          prevProps.editorType === nextProps.editorType &&

@@ -254,7 +254,6 @@ class VariablesService {
       })
 
       // Safe evaluation (basic expressions only)
-      // eslint-disable-next-line no-new-func
       return Boolean(new Function(`return ${resolved}`)())
     } catch (err) {
       console.error('Failed to evaluate condition:', expression, err)

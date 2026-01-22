@@ -254,12 +254,13 @@ const variablesSlice = createSlice({
           case 'sessionStorage':
             sessionStorage.setItem(key, serialized)
             break
-          case 'cookie':
+          case 'cookie': {
             const expiry = persistence.expiry 
               ? new Date(Date.now() + persistence.expiry * 1000).toUTCString()
               : ''
             document.cookie = `${key}=${encodeURIComponent(serialized)}${expiry ? `; expires=${expiry}` : ''}`
             break
+          }
         }
       }
     },
@@ -401,10 +402,11 @@ const variablesSlice = createSlice({
           case 'sessionStorage':
             storedValue = sessionStorage.getItem(key)
             break
-          case 'cookie':
+          case 'cookie': {
             const match = document.cookie.match(new RegExp(`${key}=([^;]+)`))
             storedValue = match ? decodeURIComponent(match[1]) : null
             break
+          }
         }
 
         if (storedValue !== null) {

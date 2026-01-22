@@ -89,7 +89,6 @@ export const ComputedFieldsEditor: React.FC<ComputedFieldsEditorProps> = ({
       }
 
       // Безопасное выполнение
-      // eslint-disable-next-line no-new-func
       const fn = new Function('item', '$var', '$data', '$page', field.expression)
       const result = fn(context.item, context.$var, context.$data, context.$page)
       

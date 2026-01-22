@@ -358,7 +358,7 @@ export const DataSourceWizard: React.FC = () => {
           storage: formData.authStorage
         }
       
-      case 'custom':
+      case 'custom': {
         const customHeadersObj: Record<string, string> = {}
         formData.customHeaders.filter(h => h.key).forEach(h => {
           customHeadersObj[h.key] = h.value
@@ -368,6 +368,7 @@ export const DataSourceWizard: React.FC = () => {
           headers: customHeadersObj,
           storage: formData.authStorage
         }
+      }
       
       default:
         return undefined

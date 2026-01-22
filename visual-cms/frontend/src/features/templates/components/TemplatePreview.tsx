@@ -114,7 +114,7 @@ const TemplatePreview: React.FC<TemplatePreviewProps> = ({
       // For other elements, replace inner content
       // This is a simplified approach - in production you'd use a proper HTML parser
       const contentRegex = new RegExp(
-        `(<[^>]+data-bind=["']${key}["'][^>]*>)([^<]*)(<\/[^>]+>)`,
+        `(<[^>]+data-bind=["']${key}["'][^>]*>)([^<]*)(</[^>]+>)`,
         'gi'
       );
       html = html.replace(contentRegex, (_, open, _oldContent, close) => {

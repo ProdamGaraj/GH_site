@@ -65,8 +65,8 @@ interface UseOutputBindingResult extends OutputBindingState {
  */
 const PATTERNS = {
   email: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
-  url: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/,
-  phone: /^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,4}[-\s\.]?[0-9]{1,9}$/,
+  url: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)$/,
+  phone: /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,4}[-\s.]?[0-9]{1,9}$/,
   creditCard: /^(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})$/,
 }
 
@@ -356,13 +356,14 @@ export function useOutputBinding(options: UseOutputBindingOptions): UseOutputBin
         }
         break
 
-      case 'reset_form':
+      case 'reset_form': {
         // Сброс формы - нужно вызвать reset на форме
         const form = document.querySelector('form')
         if (form) {
           form.reset()
         }
         break
+      }
 
       case 'show_element':
         if (action.elementSelector) {
@@ -410,11 +411,12 @@ export function useOutputBinding(options: UseOutputBindingOptions): UseOutputBin
     validationErrors?: Record<string, string[]>
   ) => {
     switch (action.type) {
-      case 'show_message':
+      case 'show_message': {
         const message = action.message || error
         console.error('Error:', message)
         // TODO: интеграция с toast/notification system
         break
+      }
 
       case 'show_inline_errors':
         // Ошибки уже в state.validationErrors

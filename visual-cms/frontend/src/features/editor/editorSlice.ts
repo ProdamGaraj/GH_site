@@ -473,7 +473,7 @@ const editorSlice = createSlice({
       const updateInNode = (current: BlockNode): BlockNode => {
         if (current.id === nodeId) {
           // Обрабатываем properties: удаляем свойства с пустыми значениями
-          let updatedProperties = properties ? { ...(current.styles.properties || {}) } : undefined
+          const updatedProperties = properties ? { ...(current.styles.properties || {}) } : undefined
           
           if (properties && updatedProperties) {
             Object.entries(properties).forEach(([key, value]) => {
@@ -496,7 +496,7 @@ const editorSlice = createSlice({
             const currentOverrideStyles = currentOverride.styles || {}
             
             // Для responsive режима также обрабатываем удаление пустых значений
-            let updatedOverrideStyles = { ...currentOverrideStyles }
+            const updatedOverrideStyles = { ...currentOverrideStyles }
             if (properties) {
               Object.entries(properties).forEach(([key, value]) => {
                 if (value === '' || value === null || value === undefined) {
@@ -688,7 +688,7 @@ const editorSlice = createSlice({
       let foundInVariations = false
       
       const deleteFromVariations = (node: BlockNode): BlockNode => {
-        let updatedNode = { ...node }
+        const updatedNode = { ...node }
         
         // Удаляем из specificChildren всех variations
         if (node.variations) {

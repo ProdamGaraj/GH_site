@@ -323,7 +323,6 @@ export function useComputedVariable<T = unknown>(
       }
       
       // Выполняем выражение
-      // eslint-disable-next-line no-new-func
       const fn = new Function(...dependencies, `return ${expression}`)
       return fn(...dependencies.map(d => context[d])) as T
     } catch (error) {

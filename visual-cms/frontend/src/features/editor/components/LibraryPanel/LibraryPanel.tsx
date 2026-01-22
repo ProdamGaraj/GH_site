@@ -38,7 +38,7 @@ interface LibraryPanelProps {
   onToggle: () => void
 }
 
-export const LibraryPanel: React.FC<LibraryPanelProps> = ({  }) => {
+export const LibraryPanel: React.FC<LibraryPanelProps> = () => {
   return (
     <>
       {categories.map((category) => (

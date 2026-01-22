@@ -16,7 +16,7 @@ export function combineRefs<T>(...refs: Array<React.Ref<T> | undefined>) {
       if (typeof ref === 'function') {
         ref(element)
       } else {
-        ;(ref as React.MutableRefObject<T>).current = element
+        (ref as React.MutableRefObject<T>).current = element
       }
     })
   }

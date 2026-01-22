@@ -237,7 +237,7 @@ class PageDataService {
           })
           break
 
-        case 'interval':
+        case 'interval': {
           // Fetch immediately, then set interval
           this.fetch(source.alias).catch(() => {})
           // loadInterval is in seconds, convert to ms
@@ -248,6 +248,7 @@ class PageDataService {
             }, intervalMs)
           }
           break
+        }
 
         case 'onDemand':
           // Don't fetch automatically

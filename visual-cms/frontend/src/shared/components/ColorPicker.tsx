@@ -226,7 +226,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
         onChange(newValue)
         setFormat(detectFormat(newValue))
       }
-      ;(e.target as HTMLInputElement).blur()
+      (e.target as HTMLInputElement).blur()
     }
   }
 
