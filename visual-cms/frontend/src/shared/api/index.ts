@@ -1,10 +1,14 @@
-// Ensure API URL always ends with /api
+﻿// Ensure API URL always ends with /api
 const getApiBaseUrl = (): string => {
   const envUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000'
   return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`
 }
 
 const API_BASE_URL = getApiBaseUrl()
+
+interface RequestOptions {
+  params?: Record<string, string | number | boolean | undefined>
+}
 
 class ApiClient {
   private baseUrl: string
@@ -13,11 +17,31 @@ class ApiClient {
     this.baseUrl = baseUrl
   }
 
+  private buildUrl(endpoint: string, params?: Record<string, string | number | boolean | undefined>): string {
+    let url = `${this.baseUrl}${endpoint}`
+    
+    if (params) {
+      const searchParams = new URLSearchParams()
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined) {
+          searchParams.append(key, String(value))
+        }
+      }
+      const queryString = searchParams.toString()
+      if (queryString) {
+        url += `?${queryString}`
+      }
+    }
+    
+    return url
+  }
+
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    params?: Record<string, string | number | boolean | undefined>
   ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`
+    const url = this.buildUrl(endpoint, params)
     
     const config: RequestInit = {
       ...options,
@@ -37,8 +61,8 @@ class ApiClient {
     return response.json()
   }
 
-  get<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: 'GET' })
+  get<T>(endpoint: string, options?: RequestOptions): Promise<T> {
+    return this.request<T>(endpoint, { method: 'GET' }, options?.params)
   }
 
   post<T>(endpoint: string, data?: unknown): Promise<T> {
@@ -82,6 +106,14 @@ export const pageApi = {
 
 // Types
 import type { Block, Page, BlockNode } from '@/shared/types'
+import type { 
+  DataSource, 
+  DataSourcesListResponse, 
+  DataSourcesFilter,
+  CreateDataSourceRequest,
+  UpdateDataSourceRequest,
+  TestConnectionResult 
+} from '@/shared/types/dataSource'
 
 export interface CreateBlockDto {
   name: string
@@ -138,15 +170,195 @@ export interface DeployResult {
 }
 
 export const deployApi = {
-  // Деплой одной страницы
+  // Р”РµРїР»РѕР№ РѕРґРЅРѕР№ СЃС‚СЂР°РЅРёС†С‹
   deployPage: (pageId: string) => api.post<DeployResult>(`/deploy/${pageId}`),
   
-  // Деплой всех опубликованных страниц
+  // Р”РµРїР»РѕР№ РІСЃРµС… РѕРїСѓР±Р»РёРєРѕРІР°РЅРЅС‹С… СЃС‚СЂР°РЅРёС†
   deployAll: () => api.post<DeployResult>('/deploy'),
   
-  // Получить список опубликованных файлов
+  // РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РѕРїСѓР±Р»РёРєРѕРІР°РЅРЅС‹С… С„Р°Р№Р»РѕРІ
   getDeployedFiles: () => api.get<{ files: string[], publicUrl: string }>('/deploy'),
   
-  // Удалить страницу из публикации
+  // РЈРґР°Р»РёС‚СЊ СЃС‚СЂР°РЅРёС†Сѓ РёР· РїСѓР±Р»РёРєР°С†РёРё
   undeploy: (slug: string) => api.delete<{ message: string }>(`/deploy/${slug}`),
 }
+
+// Data Sources API
+export const dataSourceApi = {
+  /**
+   * РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РёСЃС‚РѕС‡РЅРёРєРѕРІ РґР°РЅРЅС‹С… СЃ С„РёР»СЊС‚СЂР°С†РёРµР№ Рё РїР°РіРёРЅР°С†РёРµР№
+   */
+  getAll: (filters?: DataSourcesFilter) => {
+    const params = new URLSearchParams()
+    if (filters) {
+      if (filters.search) params.append('search', filters.search)
+      if (filters.type) params.append('type', filters.type)
+      if (filters.status) params.append('status', filters.status)
+      if (filters.groupId) params.append('groupId', filters.groupId)
+      if (filters.tags) filters.tags.forEach(tag => params.append('tags', tag))
+      if (filters.page) params.append('page', String(filters.page))
+      if (filters.limit) params.append('limit', String(filters.limit))
+      if (filters.sortBy) params.append('sortBy', filters.sortBy)
+      if (filters.sortOrder) params.append('sortOrder', filters.sortOrder)
+    }
+    const queryString = params.toString()
+    return api.get<DataSourcesListResponse>(`/data-sources${queryString ? `?${queryString}` : ''}`)
+  },
+
+  /**
+   * РџРѕР»СѓС‡РёС‚СЊ РѕРґРёРЅ РёСЃС‚РѕС‡РЅРёРє РґР°РЅРЅС‹С… РїРѕ ID
+   */
+  getById: (id: string) => api.get<DataSource>(`/data-sources/${id}`),
+
+  /**
+   * РЎРѕР·РґР°С‚СЊ РЅРѕРІС‹Р№ РёСЃС‚РѕС‡РЅРёРє РґР°РЅРЅС‹С…
+   */
+  create: (data: CreateDataSourceRequest) => api.post<DataSource>('/data-sources', data),
+
+  /**
+   * РћР±РЅРѕРІРёС‚СЊ РёСЃС‚РѕС‡РЅРёРє РґР°РЅРЅС‹С…
+   */
+  update: (id: string, data: UpdateDataSourceRequest) => api.put<DataSource>(`/data-sources/${id}`, data),
+
+  /**
+   * РЈРґР°Р»РёС‚СЊ РёСЃС‚РѕС‡РЅРёРє РґР°РЅРЅС‹С…
+   */
+  delete: (id: string) => api.delete<void>(`/data-sources/${id}`),
+
+  /**
+   * РўРµСЃС‚РёСЂРѕРІР°С‚СЊ РїРѕРґРєР»СЋС‡РµРЅРёРµ Рє СЃСѓС‰РµСЃС‚РІСѓСЋС‰РµРјСѓ РёСЃС‚РѕС‡РЅРёРєСѓ
+   */
+  testConnection: (id: string) => api.post<TestConnectionResult>(`/data-sources/${id}/test`),
+
+  /**
+   * РўРµСЃС‚РёСЂРѕРІР°С‚СЊ РЅРѕРІСѓСЋ РєРѕРЅС„РёРіСѓСЂР°С†РёСЋ (Р±РµР· СЃРѕС…СЂР°РЅРµРЅРёСЏ)
+   */
+  testNewConnection: (data: { type: string; config: unknown; authConfig?: unknown }) => 
+    api.post<TestConnectionResult>('/data-sources/new/test', data),
+
+  /**
+   * Р”СѓР±Р»РёСЂРѕРІР°С‚СЊ РёСЃС‚РѕС‡РЅРёРє РґР°РЅРЅС‹С…
+   */
+  duplicate: (id: string, newName?: string) => 
+    api.post<DataSource>(`/data-sources/${id}/duplicate`, { name: newName }),
+}
+
+// Re-export types for convenience
+export type { 
+  DataSource, 
+  DataSourcesListResponse, 
+  DataSourcesFilter,
+  CreateDataSourceRequest,
+  UpdateDataSourceRequest,
+  TestConnectionResult 
+} from '@/shared/types/dataSource'
+
+// Data Binding Types
+import type {
+  DataBinding,
+  CreateDataBindingRequest,
+  UpdateDataBindingRequest,
+  FetchWithBindingRequest,
+  FetchDataResult,
+  DirectFetchRequest
+} from '@/shared/types/dataBinding'
+
+// Data Bindings API
+export const dataBindingApi = {
+  /**
+   * РџРѕР»СѓС‡РёС‚СЊ РІСЃРµ РїСЂРёРІСЏР·РєРё
+   */
+  getAll: () => api.get<DataBinding[]>('/data-bindings'),
+
+  /**
+   * РџРѕР»СѓС‡РёС‚СЊ РїСЂРёРІСЏР·РєСѓ РїРѕ ID
+   */
+  getById: (id: string) => api.get<DataBinding>(`/data-bindings/${id}`),
+
+  /**
+   * РџРѕР»СѓС‡РёС‚СЊ РїСЂРёРІСЏР·РєРё РґР»СЏ Р±Р»РѕРєР°
+   */
+  getByBlockId: (blockId: string, pageId?: string) => {
+    return api.get<DataBinding[]>(`/data-bindings?blockId=${blockId}${pageId ? `&pageId=${pageId}` : ''}`)
+  },
+
+  /**
+   * РЎРѕР·РґР°С‚СЊ РїСЂРёРІСЏР·РєСѓ
+   */
+  create: (data: CreateDataBindingRequest) => api.post<DataBinding>('/data-bindings', data),
+
+  /**
+   * РћР±РЅРѕРІРёС‚СЊ РїСЂРёРІСЏР·РєСѓ
+   */
+  update: (id: string, data: UpdateDataBindingRequest) => 
+    api.put<DataBinding>(`/data-bindings/${id}`, data),
+
+  /**
+   * РЈРґР°Р»РёС‚СЊ РїСЂРёРІСЏР·РєСѓ
+   */
+  delete: (id: string) => api.delete<void>(`/data-bindings/${id}`),
+
+  /**
+   * РџРѕР»СѓС‡РёС‚СЊ РґР°РЅРЅС‹Рµ РЅР°РїСЂСЏРјСѓСЋ РёР· РёСЃС‚РѕС‡РЅРёРєР° (СЃ С„РёР»СЊС‚СЂР°РјРё)
+   */
+  fetchDirect: (data: DirectFetchRequest) => 
+    api.post<FetchDataResult>('/data/fetch', data),
+
+  /**
+   * РџРѕР»СѓС‡РёС‚СЊ РґР°РЅРЅС‹Рµ С‡РµСЂРµР· РїСЂРёРІСЏР·РєСѓ
+   */
+  fetchWithBinding: (data: FetchWithBindingRequest) =>
+    api.post<FetchDataResult>('/data/fetch-with-binding', data),
+}
+
+// Re-export data binding types
+export type {
+  DataBinding,
+  CreateDataBindingRequest,
+  UpdateDataBindingRequest,
+  FetchWithBindingRequest,
+  FetchDataResult,
+  DirectFetchRequest
+} from '@/shared/types/dataBinding'
+// Page Data Settings Types
+export interface PageDataSource {
+  id: string
+  dataSourceId: string
+  alias: string
+  loadStrategy: 'pageLoad' | 'onDemand' | 'interval'
+  loadInterval?: number
+  cacheEnabled: boolean
+  cacheTTL?: number
+  priority: number
+  dependsOn?: string[]
+}
+
+export interface PageVariable {
+  id: string
+  name: string
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object'
+  defaultValue: unknown
+  description?: string
+  persist?: boolean
+}
+
+export interface PageDataSettings {
+  dataSources: PageDataSource[]
+  variables: PageVariable[]
+}
+
+// Page Data Settings API
+export const pageDataSettingsApi = {
+  getSettings: (pageId: string) =>
+    api.get<PageDataSettings>(`/pages/${pageId}/data-settings`),
+
+  updateSettings: (pageId: string, settings: Partial<PageDataSettings>) =>
+    api.put<PageDataSettings>(`/pages/${pageId}/data-settings`, settings),
+
+  updateDataSources: (pageId: string, dataSources: PageDataSource[]) =>
+    api.put<{ dataSources: PageDataSource[] }>(`/pages/${pageId}/data-sources`, { dataSources }),
+
+  updateVariables: (pageId: string, variables: PageVariable[]) =>
+    api.put<{ variables: PageVariable[] }>(`/pages/${pageId}/variables`, { variables }),
+}
+

@@ -46,13 +46,19 @@ import { RightSidebar } from '@/features/editor/components/Sidebar/RightSidebar'
 import { SavedBlocksLibrary } from '@/features/editor/components/SavedBlocksLibrary/SavedBlocksLibrary'
 import { LayersPanel } from '@/features/editor/components/LeftPanel/LayersPanel'
 import { DragOverlay } from '@/features/editor/components/Canvas/DragOverlay'
+import { SaveStatusIndicator } from '@/features/editor/components/SaveStatusIndicator'
+import { useAutoSave } from '@/features/editor/hooks/useAutoSave'
+import { validateDrop } from '@/features/editor/utils/dropValidation'
 import type { DragItem, BlockNode, EditorPageSettings } from '@/shared/types'
+import { DataBindingProvider } from '@/features/dataBindings'
+
 import { 
   DropIndicator, 
   collectElementRects, 
   determineDropTarget,
   getLayoutMode,
 } from '@/features/editor/utils/dndUtils'
+import { DropValidationToast, useValidationToast } from '@/features/editor/components/DropValidationToast'
 
 interface EditorProps {
   type: 'page' | 'block'
@@ -77,6 +83,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   const activeLeftPanel = useAppSelector(selectActiveLeftPanel)
   const activeRightPanel = useAppSelector(selectActiveRightPanel)
   const inlineBlockEdit = useAppSelector(selectInlineBlockEdit)
+  const validationToast = useValidationToast()
   const [leftPanelWidth, setLeftPanelWidth] = useState(280)
   const [isResizingLeft, setIsResizingLeft] = useState(false)
   const [rightPanelWidth, setRightPanelWidth] = useState(320)
@@ -100,6 +107,22 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const dropIndicatorRef = useRef<DropIndicator | null>(null)
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  
+  // Auto-save hook
+  const isNewDocument = !id || id === 'new'
+  const autoSave = useAutoSave({
+    documentId: isNewDocument ? null : id,
+    documentType: type,
+    pageSettings: type === 'page' ? pageSettings : undefined,
+    enabled: !isNewDocument, // Отключаем для новых документов
+    debounceMs: 3000,
+    onSaveSuccess: () => {
+      console.log('Auto-saved successfully')
+    },
+    onSaveError: (error) => {
+      console.error('Auto-save failed:', error)
+    },
+  })
   
   // Viewport widths
   const viewportWidths = {
@@ -237,8 +260,10 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
             keywords: result.metadata?.keywords?.join(', ') || '',
             ogImage: result.metadata?.ogImage || '',
           })
-        } catch (error) {
-          console.error('Failed to load page:', error)
+
+          // Load data bindings for all blocks on this page
+          const { fetchBindingsForPage } = await import('@/features/dataBindings/dataBindingsSlice')
+          dispatch(fetchBindingsForPage(id))
         } finally {
           setLoading(false)
         }
@@ -436,8 +461,30 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       if (!over) return
       
       const dropTargetId = (over.id as string).replace('drop-', '')
+      const targetNode = rootNode ? findNodeById(rootNode, dropTargetId) : null
       
-      if (dragData?.type === 'library-item') {
+      if (dragData?.type === 'library-item' && targetNode && rootNode && dragData.tagName) {
+        // Validate drop
+        const validation = validateDrop({
+          draggedNode: null,
+          libraryItem: {
+            tagName: dragData.tagName,
+            elementType: dragData.elementType || 'element',
+            label: dragData.label || dragData.tagName,
+          },
+          targetNode,
+          rootNode,
+        })
+        
+        if (!validation.isValid) {
+          validationToast.showError(validation.reason || 'Недопустимая операция', validation.suggestion)
+          return
+        }
+        
+        if (validation.warning) {
+          validationToast.showWarning(validation.warning, validation.suggestion)
+        }
+        
         dispatch(addNode({
           parentId: dropTargetId,
           node: {
@@ -451,8 +498,36 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
     }
 
     const { targetParentId, position, absoluteCoords, type: indicatorType } = currentIndicator
+    
+    // Find target node for validation
+    const targetNode = rootNode ? findNodeById(rootNode, targetParentId) : null
 
     if (dragData?.type === 'library-item') {
+      // Validate drop for library items
+      if (targetNode && rootNode && (dragData.node || dragData.tagName)) {
+        const libraryItemData = dragData.node ? undefined : (dragData.tagName ? {
+          tagName: dragData.tagName,
+          elementType: String(dragData.elementType || 'element'),
+          label: dragData.label || dragData.tagName,
+        } : undefined)
+        
+        const validation = validateDrop({
+          draggedNode: dragData.node || null,
+          libraryItem: libraryItemData,
+          targetNode,
+          rootNode,
+        })
+        
+        if (!validation.isValid) {
+          validationToast.showError(validation.reason || 'Недопустимая операция', validation.suggestion)
+          return
+        }
+        
+        if (validation.warning) {
+          validationToast.showWarning(validation.warning, validation.suggestion)
+        }
+      }
+      
       // Adding new element from library
       let newNodeProps: Partial<BlockNode>
       
@@ -510,6 +585,24 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       const draggedNode = dragData.node
       const sourceParentId = dragState.sourceParentId
       
+      // Validate move for canvas elements (only when moving to different parent)
+      if (targetNode && rootNode && sourceParentId !== targetParentId) {
+        const validation = validateDrop({
+          draggedNode,
+          targetNode,
+          rootNode,
+        })
+        
+        if (!validation.isValid) {
+          validationToast.showError(validation.reason || 'Недопустимое перемещение', validation.suggestion)
+          return
+        }
+        
+        if (validation.warning) {
+          validationToast.showWarning(validation.warning, validation.suggestion)
+        }
+      }
+      
       // Check if the dragged element itself has position: absolute
       const isAbsoluteElement = draggedNode.styles?.properties?.position === 'absolute'
       
@@ -542,7 +635,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
         }))
       }
     }
-  }, [dispatch, dragState.sourceParentId])
+  }, [dispatch, dragState.sourceParentId, rootNode, validationToast])
 
   const handleDragCancel = useCallback(() => {
     dispatch(endDrag())
@@ -572,7 +665,8 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   }
 
   return (
-    <DndContext 
+    <DataBindingProvider pageId={id || 'new'}>
+      <DndContext 
       sensors={sensors}
       collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
@@ -587,19 +681,33 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       }}
     >
       <div className="h-screen flex flex-col bg-gray-100" ref={canvasContainerRef}>
-        <EditorToolbar 
-          type={type} 
-          viewport={viewport}
-          onViewportChange={(newViewport) => dispatch(setViewport(newViewport))}
-          pageSettings={type === 'page' ? pageSettings : undefined}
-        >
-          {({ centerContent, rightContent }) => (
-            <Header 
-              centerActions={centerContent}
-              rightActions={rightContent}
-            />
-          )}
-        </EditorToolbar>
+        <div className="relative">
+          <EditorToolbar 
+            type={type} 
+            viewport={viewport}
+            onViewportChange={(newViewport) => dispatch(setViewport(newViewport))}
+            pageSettings={type === 'page' ? pageSettings : undefined}
+          >
+            {({ centerContent, rightContent }) => (
+              <Header 
+                centerActions={centerContent}
+                rightActions={
+                  <div className="flex items-center gap-2">
+                    {!isNewDocument && (
+                      <SaveStatusIndicator
+                        isSaving={autoSave.isSaving}
+                        hasUnsavedChanges={autoSave.hasUnsavedChanges}
+                        error={autoSave.error}
+                        lastSavedText={autoSave.getLastSavedText()}
+                      />
+                    )}
+                    {rightContent}
+                  </div>
+                }
+              />
+            )}
+          </EditorToolbar>
+        </div>
         
         <div className="flex-1 flex overflow-hidden">
           {/* Left Sidebar with Icons */}
@@ -719,6 +827,13 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       
       {/* Drag overlay */}
       <DragOverlay activeNode={activeNode} />
-    </DndContext>
+      
+      {/* Drop validation toast */}
+      <DropValidationToast 
+        messages={validationToast.messages} 
+        onDismiss={validationToast.dismissMessage} 
+      />
+     </DndContext>
+    </DataBindingProvider>
   )
 }

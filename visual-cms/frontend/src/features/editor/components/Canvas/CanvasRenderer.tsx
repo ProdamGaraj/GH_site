@@ -1,19 +1,23 @@
-import React from 'react'
+﻿import React, { useState, useCallback } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectNode, selectSelectedNodeId, selectDragState, selectEditMode, selectRootNode, selectStatePreviewMode } from '@/features/editor/editorSlice'
+import { selectNode, selectSelectedNodeId, selectDragState, selectEditMode, selectRootNode, selectStatePreviewMode, updateNode } from '@/features/editor/editorSlice'
 import { useComputedStyles } from '../../hooks/useComputedStyles'
 import { cn } from '@/shared/utils'
 import type { BlockNode } from '@/shared/types'
 import { CSS } from '@dnd-kit/utilities'
 import { BlockNodeWithViewport } from '../../utils/variationUtils'
+import { DataBindingIndicator } from '@/features/dataBindings'
+
+// Text elements that support inline editing
+const TEXT_ELEMENTS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'a', 'button', 'label', 'li']
 
 interface CanvasRendererProps {
   node: BlockNodeWithViewport
   isRoot?: boolean
   editorType?: 'page' | 'block'
   blockAlignment?: 'left' | 'center' | 'right'
-  rootNode?: BlockNode  // Передаем root для проверки вариаций
+  rootNode?: BlockNode  // РџРµСЂРµРґР°РµРј root РґР»СЏ РїСЂРѕРІРµСЂРєРё РІР°СЂРёР°С†РёР№
 }
 
 const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({ 
@@ -33,17 +37,24 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
   const isSelected = selectedNodeId === node.id
   const isDragged = dragState.draggedNodeId === node.id
   const isLocked = node.metadata?.locked || false
+  
+  // Inline text editing state
+  const [isInlineEditing, setIsInlineEditing] = useState(false)
+  const [editText, setEditText] = useState(node.content || '')
+  
+  // Check if element supports inline editing
+  const canEditInline = TEXT_ELEMENTS.includes(node.tagName || '') && node.children.length === 0
 
   const computedStyles = useComputedStyles(node)
   
-  // Применяем стили состояния если режим превью активен
+  // РџСЂРёРјРµРЅСЏРµРј СЃС‚РёР»Рё СЃРѕСЃС‚РѕСЏРЅРёСЏ РµСЃР»Рё СЂРµР¶РёРј РїСЂРµРІСЊСЋ Р°РєС‚РёРІРµРЅ
   const getStateStyles = (): React.CSSProperties => {
     if (statePreviewMode === 'none') return {}
     
     const stateStyles = node.styles?.states?.[statePreviewMode]
     if (!stateStyles) return {}
     
-    // Конвертируем стили состояния в React.CSSProperties
+    // РљРѕРЅРІРµСЂС‚РёСЂСѓРµРј СЃС‚РёР»Рё СЃРѕСЃС‚РѕСЏРЅРёСЏ РІ React.CSSProperties
     return stateStyles as React.CSSProperties
   }
   
@@ -99,10 +110,47 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!isDragging) {
+    if (!isDragging && !isInlineEditing) {
       dispatch(selectNode(node.id))
     }
   }
+
+  // Double click to start inline editing
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (canEditInline && !isLocked) {
+      setEditText(node.content || '')
+      setIsInlineEditing(true)
+    }
+  }, [canEditInline, isLocked, node.content])
+
+  // Handle inline edit input
+  const handleInlineInput = useCallback((e: React.FormEvent<HTMLElement>) => {
+    setEditText(e.currentTarget.textContent || '')
+  }, [])
+
+  // Save inline edit
+  const saveInlineEdit = useCallback(() => {
+    if (editText !== node.content) {
+      dispatch(updateNode({
+        id: node.id,
+        updates: { content: editText },
+      }))
+    }
+    setIsInlineEditing(false)
+  }, [dispatch, editText, node.content, node.id])
+
+  // Handle inline edit keyboard events
+  const handleInlineKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      saveInlineEdit()
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      setIsInlineEditing(false)
+    }
+  }, [saveInlineEdit])
 
   // Void elements that cannot have children
   const voidElements = ['input', 'img', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr']
@@ -119,19 +167,19 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
     style: {
       ...computedStyles,
       ...dragStyle,
-      ...stateStyles, // Применяем стили состояния поверх базовых
+      ...stateStyles, // РџСЂРёРјРµРЅСЏРµРј СЃС‚РёР»Рё СЃРѕСЃС‚РѕСЏРЅРёСЏ РїРѕРІРµСЂС… Р±Р°Р·РѕРІС‹С…
       opacity: isDragging ? 0.5 : (stateStyles.opacity ?? computedStyles.opacity),
-      // Для root элемента в responsive режиме добавляем min-height: 100%
+      // Р”Р»СЏ root СЌР»РµРјРµРЅС‚Р° РІ responsive СЂРµР¶РёРјРµ РґРѕР±Р°РІР»СЏРµРј min-height: 100%
       ...(isRoot && editMode === 'responsive' ? {
         minHeight: '100%',
       } : {}),
-      // Не переопределяем стили в page редакторе для точного отображения
-      // Только для block редактора в responsive режиме применяем выравнивание
+      // РќРµ РїРµСЂРµРѕРїСЂРµРґРµР»СЏРµРј СЃС‚РёР»Рё РІ page СЂРµРґР°РєС‚РѕСЂРµ РґР»СЏ С‚РѕС‡РЅРѕРіРѕ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ
+      // РўРѕР»СЊРєРѕ РґР»СЏ block СЂРµРґР°РєС‚РѕСЂР° РІ responsive СЂРµР¶РёРјРµ РїСЂРёРјРµРЅСЏРµРј РІС‹СЂР°РІРЅРёРІР°РЅРёРµ
       ...(isRoot && editorType === 'block' && editMode === 'responsive' ? {
         marginLeft: blockAlignment === 'center' ? 'auto' : blockAlignment === 'right' ? 'auto' : '0',
         marginRight: blockAlignment === 'center' ? 'auto' : blockAlignment === 'left' ? 'auto' : '0'
       } : {}),
-      // Добавляем transition для плавности
+      // Р”РѕР±Р°РІР»СЏРµРј transition РґР»СЏ РїР»Р°РІРЅРѕСЃС‚Рё
       ...(statePreviewMode !== 'none' && node.styles?.stateTransition ? {
         transition: `${node.styles.stateTransition.properties.join(', ')} ${node.styles.stateTransition.duration}ms ${node.styles.stateTransition.easing}`,
       } : {}),
@@ -141,14 +189,24 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
       isSelected && 'canvas-element--selected',
       isOver && !isDragged && 'canvas-element--drop-target',
       isDragging && 'canvas-element--dragging',
-      isRoot && 'canvas-element--root'
+      isRoot && 'canvas-element--root',
+      isInlineEditing && 'canvas-element--inline-editing'
     ),
     'data-element-id': node.id,
     'data-element-name': node.metadata.name || node.tagName,
     'data-layout-mode': node.layoutMode || 'flex',
     onClick: handleClick,
-    // Only apply drag attributes/listeners if not root and not locked
-    ...(!isRoot && !isLocked ? { ...attributes, ...listeners } : {}),
+    onDoubleClick: canEditInline ? handleDoubleClick : undefined,
+    // Only apply drag attributes/listeners if not root and not locked and not inline editing
+    ...(!isRoot && !isLocked && !isInlineEditing ? { ...attributes, ...listeners } : {}),
+    // Inline editing props
+    ...(isInlineEditing ? {
+      contentEditable: true,
+      suppressContentEditableWarning: true,
+      onInput: handleInlineInput,
+      onKeyDown: handleInlineKeyDown,
+      onBlur: saveInlineEdit,
+    } : {}),
   }
 
   // Add attributes for specific elements
@@ -170,6 +228,17 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
     elementProps.alt = node.attributes?.alt || ''
   }
 
+  // Handle select elements
+  if (node.tagName === 'select') {
+    elementProps.value = node.attributes?.value || ''
+    elementProps.onChange = () => {} // Read-only in editor
+  }
+
+  // Handle option elements - must have value prop
+  if (node.tagName === 'option') {
+    elementProps.value = node.attributes?.value || node.content || ''
+  }
+
   // Void elements don't have children
   if (isVoidElement) {
     return React.createElement(node.tagName || 'div', elementProps)
@@ -185,7 +254,9 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
     node.tagName || 'div',
     elementProps,
     <>
-      {/* Текстовый контент без обёртки span для корректного отображения */}
+      {/* РўРµРєСЃС‚РѕРІС‹Р№ РєРѕРЅС‚РµРЅС‚ Р±РµР· РѕР±С‘СЂС‚РєРё span РґР»СЏ РєРѕСЂСЂРµРєС‚РЅРѕРіРѕ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ */}
+      {/* Data Binding Indicator */}
+      {!isRoot && <DataBindingIndicator blockId={node.id} />}
       {node.content}
       {node.children.map((child) => (
         <CanvasRenderer 
@@ -196,24 +267,27 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
           rootNode={actualRootNode || undefined}
         />
       ))}
-      {/* Empty state indicator for containers - показываем только при редактировании */}
+      {/* Empty state indicator for containers - РїРѕРєР°Р·С‹РІР°РµРј С‚РѕР»СЊРєРѕ РїСЂРё СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРё */}
       {isContainer && node.children.length === 0 && !node.content && !isRoot && (
         <div className={cn(
           "flex items-center justify-center min-h-[40px] text-xs text-gray-400 border border-dashed border-gray-300 rounded m-1",
           isOver && "border-blue-400 bg-blue-50 text-blue-500"
         )}>
-          {isOver ? 'Отпустите' : 'Пусто'}
+          {isOver ? 'РћС‚РїСѓСЃС‚РёС‚Рµ' : 'РџСѓСЃС‚Рѕ'}
         </div>
       )}
     </>
   )
 }
 
-// Мемоизируем компонент - ререндер только если node.id или selectedNodeId изменились
+// РњРµРјРѕРёР·РёСЂСѓРµРј РєРѕРјРїРѕРЅРµРЅС‚ - СЂРµСЂРµРЅРґРµСЂ С‚РѕР»СЊРєРѕ РµСЃР»Рё node.id РёР»Рё selectedNodeId РёР·РјРµРЅРёР»РёСЃСЊ
 export const CanvasRenderer = React.memo(CanvasRendererComponent, (prevProps, nextProps) => {
-  // Ререндерим только если изменился сам node или его id
+  // Р РµСЂРµРЅРґРµСЂРёРј С‚РѕР»СЊРєРѕ РµСЃР»Рё РёР·РјРµРЅРёР»СЃСЏ СЃР°Рј node РёР»Рё РµРіРѕ id
   return prevProps.node === nextProps.node && 
          prevProps.isRoot === nextProps.isRoot &&
          prevProps.editorType === nextProps.editorType &&
          prevProps.blockAlignment === nextProps.blockAlignment
 })
+
+
+

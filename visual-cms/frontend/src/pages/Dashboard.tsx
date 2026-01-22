@@ -2,10 +2,12 @@ import React, { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Header } from '@/shared/components/Header'
-import { FileText, Box, Plus, Loader2 } from 'lucide-react'
+import { FileText, Box, Plus, Loader2, Database, Layout } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { fetchBlocks, selectBlocks, selectBlocksLoading } from '@/features/blocks/blocksSlice'
 import { fetchPages, selectPages, selectPagesLoading } from '@/features/pages/pagesSlice'
+import { fetchDataSources, selectDataSources, selectDataSourcesLoading } from '@/features/data-sources/dataSourcesSlice'
+import { fetchTemplates, selectTemplates, selectTemplatesLoading } from '@/features/templates'
 
 export const Dashboard: React.FC = () => {
   const dispatch = useAppDispatch()
@@ -13,10 +15,16 @@ export const Dashboard: React.FC = () => {
   const blocksLoading = useAppSelector(selectBlocksLoading)
   const pages = useAppSelector(selectPages)
   const pagesLoading = useAppSelector(selectPagesLoading)
+  const dataSources = useAppSelector(selectDataSources)
+  const dataSourcesLoading = useAppSelector(selectDataSourcesLoading)
+  const templates = useAppSelector(selectTemplates)
+  const templatesLoading = useAppSelector(selectTemplatesLoading)
 
   useEffect(() => {
     dispatch(fetchBlocks())
     dispatch(fetchPages())
+    dispatch(fetchDataSources({}))
+    dispatch(fetchTemplates({}))
   }, [dispatch])
 
   const publishedPages = pages.filter(p => p.status === 'published')
@@ -34,7 +42,7 @@ export const Dashboard: React.FC = () => {
         </p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
         {/* Pages Card */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-4">
@@ -86,10 +94,62 @@ export const Dashboard: React.FC = () => {
             </Link>
           </div>
         </div>
+
+        {/* Data Sources Card */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-green-100 rounded-lg">
+              <Database className="text-green-600" size={24} />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Источники данных</h2>
+              <p className="text-sm text-gray-600">API, базы данных, файлы</p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Link to="/data-sources" className="flex-1">
+              <Button variant="secondary" className="w-full">
+                Все источники
+              </Button>
+            </Link>
+            <Link to="/data-sources?new=true">
+              <Button>
+                <Plus size={16} className="mr-2" />
+                Создать
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Templates Card */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-indigo-100 rounded-lg">
+              <Layout className="text-indigo-600" size={24} />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Шаблоны</h2>
+              <p className="text-sm text-gray-600">Шаблоны для повторяющихся элементов</p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Link to="/templates" className="flex-1">
+              <Button variant="secondary" className="w-full">
+                Все шаблоны
+              </Button>
+            </Link>
+            <Link to="/templates?new=true">
+              <Button>
+                <Plus size={16} className="mr-2" />
+                Создать
+              </Button>
+            </Link>
+          </div>
+        </div>
       </div>
 
       {/* Quick Stats */}
-      <div className="mt-8 grid grid-cols-3 gap-6">
+      <div className="mt-8 grid grid-cols-5 gap-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <p className="text-sm text-gray-600 mb-1">Всего страниц</p>
           {pagesLoading ? (
@@ -104,6 +164,22 @@ export const Dashboard: React.FC = () => {
             <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
           ) : (
             <p className="text-3xl font-bold text-gray-900">{blocks.length}</p>
+          )}
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <p className="text-sm text-gray-600 mb-1">Источников данных</p>
+          {dataSourcesLoading ? (
+            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+          ) : (
+            <p className="text-3xl font-bold text-gray-900">{dataSources.length}</p>
+          )}
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <p className="text-sm text-gray-600 mb-1">Шаблонов</p>
+          {templatesLoading ? (
+            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+          ) : (
+            <p className="text-3xl font-bold text-gray-900">{templates.length}</p>
           )}
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

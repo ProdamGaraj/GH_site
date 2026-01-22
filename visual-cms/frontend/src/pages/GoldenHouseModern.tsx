@@ -142,30 +142,8 @@ const Header: React.FC = () => {
 
 // ============ HERO PROMO SECTION ============
 const HeroPromoSection: React.FC = () => {
-  const [currentSlide, setCurrentSlide] = useState(0)
-  
-  const promos = [
-    {
-      id: 1,
-      badge: 'Акция',
-      title: '– 15% на квартиры\nк Новому году!',
-      subtitle: 'Исполните мечту о переезде в новом году',
-      counter: { value: 847, label: 'Осталось квартир:' },
-      cta: 'Выбрать квартиру',
-      bgColor: colors.gold,
-      image: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800',
-    },
-    {
-      id: 2,
-      badge: 'Выгода',
-      title: 'Готовые квартиры\nс выгодой до $50 000',
-      subtitle: 'Только до 31 января!',
-      cta: 'Подробнее',
-      bgColor: colors.black,
-      image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800',
-      hasFamily: true,
-    },
-  ]
+  // Slider state - currently showing first promo, TODO: implement carousel
+  // const [currentSlide, setCurrentSlide] = useState(0)
   
   return (
     <section style={{

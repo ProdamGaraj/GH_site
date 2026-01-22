@@ -2,7 +2,9 @@ import React, { useState } from 'react'
 import { useAppSelector } from '@/app/hooks'
 import { selectViewport, selectBreakpoints } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
-import { Settings, Globe, Search, FileText, Monitor, Tablet, Smartphone, Laptop, Watch, Settings2 } from 'lucide-react'
+import { Settings, Globe, Search, FileText, Monitor, Tablet, Smartphone, Laptop, Watch, Settings2, Database } from 'lucide-react'
+import { PageSettingsDataTab } from '@/features/pages/components/PageSettingsDataTab'
+import type { PageDataConfig, VariablesConfig } from '@/features/dataBindings'
 
 export interface PageSettings {
   name: string
@@ -12,18 +14,23 @@ export interface PageSettings {
   metaDescription: string
   keywords: string
   ogImage: string
+  // Data Binding settings
+  dataSources?: PageDataConfig
+  variables?: VariablesConfig
 }
 
 interface PageSettingsPanelProps {
   settings: PageSettings
   onChange: (settings: PageSettings) => void
+  pageId?: string
 }
 
 export const PageSettingsPanel: React.FC<PageSettingsPanelProps> = ({ 
   settings, 
-  onChange 
+  onChange,
+  pageId = 'current'
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'seo'>('general')
+  const [activeTab, setActiveTab] = useState<'general' | 'seo' | 'data'>('general')
   const viewport = useAppSelector(selectViewport)
   const breakpoints = useAppSelector(selectBreakpoints)
   
@@ -90,6 +97,17 @@ export const PageSettingsPanel: React.FC<PageSettingsPanelProps> = ({
         >
           <Search size={16} className="inline mr-1.5" />
           SEO
+        </button>
+        <button
+          className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
+            activeTab === 'data'
+              ? 'text-primary-600 border-b-2 border-primary-600'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+          onClick={() => setActiveTab('data')}
+        >
+          <Database size={16} className="inline mr-1.5" />
+          Data
         </button>
       </div>
 
@@ -196,6 +214,27 @@ export const PageSettingsPanel: React.FC<PageSettingsPanelProps> = ({
               placeholder="https://example.com/image.jpg"
             />
           </>
+        )}
+
+        {activeTab === 'data' && (
+          <PageSettingsDataTab
+            pageId={pageId}
+            settings={{
+              dataSources: settings.dataSources || {
+                dataSources: [],
+                variables: {},
+                cachePolicy: 'cache-first'
+              },
+              variables: settings.variables || { variables: [] }
+            }}
+            onChange={(dataSettings) => {
+              onChange({
+                ...settings,
+                dataSources: dataSettings.dataSources,
+                variables: dataSettings.variables
+              })
+            }}
+          />
         )}
       </div>
     </>

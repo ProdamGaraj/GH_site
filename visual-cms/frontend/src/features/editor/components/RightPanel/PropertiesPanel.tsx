@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { updateNode, deleteNode, selectViewport, selectBreakpoints, selectRootNode, selectEditMode, moveNodeToViewport } from '@/features/editor/editorSlice'
+import { updateNode, deleteNode, selectViewport, selectBreakpoints, selectRootNode, moveNodeToViewport } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
 import { Button } from '@/shared/components/Button'
-import { Trash2, Move, Palette, Type, Code, Monitor, Tablet, Smartphone, Laptop, Watch, Settings2, ArrowRightLeft, Globe, MousePointer, Sparkles, FileCode } from 'lucide-react'
+import { Trash2, Move, Palette, Type, Code, Monitor, Tablet, Smartphone, Laptop, Watch, Settings2, ArrowRightLeft, Globe, MousePointer, Sparkles, FileCode, Database } from 'lucide-react'
 import type { BlockNode, EditorPageSettings } from '@/shared/types'
 import { PositioningTab } from './PositioningTab'
 import { ColorsTab } from './ColorsTab'
@@ -12,6 +12,7 @@ import { CustomCSSTab } from './CustomCSSTab'
 import { StatesTab } from './StatesTab'
 import { AnimationsTab } from './AnimationsTab'
 import { ScriptsTab } from './ScriptsTab'
+import { DataBindingTab } from '@/features/dataBindings/components/DataBindingTab'
 import { cn } from '@/shared/utils'
 import { getNodeBreakpoint } from '../../utils/variationUtils'
 
@@ -20,16 +21,16 @@ interface PropertiesPanelProps {
   isPageRoot?: boolean
   pageSettings?: EditorPageSettings
   onPageSettingsChange?: (settings: EditorPageSettings) => void
+  pageId?: string
 }
 
-type TabType = 'positioning' | 'colors' | 'content' | 'states' | 'animations' | 'scripts' | 'css'
+type TabType = 'positioning' | 'colors' | 'content' | 'states' | 'animations' | 'scripts' | 'data' | 'css'
 
-export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRoot, pageSettings, onPageSettingsChange }) => {
+export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRoot, pageSettings, onPageSettingsChange, pageId }) => {
   const dispatch = useAppDispatch()
   const viewport = useAppSelector(selectViewport)
   const breakpoints = useAppSelector(selectBreakpoints)
   const rootNode = useAppSelector(selectRootNode)
-  const editMode = useAppSelector(selectEditMode)
   const [activeTab, setActiveTab] = useState<TabType>('positioning')
   const [showMoveMenu, setShowMoveMenu] = useState(false)
   
@@ -98,6 +99,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRo
     { id: 'states' as TabType, label: 'Hover', icon: MousePointer },
     { id: 'animations' as TabType, label: 'Анимации', icon: Sparkles },
     { id: 'scripts' as TabType, label: 'Скрипты', icon: FileCode },
+    { id: 'data' as TabType, label: 'Данные', icon: Database },
     { id: 'css' as TabType, label: 'CSS', icon: Code },
   ]
 
@@ -183,7 +185,6 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRo
                     // Skip current viewport if already specific to it
                     if (nodeBreakpointId === bp.id) return null
                     
-                    const BpIcon = getIcon(bp.icon)
                     return (
                       <button
                         key={bp.id}
@@ -264,6 +265,12 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRo
             isPageRoot={isPageRoot} 
             pageSettings={pageSettings}
             onPageSettingsChange={onPageSettingsChange}
+          />
+        )}
+        {activeTab === 'data' && (
+          <DataBindingTab 
+            blockId={node.id}
+            pageId={pageId}
           />
         )}
         {activeTab === 'css' && <CustomCSSTab node={node} />}

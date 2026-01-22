@@ -9,10 +9,10 @@ import type { EditorPageSettings } from '@/shared/types'
 interface RightPanelProps {
   pageSettings?: EditorPageSettings
   onPageSettingsChange?: (settings: EditorPageSettings) => void
-  pageId?: string // ID страницы для сохранения
+  pageId?: string
 }
 
-export const RightPanel: React.FC<RightPanelProps> = ({ pageSettings, onPageSettingsChange }) => {
+export const RightPanel: React.FC<RightPanelProps> = ({ pageSettings, onPageSettingsChange, pageId }) => {
   const selectedNode = useAppSelector(selectSelectedNode)
   const rootNode = useAppSelector(selectRootNode)
   const inlineBlockEdit = useAppSelector(selectInlineBlockEdit)
@@ -97,6 +97,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ pageSettings, onPageSett
           isPageRoot={isPageRoot}
           pageSettings={pageSettings}
           onPageSettingsChange={onPageSettingsChange}
+          pageId={pageId}
         />
       ) : (
         <div className="p-8 text-center">

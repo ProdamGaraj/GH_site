@@ -10,7 +10,6 @@ import {
   updateBrowser,
   addStandardMonitor,
   removeStandardMonitor,
-  updateStandardMonitor,
   addBreakpoint,
   removeBreakpoint,
   updateBreakpoint

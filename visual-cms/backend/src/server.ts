@@ -4,36 +4,84 @@ import helmet from 'helmet'
 import dotenv from 'dotenv'
 import { AppDataSource } from './config/database'
 import routes from './routes'
+import swaggerRouter from './docs/swagger'
+import { 
+  errorHandler, 
+  notFoundHandler, 
+  requestTiming, 
+  rateLimit,
+  compressionHint,
+  queryOptimization,
+  getTimingStats,
+  getErrorStats,
+} from './middleware'
+import { cacheService } from './services/CacheService'
 
 dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 5000
 
-// Middleware
+// Performance middleware
+app.use(requestTiming)
+app.use(compressionHint)
+app.use(queryOptimization)
+
+// Rate limiting
+app.use(rateLimit({
+  windowMs: 60000, // 1 minute
+  maxRequests: 100, // 100 requests per minute
+}))
+
+// Security middleware
 app.use(cors())
-app.use(helmet())
-app.use(express.json())
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "unpkg.com", "cdn.redoc.ly"],
+      styleSrc: ["'self'", "'unsafe-inline'", "unpkg.com", "fonts.googleapis.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      fontSrc: ["'self'", "fonts.gstatic.com", "fonts.googleapis.com"],
+      connectSrc: ["'self'"],
+    },
+  },
+}))
+app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
+
+// API Documentation (Swagger UI)
+app.use('/api/docs', swaggerRouter)
 
 // Routes
 app.use('/api', routes)
 
-// Health check
+// Health check with stats
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
-})
-
-// Error handling
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack)
-  res.status(err.status || 500).json({
-    error: {
-      message: err.message || 'Internal Server Error',
-      ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-    },
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
   })
 })
+
+// Stats endpoint (development only)
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/api/stats', (req, res) => {
+    res.json({
+      timing: getTimingStats(),
+      errors: getErrorStats(),
+      cache: cacheService.getStats(),
+    })
+  })
+}
+
+// 404 handler
+app.use(notFoundHandler)
+
+// Error handling
+app.use(errorHandler)
 
 // Initialize database and start server
 AppDataSource.initialize()
@@ -43,6 +91,8 @@ AppDataSource.initialize()
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`)
       console.log(`📡 API available at http://localhost:${PORT}/api`)
+      console.log(`📚 API Docs at http://localhost:${PORT}/api/docs`)
+      console.log(`📖 ReDoc at http://localhost:${PORT}/api/docs/redoc`)
     })
   })
   .catch((error) => {

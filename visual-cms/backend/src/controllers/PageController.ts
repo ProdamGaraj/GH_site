@@ -96,4 +96,114 @@ export class PageController {
       res.status(500).json({ error: error.message })
     }
   }
+
+  /**
+   * Update page data sources configuration
+   * Stage 3.5: Page-Level Data Sources
+   */
+  async updateDataSources(req: Request, res: Response) {
+    try {
+      const { id } = req.params
+      const { dataSources } = req.body
+
+      const page = await pageRepository.findOne({ where: { id } })
+
+      if (!page) {
+        return res.status(404).json({ error: 'Page not found' })
+      }
+
+      page.dataSources = dataSources
+      await pageRepository.save(page)
+
+      res.json({ success: true, dataSources: page.dataSources })
+    } catch (error: any) {
+      res.status(500).json({ error: error.message })
+    }
+  }
+
+  /**
+   * Update page variables configuration
+   * Stage 3.6: Variables System
+   */
+  async updateVariables(req: Request, res: Response) {
+    try {
+      const { id } = req.params
+      const { variables } = req.body
+
+      const page = await pageRepository.findOne({ where: { id } })
+
+      if (!page) {
+        return res.status(404).json({ error: 'Page not found' })
+      }
+
+      page.variables = variables
+      await pageRepository.save(page)
+
+      res.json({ success: true, variables: page.variables })
+    } catch (error: any) {
+      res.status(500).json({ error: error.message })
+    }
+  }
+
+  /**
+   * Get page data settings (data sources + variables)
+   */
+  async getDataSettings(req: Request, res: Response) {
+    try {
+      const { id } = req.params
+
+      const page = await pageRepository.findOne({
+        where: { id },
+        select: ['id', 'dataSources', 'variables']
+      })
+
+      if (!page) {
+        return res.status(404).json({ error: 'Page not found' })
+      }
+
+      res.json({
+        dataSources: page.dataSources || {
+          dataSources: [],
+          variables: {},
+          cachePolicy: 'cache-first'
+        },
+        variables: page.variables || { variables: [] }
+      })
+    } catch (error: any) {
+      res.status(500).json({ error: error.message })
+    }
+  }
+
+  /**
+   * Update all page data settings at once
+   */
+  async updateDataSettings(req: Request, res: Response) {
+    try {
+      const { id } = req.params
+      const { dataSources, variables } = req.body
+
+      const page = await pageRepository.findOne({ where: { id } })
+
+      if (!page) {
+        return res.status(404).json({ error: 'Page not found' })
+      }
+
+      if (dataSources !== undefined) {
+        page.dataSources = dataSources
+      }
+      if (variables !== undefined) {
+        page.variables = variables
+      }
+
+      await pageRepository.save(page)
+
+      res.json({
+        success: true,
+        dataSources: page.dataSources,
+        variables: page.variables
+      })
+    } catch (error: any) {
+      res.status(500).json({ error: error.message })
+    }
+  }
 }

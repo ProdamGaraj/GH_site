@@ -9,6 +9,10 @@ import { GoldenHouseHome } from '@/pages/GoldenHouseHome'
 import { GoldenHouseModern } from '@/pages/GoldenHouseModern'
 import { GoldenHousePremium } from '@/pages/GoldenHousePremium'
 import GoldenHouseElite from '@/pages/GoldenHouseElite'
+import { DataSourcesList } from '@/pages/DataSourcesList'
+import { DataSourceWizard } from '@/features/data-sources/components/DataSourceWizard'
+import { DataBindingDemo } from '@/pages/DataBindingDemo'
+import TemplatesPage from '@/pages/TemplatesPage'
 
 export const router = createBrowserRouter([
   {
@@ -28,8 +32,20 @@ export const router = createBrowserRouter([
         element: <BlocksList />,
       },
       {
+        path: 'data-sources',
+        element: <DataSourcesList />,
+      },
+      {
+        path: 'templates',
+        element: <TemplatesPage />,
+      },
+      {
         path: 'settings',
         element: <Settings />,
+      },
+      {
+        path: 'data-binding-demo',
+        element: <DataBindingDemo />,
       },
       {
         path: 'editor/page/new',
@@ -48,6 +64,15 @@ export const router = createBrowserRouter([
         element: <Editor type="block" />,
       },
     ],
+  },
+  // Data Source Wizard - отдельно от layout для полноэкранного режима
+  {
+    path: '/data-sources/new',
+    element: <DataSourceWizard />,
+  },
+  {
+    path: '/data-sources/:id/edit',
+    element: <DataSourceWizard />,
   },
   {
     path: '/golden-house',

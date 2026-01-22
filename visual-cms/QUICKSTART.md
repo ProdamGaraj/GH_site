@@ -168,13 +168,19 @@ npm run build
 - [План реализации](../docs/visual-constructor-implementation-plan.md)
 - [Использование CMS](../docs/company-website-cms-plan.md)
 
-## 💡 Что дальше?
+## 💡 Реализованные возможности
 
-- [ ] Добавить Undo/Redo
-- [ ] Реализовать адаптивность (tablet, mobile views)
-- [ ] Добавить Custom CSS редактор (Monaco)
-- [ ] Создать больше готовых блоков
-- [ ] Добавить экспорт в HTML/CSS
-- [ ] Реализовать сохранение на backend
+- [x] Undo/Redo
+- [x] Адаптивность (desktop, tablet, mobile views + custom breakpoints)
+- [x] Custom CSS редактор (Monaco)
+- [x] Библиотека готовых блоков (SavedBlocksLibrary)
+- [x] Экспорт в HTML/CSS/React/Vue
+- [x] Сохранение на backend с автосохранением
+- [x] Data Binding система (INPUT/OUTPUT/REPEATER)
+- [x] Реактивные переменные
+- [x] Inline редактирование текста
+- [x] Загрузка изображений
+- [x] Визуальные контролы для Flexbox/Grid
+- [x] Валидация Drag & Drop
 
 Удачи в разработке! 🚀

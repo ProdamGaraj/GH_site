@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
-import type { Block, BlockNode } from '@/shared/types'
+import type { Block } from '@/shared/types'
 import type { RootState } from '@/app/store'
 import { blockApi, CreateBlockDto, UpdateBlockDto } from '@/shared/api'
 

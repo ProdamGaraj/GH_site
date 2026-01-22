@@ -219,6 +219,40 @@ body {
   display: none !important;
 }
 
+/* Inline editing mode */
+.canvas-element--inline-editing {
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: 2px;
+  cursor: text !important;
+  min-width: 50px;
+  min-height: 1em;
+}
+
+.canvas-element--inline-editing:focus {
+  outline: 2px solid #2563eb !important;
+  outline-offset: 2px;
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+/* Double-click hint for text elements */
+.canvas-element[data-can-edit-inline="true"]:hover::after {
+  content: '2x клик для редактирования';
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: #6b7280;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.canvas-element[data-can-edit-inline="true"]:hover::after {
+  opacity: 0.8;
+}
+
 /* Layout mode indicators - убираем, т.к. это мешает видеть реальный результат */
 .canvas-element[data-layout-mode="absolute"]::after {
   display: none;

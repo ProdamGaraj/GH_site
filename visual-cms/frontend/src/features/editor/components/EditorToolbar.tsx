@@ -6,7 +6,7 @@ import { ColorPicker } from '@/shared/components/ColorPicker'
 import { ExpandableButton } from '@/shared/components/ExpandableButton'
 import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, Rocket, ExternalLink, ChevronDown, Palette, Pencil, FileText, Library, FileDown } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor, selectInlineBlockEdit, startInlineBlockEdit, cancelInlineBlockEdit, finishInlineBlockEdit, selectSelectedNodeId, updateNode } from '@/features/editor/editorSlice'
+import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor, selectInlineBlockEdit, startInlineBlockEdit, cancelInlineBlockEdit, finishInlineBlockEdit } from '@/features/editor/editorSlice'
 import { createBlock, updateBlock, selectBlocksSaving } from '@/features/blocks/blocksSlice'
 import { createPage, updatePage, selectPagesSaving } from '@/features/pages/pagesSlice'
 import { BreakpointManager } from './BreakpointManager'
@@ -61,7 +61,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const canRedo = useAppSelector(selectCanRedo)
   const canvasColor = useAppSelector(selectCanvasColor)
   const inlineBlockEdit = useAppSelector(selectInlineBlockEdit)
-  const selectedNodeId = useAppSelector(selectSelectedNodeId)
   
   const isNewBlock = id === 'new' || !id
   const isPageEditor = _type === 'page'

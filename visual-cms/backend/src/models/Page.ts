@@ -41,6 +41,38 @@ export class Page {
   @Column({ default: 1 })
   version!: number
 
+  // Data Binding settings (Stage 3.5 & 3.6)
+  @Column('jsonb', { nullable: true })
+  dataSources?: {
+    dataSources: Array<{
+      id: string
+      dataSourceId: string
+      alias: string
+      loadStrategy: 'pageLoad' | 'onDemand' | 'interval'
+      loadInterval?: number
+      cacheEnabled: boolean
+      cacheTTL?: number
+      priority: number
+      dependsOn?: string[]
+    }>
+    variables: Record<string, unknown>
+    cachePolicy: 'cache-first' | 'network-first' | 'network-only'
+  }
+
+  @Column('jsonb', { nullable: true })
+  variables?: {
+    variables: Array<{
+      id: string
+      name: string
+      scope: 'page' | 'global' | 'session'
+      type: 'string' | 'number' | 'boolean' | 'array' | 'object'
+      defaultValue: unknown
+      persist?: boolean
+      reactive?: boolean
+      computed?: string
+    }>
+  }
+
   @CreateDateColumn()
   createdAt!: Date
 

@@ -266,7 +266,6 @@ export function generateReactComponent(
     cssModules = true 
   } = options
   
-  const ext = useTypeScript ? 'tsx' : 'jsx'
   const styleImport = cssModules 
     ? `import styles from './${componentName}.module.css'`
     : `import './${componentName}.css'`

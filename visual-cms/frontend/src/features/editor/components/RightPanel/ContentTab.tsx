@@ -2,6 +2,8 @@ import React from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { updateNode, updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
+import { ImageUpload } from './ImageUpload'
+import { Link as LinkIcon, Image as ImageIcon } from 'lucide-react'
 import type { BlockNode } from '@/shared/types'
 
 interface ContentTabProps {
@@ -19,6 +21,18 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
     }))
   }
 
+  const handleAttributeChange = (attr: string, value: string) => {
+    dispatch(updateNode({
+      id: node.id,
+      updates: {
+        attributes: {
+          ...node.attributes,
+          [attr]: value,
+        },
+      },
+    }))
+  }
+
   const handleStyleChange = (property: string, value: string) => {
     dispatch(updateNodeStyles({
       nodeId: node.id,
@@ -27,12 +41,18 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
     }))
   }
 
-  // Show content editor for text elements
-  const isTextElement = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'a', 'button'].includes(node.tagName || '')
+  // Element type checks
+  const isTextElement = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'a', 'button', 'label'].includes(node.tagName || '')
+  const isLinkElement = node.tagName === 'a'
+  const isImageElement = node.tagName === 'img'
+  const isInputElement = ['input', 'textarea', 'select'].includes(node.tagName || '')
+  const isButtonElement = node.tagName === 'button'
+  const isVideoElement = node.tagName === 'video'
+  const isIframeElement = node.tagName === 'iframe'
   
   return (
     <div className="space-y-4">
-      {/* Content */}
+      {/* Content for text elements */}
       {isTextElement && (
         <div>
           <label className="text-xs font-medium text-gray-700 mb-2 block">Текст</label>
@@ -45,91 +65,442 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
         </div>
       )}
 
-      {/* Typography */}
-      <div>
-        <h4 className="text-xs font-medium text-gray-700 mb-2">Типографика</h4>
-        <div className="space-y-2">
+      {/* Link attributes */}
+      {isLinkElement && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-medium text-gray-700 flex items-center gap-1">
+            <LinkIcon size={14} /> Ссылка
+          </h4>
           <Input
-            label="Font Family"
-            value={node.styles.properties?.fontFamily || ''}
-            onChange={(e) => handleStyleChange('fontFamily', e.target.value)}
-            placeholder="inherit"
-
+            label="URL (href)"
+            value={node.attributes?.href || ''}
+            onChange={(e) => handleAttributeChange('href', e.target.value)}
+            placeholder="https://example.com"
           />
+          <div>
+            <label className="text-xs text-gray-600 mb-1 block">Открывать в</label>
+            <select
+              value={node.attributes?.target || ''}
+              onChange={(e) => handleAttributeChange('target', e.target.value)}
+              className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
+            >
+              <option value="">Текущее окно</option>
+              <option value="_blank">Новая вкладка</option>
+              <option value="_parent">Родительский фрейм</option>
+              <option value="_top">Полное окно</option>
+            </select>
+          </div>
+          <Input
+            label="Title (подсказка)"
+            value={node.attributes?.title || ''}
+            onChange={(e) => handleAttributeChange('title', e.target.value)}
+            placeholder="Подсказка при наведении"
+          />
+          <div>
+            <label className="text-xs text-gray-600 mb-1 block">Rel атрибут</label>
+            <select
+              value={node.attributes?.rel || ''}
+              onChange={(e) => handleAttributeChange('rel', e.target.value)}
+              className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
+            >
+              <option value="">Не указан</option>
+              <option value="noopener">noopener</option>
+              <option value="noreferrer">noreferrer</option>
+              <option value="nofollow">nofollow</option>
+              <option value="noopener noreferrer">noopener noreferrer</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Image attributes */}
+      {isImageElement && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-medium text-gray-700 flex items-center gap-1">
+            <ImageIcon size={14} /> Изображение
+          </h4>
+          
+          <ImageUpload
+            value={node.attributes?.src || ''}
+            onChange={(url) => handleAttributeChange('src', url)}
+            label="Источник изображения"
+          />
+          
+          <Input
+            label="Alt текст"
+            value={node.attributes?.alt || ''}
+            onChange={(e) => handleAttributeChange('alt', e.target.value)}
+            placeholder="Описание изображения"
+          />
+          
           <div className="grid grid-cols-2 gap-2">
             <Input
-              label="Font Size"
-              value={node.styles.properties?.fontSize || ''}
-              onChange={(e) => handleStyleChange('fontSize', e.target.value)}
-              placeholder="16px"
-
+              label="Width"
+              value={node.attributes?.width || ''}
+              onChange={(e) => handleAttributeChange('width', e.target.value)}
+              placeholder="auto"
             />
             <Input
-              label="Font Weight"
-              value={node.styles.properties?.fontWeight || ''}
-              onChange={(e) => handleStyleChange('fontWeight', e.target.value)}
-              placeholder="400"
-
+              label="Height"
+              value={node.attributes?.height || ''}
+              onChange={(e) => handleAttributeChange('height', e.target.value)}
+              placeholder="auto"
             />
           </div>
+          
+          <div>
+            <label className="text-xs text-gray-600 mb-1 block">Object Fit</label>
+            <select
+              value={node.styles.properties?.objectFit || ''}
+              onChange={(e) => handleStyleChange('objectFit', e.target.value)}
+              className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
+            >
+              <option value="">По умолчанию</option>
+              <option value="contain">Contain</option>
+              <option value="cover">Cover</option>
+              <option value="fill">Fill</option>
+              <option value="none">None</option>
+              <option value="scale-down">Scale Down</option>
+            </select>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="img-loading"
+              checked={node.attributes?.loading === 'lazy'}
+              onChange={(e) => handleAttributeChange('loading', e.target.checked ? 'lazy' : 'eager')}
+              className="rounded border-gray-300"
+            />
+            <label htmlFor="img-loading" className="text-xs text-gray-600">
+              Ленивая загрузка (lazy loading)
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* Input element attributes */}
+      {isInputElement && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-medium text-gray-700">Поле ввода</h4>
+          
+          {node.tagName === 'input' && (
+            <div>
+              <label className="text-xs text-gray-600 mb-1 block">Тип</label>
+              <select
+                value={node.attributes?.type || 'text'}
+                onChange={(e) => handleAttributeChange('type', e.target.value)}
+                className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
+              >
+                <option value="text">Текст</option>
+                <option value="email">Email</option>
+                <option value="password">Пароль</option>
+                <option value="number">Число</option>
+                <option value="tel">Телефон</option>
+                <option value="url">URL</option>
+                <option value="date">Дата</option>
+                <option value="time">Время</option>
+                <option value="search">Поиск</option>
+                <option value="checkbox">Чекбокс</option>
+                <option value="radio">Радио</option>
+                <option value="file">Файл</option>
+                <option value="hidden">Скрытое</option>
+              </select>
+            </div>
+          )}
+          
+          <Input
+            label="Placeholder"
+            value={node.attributes?.placeholder || ''}
+            onChange={(e) => handleAttributeChange('placeholder', e.target.value)}
+            placeholder="Текст подсказки"
+          />
+          
+          <Input
+            label="Name (имя поля)"
+            value={node.attributes?.name || ''}
+            onChange={(e) => handleAttributeChange('name', e.target.value)}
+            placeholder="field_name"
+          />
+          
+          <Input
+            label="Value (значение)"
+            value={node.attributes?.value || ''}
+            onChange={(e) => handleAttributeChange('value', e.target.value)}
+            placeholder=""
+          />
+          
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="input-required"
+                checked={node.attributes?.required === 'true'}
+                onChange={(e) => handleAttributeChange('required', e.target.checked ? 'true' : '')}
+                className="rounded border-gray-300"
+              />
+              <label htmlFor="input-required" className="text-xs text-gray-600">
+                Обязательное поле
+              </label>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="input-disabled"
+                checked={node.attributes?.disabled === 'true'}
+                onChange={(e) => handleAttributeChange('disabled', e.target.checked ? 'true' : '')}
+                className="rounded border-gray-300"
+              />
+              <label htmlFor="input-disabled" className="text-xs text-gray-600">
+                Отключено
+              </label>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="input-readonly"
+                checked={node.attributes?.readonly === 'true'}
+                onChange={(e) => handleAttributeChange('readonly', e.target.checked ? 'true' : '')}
+                className="rounded border-gray-300"
+              />
+              <label htmlFor="input-readonly" className="text-xs text-gray-600">
+                Только чтение
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Button attributes */}
+      {isButtonElement && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-medium text-gray-700">Кнопка</h4>
+          
+          <div>
+            <label className="text-xs text-gray-600 mb-1 block">Тип</label>
+            <select
+              value={node.attributes?.type || 'button'}
+              onChange={(e) => handleAttributeChange('type', e.target.value)}
+              className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
+            >
+              <option value="button">Button</option>
+              <option value="submit">Submit</option>
+              <option value="reset">Reset</option>
+            </select>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="btn-disabled"
+              checked={node.attributes?.disabled === 'true'}
+              onChange={(e) => handleAttributeChange('disabled', e.target.checked ? 'true' : '')}
+              className="rounded border-gray-300"
+            />
+            <label htmlFor="btn-disabled" className="text-xs text-gray-600">
+              Отключена
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* Video/Iframe attributes */}
+      {(isVideoElement || isIframeElement) && (
+        <div className="space-y-3">
+          <h4 className="text-xs font-medium text-gray-700">
+            {isVideoElement ? 'Видео' : 'Iframe'}
+          </h4>
+          
+          <Input
+            label="URL (src)"
+            value={node.attributes?.src || ''}
+            onChange={(e) => handleAttributeChange('src', e.target.value)}
+            placeholder={isVideoElement ? 'https://example.com/video.mp4' : 'https://example.com'}
+          />
+          
           <div className="grid grid-cols-2 gap-2">
             <Input
-              label="Line Height"
-              value={node.styles.properties?.lineHeight || ''}
-              onChange={(e) => handleStyleChange('lineHeight', e.target.value)}
-              placeholder="1.5"
-
+              label="Width"
+              value={node.attributes?.width || ''}
+              onChange={(e) => handleAttributeChange('width', e.target.value)}
+              placeholder="100%"
             />
             <Input
-              label="Letter Spacing"
-              value={node.styles.properties?.letterSpacing || ''}
-              onChange={(e) => handleStyleChange('letterSpacing', e.target.value)}
-              placeholder="0"
-
+              label="Height"
+              value={node.attributes?.height || ''}
+              onChange={(e) => handleAttributeChange('height', e.target.value)}
+              placeholder="auto"
             />
           </div>
+          
+          {isVideoElement && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="video-controls"
+                  checked={node.attributes?.controls === 'true'}
+                  onChange={(e) => handleAttributeChange('controls', e.target.checked ? 'true' : '')}
+                  className="rounded border-gray-300"
+                />
+                <label htmlFor="video-controls" className="text-xs text-gray-600">
+                  Показать контролы
+                </label>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="video-autoplay"
+                  checked={node.attributes?.autoplay === 'true'}
+                  onChange={(e) => handleAttributeChange('autoplay', e.target.checked ? 'true' : '')}
+                  className="rounded border-gray-300"
+                />
+                <label htmlFor="video-autoplay" className="text-xs text-gray-600">
+                  Автозапуск
+                </label>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="video-loop"
+                  checked={node.attributes?.loop === 'true'}
+                  onChange={(e) => handleAttributeChange('loop', e.target.checked ? 'true' : '')}
+                  className="rounded border-gray-300"
+                />
+                <label htmlFor="video-loop" className="text-xs text-gray-600">
+                  Зациклить
+                </label>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="video-muted"
+                  checked={node.attributes?.muted === 'true'}
+                  onChange={(e) => handleAttributeChange('muted', e.target.checked ? 'true' : '')}
+                  className="rounded border-gray-300"
+                />
+                <label htmlFor="video-muted" className="text-xs text-gray-600">
+                  Без звука
+                </label>
+              </div>
+            </div>
+          )}
         </div>
+      )}
+
+      {/* Common ID/Class attributes */}
+      <div className="space-y-3 pt-2 border-t border-gray-100">
+        <h4 className="text-xs font-medium text-gray-700">HTML атрибуты</h4>
+        
+        <Input
+          label="ID"
+          value={node.attributes?.id || ''}
+          onChange={(e) => handleAttributeChange('id', e.target.value)}
+          placeholder="element-id"
+        />
+        
+        <Input
+          label="Class"
+          value={node.attributes?.class || ''}
+          onChange={(e) => handleAttributeChange('class', e.target.value)}
+          placeholder="class1 class2"
+        />
+        
+        <Input
+          label="Title (подсказка)"
+          value={node.attributes?.title || ''}
+          onChange={(e) => handleAttributeChange('title', e.target.value)}
+          placeholder="Текст при наведении"
+        />
       </div>
 
-      {/* Text Align */}
-      <div>
-        <label className="text-xs font-medium text-gray-700 mb-2 block">Выравнивание</label>
-        <div className="flex gap-2">
-          {['left', 'center', 'right', 'justify'].map((align) => (
-            <button
-              key={align}
-              onClick={() => handleStyleChange('textAlign', align)}
-              className={`flex-1 px-3 py-2 text-xs border rounded text-gray-700 ${
-                node.styles.properties?.textAlign === align
-                  ? 'bg-primary-100 border-primary-300'
-                  : 'bg-white border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              {align}
-            </button>
-          ))}
+      {/* Typography */}
+      {isTextElement && (
+        <div className="pt-2 border-t border-gray-100">
+          <h4 className="text-xs font-medium text-gray-700 mb-2">Типографика</h4>
+          <div className="space-y-2">
+            <Input
+              label="Font Family"
+              value={node.styles.properties?.fontFamily || ''}
+              onChange={(e) => handleStyleChange('fontFamily', e.target.value)}
+              placeholder="inherit"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                label="Font Size"
+                value={node.styles.properties?.fontSize || ''}
+                onChange={(e) => handleStyleChange('fontSize', e.target.value)}
+                placeholder="16px"
+              />
+              <Input
+                label="Font Weight"
+                value={node.styles.properties?.fontWeight || ''}
+                onChange={(e) => handleStyleChange('fontWeight', e.target.value)}
+                placeholder="400"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                label="Line Height"
+                value={node.styles.properties?.lineHeight || ''}
+                onChange={(e) => handleStyleChange('lineHeight', e.target.value)}
+                placeholder="1.5"
+              />
+              <Input
+                label="Letter Spacing"
+                value={node.styles.properties?.letterSpacing || ''}
+                onChange={(e) => handleStyleChange('letterSpacing', e.target.value)}
+                placeholder="0"
+              />
+            </div>
+          </div>
+          
+          {/* Text Align */}
+          <div className="mt-3">
+            <label className="text-xs font-medium text-gray-700 mb-2 block">Выравнивание</label>
+            <div className="flex gap-2">
+              {['left', 'center', 'right', 'justify'].map((align) => (
+                <button
+                  key={align}
+                  onClick={() => handleStyleChange('textAlign', align)}
+                  className={`flex-1 px-3 py-2 text-xs border rounded text-gray-700 ${
+                    node.styles.properties?.textAlign === align
+                      ? 'bg-primary-100 border-primary-300'
+                      : 'bg-white border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {align}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Text Decoration */}
+          <div className="mt-3">
+            <label className="text-xs font-medium text-gray-700 mb-2 block">Декорация</label>
+            <div className="flex gap-2">
+              {['none', 'underline', 'line-through'].map((decoration) => (
+                <button
+                  key={decoration}
+                  onClick={() => handleStyleChange('textDecoration', decoration)}
+                  className={`flex-1 px-3 py-2 text-xs border rounded text-gray-700 ${
+                    node.styles.properties?.textDecoration === decoration
+                      ? 'bg-primary-100 border-primary-300'
+                      : 'bg-white border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {decoration}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
-
-      {/* Text Decoration */}
-      <div>
-        <label className="text-xs font-medium text-gray-700 mb-2 block">Декорация</label>
-        <div className="flex gap-2">
-          {['none', 'underline', 'line-through'].map((decoration) => (
-            <button
-              key={decoration}
-              onClick={() => handleStyleChange('textDecoration', decoration)}
-              className={`flex-1 px-3 py-2 text-xs border rounded text-gray-700 ${
-                node.styles.properties?.textDecoration === decoration
-                  ? 'bg-primary-100 border-primary-300'
-                  : 'bg-white border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              {decoration}
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   )
 }

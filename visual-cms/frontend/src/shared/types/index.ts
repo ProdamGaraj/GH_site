@@ -1,4 +1,4 @@
-// Base types
+﻿// Base types
 
 export type LayoutMode = 'absolute' | 'flex' | 'grid' | 'table'
 
@@ -205,7 +205,7 @@ export type Breakpoint = 'desktop' | 'tablet' | 'mobile' | string
 export interface Browser {
   id: string
   name: string
-  viewportHeightOffset: number // Высота панелей браузера + UI (в пикселях)
+  viewportHeightOffset: number // Р’С‹СЃРѕС‚Р° РїР°РЅРµР»РµР№ Р±СЂР°СѓР·РµСЂР° + UI (РІ РїРёРєСЃРµР»СЏС…)
   icon?: string
   isDefault?: boolean
 }
@@ -215,9 +215,9 @@ export interface CustomBreakpoint {
   name: string
   width: number
   height?: number
-  browserId?: string // ID выбранного браузера для этого breakpoint
+  browserId?: string // ID РІС‹Р±СЂР°РЅРЅРѕРіРѕ Р±СЂР°СѓР·РµСЂР° РґР»СЏ СЌС‚РѕРіРѕ breakpoint
   icon?: 'monitor' | 'tablet' | 'smartphone' | 'laptop' | 'watch'
-  color?: string // Цвет выделения для viewport-специфичных элементов
+  color?: string // Р¦РІРµС‚ РІС‹РґРµР»РµРЅРёСЏ РґР»СЏ viewport-СЃРїРµС†РёС„РёС‡РЅС‹С… СЌР»РµРјРµРЅС‚РѕРІ
 }
 
 export interface StandardMonitor {
@@ -229,17 +229,17 @@ export interface StandardMonitor {
 }
 // Variation for responsive breakpoints
 export interface BlockNodeVariation {
-  // Переопределения для унаследованных элементов
+  // РџРµСЂРµРѕРїСЂРµРґРµР»РµРЅРёСЏ РґР»СЏ СѓРЅР°СЃР»РµРґРѕРІР°РЅРЅС‹С… СЌР»РµРјРµРЅС‚РѕРІ
   inheritedOverrides?: {
     [nodeId: string]: {
-      hidden?: boolean  // Скрыть унаследованный элемент
+      hidden?: boolean  // РЎРєСЂС‹С‚СЊ СѓРЅР°СЃР»РµРґРѕРІР°РЅРЅС‹Р№ СЌР»РµРјРµРЅС‚
       styles?: Partial<CSSProperties>
       attributes?: Record<string, string>
       content?: string
     }
   }
   
-  // Специфичные дочерние элементы (только для этого брейкпоинта)
+  // РЎРїРµС†РёС„РёС‡РЅС‹Рµ РґРѕС‡РµСЂРЅРёРµ СЌР»РµРјРµРЅС‚С‹ (С‚РѕР»СЊРєРѕ РґР»СЏ СЌС‚РѕРіРѕ Р±СЂРµР№РєРїРѕРёРЅС‚Р°)
   specificChildren?: BlockNode[]
 }
 
@@ -284,7 +284,7 @@ export interface BlockNode {
     linkedBlockId?: string
   }
   
-  // Вариации для разных брейкпоинтов (независимые DOM деревья)
+  // Р’Р°СЂРёР°С†РёРё РґР»СЏ СЂР°Р·РЅС‹С… Р±СЂРµР№РєРїРѕРёРЅС‚РѕРІ (РЅРµР·Р°РІРёСЃРёРјС‹Рµ DOM РґРµСЂРµРІСЊСЏ)
   variations?: {
     [breakpointId: string]: BlockNodeVariation
   }
@@ -380,3 +380,4 @@ export interface ConflictResolution {
   label: string
   description: string
 }
+

@@ -1,11 +1,11 @@
-import React, { useState } from 'react'
+﻿import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Home, FileText, Box, Settings, Menu } from 'lucide-react'
+import { Home, FileText, Box, Database, Settings, Menu } from 'lucide-react'
 
 interface HeaderProps {
   showActions?: React.ReactNode
-  centerActions?: React.ReactNode  // Действия на странице (масштаб, цвета)
-  rightActions?: React.ReactNode   // Действия со страницей (сохранить, экспорт)
+  centerActions?: React.ReactNode  // Р”РµР№СЃС‚РІРёСЏ РЅР° СЃС‚СЂР°РЅРёС†Рµ (РјР°СЃС€С‚Р°Р±, С†РІРµС‚Р°)
+  rightActions?: React.ReactNode   // Р”РµР№СЃС‚РІРёСЏ СЃРѕ СЃС‚СЂР°РЅРёС†РµР№ (СЃРѕС…СЂР°РЅРёС‚СЊ, СЌРєСЃРїРѕСЂС‚)
 }
 
 export const Header: React.FC<HeaderProps> = ({ showActions, centerActions, rightActions }) => {
@@ -13,10 +13,11 @@ export const Header: React.FC<HeaderProps> = ({ showActions, centerActions, righ
   const [showNavDropdown, setShowNavDropdown] = useState(false)
 
   const navItems = [
-    { path: '/', icon: Home, label: 'Главная' },
-    { path: '/pages', icon: FileText, label: 'Страницы' },
-    { path: '/blocks', icon: Box, label: 'Блоки' },
-    { path: '/settings', icon: Settings, label: 'Настройки' },
+    { path: '/', icon: Home, label: 'Р“Р»Р°РІРЅР°СЏ' },
+    { path: '/pages', icon: FileText, label: 'РЎС‚СЂР°РЅРёС†С‹' },
+    { path: '/blocks', icon: Box, label: 'Р‘Р»РѕРєРё' },
+    { path: '/data-sources', icon: Database, label: 'Data Sources' },
+    { path: '/settings', icon: Settings, label: 'РќР°СЃС‚СЂРѕР№РєРё' },
   ]
 
   const isActive = (path: string) => {
@@ -27,12 +28,12 @@ export const Header: React.FC<HeaderProps> = ({ showActions, centerActions, righ
   // Check if we're in the editor
   const isInEditor = location.pathname.includes('/editor/')
 
-  // Если есть centerActions или rightActions - используем 3-колоночную структуру
+  // Р•СЃР»Рё РµСЃС‚СЊ centerActions РёР»Рё rightActions - РёСЃРїРѕР»СЊР·СѓРµРј 3-РєРѕР»РѕРЅРѕС‡РЅСѓСЋ СЃС‚СЂСѓРєС‚СѓСЂСѓ
   const hasThreeColumns = centerActions || rightActions
 
   return (
     <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4">
-      {/* 1. Лого и меню */}
+      {/* 1. Р›РѕРіРѕ Рё РјРµРЅСЋ */}
       <div className="flex items-center gap-6">
         {/* Logo */}
         <div className="font-bold text-lg text-gray-900">Visual CMS</div>
@@ -43,10 +44,10 @@ export const Header: React.FC<HeaderProps> = ({ showActions, centerActions, righ
             <button
               onClick={() => setShowNavDropdown(!showNavDropdown)}
               className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-              title="Навигация"
+              title="РќР°РІРёРіР°С†РёСЏ"
             >
               <Menu size={18} />
-              <span>Меню</span>
+              <span>РњРµРЅСЋ</span>
             </button>
             
             {showNavDropdown && (
@@ -105,20 +106,20 @@ export const Header: React.FC<HeaderProps> = ({ showActions, centerActions, righ
         )}
       </div>
 
-      {/* 2. Центр - действия на странице (масштаб, цвета, viewport и т.д.) */}
+      {/* 2. Р¦РµРЅС‚СЂ - РґРµР№СЃС‚РІРёСЏ РЅР° СЃС‚СЂР°РЅРёС†Рµ (РјР°СЃС€С‚Р°Р±, С†РІРµС‚Р°, viewport Рё С‚.Рґ.) */}
       {hasThreeColumns ? (
         <>
           <div className="flex items-center gap-2">
             {centerActions}
           </div>
 
-          {/* 3. Справа - действия со страницей (сохранить, экспорт, публикация) */}
+          {/* 3. РЎРїСЂР°РІР° - РґРµР№СЃС‚РІРёСЏ СЃРѕ СЃС‚СЂР°РЅРёС†РµР№ (СЃРѕС…СЂР°РЅРёС‚СЊ, СЌРєСЃРїРѕСЂС‚, РїСѓР±Р»РёРєР°С†РёСЏ) */}
           <div className="flex items-center gap-2">
             {rightActions}
           </div>
         </>
       ) : (
-        /* Fallback для старого API с showActions */
+        /* Fallback РґР»СЏ СЃС‚Р°СЂРѕРіРѕ API СЃ showActions */
         showActions && (
           <div className="flex items-center gap-2">
             {showActions}
@@ -128,3 +129,4 @@ export const Header: React.FC<HeaderProps> = ({ showActions, centerActions, righ
     </header>
   )
 }
+

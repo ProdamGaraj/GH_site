@@ -1,0 +1,417 @@
+/**
+ * Data Transform Service
+ * 
+ * Согласно ТЗ: docs/data-binding-system-spec.md
+ * Этап 2.1 Backend: Data Fetching Service
+ * 
+ * Сервис для трансформации данных, маппинга полей и вычисляемых значений.
+ */
+
+import vm from 'vm'
+import { dataFilterService } from './DataFilterService'
+import type { FieldMapping, ComputedField, ConditionalMapping, FilterOperator } from '../models/DataBinding'
+
+// Типы
+export interface TransformContext {
+  item: unknown
+  index?: number
+  items?: unknown[]
+  variables?: Record<string, unknown>
+  pageData?: Record<string, unknown>
+}
+
+export interface MappingResult {
+  [targetProperty: string]: unknown
+}
+
+class DataTransformService {
+  private sandboxTimeout = 1000 // 1 секунда на выполнение скрипта
+
+  /**
+   * Применить маппинг полей к данным
+   */
+  applyMapping(
+    data: unknown,
+    mappings: FieldMapping[],
+    context?: Partial<TransformContext>
+  ): MappingResult {
+    const result: MappingResult = {}
+    const fullContext: TransformContext = {
+      item: data,
+      ...context
+    }
+
+    for (const mapping of mappings) {
+      try {
+        const value = this.resolveMapping(mapping, fullContext)
+        this.setNestedValue(result, mapping.targetProperty, value)
+      } catch (error) {
+        console.error(`Error applying mapping for ${mapping.targetProperty}:`, error)
+        // Используем fallback при ошибке
+        if (mapping.fallbackValue !== undefined) {
+          this.setNestedValue(result, mapping.targetProperty, mapping.fallbackValue)
+        }
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Разрешить значение маппинга
+   */
+  private resolveMapping(
+    mapping: FieldMapping,
+    context: TransformContext
+  ): unknown {
+    // 1. Проверяем условный маппинг
+    if (mapping.condition) {
+      return this.evaluateConditionalMapping(mapping.condition, context)
+    }
+
+    // 2. Получаем значение из источника
+    let value = dataFilterService.getValueByPath(context.item, mapping.sourceField)
+
+    // 3. Применяем трансформацию
+    if (mapping.transform && value !== undefined) {
+      value = this.executeTransform(mapping.transform, value, context)
+    }
+
+    // 4. Проверяем fallback
+    if ((value === undefined || value === null || value === '') && mapping.fallbackField) {
+      value = dataFilterService.getValueByPath(context.item, mapping.fallbackField)
+    }
+
+    if ((value === undefined || value === null || value === '') && mapping.fallbackValue !== undefined) {
+      value = mapping.fallbackValue
+    }
+
+    return value
+  }
+
+  /**
+   * Оценить условный маппинг
+   */
+  private evaluateConditionalMapping(
+    conditional: ConditionalMapping,
+    context: TransformContext
+  ): unknown {
+    const { condition, thenValue, elseValue } = conditional
+    
+    // Получаем значение поля для условия
+    const fieldValue = dataFilterService.getValueByPath(context.item, condition.field)
+    
+    // Проверяем условие
+    const conditionMet = this.evaluateCondition(fieldValue, condition.operator, condition.value)
+
+    // Возвращаем соответствующее значение
+    const resultValue = conditionMet ? thenValue : elseValue
+    
+    // Если значение - объект с field, получаем значение из данных
+    if (resultValue && typeof resultValue === 'object' && 'field' in resultValue) {
+      return dataFilterService.getValueByPath(context.item, (resultValue as { field: string }).field)
+    }
+    
+    return resultValue
+  }
+
+  /**
+   * Проверить условие
+   */
+  private evaluateCondition(
+    value: unknown,
+    operator: FilterOperator,
+    compareValue: unknown
+  ): boolean {
+    // Используем тот же метод сравнения, что и в фильтрах
+    switch (operator) {
+      case 'equals':
+        return value === compareValue
+      case 'notEquals':
+        return value !== compareValue
+      case 'contains':
+        return String(value).toLowerCase().includes(String(compareValue).toLowerCase())
+      case 'greaterThan':
+        return Number(value) > Number(compareValue)
+      case 'lessThan':
+        return Number(value) < Number(compareValue)
+      case 'exists':
+        return value !== undefined && value !== null
+      case 'notExists':
+        return value === undefined || value === null
+      case 'isEmpty':
+        return this.isEmpty(value)
+      case 'isNotEmpty':
+        return !this.isEmpty(value)
+      default:
+        return true
+    }
+  }
+
+  /**
+   * Выполнить трансформацию (JavaScript функция)
+   */
+  executeTransform(
+    transformCode: string,
+    value: unknown,
+    context: TransformContext
+  ): unknown {
+    try {
+      // Создаём безопасный sandbox
+      const sandbox = {
+        value,
+        item: context.item,
+        index: context.index,
+        items: context.items,
+        variables: context.variables || {},
+        pageData: context.pageData || {},
+        // Безопасные утилиты
+        JSON: {
+          parse: JSON.parse,
+          stringify: JSON.stringify
+        },
+        String,
+        Number,
+        Boolean,
+        Array,
+        Object,
+        Math,
+        Date,
+        parseInt,
+        parseFloat,
+        isNaN,
+        isFinite,
+        encodeURIComponent,
+        decodeURIComponent,
+        // Результат
+        result: undefined
+      }
+
+      // Оборачиваем код в функцию
+      const wrappedCode = `
+        result = (function(value, item, index, items, variables, pageData) {
+          ${transformCode}
+        })(value, item, index, items, variables, pageData);
+      `
+
+      // Создаём контекст и выполняем
+      const vmContext = vm.createContext(sandbox)
+      vm.runInContext(wrappedCode, vmContext, {
+        timeout: this.sandboxTimeout,
+        displayErrors: true
+      })
+
+      return sandbox.result
+    } catch (error: any) {
+      console.error('Transform execution error:', error.message)
+      throw new Error(`Transform error: ${error.message}`)
+    }
+  }
+
+  /**
+   * Применить вычисляемые поля
+   */
+  async applyComputedFields(
+    data: unknown,
+    computedFields: ComputedField[],
+    context?: Partial<TransformContext>
+  ): Promise<Record<string, unknown>> {
+    const result: Record<string, unknown> = {}
+    const fullContext: TransformContext = {
+      item: data,
+      ...context
+    }
+
+    for (const field of computedFields) {
+      try {
+        if (field.isAsync) {
+          result[field.name] = await this.executeAsyncComputed(field, fullContext)
+        } else {
+          result[field.name] = this.executeTransform(
+            field.expression,
+            data,
+            fullContext
+          )
+        }
+      } catch (error) {
+        console.error(`Error computing field ${field.name}:`, error)
+        result[field.name] = null
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Выполнить async вычисляемое поле
+   */
+  private async executeAsyncComputed(
+    field: ComputedField,
+    context: TransformContext
+  ): Promise<unknown> {
+    // Для async полей используем обычный eval с Promise
+    // В продакшене это нужно заменить на более безопасное решение
+    try {
+      const asyncFunction = new Function(
+        'value', 'item', 'index', 'items', 'variables', 'pageData',
+        `return (async () => { ${field.expression} })()`
+      )
+
+      return await asyncFunction(
+        context.item,
+        context.item,
+        context.index,
+        context.items,
+        context.variables,
+        context.pageData
+      )
+    } catch (error: any) {
+      throw new Error(`Async compute error: ${error.message}`)
+    }
+  }
+
+  /**
+   * Обработать массив данных с маппингом
+   */
+  processArray(
+    items: unknown[],
+    mappings: FieldMapping[],
+    context?: Partial<TransformContext>
+  ): MappingResult[] {
+    return items.map((item, index) => 
+      this.applyMapping(item, mappings, {
+        ...context,
+        item,
+        index,
+        items
+      })
+    )
+  }
+
+  /**
+   * Объединить данные из нескольких источников
+   */
+  joinData(
+    primary: unknown[],
+    additional: unknown[],
+    primaryField: string,
+    additionalField: string,
+    joinType: 'left' | 'inner' = 'left',
+    alias: string = 'joined'
+  ): unknown[] {
+    // Создаём индекс для additional данных
+    const additionalIndex = new Map<unknown, unknown>()
+    for (const item of additional) {
+      const key = dataFilterService.getValueByPath(item, additionalField)
+      if (key !== undefined) {
+        additionalIndex.set(key, item)
+      }
+    }
+
+    const result: unknown[] = []
+
+    for (const primaryItem of primary) {
+      const key = dataFilterService.getValueByPath(primaryItem, primaryField)
+      const additionalItem = additionalIndex.get(key)
+
+      if (joinType === 'inner' && !additionalItem) {
+        continue // Пропускаем элементы без соответствия при INNER join
+      }
+
+      result.push({
+        ...primaryItem as object,
+        [alias]: additionalItem || null
+      })
+    }
+
+    return result
+  }
+
+  /**
+   * Flatten вложенных данных
+   */
+  flattenData(
+    data: unknown,
+    prefix: string = ''
+  ): Record<string, unknown> {
+    const result: Record<string, unknown> = {}
+
+    const flatten = (obj: unknown, currentPrefix: string) => {
+      if (obj === null || obj === undefined) {
+        result[currentPrefix] = obj
+        return
+      }
+
+      if (Array.isArray(obj)) {
+        obj.forEach((item, index) => {
+          flatten(item, `${currentPrefix}[${index}]`)
+        })
+        return
+      }
+
+      if (typeof obj === 'object') {
+        for (const [key, value] of Object.entries(obj as object)) {
+          const newPrefix = currentPrefix ? `${currentPrefix}.${key}` : key
+          flatten(value, newPrefix)
+        }
+        return
+      }
+
+      result[currentPrefix] = obj
+    }
+
+    flatten(data, prefix)
+    return result
+  }
+
+  /**
+   * Установить вложенное значение
+   */
+  private setNestedValue(
+    obj: Record<string, unknown>,
+    path: string,
+    value: unknown
+  ): void {
+    dataFilterService.setValueByPath(obj, path, value)
+  }
+
+  /**
+   * Проверить пустое значение
+   */
+  private isEmpty(value: unknown): boolean {
+    if (value === null || value === undefined) return true
+    if (typeof value === 'string') return value.trim() === ''
+    if (Array.isArray(value)) return value.length === 0
+    if (typeof value === 'object') return Object.keys(value).length === 0
+    return false
+  }
+
+  /**
+   * Создать шаблон для Repeater из данных
+   */
+  generateTemplateFields(structure: unknown): string[] {
+    const fields: string[] = []
+    
+    const extract = (obj: unknown, prefix: string = '') => {
+      if (!obj || typeof obj !== 'object') return
+      
+      for (const [key, value] of Object.entries(obj as object)) {
+        const path = prefix ? `${prefix}.${key}` : key
+        
+        // Ищем элементы с id
+        if (key === 'id' && typeof value === 'string') {
+          fields.push(prefix || value)
+        }
+        
+        if (Array.isArray(value)) {
+          value.forEach((item, i) => extract(item, `${path}[${i}]`))
+        } else if (typeof value === 'object') {
+          extract(value, path)
+        }
+      }
+    }
+    
+    extract(structure)
+    return fields
+  }
+}

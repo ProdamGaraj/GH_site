@@ -1,7 +1,9 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
+import { FlexboxVisualControls } from './FlexboxVisualControls'
+import { GridVisualControls } from './GridVisualControls'
 import type { BlockNode } from '@/shared/types'
 
 interface PositioningTabProps {
@@ -11,6 +13,7 @@ interface PositioningTabProps {
 export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
   const dispatch = useAppDispatch()
   const viewport = useAppSelector(selectViewport)
+  const [useVisualControls, setUseVisualControls] = useState(true)
 
   const handleStyleChange = (property: string, value: string) => {
     dispatch(updateNodeStyles({
@@ -21,6 +24,7 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
   }
 
   const currentDisplay = node.styles.properties?.display || ''
+  const props = node.styles.properties || {}
 
   return (
     <div className="space-y-4">
@@ -42,11 +46,37 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
         </select>
       </div>
 
-      {/* Flex-specific properties */}
-      {currentDisplay === 'flex' && (
+      {/* Visual/Classic toggle for flex/grid */}
+      {(currentDisplay === 'flex' || currentDisplay === 'grid') && (
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-medium text-gray-700">
+            {currentDisplay === 'flex' ? 'Flex' : 'Grid'} свойства
+          </h4>
+          <button
+            type="button"
+            onClick={() => setUseVisualControls(!useVisualControls)}
+            className="text-xs text-primary-600 hover:text-primary-700"
+          >
+            {useVisualControls ? 'Текстовые поля' : 'Визуальные кнопки'}
+          </button>
+        </div>
+      )}
+
+      {/* Flex-specific properties - Visual Mode */}
+      {currentDisplay === 'flex' && useVisualControls && (
+        <FlexboxVisualControls
+          direction={props.flexDirection?.toString() || ''}
+          justifyContent={props.justifyContent?.toString() || ''}
+          alignItems={props.alignItems?.toString() || ''}
+          flexWrap={props.flexWrap?.toString() || ''}
+          gap={props.gap?.toString() || ''}
+          onChange={handleStyleChange}
+        />
+      )}
+
+      {/* Flex-specific properties - Classic Mode */}
+      {currentDisplay === 'flex' && !useVisualControls && (
         <div className="space-y-3">
-          <h4 className="text-xs font-medium text-gray-700">Flex свойства</h4>
-          
           <div>
             <label className="text-xs text-gray-600 mb-1 block">Flex Direction</label>
             <select
@@ -136,11 +166,21 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
         </div>
       )}
 
-      {/* Grid-specific properties */}
-      {currentDisplay === 'grid' && (
+      {/* Grid-specific properties - Visual Mode */}
+      {currentDisplay === 'grid' && useVisualControls && (
+        <GridVisualControls
+          gridTemplateColumns={props.gridTemplateColumns?.toString() || ''}
+          gridTemplateRows={props.gridTemplateRows?.toString() || ''}
+          gap={props.gap?.toString() || ''}
+          justifyItems={props.justifyItems?.toString() || ''}
+          alignItems={props.alignItems?.toString() || ''}
+          onChange={handleStyleChange}
+        />
+      )}
+
+      {/* Grid-specific properties - Classic Mode */}
+      {currentDisplay === 'grid' && !useVisualControls && (
         <div className="space-y-3">
-          <h4 className="text-xs font-medium text-gray-700">Grid свойства</h4>
-          
           <Input
             label="Grid Template Columns"
             value={node.styles.properties?.gridTemplateColumns || ''}

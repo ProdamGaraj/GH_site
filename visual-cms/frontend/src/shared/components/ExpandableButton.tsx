@@ -24,17 +24,6 @@ export const ExpandableButton: React.FC<ExpandableButtonProps> = ({
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const leaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const clearAllTimeouts = useCallback(() => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current)
-      hoverTimeoutRef.current = null
-    }
-    if (leaveTimeoutRef.current) {
-      clearTimeout(leaveTimeoutRef.current)
-      leaveTimeoutRef.current = null
-    }
-  }, [])
-
   const handleMouseEnter = useCallback(() => {
     // Отменяем закрытие если оно было запланировано
     if (leaveTimeoutRef.current) {

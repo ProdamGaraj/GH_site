@@ -1,7 +1,8 @@
-/**
- * Сервис генерации HTML из структуры страницы
+﻿/**
+ * РЎРµСЂРІРёСЃ РіРµРЅРµСЂР°С†РёРё HTML РёР· СЃС‚СЂСѓРєС‚СѓСЂС‹ СЃС‚СЂР°РЅРёС†С‹
  */
 import { styleGenerator } from './StyleGenerator'
+import { generateDataBindingRuntime, type PageDataConfig } from './DataBindingGenerator'
 
 interface CSSProperties {
   [key: string]: string | undefined
@@ -58,12 +59,12 @@ interface PageMetadata {
 
 export class HtmlGenerator {
   /**
-   * Генерирует полный HTML документ из структуры страницы
+   * Р“РµРЅРµСЂРёСЂСѓРµС‚ РїРѕР»РЅС‹Р№ HTML РґРѕРєСѓРјРµРЅС‚ РёР· СЃС‚СЂСѓРєС‚СѓСЂС‹ СЃС‚СЂР°РЅРёС†С‹
    */
-  generatePage(structure: BlockNode, metadata: PageMetadata, slug: string): string {
+  generatePage(structure: BlockNode, metadata: PageMetadata, slug: string, dataConfig?: PageDataConfig): string {
     const bodyContent = this.renderNode(structure)
     
-    // Генерируем CSS для hover, анимаций и т.д.
+    // Р“РµРЅРµСЂРёСЂСѓРµРј CSS РґР»СЏ hover, Р°РЅРёРјР°С†РёР№ Рё С‚.Рґ.
     const { css: dynamicCSS, keyframes, scripts } = styleGenerator.generateNodeTreeStyles(structure as any)
     
     return `<!DOCTYPE html>
@@ -154,17 +155,21 @@ export class HtmlGenerator {
     
     /* Dynamic styles (hover, animations, etc.) */
     ${dynamicCSS}
+    
+    /* Form and output binding styles */
+    ${styleGenerator.generateFormStyles()}
   </style>
 </head>
 <body>
 ${bodyContent}
+${dataConfig ? generateDataBindingRuntime(dataConfig) : ''}
 ${scripts ? `<script>\n${scripts}\n</script>` : ''}
 </body>
 </html>`
   }
 
   /**
-   * Рекурсивно рендерит узел в HTML
+   * Р РµРєСѓСЂСЃРёРІРЅРѕ СЂРµРЅРґРµСЂРёС‚ СѓР·РµР» РІ HTML
    */
   private renderNode(node: BlockNode, indent: string = '  '): string {
     if (!node) return ''
@@ -173,30 +178,30 @@ ${scripts ? `<script>\n${scripts}\n</script>` : ''}
     const styles = this.renderStyles(node.styles?.properties || {})
     const attributes = this.renderAttributes(node.attributes || {})
     
-    // Добавляем data-element-id для CSS селекторов (hover, анимации)
+    // Р”РѕР±Р°РІР»СЏРµРј data-element-id РґР»СЏ CSS СЃРµР»РµРєС‚РѕСЂРѕРІ (hover, Р°РЅРёРјР°С†РёРё)
     const dataAttr = ` data-element-id="${node.id}"`
     
-    // Void elements (самозакрывающиеся)
+    // Void elements (СЃР°РјРѕР·Р°РєСЂС‹РІР°СЋС‰РёРµСЃСЏ)
     const voidElements = ['input', 'img', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr']
     
     if (voidElements.includes(tagName.toLowerCase())) {
       return `${indent}<${tagName}${styles}${dataAttr}${attributes} />\n`
     }
     
-    // Текстовый контент
+    // РўРµРєСЃС‚РѕРІС‹Р№ РєРѕРЅС‚РµРЅС‚
     const textContent = node.content ? this.escapeHtml(node.content) : ''
     
-    // Дочерние элементы
+    // Р”РѕС‡РµСЂРЅРёРµ СЌР»РµРјРµРЅС‚С‹
     const childrenHtml = node.children?.map(child => 
       this.renderNode(child, indent + '  ')
     ).join('') || ''
     
-    // Если нет контента и детей - короткая запись
+    // Р•СЃР»Рё РЅРµС‚ РєРѕРЅС‚РµРЅС‚Р° Рё РґРµС‚РµР№ - РєРѕСЂРѕС‚РєР°СЏ Р·Р°РїРёСЃСЊ
     if (!textContent && !childrenHtml) {
       return `${indent}<${tagName}${styles}${dataAttr}${attributes}></${tagName}>\n`
     }
     
-    // Полная запись с контентом
+    // РџРѕР»РЅР°СЏ Р·Р°РїРёСЃСЊ СЃ РєРѕРЅС‚РµРЅС‚РѕРј
     if (textContent && !childrenHtml) {
       return `${indent}<${tagName}${styles}${dataAttr}${attributes}>${textContent}</${tagName}>\n`
     }
@@ -205,7 +210,7 @@ ${scripts ? `<script>\n${scripts}\n</script>` : ''}
   }
 
   /**
-   * Конвертирует объект стилей в inline style атрибут
+   * РљРѕРЅРІРµСЂС‚РёСЂСѓРµС‚ РѕР±СЉРµРєС‚ СЃС‚РёР»РµР№ РІ inline style Р°С‚СЂРёР±СѓС‚
    */
   private renderStyles(properties: Record<string, string>): string {
     if (!properties || Object.keys(properties).length === 0) {
@@ -215,7 +220,7 @@ ${scripts ? `<script>\n${scripts}\n</script>` : ''}
     const cssString = Object.entries(properties)
       .filter(([_, value]) => value !== undefined && value !== null && value !== '')
       .map(([key, value]) => {
-        // Конвертируем camelCase в kebab-case
+        // РљРѕРЅРІРµСЂС‚РёСЂСѓРµРј camelCase РІ kebab-case
         const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase()
         return `${cssKey}: ${value}`
       })
@@ -225,7 +230,7 @@ ${scripts ? `<script>\n${scripts}\n</script>` : ''}
   }
 
   /**
-   * Конвертирует объект атрибутов в строку атрибутов
+   * РљРѕРЅРІРµСЂС‚РёСЂСѓРµС‚ РѕР±СЉРµРєС‚ Р°С‚СЂРёР±СѓС‚РѕРІ РІ СЃС‚СЂРѕРєСѓ Р°С‚СЂРёР±СѓС‚РѕРІ
    */
   private renderAttributes(attributes: Record<string, string>): string {
     if (!attributes || Object.keys(attributes).length === 0) {
@@ -239,7 +244,7 @@ ${scripts ? `<script>\n${scripts}\n</script>` : ''}
   }
 
   /**
-   * Экранирует HTML спецсимволы
+   * Р­РєСЂР°РЅРёСЂСѓРµС‚ HTML СЃРїРµС†СЃРёРјРІРѕР»С‹
    */
   private escapeHtml(text: string): string {
     if (!text) return ''
@@ -253,3 +258,6 @@ ${scripts ? `<script>\n${scripts}\n</script>` : ''}
 }
 
 export const htmlGenerator = new HtmlGenerator()
+
+
+

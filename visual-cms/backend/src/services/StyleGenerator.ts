@@ -322,6 +322,142 @@ export class StyleGenerator {
 
     return { css, keyframes, scripts }
   }
+
+  /**
+   * Генерирует CSS для форм и OUTPUT bindings
+   */
+  generateFormStyles(): string {
+    return `
+/* Visual CMS Form Styles */
+
+/* Базовые стили формы */
+form {
+  width: 100%;
+}
+
+/* Поля ввода */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="number"],
+input[type="url"],
+textarea,
+select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: #fff;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Состояния ошибки */
+input.border-red-500,
+textarea.border-red-500,
+select.border-red-500 {
+  border-color: #ef4444;
+}
+
+input.border-red-500:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+/* Сообщения об ошибках */
+.validation-error {
+  color: #ef4444;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* Кнопки */
+button[type="submit"],
+.submit-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #3b82f6;
+  color: #fff;
+}
+
+button[type="submit"]:hover,
+.submit-button:hover {
+  background: #2563eb;
+}
+
+button[type="submit"]:disabled,
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Состояние загрузки */
+button.loading {
+  background: #6b7280;
+  cursor: wait;
+}
+
+button.loading .spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Состояние успеха */
+button.success {
+  background: #10b981;
+}
+
+/* Состояние ошибки */
+button.error {
+  background: #ef4444;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Лейблы */
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* Группы полей */
+.form-group {
+  margin-bottom: 1rem;
+}
+
+/* Плейсхолдеры */
+::placeholder {
+  color: #9ca3af;
+}
+`
+  }
 }
 
 export const styleGenerator = new StyleGenerator()
