@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
+import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit'
 import type { Block } from '@/shared/types'
 import type { RootState } from '@/app/store'
 import { blockApi, CreateBlockDto, UpdateBlockDto } from '@/shared/api'
@@ -140,8 +140,13 @@ export const { setCurrentBlock, clearError } = blocksSlice.actions
 
 export const selectBlocks = (state: RootState) => state.blocks.items
 export const selectCurrentBlock = (state: RootState) => state.blocks.currentBlock
-export const selectReusableBlocks = (state: RootState) => 
-  state.blocks.items.filter(block => block.isReusable)
+
+// Memoized selector to prevent unnecessary re-renders
+export const selectReusableBlocks = createSelector(
+  [selectBlocks],
+  (blocks) => blocks.filter(block => block.isReusable)
+)
+
 export const selectBlocksLoading = (state: RootState) => state.blocks.loading
 export const selectBlocksSaving = (state: RootState) => state.blocks.saving
 export const selectBlocksError = (state: RootState) => state.blocks.error

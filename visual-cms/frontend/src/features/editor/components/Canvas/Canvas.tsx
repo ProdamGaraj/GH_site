@@ -74,6 +74,20 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Pan with Space + Drag or Middle Mouse Button
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Ignore events from input elements or their labels
+    const target = e.target as HTMLElement
+    
+    // Check if target is an input element
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || 
+        target.isContentEditable) {
+      return
+    }
+    
+    // Check if target is inside a label (for checkboxes/radio buttons)
+    if (target.closest('label') || target.closest('input') || target.closest('textarea') || target.closest('select')) {
+      return
+    }
+    
     // Start panning on middle-click or left-click while Space is held
     if (e.button === 1 || (e.button === 0 && isSpacePressed)) {
       e.preventDefault()
@@ -84,6 +98,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanning && panContainerRef.current) {
+      e.preventDefault() // Prevent text selection during panning
       // Обновляем через DOM напрямую - без React state/Redux
       const newX = e.clientX - panStart.x
       const newY = e.clientY - panStart.y
@@ -103,6 +118,12 @@ export const Canvas: React.FC<CanvasProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
+        // Skip if user is typing in input/textarea
+        const target = e.target as HTMLElement
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+          return
+        }
+        
         setIsSpacePressed(true)
         if (!isPanning) {
           e.preventDefault()

@@ -17,6 +17,11 @@ export interface PageSettings {
   // Data Binding settings
   dataSources?: PageDataConfig
   variables?: VariablesConfig
+  globalCachePolicy?: {
+    enabled: boolean
+    defaultTtl: number
+    staleWhileRevalidate: boolean
+  }
 }
 
 interface PageSettingsPanelProps {
@@ -225,13 +230,15 @@ export const PageSettingsPanel: React.FC<PageSettingsPanelProps> = ({
                 variables: {},
                 cachePolicy: 'cache-first'
               },
-              variables: settings.variables || { variables: [] }
+              variables: settings.variables || { variables: [] },
+              globalCachePolicy: settings.globalCachePolicy
             }}
             onChange={(dataSettings) => {
               onChange({
                 ...settings,
                 dataSources: dataSettings.dataSources,
-                variables: dataSettings.variables
+                variables: dataSettings.variables,
+                globalCachePolicy: dataSettings.globalCachePolicy
               })
             }}
           />

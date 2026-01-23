@@ -312,3 +312,82 @@ body {
 .animate-slide-in {
   animation: slide-in 0.3s ease-out;
 }
+
+/* Range input styles */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* Webkit slider track */
+input[type="range"]::-webkit-slider-track {
+  background-color: #cbd5e1;
+  border-radius: 0.5rem;
+  height: 0.5rem;
+}
+
+/* Webkit slider thumb */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: #2563eb;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  height: 1.25rem;
+  width: 1.25rem;
+  margin-top: -0.375rem;
+  cursor: grab;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.15s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  background-color: #1d4ed8;
+  transform: scale(1.1);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.05);
+}
+
+/* Firefox slider track */
+input[type="range"]::-moz-range-track {
+  background-color: #cbd5e1;
+  border-radius: 0.5rem;
+  height: 0.5rem;
+}
+
+/* Firefox slider progress (filled part) */
+input[type="range"]::-moz-range-progress {
+  background-color: #3b82f6;
+  border-radius: 0.5rem 0 0 0.5rem;
+  height: 0.625rem;
+}
+
+/* Firefox slider thumb */
+input[type="range"]::-moz-range-thumb {
+  background-color: #2563eb;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  height: 1.25rem;
+  width: 1.25rem;
+  cursor: grab;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.15s ease;
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  background-color: #1d4ed8;
+  transform: scale(1.1);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-moz-range-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.05);
+}

@@ -142,7 +142,7 @@ export const VariablesEditor: React.FC<VariablesEditorProps> = ({
             value={variable.defaultValue as string || ''}
             onChange={(e) => updateVariable(variable.id, { defaultValue: e.target.value })}
             placeholder="Default string value"
-            className="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            className="w-full text-sm bg-white text-gray-900 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
           />
         )
       case 'number':
@@ -151,7 +151,7 @@ export const VariablesEditor: React.FC<VariablesEditorProps> = ({
             type="number"
             value={variable.defaultValue as number || 0}
             onChange={(e) => updateVariable(variable.id, { defaultValue: parseFloat(e.target.value) || 0 })}
-            className="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            className="w-full text-sm bg-white text-gray-900 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
           />
         )
       case 'boolean':
@@ -163,7 +163,7 @@ export const VariablesEditor: React.FC<VariablesEditorProps> = ({
               onChange={(e) => updateVariable(variable.id, { defaultValue: e.target.checked })}
               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-gray-900">
               {variable.defaultValue ? 'true' : 'false'}
             </span>
           </label>
@@ -183,7 +183,7 @@ export const VariablesEditor: React.FC<VariablesEditorProps> = ({
             }}
             rows={3}
             placeholder={variable.type === 'array' ? '["item1", "item2"]' : '{"key": "value"}'}
-            className="w-full text-sm font-mono border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            className="w-full text-sm font-mono bg-white text-gray-900 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
           />
         )
       default:
@@ -268,32 +268,32 @@ export const VariablesEditor: React.FC<VariablesEditorProps> = ({
               }`}
             >
               {/* Variable Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
                   {/* Type badge */}
-                  <span className="w-7 h-7 flex items-center justify-center text-xs font-mono font-medium text-gray-500 bg-gray-100 rounded">
+                  <span className="w-7 h-7 flex-shrink-0 flex items-center justify-center text-xs font-mono font-medium text-gray-500 bg-gray-100 rounded">
                     {getTypeIcon(variable.type)}
                   </span>
 
                   {/* Full name */}
-                  <code className={`px-2 py-0.5 text-sm font-mono rounded ${getScopeColor(variable.scope)}`}>
+                  <code className={`px-2 py-0.5 text-sm font-mono rounded truncate ${getScopeColor(variable.scope)}`}>
                     {getVariableFullName(variable)}
                   </code>
 
                   {/* Badges */}
                   {variable.reactive && (
-                    <span className="px-1.5 py-0.5 text-[10px] font-medium text-amber-700 bg-amber-100 rounded">
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium text-amber-700 bg-amber-100 rounded whitespace-nowrap flex-shrink-0">
                       REACTIVE
                     </span>
                   )}
                   {variable.readOnly && (
-                    <span className="px-1.5 py-0.5 text-[10px] font-medium text-gray-700 bg-gray-100 rounded">
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium text-gray-700 bg-gray-100 rounded whitespace-nowrap flex-shrink-0">
                       READ-ONLY
                     </span>
                   )}
                 </div>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <button
                     onClick={() => duplicateVariable(variable)}
                     className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
@@ -344,7 +344,7 @@ export const VariablesEditor: React.FC<VariablesEditorProps> = ({
                       value={variable.name}
                       onChange={(e) => updateVariable(variable.id, { name: e.target.value })}
                       placeholder="variableName"
-                      className={`w-full text-sm font-mono border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 ${
+                      className={`w-full text-sm font-mono bg-white text-gray-900 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 ${
                         validateName(variable.name, variable.id) ? 'border-red-300' : ''
                       }`}
                     />
@@ -369,7 +369,7 @@ export const VariablesEditor: React.FC<VariablesEditorProps> = ({
                             className={`p-2 text-center rounded-lg border transition-colors ${
                               variable.scope === s
                                 ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                : 'border-gray-200 hover:border-gray-300'
+                                : 'border-gray-200 hover:border-gray-300 text-gray-900'
                             }`}
                           >
                             <span className="text-lg">{getScopeIcon(s)}</span>
@@ -398,7 +398,7 @@ export const VariablesEditor: React.FC<VariablesEditorProps> = ({
                           className={`p-2 text-center rounded-lg border transition-colors ${
                             variable.type === t
                               ? 'border-blue-500 bg-blue-50 text-blue-700'
-                              : 'border-gray-200 hover:border-gray-300'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-900'
                           }`}
                         >
                           <span className="font-mono text-sm">{getTypeIcon(t)}</span>
@@ -426,7 +426,7 @@ export const VariablesEditor: React.FC<VariablesEditorProps> = ({
                       value={variable.description || ''}
                       onChange={(e) => updateVariable(variable.id, { description: e.target.value })}
                       placeholder="What is this variable for?"
-                      className="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full text-sm bg-white text-gray-900 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
 
@@ -486,20 +486,20 @@ export const VariablesEditor: React.FC<VariablesEditorProps> = ({
           <h4 className="text-sm font-medium text-gray-700 mb-2">Usage in blocks:</h4>
           <div className="space-y-2 text-xs">
             <div>
-              <span className="font-medium text-gray-600">Read:</span>
-              <code className="ml-2 px-1.5 py-0.5 bg-gray-200 rounded">
+              <span className="font-medium text-gray-900">Read:</span>
+              <code className="ml-2 px-1.5 py-0.5 bg-gray-200 text-gray-900 rounded">
                 {'{'}$page.variableName{'}'}
               </code>
             </div>
             <div>
-              <span className="font-medium text-gray-600">Write (on click):</span>
-              <code className="ml-2 px-1.5 py-0.5 bg-gray-200 rounded">
+              <span className="font-medium text-gray-900">Write (on click):</span>
+              <code className="ml-2 px-1.5 py-0.5 bg-gray-200 text-gray-900 rounded">
                 $page.counter = $page.counter + 1
               </code>
             </div>
             <div>
-              <span className="font-medium text-gray-600">Conditional:</span>
-              <code className="ml-2 px-1.5 py-0.5 bg-gray-200 rounded">
+              <span className="font-medium text-gray-900">Conditional:</span>
+              <code className="ml-2 px-1.5 py-0.5 bg-gray-200 text-gray-900 rounded">
                 {'{'}$page.isLoggedIn ? 'Welcome' : 'Login'{'}'}
               </code>
             </div>

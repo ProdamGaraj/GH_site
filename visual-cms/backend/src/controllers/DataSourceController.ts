@@ -4,8 +4,6 @@ import { DataSource, DataSourceType, DataSourceStatus } from '../models/DataSour
 import { CredentialsManager } from '../services/CredentialsManager'
 import { Like, In } from 'typeorm'
 
-const dataSourceRepository = AppDataSource.getRepository(DataSource)
-
 /**
  * DataSourceController - Контроллер для управления источниками данных
  * 
@@ -23,11 +21,19 @@ const dataSourceRepository = AppDataSource.getRepository(DataSource)
  */
 export class DataSourceController {
   /**
+   * Получение repository (вызывается после инициализации базы данных)
+   */
+  private getRepository() {
+    return AppDataSource.getRepository(DataSource)
+  }
+
+  /**
    * GET /api/data-sources
    * Получение списка источников данных с фильтрацией и пагинацией
    */
   async getAll(req: Request, res: Response) {
     try {
+      const dataSourceRepository = this.getRepository()
       const {
         search,
         type,
@@ -106,6 +112,7 @@ export class DataSourceController {
    */
   async getById(req: Request, res: Response) {
     try {
+      const dataSourceRepository = this.getRepository()
       const { id } = req.params
 
       const dataSource = await dataSourceRepository.findOne({
@@ -143,6 +150,7 @@ export class DataSourceController {
    */
   async create(req: Request, res: Response) {
     try {
+      const dataSourceRepository = this.getRepository()
       const { name, description, type, config, authConfig, groupId, tags, status } = req.body
 
       // Валидация обязательных полей
@@ -197,6 +205,7 @@ export class DataSourceController {
    */
   async update(req: Request, res: Response) {
     try {
+      const dataSourceRepository = this.getRepository()
       const { id } = req.params
       const { name, description, type, config, authConfig, groupId, tags, status } = req.body
 
@@ -253,6 +262,7 @@ export class DataSourceController {
    */
   async delete(req: Request, res: Response) {
     try {
+      const dataSourceRepository = this.getRepository()
       const { id } = req.params
 
       const result = await dataSourceRepository.delete(id)
@@ -280,6 +290,7 @@ export class DataSourceController {
    */
   async testConnection(req: Request, res: Response) {
     try {
+      const dataSourceRepository = this.getRepository()
       const { id } = req.params
       
       // Можно тестировать существующий источник или новую конфигурацию
@@ -401,6 +412,7 @@ export class DataSourceController {
    */
   async duplicate(req: Request, res: Response) {
     try {
+      const dataSourceRepository = this.getRepository()
       const { id } = req.params
       const { name: newName } = req.body
 

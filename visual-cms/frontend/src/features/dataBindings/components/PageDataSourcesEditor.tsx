@@ -61,7 +61,9 @@ export const PageDataSourcesEditor: React.FC<PageDataSourcesEditorProps> = ({
         const response = await fetch('/api/data-sources')
         if (response.ok) {
           const data = await response.json()
-          setAvailableDataSources(data.map((ds: any) => ({
+          // Backend возвращает объект с полями {items, total, page, limit, totalPages}
+          const sources = data.items || data
+          setAvailableDataSources(sources.map((ds: any) => ({
             id: ds.id,
             name: ds.name,
             type: ds.type
@@ -186,7 +188,7 @@ export const PageDataSourcesEditor: React.FC<PageDataSourcesEditorProps> = ({
           <select
             value={config.cachePolicy}
             onChange={(e) => onChange({ ...config, cachePolicy: e.target.value as any })}
-            className="text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            className="text-sm bg-white text-gray-900 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="cache-first">Cache First (faster)</option>
             <option value="network-first">Network First (fresh)</option>
@@ -216,10 +218,10 @@ export const PageDataSourcesEditor: React.FC<PageDataSourcesEditorProps> = ({
               }`}
             >
               {/* Source Header */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
                   {/* Reorder buttons */}
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex flex-col gap-0.5 flex-shrink-0">
                     <button
                       onClick={() => moveDataSource(source.id, 'up')}
                       disabled={index === 0}
@@ -241,17 +243,17 @@ export const PageDataSourcesEditor: React.FC<PageDataSourcesEditorProps> = ({
                   </div>
 
                   {/* Alias badge */}
-                  <span className="px-2 py-1 text-sm font-mono font-medium text-blue-700 bg-blue-100 rounded">
+                  <span className="px-2 py-1 text-sm font-mono font-medium text-blue-700 bg-blue-100 rounded whitespace-nowrap flex-shrink-0">
                     {source.alias}
                   </span>
 
                   {/* Source name */}
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-gray-600 truncate">
                     ← {getDataSourceName(source.dataSourceId)}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <button
                     onClick={() => setEditingSource(editingSource === source.id ? null : source.id)}
                     className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
@@ -286,7 +288,7 @@ export const PageDataSourcesEditor: React.FC<PageDataSourcesEditorProps> = ({
                     <select
                       value={source.dataSourceId}
                       onChange={(e) => updateDataSource(source.id, { dataSourceId: e.target.value })}
-                      className="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full text-sm bg-white text-gray-900 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="">Select data source...</option>
                       {availableDataSources.map(ds => (
@@ -307,7 +309,7 @@ export const PageDataSourcesEditor: React.FC<PageDataSourcesEditorProps> = ({
                       value={source.alias}
                       onChange={(e) => updateDataSource(source.id, { alias: e.target.value })}
                       placeholder="$variableName"
-                      className={`w-full text-sm font-mono border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 ${
+                      className={`w-full text-sm font-mono bg-white text-gray-900 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 ${
                         validateAlias(source.alias, source.id) ? 'border-red-300' : ''
                       }`}
                     />
@@ -317,7 +319,7 @@ export const PageDataSourcesEditor: React.FC<PageDataSourcesEditorProps> = ({
                       </p>
                     )}
                     <p className="mt-1 text-xs text-gray-500">
-                      Use this alias in blocks: <code className="bg-gray-100 px-1 rounded">{source.alias}.fieldName</code>
+                      Use this alias in blocks: <code className="bg-gray-100 text-gray-900 px-1 rounded">{source.alias}.fieldName</code>
                     </p>
                   </div>
 
@@ -341,7 +343,7 @@ export const PageDataSourcesEditor: React.FC<PageDataSourcesEditorProps> = ({
                           className={`p-2 text-center rounded-lg border transition-colors ${
                             source.loadStrategy === option.value
                               ? 'border-blue-500 bg-blue-50 text-blue-700'
-                              : 'border-gray-200 hover:border-gray-300'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-900'
                           }`}
                         >
                           <span className="text-lg">{option.icon}</span>
@@ -363,7 +365,7 @@ export const PageDataSourcesEditor: React.FC<PageDataSourcesEditorProps> = ({
                         onChange={(e) => updateDataSource(source.id, { loadInterval: parseInt(e.target.value) || 30 })}
                         min={5}
                         max={3600}
-                        className="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full text-sm bg-white text-gray-900 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
                   )}
@@ -396,7 +398,7 @@ export const PageDataSourcesEditor: React.FC<PageDataSourcesEditorProps> = ({
                         onChange={(e) => updateDataSource(source.id, { cacheTTL: parseInt(e.target.value) || 300 })}
                         min={0}
                         max={86400}
-                        className="w-full text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full text-sm bg-white text-gray-900 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                       />
                       <p className="mt-1 text-xs text-gray-500">
                         How long to keep cached data. 0 = cache forever.

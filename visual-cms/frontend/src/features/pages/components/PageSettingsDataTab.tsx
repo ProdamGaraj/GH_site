@@ -62,6 +62,10 @@ export const PageSettingsDataTab: React.FC<PageSettingsDataTabProps> = ({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  
+  // Локальный state для ползунка TTL для мгновенной визуальной обратной связи
+  const [localTtl, setLocalTtl] = useState<number | null>(null)
+  const ttlTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
 
   // Используем либо внешние settings, либо внутренние (если useApi=true)
   const settings = externalSettings ?? internalSettings
@@ -144,6 +148,32 @@ export const PageSettingsDataTab: React.FC<PageSettingsDataTabProps> = ({
       }
     })
   }
+
+  // Обработчик изменения TTL с debounce для мгновенной визуальной обратной связи
+  const handleTtlChange = (newTtl: number) => {
+    // Мгновенно обновляем локальный state для UI
+    setLocalTtl(newTtl)
+    
+    // Отменяем предыдущий таймер
+    if (ttlTimeoutRef.current) {
+      clearTimeout(ttlTimeoutRef.current)
+    }
+    
+    // Откладываем обновление родительского state на 150ms
+    ttlTimeoutRef.current = setTimeout(() => {
+      handleCachePolicyChange({ defaultTtl: newTtl })
+      setLocalTtl(null)
+    }, 150)
+  }
+  
+  // Очистка таймера при размонтировании
+  React.useEffect(() => {
+    return () => {
+      if (ttlTimeoutRef.current) {
+        clearTimeout(ttlTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const tabs: Array<{ id: TabId; label: string; icon: React.ReactNode; count?: number }> = [
     {
@@ -320,7 +350,9 @@ export const PageSettingsDataTab: React.FC<PageSettingsDataTabProps> = ({
                   type="checkbox"
                   checked={settings.globalCachePolicy?.enabled ?? true}
                   onChange={(e) => handleCachePolicyChange({ enabled: e.target.checked })}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-5 h-5 rounded border-2 border-gray-400 bg-white focus:ring-gray-500"
+                  style={{ pointerEvents: 'auto', accentColor: '#1f2937' }}
                 />
               </label>
             </div>
@@ -332,18 +364,26 @@ export const PageSettingsDataTab: React.FC<PageSettingsDataTabProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Default Cache Duration (TTL)
                   </label>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-0.5">
                     <input
                       type="range"
                       min="0"
                       max="3600"
                       step="60"
-                      value={settings.globalCachePolicy?.defaultTtl ?? 300}
-                      onChange={(e) => handleCachePolicyChange({ defaultTtl: parseInt(e.target.value) })}
-                      className="flex-1"
+                      value={localTtl ?? settings.globalCachePolicy?.defaultTtl ?? 300}
+                      onChange={(e) => handleTtlChange(parseInt(e.target.value))}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      className="flex-1 h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                      style={{
+                        WebkitAppearance: 'none',
+                        MozAppearance: 'none',
+                        pointerEvents: 'auto',
+                        background: '#cbd5e1',
+                      }}
                     />
-                    <span className="text-sm font-mono text-gray-600 w-20 text-right">
-                      {formatTtl(settings.globalCachePolicy?.defaultTtl ?? 300)}
+                    <span className="text-sm font-mono text-gray-600 min-w-[1.5rem] text-right">
+                      {formatTtl(localTtl ?? settings.globalCachePolicy?.defaultTtl ?? 300)}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-gray-500">
@@ -364,7 +404,9 @@ export const PageSettingsDataTab: React.FC<PageSettingsDataTabProps> = ({
                       type="checkbox"
                       checked={settings.globalCachePolicy?.staleWhileRevalidate ?? true}
                       onChange={(e) => handleCachePolicyChange({ staleWhileRevalidate: e.target.checked })}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-5 h-5 rounded border-2 border-gray-400 bg-white focus:ring-gray-500"
+                      style={{ pointerEvents: 'auto', accentColor: '#1f2937' }}
                     />
                   </label>
                 </div>
