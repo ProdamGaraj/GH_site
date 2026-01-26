@@ -148,8 +148,9 @@ export const calculateAbsoluteDropPosition = (
 /**
  * Edge zone threshold in pixels - area near container edges where dropping
  * will target the parent container instead
+ * Увеличено до 40px для более комфортной работы с вложенностью
  */
-const EDGE_ZONE_SIZE = 20
+const EDGE_ZONE_SIZE = 40
 
 /**
  * Check if mouse is in the edge zone of a rect (near the borders)
@@ -259,19 +260,39 @@ export const determineDropTarget = (
     return createDropIndicator(root, root.id, rootRect, mousePosition, elementRects, /* root, */ dragOffset)
   }
   
-  // Find the appropriate target based on edge zones
-  // Logic: start with deepest container, if cursor is in edge zone - go to parent (one level up only)
+  // Find the appropriate target based on edge zones and container proximity
+  // Улучшенная логика: проверяем все контейнеры, начиная с самого глубокого
+  let targetContainer = containers[0]
   const deepest = containers[0]
   const edgeInfo = isInEdgeZone(mousePosition, deepest.rect)
   
   console.log('🎯 Deepest:', deepest.node.metadata.name || deepest.node.tagName, 'inEdge:', edgeInfo.inEdge)
   
-  let targetContainer = deepest
-  
+  // Если курсор в edge zone самого глубокого контейнера, пытаемся найти родителя
   if (edgeInfo.inEdge && containers.length > 1) {
-    // Cursor is in edge zone of deepest container - use its parent
-    targetContainer = containers[1]
-    console.log('⬆️ Using parent:', targetContainer.node.metadata.name || targetContainer.node.tagName)
+    // Проверяем, есть ли у родителя дети на том же уровне, что и deepest
+    const parent = containers[1]
+    const parentRect = elementRects.get(parent.node.id)
+    
+    if (parentRect) {
+      // Проверяем расстояние от курсора до границ родителя
+      const distanceToParentEdge = Math.min(
+        mousePosition.y - parentRect.top,
+        parentRect.bottom - mousePosition.y,
+        mousePosition.x - parentRect.left,
+        parentRect.right - mousePosition.x
+      )
+      
+      // Если курсор близко к краю родителя (в пределах edge zone), используем родителя
+      // Это позволит размещать элементы между siblings на одном уровне
+      if (distanceToParentEdge <= EDGE_ZONE_SIZE) {
+        targetContainer = parent
+        console.log('⬆️ Using parent (near edge):', targetContainer.node.metadata.name || targetContainer.node.tagName)
+      } else {
+        // Иначе используем самый глубокий контейнер
+        targetContainer = deepest
+      }
+    }
   }
   
   const { node: targetNode, rect: targetRect } = targetContainer

@@ -35,6 +35,14 @@ interface Animation {
   keyframes?: AnimationKeyframe[]
 }
 
+interface BlockScript {
+  id: string
+  name: string
+  code: string
+  trigger: 'load' | 'click' | 'hover' | 'scroll' | 'custom'
+  enabled: boolean
+}
+
 interface BlockNode {
   id: string
   tagName: string
@@ -45,6 +53,7 @@ interface BlockNode {
     stateTransition?: StateTransition
   }
   animations?: Animation[]
+  scripts?: BlockScript[]
 }
 
 // Animation preset keyframes
@@ -309,6 +318,65 @@ export class StyleGenerator {
         if (kf) {
           keyframes += `@keyframes ${animName} {\n${kf}\n}\n`
         }
+      })
+    }
+
+    // Generate element scripts
+    if (node.scripts && node.scripts.length > 0) {
+      node.scripts.forEach(script => {
+        if (!script.enabled) return
+
+        let scriptCode = ''
+        switch (script.trigger) {
+          case 'load':
+            scriptCode = `(function() {
+  const element = document.querySelector('[data-element-id="${node.id}"]');
+  if (!element) return;
+  ${script.code}
+})();`
+            break
+          case 'click':
+            scriptCode = `(function() {
+  const element = document.querySelector('[data-element-id="${node.id}"]');
+  if (!element) return;
+  element.addEventListener('click', function(e) {
+    ${script.code}
+  });
+})();`
+            break
+          case 'hover':
+            scriptCode = `(function() {
+  const element = document.querySelector('[data-element-id="${node.id}"]');
+  if (!element) return;
+  element.addEventListener('mouseenter', function(e) {
+    ${script.code}
+  });
+})();`
+            break
+          case 'scroll':
+            scriptCode = `(function() {
+  const element = document.querySelector('[data-element-id="${node.id}"]');
+  if (!element) return;
+  const observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        ${script.code}
+        observer.disconnect();
+      }
+    });
+  });
+  observer.observe(element);
+})();`
+            break
+          case 'custom':
+            scriptCode = `(function() {
+  const element = document.querySelector('[data-element-id="${node.id}"]');
+  if (!element) return;
+  ${script.code}
+})();`
+            break
+        }
+        scripts += scriptCode + '\n'
       })
     }
 

@@ -10,9 +10,10 @@ interface RightPanelProps {
   pageSettings?: EditorPageSettings
   onPageSettingsChange?: (settings: EditorPageSettings) => void
   pageId?: string
+  currentBlockData?: any // Данные блока для показа Template информации
 }
 
-export const RightPanel: React.FC<RightPanelProps> = ({ pageSettings, onPageSettingsChange, pageId }) => {
+export const RightPanel: React.FC<RightPanelProps> = ({ pageSettings, onPageSettingsChange, pageId, currentBlockData }) => {
   const selectedNode = useAppSelector(selectSelectedNode)
   const rootNode = useAppSelector(selectRootNode)
   const inlineBlockEdit = useAppSelector(selectInlineBlockEdit)
@@ -98,6 +99,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ pageSettings, onPageSett
           pageSettings={pageSettings}
           onPageSettingsChange={onPageSettingsChange}
           pageId={pageId}
+          currentBlockData={currentBlockData}
         />
       ) : (
         <div className="p-8 text-center">

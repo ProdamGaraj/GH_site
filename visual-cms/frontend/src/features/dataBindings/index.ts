@@ -33,6 +33,7 @@ export {
 
 // Components
 export { DataBindingTab } from './components/DataBindingTab'
+export { SmartDataBindingTab } from './components/SmartDataBindingTab'
 export { InputBindingEditor } from './components/InputBindingEditor'
 export { FieldMappingEditor } from './components/FieldMappingEditor'
 export { FilterBuilder } from './components/FilterBuilder'

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { AppDataSource } from '../config/database'
 import { Page } from '../models/Page'
+import { linkedBlocksService } from '../services/LinkedBlocksService'
 
 const pageRepository = AppDataSource.getRepository(Page)
 
@@ -27,6 +28,11 @@ export class PageController {
 
       if (!page) {
         return res.status(404).json({ error: 'Page not found' })
+      }
+
+      // Обновляем связанные блоки перед отправкой
+      if (page.structure) {
+        page.structure = await linkedBlocksService.updateLinkedBlocks(page.structure)
       }
 
       res.json(page)

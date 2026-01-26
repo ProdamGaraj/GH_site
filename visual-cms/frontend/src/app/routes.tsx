@@ -13,6 +13,7 @@ import { DataSourcesList } from '@/pages/DataSourcesList'
 import { DataSourceWizard } from '@/features/data-sources/components/DataSourceWizard'
 import { DataBindingDemo } from '@/pages/DataBindingDemo'
 import TemplatesPage from '@/pages/TemplatesPage'
+import TemplateBlocksPage from '@/pages/TemplateBlocksPage'
 
 export const router = createBrowserRouter([
   {
@@ -37,6 +38,10 @@ export const router = createBrowserRouter([
       },
       {
         path: 'templates',
+        element: <TemplateBlocksPage />,
+      },
+      {
+        path: 'templates-old',
         element: <TemplatesPage />,
       },
       {

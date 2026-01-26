@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm'
 import { Group } from './Group'
+import type { DetectedField, TemplateSettings, TemplateCategory } from './Template'
 
 @Entity('blocks')
 export class Block {
@@ -29,6 +30,19 @@ export class Block {
 
   @Column('text', { array: true, default: [] })
   tags!: string[]
+
+  // Template functionality
+  @Column({ default: false })
+  isTemplate!: boolean
+
+  @Column({ type: 'varchar', nullable: true })
+  templateCategory?: TemplateCategory
+
+  @Column('jsonb', { nullable: true })
+  detectedFields?: DetectedField[]
+
+  @Column('jsonb', { nullable: true })
+  templateSettings?: TemplateSettings
 
   @CreateDateColumn()
   createdAt!: Date

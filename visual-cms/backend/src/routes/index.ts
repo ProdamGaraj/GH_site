@@ -9,6 +9,8 @@ import dataFetchRouter from './dataFetch'
 import dataSubmitRouter from './dataSubmit'
 import templatesRouter from './templates'
 import variablesRouter from './variables'
+import templateTestRouter from './template-test'
+import mockRouter from './mock'
 
 const router = Router()
 
@@ -22,5 +24,7 @@ router.use('/data', dataFetchRouter)
 router.use('/data', dataSubmitRouter)
 router.use('/templates', templatesRouter)
 router.use('/variables', variablesRouter)
+router.use('/template-test', templateTestRouter)
+router.use('/mock', mockRouter)
 
 export default router

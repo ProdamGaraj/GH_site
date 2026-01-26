@@ -327,6 +327,11 @@ export interface Block {
   tags: string[]
   createdAt: string
   updatedAt: string
+  // Template functionality
+  isTemplate?: boolean
+  templateCategory?: import('./template').TemplateCategory
+  detectedFields?: import('./template').DetectedField[]
+  templateSettings?: import('./template').TemplateSettings
 }
 
 // Group

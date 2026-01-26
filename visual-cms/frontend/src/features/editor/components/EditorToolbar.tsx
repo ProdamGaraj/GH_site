@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
@@ -13,6 +13,7 @@ import { BreakpointManager } from './BreakpointManager'
 import { ExportImportModal } from './ExportImportModal'
 import { deployApi, blockApi, pageApi } from '@/shared/api'
 import { generateNodeTreeCSS } from '../utils/styleGenerator'
+import { getEffectiveTree } from '../utils/variationUtils'
 import type { BlockNode } from '@/shared/types'
 
 interface EditorToolbarProps {
@@ -1207,6 +1208,11 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onCl
     return () => document.removeEventListener('wheel', handleWheel, { capture: true })
   }, [zoom])
 
+  // Получаем эффективное дерево с применёнными responsive стилями
+  const effectiveTree = useMemo(() => {
+    return getEffectiveTree(rootNode, selectedBreakpoint, 'responsive')
+  }, [rootNode, selectedBreakpoint])
+
   // Generate HTML from BlockNode tree
   const generateHTML = (node: import('@/shared/types').BlockNode): string => {
     const styleString = Object.entries(node.styles.properties)
@@ -1231,10 +1237,11 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onCl
     return `<${node.tagName} style="${styleString}" ${dataAttr} ${attrs}>${content}${childrenHTML}</${node.tagName}>`
   }
 
-  const previewHTML = generateHTML(rootNode)
+  // Используем effectiveTree для генерации HTML с responsive стилями
+  const previewHTML = generateHTML(effectiveTree)
   
   // Generate CSS for states (hover, etc.) and animations
-  const { css: stateAnimCSS, keyframes, scripts: animScripts } = generateNodeTreeCSS(rootNode)
+  const { css: stateAnimCSS, keyframes, scripts: animScripts } = generateNodeTreeCSS(effectiveTree)
 
   return (
     <div 
@@ -1423,7 +1430,10 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onCl
                       ${stateAnimCSS}
                     </style>
                   </head>
-                  <body>${previewHTML}${animScripts ? `<script>${animScripts}</script>` : ''}</body>
+                  <body>
+                    ${previewHTML}
+                    ${animScripts ? `<script>${animScripts}</script>` : ''}
+                  </body>
                 </html>
               `}
               className="w-full h-full border-0"

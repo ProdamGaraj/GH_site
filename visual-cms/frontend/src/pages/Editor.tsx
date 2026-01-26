@@ -94,6 +94,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   const [targetLayoutMode, setTargetLayoutMode] = useState<'flex' | 'grid' | 'absolute' | 'table'>('flex')
   const [activeNode, setActiveNode] = useState<BlockNode | null>(null)
   const [loading, setLoading] = useState(false)
+  const [currentBlockData, setCurrentBlockData] = useState<any>(null) // Данные загруженного блока (для Template)
   const [pageSettings, setPageSettings] = useState<EditorPageSettings>({
     name: '',
     slug: '',
@@ -108,13 +109,13 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   const dropIndicatorRef = useRef<DropIndicator | null>(null)
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
   
-  // Auto-save hook
+  // Auto-save hook - ОТКЛЮЧЕНО, сохранение только по кнопке
   const isNewDocument = !id || id === 'new'
   const autoSave = useAutoSave({
     documentId: isNewDocument ? null : id,
     documentType: type,
     pageSettings: type === 'page' ? pageSettings : undefined,
-    enabled: !isNewDocument, // Отключаем для новых документов
+    enabled: false, // ОТКЛЮЧЕНО - сохранение только вручную
     debounceMs: 3000,
     onSaveSuccess: () => {
       console.log('Auto-saved successfully')
@@ -230,6 +231,9 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
         try {
           const { fetchBlockById } = await import('@/features/blocks/blocksSlice')
           const result = await dispatch(fetchBlockById(id)).unwrap()
+          
+          // Сохраняем данные блока (включая isTemplate, detectedFields)
+          setCurrentBlockData(result)
           
           // Load the block structure into editor
           const { loadEditor: loadEditorAction } = await import('@/features/editor/editorSlice')
@@ -445,7 +449,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
-    const dragData = active.data.current as DragItem
+    const dragData = active.data.current as any
 
     // Use ref to get the latest indicator value
     const currentIndicator = dropIndicatorRef.current
@@ -455,6 +459,143 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
     setActiveNode(null)
     setDropIndicator(null)
     setTargetContainerRect(null)
+
+    // === Handle layer-item drag (from structure panel) ===
+    if (dragData?.type === 'layer-item' && over) {
+      const dropData = over.data.current as any
+      
+      // Обработка drop в edge зоны (верх/низ списка)
+      if (dropData && dropData.type === 'layers-list-edge') {
+        const sourceNodeId = dragData.nodeId
+        const sourceParentId = dragData.parentId
+        const sourceIndex = dragData.index
+        
+        const targetParentId = dropData.parentId
+        const targetIndex = dropData.targetIndex
+        const position = dropData.position
+        
+        console.log('[Edge Drop]', {
+          sourceNodeId,
+          sourceParentId,
+          sourceIndex,
+          targetParentId,
+          targetIndex,
+          position
+        })
+        
+        // Check if it's a reorder within the same parent
+        if (sourceParentId === targetParentId) {
+          // НЕ корректируем индекс здесь - reducer сам это сделает
+          // Просто проверяем что позиция изменится
+          if (sourceIndex === targetIndex) {
+            console.log('[Edge Drop] Already at target position')
+            return
+          }
+          
+          console.log('[Edge Drop] Same parent reorder:', {
+            sourceIndex,
+            targetIndex,
+            willMove: true
+          })
+          
+          dispatch(reorderNode({
+            nodeId: sourceNodeId,
+            parentId: targetParentId,
+            newIndex: targetIndex, // Передаём как есть, reducer скорректирует
+          }))
+        } else {
+          console.log('[Edge Drop] Move to different parent')
+          // Move to different parent
+          dispatch(moveNode({
+            nodeId: sourceNodeId,
+            targetParentId: targetParentId,
+            position: targetIndex,
+          }))
+        }
+        return
+      }
+      
+      if (dropData && dropData.type === 'layer-droppable') {
+        const sourceNodeId = dragData.nodeId
+        const sourceParentId = dragData.parentId
+        const sourceIndex = dragData.index
+        
+        const targetNodeId = dropData.nodeId
+        const targetParentId = dropData.parentId
+        const targetIndex = dropData.index
+        const isTargetContainer = dropData.isContainer
+        const isTargetRoot = dropData.isRoot
+        
+        // Don't do anything if dropping on itself
+        if (sourceNodeId === targetNodeId) {
+          return
+        }
+        
+        // Determine drop position based on over element's rect and mouse position
+        // This is a simplified version - the LayerItem component handles visual feedback
+        // We need to determine: before, after, or inside
+        const overRect = over.rect
+        const activeRect = active.rect.current.translated
+        
+        if (!overRect || !activeRect) return
+        
+        // Calculate which zone we're in based on the active element position
+        const overCenterY = overRect.top + overRect.height / 2
+        const activeCenterY = activeRect.top + activeRect.height / 2
+        
+        let finalTargetParentId = targetParentId
+        let finalTargetIndex = targetIndex
+        
+        // Determine position: before, after, or inside
+        if (isTargetRoot) {
+          // Can only drop inside root
+          finalTargetParentId = targetNodeId
+          finalTargetIndex = 0
+        } else if (isTargetContainer && activeCenterY > overRect.top + overRect.height * 0.3 && activeCenterY < overRect.top + overRect.height * 0.7) {
+          // Drop inside container (middle 40%)
+          finalTargetParentId = targetNodeId
+          finalTargetIndex = 0
+        } else if (activeCenterY < overCenterY) {
+          // Drop before (top half)
+          finalTargetParentId = targetParentId || ''
+          finalTargetIndex = targetIndex
+        } else {
+          // Drop after (bottom half)
+          finalTargetParentId = targetParentId || ''
+          finalTargetIndex = targetIndex + 1
+        }
+        
+        // Check if it's a reorder within the same parent
+        if (sourceParentId === finalTargetParentId) {
+          // При перестановке в том же родителе:
+          // Если тащим вниз (sourceIndex < finalTargetIndex), то после удаления
+          // элемента все индексы ниже сдвигаются на -1, поэтому compensate
+          let adjustedIndex = finalTargetIndex
+          if (sourceIndex < finalTargetIndex) {
+            adjustedIndex = finalTargetIndex - 1
+          }
+          
+          // Don't do anything if position hasn't changed
+          if (sourceIndex === adjustedIndex) {
+            return
+          }
+          
+          dispatch(reorderNode({
+            nodeId: sourceNodeId,
+            parentId: finalTargetParentId,
+            newIndex: adjustedIndex,
+          }))
+        } else {
+          // Move to different parent
+          dispatch(moveNode({
+            nodeId: sourceNodeId,
+            targetParentId: finalTargetParentId,
+            position: finalTargetIndex,
+          }))
+        }
+      }
+      return
+    }
 
     if (!currentIndicator) {
       // Fallback to simple drop logic if no indicator
@@ -759,10 +900,13 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                 </>
               )}
               
-              {activeLeftPanel === 'savedBlocks' && type === 'page' && (
+              {activeLeftPanel === 'savedBlocks' && (
                 <>
                   <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
                     <h3 className="font-semibold text-gray-900 text-sm">Сохраненные блоки</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {type === 'page' ? 'Блоки, которые можно добавить на страницу' : 'Блоки, которые можно добавить в этот блок'}
+                    </p>
                   </div>
                   <div className="flex-1 overflow-y-auto p-3">
                     <SavedBlocksLibrary />
@@ -813,7 +957,8 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                   <RightPanel 
                     pageSettings={type === 'page' ? pageSettings : undefined}
                     onPageSettingsChange={type === 'page' ? setPageSettings : undefined}
-                    pageId={id}
+                    pageId={type === 'page' ? id : undefined}
+                    currentBlockData={type === 'block' ? currentBlockData : undefined}
                   />
                 )}
               </div>

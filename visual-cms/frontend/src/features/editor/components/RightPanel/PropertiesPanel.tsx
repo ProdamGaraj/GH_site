@@ -12,7 +12,11 @@ import { CustomCSSTab } from './CustomCSSTab'
 import { StatesTab } from './StatesTab'
 import { AnimationsTab } from './AnimationsTab'
 import { ScriptsTab } from './ScriptsTab'
-import { DataBindingTab } from '@/features/dataBindings/components/DataBindingTab'
+import { SmartDataBindingTab } from '@/features/dataBindings/components/SmartDataBindingTab'
+import { DetectedFieldsViewer } from '@/features/blocks/components/DetectedFieldsViewer'
+import { TemplateBlockControls } from '@/features/blocks/components/TemplateBlockControls'
+import { CreateBlockFromElement } from '@/features/blocks/components/CreateBlockFromElement'
+import { BlockInfoSection } from './BlockInfoSection'
 import { cn } from '@/shared/utils'
 import { getNodeBreakpoint } from '../../utils/variationUtils'
 
@@ -22,11 +26,12 @@ interface PropertiesPanelProps {
   pageSettings?: EditorPageSettings
   onPageSettingsChange?: (settings: EditorPageSettings) => void
   pageId?: string
+  currentBlockData?: any // Данные блока для показа Template информации
 }
 
 type TabType = 'positioning' | 'colors' | 'content' | 'states' | 'animations' | 'scripts' | 'data' | 'css'
 
-export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRoot, pageSettings, onPageSettingsChange, pageId }) => {
+export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRoot, pageSettings, onPageSettingsChange, pageId, currentBlockData }) => {
   const dispatch = useAppDispatch()
   const viewport = useAppSelector(selectViewport)
   const breakpoints = useAppSelector(selectBreakpoints)
@@ -105,6 +110,9 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRo
 
   return (
     <div className="h-full flex flex-col">
+      {/* Block Info Section - показываем если блок связан с библиотекой */}
+      <BlockInfoSection node={node} pageId={pageId} />
+      
       {/* Header */}
       <div className="p-4 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center justify-between mb-3">
@@ -226,6 +234,19 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRo
               <span className="font-mono">&lt;{node.tagName}&gt;</span>
             </div>
           </div>
+
+          {/* Кнопка создания блока из элемента */}
+          {!isRootElement && !currentBlockData?.id && (
+            <div className="pt-2">
+              <CreateBlockFromElement 
+                element={node}
+                onSuccess={(blockId) => {
+                  console.log('Created block:', blockId)
+                  // Можно перейти к редактированию нового блока
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -268,12 +289,58 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRo
           />
         )}
         {activeTab === 'data' && (
-          <DataBindingTab 
-            blockId={node.id}
-            pageId={pageId}
-          />
+          <div className="space-y-6">
+            {/* Template Mode Controls - только для блоков с UUID */}
+            {currentBlockData && currentBlockData.id && (
+              <TemplateBlockControls
+                blockId={currentBlockData.id}
+                blockName={currentBlockData.name || node.metadata.name || 'Unnamed Block'}
+                isTemplate={currentBlockData.isTemplate || false}
+                templateCategory={currentBlockData.templateCategory}
+                detectedFieldsCount={currentBlockData.detectedFields?.length || 0}
+                onToggle={() => {
+                  // Перезагрузить данные блока после изменения
+                  window.location.reload()
+                }}
+              />
+            )}
+            
+            {/* Data Binding Tab - только если есть реальный блок */}
+            {currentBlockData && currentBlockData.id ? (
+              <SmartDataBindingTab 
+                blockId={currentBlockData.id}
+                pageId={pageId}
+              />
+            ) : (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  ⚠️ Data Binding доступен только для блоков, а не для элементов внутри блока.
+                </p>
+                <p className="text-xs text-yellow-600 mt-2">
+                  Выберите блок целиком для настройки привязки данных.
+                </p>
+              </div>
+            )}
+          </div>
         )}
         {activeTab === 'css' && <CustomCSSTab node={node} />}
+        
+        {/* Template Fields - показываем если это Template блок */}
+        {currentBlockData?.isTemplate && currentBlockData?.detectedFields && (
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles size={16} className="text-purple-600" />
+              <h3 className="text-sm font-medium text-gray-900">Template Fields</h3>
+              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
+                {currentBlockData.detectedFields.length}
+              </span>
+            </div>
+            <div className="text-xs text-gray-500 mb-3">
+              Поля автоматически определяются из элементов с metadata.name
+            </div>
+            <DetectedFieldsViewer fields={currentBlockData.detectedFields} />
+          </div>
+        )}
       </div>
     </div>
   )

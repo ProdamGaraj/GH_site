@@ -975,7 +975,7 @@ export const DataSourceWizard: React.FC = () => {
             {testResult.sampleData !== undefined && (
               <div>
                 <p className="text-sm font-medium text-gray-700 mb-2">Sample Data:</p>
-                <pre className="bg-white p-3 rounded border text-xs overflow-auto max-h-64">
+                <pre className="bg-white p-3 rounded border text-xs overflow-auto max-h-64 text-gray-700 ">
                   {typeof testResult.sampleData === 'string' 
                     ? testResult.sampleData 
                     : JSON.stringify(testResult.sampleData, null, 2)}

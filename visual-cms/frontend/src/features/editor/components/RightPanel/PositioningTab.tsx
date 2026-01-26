@@ -16,9 +16,21 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
   const [useVisualControls, setUseVisualControls] = useState(true)
 
   const handleStyleChange = (property: string, value: string) => {
+    const updates: Record<string, string | undefined> = { [property]: value }
+    
+    // Remove shorthand properties when setting specific ones
+    if (property === 'paddingTop' || property === 'paddingRight' || 
+        property === 'paddingBottom' || property === 'paddingLeft') {
+      updates.padding = undefined
+    }
+    if (property === 'marginTop' || property === 'marginRight' || 
+        property === 'marginBottom' || property === 'marginLeft') {
+      updates.margin = undefined
+    }
+    
     dispatch(updateNodeStyles({
       nodeId: node.id,
-      properties: { [property]: value },
+      properties: updates,
       breakpoint: viewport,
     }))
   }
@@ -336,7 +348,21 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
         <label className="text-xs font-medium text-gray-700 mb-2 block">Position</label>
         <select
           value={node.styles.properties?.position || ''}
-          onChange={(e) => handleStyleChange('position', e.target.value)}
+          onChange={(e) => {
+            const newPosition = e.target.value
+            const updates: Record<string, string | undefined> = { position: newPosition }
+            
+            // Auto-set top: 0 for sticky/fixed if not already set
+            if ((newPosition === 'sticky' || newPosition === 'fixed') && !node.styles.properties?.top) {
+              updates.top = '0'
+            }
+            
+            dispatch(updateNodeStyles({
+              nodeId: node.id,
+              properties: updates,
+              breakpoint: viewport,
+            }))
+          }}
           className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm text-gray-900"
         >
           <option value="">(не задано)</option>
@@ -346,6 +372,12 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
           <option value="fixed">Fixed</option>
           <option value="sticky">Sticky</option>
         </select>
+        {/* Hint for sticky positioning */}
+        {node.styles.properties?.position === 'sticky' && !node.styles.properties?.top && (
+          <p className="mt-1 text-xs text-amber-600">
+            ⚠️ Sticky требует указания offset (top, bottom и т.д.)
+          </p>
+        )}
       </div>
 
       {/* Position offset (for positioned elements) */}

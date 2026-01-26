@@ -9,8 +9,10 @@ import { RepeaterStatesEditor, type RepeaterStatesConfig } from './RepeaterState
 import { AdditionalDataSourcesEditor, type AdditionalDataSource } from './AdditionalDataSourcesEditor'
 import { ComputedFieldsEditor, type ComputedFieldConfig } from './ComputedFieldsEditor'
 import { ConditionalMappingEditor, type ConditionalFieldConfig } from './ConditionalMappingEditor'
-import { TemplateSelector, selectTemplates, fetchTemplates } from '@/features/templates'
-import type { Template } from '@/shared/types/template'
+import { BlockTemplateSelector } from '@/features/blocks/components/BlockTemplateSelector'
+import { selectBlocks } from '@/features/blocks/blocksSlice'
+import type { Block } from '@/shared/types'
+import type { DetectedField } from '@/shared/types/template'
 // PaginationControlsEditor is imported but not yet used - will be integrated later
 
 interface InputBindingEditorProps {
@@ -21,17 +23,10 @@ interface InputBindingEditorProps {
 export const InputBindingEditor: React.FC<InputBindingEditorProps> = ({ binding, onTest }) => {
   const dispatch = useAppDispatch()
   const saving = useAppSelector(selectBindingsSaving)
-  const templates = useAppSelector(selectTemplates)
+  const blocks = useAppSelector(selectBlocks)
   const [config, setConfig] = useState<InputBindingConfig>(binding.config.inputConfig || { mode: 'single', fieldMappings: [] })
   const [activeSection, setActiveSection] = useState<string>('mode')
   const [hasChanges, setHasChanges] = useState(false)
-
-  // Load templates on mount
-  React.useEffect(() => {
-    if (templates.length === 0) {
-      dispatch(fetchTemplates({ status: 'active' }))
-    }
-  }, [dispatch, templates.length])
 
   const updateConfig = (updates: Partial<InputBindingConfig>) => {
     setConfig(prev => ({ ...prev, ...updates }))
@@ -58,24 +53,24 @@ export const InputBindingEditor: React.FC<InputBindingEditorProps> = ({ binding,
     { id: 'conditional', label: 'Conditional' },
   ].filter(s => s.show !== false)
 
-  // Handle template selection
-  const handleTemplateSelect = (templateId: string | null, template?: Template) => {
+  // Handle template block selection
+  const handleTemplateSelect = (blockId: string | null, block?: Block) => {
     updateConfig({
-      templateId: templateId || undefined,
-      // Auto-populate field mappings from template fields
-      fieldMappings: template?.detectedFields?.map((field, index) => ({
+      templateId: blockId || undefined,
+      // Auto-populate field mappings from block's detected fields
+      fieldMappings: block?.detectedFields?.map((field: DetectedField, index: number) => ({
         id: `mapping-${index}-${Date.now()}`,
         sourceField: field.name,
-        targetProperty: `data-bind-${field.name}`,
+        targetProperty: `data.${field.name}`,
         transform: undefined,
         fallbackValue: field.defaultValue,
       })) || config.fieldMappings,
     })
   }
 
-  // Get selected template
-  const selectedTemplate = config.templateId 
-    ? templates.find(t => t.id === config.templateId) 
+  // Get selected template block
+  const selectedTemplateBlock = config.templateId 
+    ? blocks.find(b => b.id === config.templateId) 
     : null
 
   return (
@@ -118,35 +113,38 @@ export const InputBindingEditor: React.FC<InputBindingEditorProps> = ({ binding,
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Item Template
+                  Item Template (Template блок)
                 </label>
                 <p className="text-sm text-gray-500 mb-3">
-                  Select a template to render each item in the repeater. Template fields will be auto-mapped to your data.
+                  Выберите Template блок для отображения каждого элемента. Поля будут автоматически сопоставлены с данными.
                 </p>
-                <TemplateSelector
+                <BlockTemplateSelector
                   value={config.templateId}
                   onChange={handleTemplateSelect}
-                  placeholder="Choose a template..."
-                  showPreview={true}
+                  placeholder="Выберите Template блок..."
                 />
               </div>
               
-              {selectedTemplate && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h5 className="font-medium text-blue-900 mb-2">Template: {selectedTemplate.name}</h5>
-                  {selectedTemplate.description && (
-                    <p className="text-sm text-blue-700 mb-3">{selectedTemplate.description}</p>
-                  )}
-                  {selectedTemplate.detectedFields && selectedTemplate.detectedFields.length > 0 && (
+              {selectedTemplateBlock && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h5 className="font-medium text-purple-900">Template блок: {selectedTemplateBlock.name}</h5>
+                    {selectedTemplateBlock.templateCategory && (
+                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
+                        {selectedTemplateBlock.templateCategory}
+                      </span>
+                    )}
+                  </div>
+                  {selectedTemplateBlock.detectedFields && selectedTemplateBlock.detectedFields.length > 0 && (
                     <div>
-                      <p className="text-sm font-medium text-blue-800 mb-1">Template Fields:</p>
+                      <p className="text-sm font-medium text-purple-800 mb-2">Обнаруженные поля ({selectedTemplateBlock.detectedFields.length}):</p>
                       <div className="flex flex-wrap gap-2">
-                        {selectedTemplate.detectedFields.map(field => (
+                        {selectedTemplateBlock.detectedFields.map(field => (
                           <span 
                             key={field.name}
-                            className="px-2 py-1 bg-white text-blue-700 text-xs rounded border border-blue-200"
+                            className="px-2 py-1 bg-white text-purple-700 text-xs rounded border border-purple-200"
                           >
-                            {field.name} <span className="text-blue-400">({field.type})</span>
+                            {field.name} <span className="text-purple-400">({field.type})</span>
                           </span>
                         ))}
                       </div>
@@ -155,10 +153,13 @@ export const InputBindingEditor: React.FC<InputBindingEditorProps> = ({ binding,
                 </div>
               )}
 
-              {!selectedTemplate && (
+              {!selectedTemplateBlock && (
                 <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
-                  <p className="text-gray-500">
-                    No template selected. You can still use field mappings to bind data to element attributes.
+                  <p className="text-sm text-gray-600 mb-2">
+                    Template блок не выбран
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Вы можете использовать field mappings для привязки данных к атрибутам элементов
                   </p>
                 </div>
               )}

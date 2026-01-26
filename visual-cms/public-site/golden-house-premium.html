@@ -85,248 +85,881 @@
     
     
     /* Dynamic styles (hover, animations, etc.) */
-    [data-element-id="gh-premium-1768393306925-14"] { transition: background-color 200ms ease; }
-[data-element-id="gh-premium-1768393306925-14"]:hover { opacity: 0.5 !important; transform: scale(1.05) !important; background-color: #e00606 !important }
+    [data-element-id="gh-premium-1769148718507-14"] { animation: anim-ghpremium176914871850714-anim1769164179636khs3xqwi7 500ms ease-out 0ms 1; }
+
+    
+    /* Form and output binding styles */
+    
+/* Visual CMS Form Styles */
+
+/* Базовые стили формы */
+form {
+  width: 100%;
+}
+
+/* Поля ввода */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="number"],
+input[type="url"],
+textarea,
+select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: #fff;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Состояния ошибки */
+input.border-red-500,
+textarea.border-red-500,
+select.border-red-500 {
+  border-color: #ef4444;
+}
+
+input.border-red-500:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+/* Сообщения об ошибках */
+.validation-error {
+  color: #ef4444;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* Кнопки */
+button[type="submit"],
+.submit-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #3b82f6;
+  color: #fff;
+}
+
+button[type="submit"]:hover,
+.submit-button:hover {
+  background: #2563eb;
+}
+
+button[type="submit"]:disabled,
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Состояние загрузки */
+button.loading {
+  background: #6b7280;
+  cursor: wait;
+}
+
+button.loading .spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Состояние успеха */
+button.success {
+  background: #10b981;
+}
+
+/* Состояние ошибки */
+button.error {
+  background: #ef4444;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Лейблы */
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* Группы полей */
+.form-group {
+  margin-bottom: 1rem;
+}
+
+/* Плейсхолдеры */
+::placeholder {
+  color: #9ca3af;
+}
 
   </style>
 </head>
 <body>
-  <div style="color: #1A1A1A; height: auto; display: flex; min-height: 100px; font-family: 'Muller', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; flex-direction: column" data-element-id="gh-premium-1768393306926-155">
-    <header style="top: 0px; height: 72px; z-index: 1000; display: flex; padding: 0 48px; position: sticky; margin-bottom: -72px; backdrop-filter: blur(20px); justify-content: space-between; background-color: rgba(0, 0, 0, 0.3); -webkit-backdrop-filter: blur(20px)" data-element-id="1768475677857_vrqnfcdea">
-      <a style="color: #D29F66; display: flex; font-size: 24px; align-items: center; font-weight: 700; padding-left: 5px; border-radius: 5px; padding-right: 5px; letter-spacing: 1px; text-decoration: none; background-color: rgba(0, 0, 0, 0.3)" data-element-id="1768475677858_9g0m56uly" href="/">GOLDEN HOUSE</a>
-      <nav style="gap: 32px; display: flex; align-items: center" data-element-id="1768475677858_szysa378a">
-        <a style="color: #ffffff; font-size: 15px; font-weight: 500; text-decoration: none" data-element-id="1768475677858_1186ivb41" href="#">Квартиры</a>
-        <a style="color: #ffffff; font-size: 15px; font-weight: 500; text-decoration: none" data-element-id="1768475677858_p4meeprg5" href="#">Коммерция</a>
-        <a style="color: #ffffff; font-size: 15px; font-weight: 500; text-decoration: none" data-element-id="1768475677858_4uajhjbwx" href="#">Ипотека</a>
-        <a style="color: #ffffff; font-size: 15px; font-weight: 500; text-decoration: none" data-element-id="1768475677858_n4lsompub" href="#">О компании</a>
-        <a style="color: #ffffff; font-size: 15px; font-weight: 500; text-decoration: none" data-element-id="1768475677858_tvm1imkdb" href="#">Контакты</a>
+  <div style="color: #1A1A1A; height: auto; display: flex; min-height: 100px; font-family: 'Muller', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; flex-direction: column" data-element-id="gh-premium-1769148718509-155">
+    <header style="top: 0; height: 80px; z-index: 1000; display: flex; opacity: 1; position: sticky; margin-top: 0px; align-items: center; padding-top: 0px; padding-left: 20px; border-bottom: 1px solid rgba(0,0,0,0.06); margin-bottom: -80px; padding-right: 20px; backdrop-filter: blur(25px); justify-content: space-between; background-color: rgba(0,0,0,0.2)" data-element-id="gh-premium-1769148718507-9">
+      <span style="color: #D29F66; font-size: 18px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase" data-element-id="gh-premium-1769148718507-1">Golden House</span>
+      <nav style="gap: 48px; display: flex" data-element-id="gh-premium-1769148718507-7">
+        <span style="color: #ffffff; cursor: pointer; font-size: 14px; font-weight: 400; letter-spacing: 0.5px" data-element-id="gh-premium-1769148718507-2">Проекты</span>
+        <span style="color: #ffffff; cursor: pointer; font-size: 14px; font-weight: 400; letter-spacing: 0.5px" data-element-id="gh-premium-1769148718507-3">О компании</span>
+        <span style="color: #ffffff; cursor: pointer; font-size: 14px; font-weight: 400; letter-spacing: 0.5px" data-element-id="gh-premium-1769148718507-4">Покупателям</span>
+        <span style="color: #ffffff; cursor: pointer; font-size: 14px; font-weight: 400; letter-spacing: 0.5px" data-element-id="gh-premium-1769148718507-5">Коммерция</span>
+        <span style="color: #ffffff; cursor: pointer; font-size: 14px; font-weight: 400; letter-spacing: 0.5px" data-element-id="gh-premium-1769148718507-6">Контакты</span>
       </nav>
-      <div style="gap: 24px; display: flex; align-items: center" data-element-id="1768475677858_ummh9q226">
-        <a style="color: #ffffff; font-size: 15px; font-weight: 500; text-decoration: none" data-element-id="1768475677858_s1k9v5tgr" href="tel:+998781501111">+998 78 150-11-11</a>
-        <button style="color: #FFFFFF; border: none; cursor: pointer; padding: 12px 24px; font-size: 14px; font-weight: 600; border-radius: 8px; background-color: #D29F66" data-element-id="1768475677858_3mfa91em5">Заказать звонок</button>
-      </div>
+      <span style="color: #D29F66; font-size: 14px; font-weight: 500; letter-spacing: 1px" data-element-id="gh-premium-1769148718507-8">+998 78 150 11 11</span>
     </header>
-    <section style="height: 100vh; display: flex; position: relative; align-items: center; background-size: cover; justify-content: center; background-image: url(https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1920); background-position: center" data-element-id="gh-premium-1768393306925-16">
-      <div style="top: 0; left: 0; right: 0; bottom: 0; position: absolute; background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.5) 100%)" data-element-id="gh-premium-1768393306925-10"></div>
-      <div style="z-index: 1; display: flex; padding: 0 40px; max-width: 800px; position: relative; text-align: center; align-items: center; flex-direction: column" data-element-id="gh-premium-1768393306925-15">
-        <p style="color: #D29F66; font-size: 13px; font-weight: 500; margin-bottom: 24px; letter-spacing: 4px; text-transform: uppercase" data-element-id="gh-premium-1768393306925-11">Девелопер премиальной недвижимости</p>
-        <h1 style="color: #FFFFFF; font-size: 56px; font-weight: 300; line-height: 1.2; margin-bottom: 32px; letter-spacing: -1px" data-element-id="gh-premium-1768393306925-12">Создаём пространства для жизни</h1>
-        <p style="color: rgba(255,255,255,0.8); font-size: 18px; font-weight: 300; line-height: 1.7; margin-bottom: 48px" data-element-id="gh-premium-1768393306925-13">13 лет мы строим дома, в которых хочется жить. Архитектура, продуманная до мелочей.</p>
-        <button style="color: #FFFFFF; border: 1px solid rgba(255,255,255,0.4); cursor: pointer; padding: 16px 48px; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; background-color: #000000" data-element-id="gh-premium-1768393306925-14">Смотреть проекты</button>
+    <section style="height: 100vh; display: flex; position: relative; align-items: center; background-size: cover; justify-content: center; background-image: url(https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1920); background-position: center" data-element-id="gh-premium-1769148718507-16">
+      <div style="top: 0; left: 0; right: 0; bottom: 0; position: absolute; background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.5) 100%); border-width: 1px" data-element-id="gh-premium-1769148718507-10"></div>
+      <div style="z-index: 1; display: flex; padding: 0 40px; max-width: 800px; position: relative; text-align: center; align-items: center; flex-direction: column" data-element-id="gh-premium-1769148718507-15">
+        <p style="color: #D29F66; font-size: 13px; font-weight: 500; margin-bottom: 24px; letter-spacing: 4px; text-transform: uppercase" data-element-id="gh-premium-1769148718507-11">Девелопер премиальной недвижимости</p>
+        <h1 style="color: #FFFFFF; font-size: 56px; font-weight: 300; line-height: 1.2; margin-bottom: 32px; letter-spacing: -1px" data-element-id="gh-premium-1769148718507-12">Создаём пространства для жизни</h1>
+        <p style="color: rgba(255,255,255,0.8); font-size: 18px; font-weight: 300; line-height: 1.7; margin-bottom: 48px" data-element-id="gh-premium-1769148718507-13">13 лет мы строим дома, в которых хочется жить. Архитектура, продуманная до мелочей.</p>
+        <button style="color: #FFFFFF; border: 1px solid rgba(255,255,255,0.4); cursor: pointer; padding: 16px 48px; font-size: 14px; border-width: 1px; letter-spacing: 2px; text-transform: uppercase; background-color: transparent" data-element-id="gh-premium-1769148718507-14">Смотреть проекты</button>
       </div>
     </section>
-    <section style="padding: 160px 80px; background-color: #FAFAF8" data-element-id="gh-premium-1768393306925-36">
-      <div style="gap: 120px; margin: 0 auto; display: grid; max-width: 1200px; align-items: center; grid-template-columns: 1fr 1fr" data-element-id="gh-premium-1768393306925-35">
-        <div style="display: flex; flex-direction: column" data-element-id="gh-premium-1768393306925-21">
-          <p style="color: #D29F66; font-size: 12px; margin-bottom: 24px; letter-spacing: 3px; text-transform: uppercase" data-element-id="gh-premium-1768393306925-17">О компании</p>
-          <h2 style="color: #1A1A1A; font-size: 42px; font-weight: 300; line-height: 1.3; margin-bottom: 32px" data-element-id="gh-premium-1768393306925-18">Мы верим, что дом — это больше, чем стены</h2>
-          <p style="color: #4A4A4A; font-size: 16px; line-height: 1.8; margin-bottom: 24px" data-element-id="gh-premium-1768393306925-19">Golden House — это команда архитекторов, инженеров и дизайнеров, объединённых общей целью: создавать жилые пространства, которые вдохновляют.</p>
-          <p style="color: #4A4A4A; font-size: 16px; line-height: 1.8" data-element-id="gh-premium-1768393306925-20">Каждый наш проект — это результат глубокого анализа потребностей современного человека.</p>
+    <section style="padding: 160px 80px; background-color: #FAFAF8" data-element-id="gh-premium-1769148718508-36">
+      <div style="gap: 120px; margin: 0 auto; display: grid; max-width: 1200px; align-items: center; grid-template-columns: 1fr 1fr" data-element-id="gh-premium-1769148718508-35">
+        <div style="display: flex; flex-direction: column" data-element-id="gh-premium-1769148718508-21">
+          <p style="color: #D29F66; font-size: 12px; margin-bottom: 24px; letter-spacing: 3px; text-transform: uppercase" data-element-id="gh-premium-1769148718507-17">О компании</p>
+          <h2 style="color: #1A1A1A; font-size: 42px; font-weight: 300; line-height: 1.3; margin-bottom: 32px" data-element-id="gh-premium-1769148718507-18">Мы верим, что дом — это больше, чем стены</h2>
+          <p style="color: #4A4A4A; font-size: 16px; line-height: 1.8; margin-bottom: 24px" data-element-id="gh-premium-1769148718507-19">Golden House — это команда архитекторов, инженеров и дизайнеров, объединённых общей целью: создавать жилые пространства, которые вдохновляют.</p>
+          <p style="color: #4A4A4A; font-size: 16px; line-height: 1.8" data-element-id="gh-premium-1769148718507-20">Каждый наш проект — это результат глубокого анализа потребностей современного человека.</p>
         </div>
-        <div style="gap: 48px; display: grid; grid-template-columns: 1fr 1fr" data-element-id="gh-premium-1768393306925-34">
-          <div style="display: flex; padding: 32px 0; border-top: 1px solid #E8E8E8; flex-direction: column" data-element-id="gh-premium-1768393306925-24">
-            <span style="color: #1A1A1A; font-size: 48px; font-weight: 300; margin-bottom: 8px; letter-spacing: -2px" data-element-id="gh-premium-1768393306925-22">13</span>
-            <span style="color: #8A8A8A; font-size: 14px" data-element-id="gh-premium-1768393306925-23">лет на рынке</span>
+        <div style="gap: 48px; display: grid; grid-template-columns: 1fr 1fr" data-element-id="gh-premium-1769148718508-34">
+          <div style="display: flex; padding: 32px 0; border-top: 1px solid #E8E8E8; flex-direction: column" data-element-id="gh-premium-1769148718508-24">
+            <span style="color: #1A1A1A; font-size: 48px; font-weight: 300; margin-bottom: 8px; letter-spacing: -2px" data-element-id="gh-premium-1769148718508-22">13</span>
+            <span style="color: #8A8A8A; font-size: 14px" data-element-id="gh-premium-1769148718508-23">лет на рынке</span>
           </div>
-          <div style="display: flex; padding: 32px 0; border-top: 1px solid #E8E8E8; flex-direction: column" data-element-id="gh-premium-1768393306925-27">
-            <span style="color: #1A1A1A; font-size: 48px; font-weight: 300; margin-bottom: 8px; letter-spacing: -2px" data-element-id="gh-premium-1768393306925-25">500K</span>
-            <span style="color: #8A8A8A; font-size: 14px" data-element-id="gh-premium-1768393306925-26">м² построено</span>
+          <div style="display: flex; padding: 32px 0; border-top: 1px solid #E8E8E8; flex-direction: column" data-element-id="gh-premium-1769148718508-27">
+            <span style="color: #1A1A1A; font-size: 48px; font-weight: 300; margin-bottom: 8px; letter-spacing: -2px" data-element-id="gh-premium-1769148718508-25">500K</span>
+            <span style="color: #8A8A8A; font-size: 14px" data-element-id="gh-premium-1769148718508-26">м² построено</span>
           </div>
-          <div style="display: flex; padding: 32px 0; border-top: 1px solid #E8E8E8; flex-direction: column" data-element-id="gh-premium-1768393306925-30">
-            <span style="color: #1A1A1A; font-size: 48px; font-weight: 300; margin-bottom: 8px; letter-spacing: -2px" data-element-id="gh-premium-1768393306925-28">12</span>
-            <span style="color: #8A8A8A; font-size: 14px" data-element-id="gh-premium-1768393306925-29">проектов сдано</span>
+          <div style="display: flex; padding: 32px 0; border-top: 1px solid #E8E8E8; flex-direction: column" data-element-id="gh-premium-1769148718508-30">
+            <span style="color: #1A1A1A; font-size: 48px; font-weight: 300; margin-bottom: 8px; letter-spacing: -2px" data-element-id="gh-premium-1769148718508-28">12</span>
+            <span style="color: #8A8A8A; font-size: 14px" data-element-id="gh-premium-1769148718508-29">проектов сдано</span>
           </div>
-          <div style="display: flex; padding: 32px 0; border-top: 1px solid #E8E8E8; flex-direction: column" data-element-id="gh-premium-1768393306925-33">
-            <span style="color: #1A1A1A; font-size: 48px; font-weight: 300; margin-bottom: 8px; letter-spacing: -2px" data-element-id="gh-premium-1768393306925-31">8 000</span>
-            <span style="color: #8A8A8A; font-size: 14px" data-element-id="gh-premium-1768393306925-32">семей</span>
+          <div style="display: flex; padding: 32px 0; border-top: 1px solid #E8E8E8; flex-direction: column" data-element-id="gh-premium-1769148718508-33">
+            <span style="color: #1A1A1A; font-size: 48px; font-weight: 300; margin-bottom: 8px; letter-spacing: -2px" data-element-id="gh-premium-1769148718508-31">8 000</span>
+            <span style="color: #8A8A8A; font-size: 14px" data-element-id="gh-premium-1769148718508-32">семей</span>
           </div>
         </div>
       </div>
     </section>
-    <section style="color: #FFFFFF; display: flex; padding: 100px 80px; min-width: 200px; min-height: 100px; align-content: center; justify-content: center; background-color: #ffffff" data-element-id="gh-premium-1768393306926-102">
-      <div style="margin: 0 auto; max-width: 1200px; position: relative" data-element-id="gh-premium-1768393306926-101">
-        <div style="display: flex; margin-bottom: 48px; flex-direction: column" data-element-id="gh-premium-1768393306925-39">
-          <p style="color: #D29F66; font-size: 12px; margin-bottom: 16px; letter-spacing: 3px; text-transform: uppercase" data-element-id="gh-premium-1768393306925-37">Каталог</p>
-          <h2 style="color: #1A1A1A; font-size: 36px; font-weight: 300; letter-spacing: -1px" data-element-id="gh-premium-1768393306925-38">Наши жилые комплексы</h2>
+    <section style="width: 100%; padding: 100px 80px; min-width: 200px; min-height: 100px" data-element-id="gh-premium-1769148718508-102">
+      <div style="margin: 0 auto; max-width: 1200px" data-element-id="gh-premium-1769148718508-101">
+        <div style="display: flex; margin-bottom: 48px; flex-direction: column" data-element-id="gh-premium-1769148718508-39">
+          <p style="color: #D29F66; font-size: 12px; margin-bottom: 16px; letter-spacing: 3px; text-transform: uppercase" data-element-id="gh-premium-1769148718508-37">Каталог</p>
+          <h2 style="color: #1A1A1A; font-size: 36px; font-weight: 300; letter-spacing: -1px" data-element-id="gh-premium-1769148718508-38">Наши жилые комплексы</h2>
         </div>
-        <div style="gap: 32px; display: flex; flex-wrap: wrap; align-items: flex-start; margin-bottom: 32px; justify-content: space-between" data-element-id="gh-premium-1768393306926-59">
-          <div data-element-id="gh-premium-1768393306925-46">
-            <label style="color: #8A8A8A; display: block; font-size: 13px; margin-bottom: 8px" data-element-id="gh-premium-1768393306925-40">Выберите локацию</label>
-            <select style="border: 1px solid #E8E8E8; cursor: pointer; padding: 14px 48px 14px 16px; font-size: 15px; min-width: 240px; border-radius: 4px; background-color: #FFFFFF" data-element-id="gh-premium-1768393306925-45">
-              <option data-element-id="gh-premium-1768393306925-41">Район, метро</option>
-              <option data-element-id="gh-premium-1768393306925-42">Юнусабад</option>
-              <option data-element-id="gh-premium-1768393306925-43">Мирзо Улугбек</option>
-              <option data-element-id="gh-premium-1768393306925-44">Чиланзар</option>
+        <div style="gap: 32px; display: flex; flex-wrap: wrap; align-items: flex-start; margin-bottom: 32px; justify-content: space-between" data-element-id="gh-premium-1769148718508-59">
+          <div data-element-id="gh-premium-1769148718508-46">
+            <label style="color: #8A8A8A; display: block; font-size: 13px; margin-bottom: 8px" data-element-id="gh-premium-1769148718508-40">Выберите локацию</label>
+            <select style="border: 1px solid #E8E8E8; cursor: pointer; padding: 14px 48px 14px 16px; font-size: 15px; min-width: 240px; border-radius: 4px; background-color: #FFFFFF" data-element-id="gh-premium-1769148718508-45">
+              <option data-element-id="gh-premium-1769148718508-41">Район, метро</option>
+              <option data-element-id="gh-premium-1769148718508-42">Юнусабад</option>
+              <option data-element-id="gh-premium-1769148718508-43">Мирзо Улугбек</option>
+              <option data-element-id="gh-premium-1769148718508-44">Чиланзар</option>
             </select>
           </div>
-          <div style="flex: 1; max-width: 300px" data-element-id="gh-premium-1768393306925-52">
-            <label style="color: #8A8A8A; display: block; font-size: 13px; margin-bottom: 8px" data-element-id="gh-premium-1768393306925-47">Стоимость, $</label>
-            <div style="gap: 16px; display: flex; align-items: center" data-element-id="gh-premium-1768393306925-51">
-              <input style="width: 120px; border: 1px solid #E8E8E8; padding: 14px 16px; font-size: 15px; border-radius: 4px; background-color: #ffffff" data-element-id="gh-premium-1768393306925-48" type="text" placeholder="от 50 000" />
-              <span style="color: #8A8A8A" data-element-id="gh-premium-1768393306925-49">—</span>
-              <input style="width: 120px; border: 1px solid #E8E8E8; padding: 14px 16px; font-size: 15px; border-radius: 4px; background-color: #ffffff" data-element-id="gh-premium-1768393306925-50" type="text" placeholder="до 500 000" />
+          <div style="flex: 1; max-width: 300px" data-element-id="gh-premium-1769148718508-52">
+            <label style="color: #8A8A8A; display: block; font-size: 13px; margin-bottom: 8px" data-element-id="gh-premium-1769148718508-47">Стоимость, $</label>
+            <div style="gap: 16px; display: flex; align-items: center" data-element-id="gh-premium-1769148718508-51">
+              <input style="width: 120px; border: 1px solid #E8E8E8; padding: 14px 16px; font-size: 15px; border-radius: 4px; background-color: #ffffff" data-element-id="gh-premium-1769148718508-48" type="text" placeholder="от 50 000" />
+              <span style="color: #8A8A8A" data-element-id="gh-premium-1769148718508-49">—</span>
+              <input style="width: 120px; border: 1px solid #E8E8E8; padding: 14px 16px; font-size: 15px; border-radius: 4px; background-color: #ffffff" data-element-id="gh-premium-1769148718508-50" type="text" placeholder="до 500 000" />
             </div>
           </div>
-          <div data-element-id="gh-premium-1768393306926-58">
-            <label style="color: #8A8A8A; display: block; font-size: 13px; margin-bottom: 8px" data-element-id="gh-premium-1768393306925-53">Дата сдачи до</label>
-            <div style="gap: 8px; display: flex" data-element-id="gh-premium-1768393306926-57">
-              <button style="color: #1A1A1A; border: 1px solid #D29F66; cursor: pointer; padding: 12px 20px; font-size: 14px; font-weight: 400; border-radius: 4px; background-color: rgba(210,159,102,0.1)" data-element-id="gh-premium-1768393306925-54">2026</button>
-              <button style="color: #1A1A1A; border: 1px solid #E8E8E8; cursor: pointer; padding: 12px 20px; font-size: 14px; font-weight: 400; border-radius: 4px; background-color: #FFFFFF" data-element-id="gh-premium-1768393306926-55">2027</button>
-              <button style="color: #1A1A1A; border: 1px solid #E8E8E8; cursor: pointer; padding: 12px 20px; font-size: 14px; font-weight: 400; border-radius: 4px; background-color: #FFFFFF" data-element-id="gh-premium-1768393306926-56">2028</button>
+          <div data-element-id="gh-premium-1769148718508-58">
+            <label style="color: #8A8A8A; display: block; font-size: 13px; margin-bottom: 8px" data-element-id="gh-premium-1769148718508-53">Дата сдачи до</label>
+            <div style="gap: 8px; display: flex" data-element-id="gh-premium-1769148718508-57">
+              <button style="color: #1A1A1A; border: 1px solid #D29F66; cursor: pointer; padding: 12px 20px; font-size: 14px; font-weight: 400; border-radius: 4px; background-color: rgba(210,159,102,0.1)" data-element-id="gh-premium-1769148718508-54">2026</button>
+              <button style="color: #1A1A1A; border: 1px solid #E8E8E8; cursor: pointer; padding: 12px 20px; font-size: 14px; font-weight: 400; border-radius: 4px; background-color: #FFFFFF" data-element-id="gh-premium-1769148718508-55">2027</button>
+              <button style="color: #1A1A1A; border: 1px solid #E8E8E8; cursor: pointer; padding: 12px 20px; font-size: 14px; font-weight: 400; border-radius: 4px; background-color: #FFFFFF" data-element-id="gh-premium-1769148718508-56">2028</button>
             </div>
-          </div>
-        </div>
-        <div style="gap: 12px; display: flex; flex-wrap: wrap; position: relative; align-items: center; margin-bottom: 48px; flex-direction: row; justify-content: space-between" data-element-id="gh-premium-1768393306926-65">
-          <div style="gap: 10px; color: #000000; border: 2px solid #94a3b8; height: auto; display: flex; padding: 20px; min-width: 50px; min-height: 100px; align-items: center; border-width: 0px; padding-left: 0px; flex-direction: row; background-color: transparent" data-element-id="1768810572755-s946lfjr4">
-            <button style="color: #FFFFFF; border: 1px solid #D29F66; cursor: pointer; padding: 10px 24px; font-size: 14px; font-weight: 400; border-radius: 4px; background-color: #D29F66" data-element-id="gh-premium-1768393306926-60">Все</button>
-            <button style="color: #4A4A4A; border: 1px solid #E8E8E8; cursor: pointer; padding: 10px 24px; font-size: 14px; font-weight: 400; border-radius: 4px; background-color: #FFFFFF" data-element-id="gh-premium-1768393306926-61">С ключами</button>
-            <button style="color: #4A4A4A; border: 1px solid #E8E8E8; cursor: pointer; padding: 10px 24px; font-size: 14px; font-weight: 400; border-radius: 4px; background-color: #FFFFFF" data-element-id="gh-premium-1768393306926-62">Бизнес-класс</button>
-            <button style="color: #4A4A4A; border: 1px solid #E8E8E8; cursor: pointer; padding: 10px 24px; font-size: 14px; font-weight: 400; border-radius: 4px; background-color: #FFFFFF" data-element-id="gh-premium-1768393306926-63">Премиум</button>
-          </div>
-          <div style="color: #000000; border: 2px solid #94a3b8; height: auto; display: flex; padding: 20px; min-width: 50px; min-height: 100px; align-items: center; border-width: 0px; flex-direction: row; background-color: transparent" data-element-id="1768810659355-42sn6pnww">
-            <span style="color: #8A8A8A; font-size: 14px; margin-left: 24px" data-element-id="gh-premium-1768393306926-64">Найдено 12 проектов</span>
           </div>
         </div>
-        <div style="gap: 32px; display: grid; grid-template-columns: repeat(2, 1fr)" data-element-id="gh-premium-1768393306926-100">
-          <div style="border: 1px solid #E8E8E8; cursor: pointer; display: flex; overflow: hidden; flex-direction: column; background-color: #FFFFFF" data-element-id="gh-premium-1768393306926-74">
-            <div style="height: 300px; overflow: hidden; position: relative" data-element-id="gh-premium-1768393306926-69">
-              <img style="width: 100%; height: 100%; object-fit: cover" data-element-id="gh-premium-1768393306926-66" alt="Golden Residence" src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600" />
-              <div style="top: 20px; left: 20px; color: #FFFFFF; padding: 8px 16px; font-size: 12px; position: absolute; font-weight: 500; background-color: #D29F66" data-element-id="gh-premium-1768393306926-68">
-                <span style="color: #FFFFFF" data-element-id="gh-premium-1768393306926-67">Новый проект</span>
-              </div>
-            </div>
-            <div style="display: flex; padding: 28px; flex-direction: column" data-element-id="gh-premium-1768393306926-73">
-              <h3 style="color: #1A1A1A; font-size: 22px; font-weight: 500; margin-bottom: 12px" data-element-id="gh-premium-1768393306926-70">Golden Residence</h3>
-              <p style="color: #8A8A8A; font-size: 14px; margin-bottom: 20px" data-element-id="gh-premium-1768393306926-71">Юнусабад · до метро 5 мин</p>
-              <p style="color: #1A1A1A; font-size: 20px; font-weight: 500" data-element-id="gh-premium-1768393306926-72">от $85 000</p>
-            </div>
+        <div style="gap: 12px; display: flex; flex-wrap: wrap; align-items: center; margin-bottom: 48px" data-element-id="gh-premium-1769148718508-65">
+          <button style="color: #FFFFFF; border: 1px solid #D29F66; cursor: pointer; padding: 10px 24px; font-size: 14px; font-weight: 400; border-radius: 4px; background-color: #D29F66" data-element-id="gh-premium-1769148718508-60">Все</button>
+          <button style="color: #4A4A4A; border: 1px solid #E8E8E8; cursor: pointer; padding: 10px 24px; font-size: 14px; font-weight: 400; border-radius: 4px; background-color: #FFFFFF" data-element-id="gh-premium-1769148718508-61">С ключами</button>
+          <button style="color: #4A4A4A; border: 1px solid #E8E8E8; cursor: pointer; padding: 10px 24px; font-size: 14px; font-weight: 400; border-radius: 4px; background-color: #FFFFFF" data-element-id="gh-premium-1769148718508-62">Бизнес-класс</button>
+          <button style="color: #4A4A4A; border: 1px solid #E8E8E8; cursor: pointer; padding: 10px 24px; font-size: 14px; font-weight: 400; border-radius: 4px; background-color: #FFFFFF" data-element-id="gh-premium-1769148718508-63">Премиум</button>
+          <span style="color: #8A8A8A; font-size: 14px; margin-left: 24px" data-element-id="gh-premium-1769148718508-64">Найдено 12 проектов</span>
+        </div>
+        <div style="gap: 32px; width: fit-content; display: grid; min-width: 200px; min-height: 100px; grid-template-rows: repeat(2, 1fr); grid-template-columns: repeat(2, 1fr)" data-element-id="1769405707337_unm4vedmb"></div>
+      </div>
+    </section>
+    <section style="padding: 120px 80px; background-color: #2D2D2D" data-element-id="gh-premium-1769148718509-116">
+      <div style="margin: 0 auto; display: flex; max-width: 1200px; align-items: center; flex-direction: column" data-element-id="gh-premium-1769148718509-115">
+        <p style="color: #D29F66; font-size: 12px; text-align: center; margin-bottom: 24px; letter-spacing: 3px; text-transform: uppercase" data-element-id="gh-premium-1769148718508-103">Покупателям</p>
+        <h2 style="color: #FFFFFF; font-size: 36px; text-align: center; font-weight: 300; margin-bottom: 80px" data-element-id="gh-premium-1769148718508-104">Удобные способы приобретения</h2>
+        <div style="gap: 48px; width: 100%; display: grid; grid-template-columns: repeat(3, 1fr)" data-element-id="gh-premium-1769148718509-114">
+          <div style="display: flex; padding: 40px; border-top: 1px solid rgba(255,255,255,0.15); flex-direction: column" data-element-id="gh-premium-1769148718509-107">
+            <h3 style="color: #FFFFFF; font-size: 24px; font-weight: 400; margin-bottom: 16px" data-element-id="gh-premium-1769148718509-105">Ипотека</h3>
+            <p style="color: rgba(255,255,255,0.6); font-size: 15px; line-height: 1.7" data-element-id="gh-premium-1769148718509-106">Помогаем подобрать оптимальную программу кредитования от ведущих банков</p>
           </div>
-          <div style="border: 1px solid #E8E8E8; cursor: pointer; display: flex; overflow: hidden; flex-direction: column; background-color: #FFFFFF" data-element-id="gh-premium-1768393306926-83">
-            <div style="height: 300px; overflow: hidden; position: relative" data-element-id="gh-premium-1768393306926-78">
-              <img style="width: 100%; height: 100%; object-fit: cover" data-element-id="gh-premium-1768393306926-75" alt="Golden Park" src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600" />
-              <div style="top: 20px; left: 20px; color: #FFFFFF; padding: 8px 16px; font-size: 12px; position: absolute; font-weight: 500; background-color: #D29F66" data-element-id="gh-premium-1768393306926-77">
-                <span style="color: #FFFFFF" data-element-id="gh-premium-1768393306926-76">Бизнес-класс</span>
-              </div>
-            </div>
-            <div style="display: flex; padding: 28px; flex-direction: column" data-element-id="gh-premium-1768393306926-82">
-              <h3 style="color: #1A1A1A; font-size: 22px; font-weight: 500; margin-bottom: 12px" data-element-id="gh-premium-1768393306926-79">Golden Park</h3>
-              <p style="color: #8A8A8A; font-size: 14px; margin-bottom: 20px" data-element-id="gh-premium-1768393306926-80">Мирзо Улугбек · до метро 10 мин</p>
-              <p style="color: #1A1A1A; font-size: 20px; font-weight: 500" data-element-id="gh-premium-1768393306926-81">от $72 000</p>
-            </div>
+          <div style="display: flex; padding: 40px; border-top: 1px solid rgba(255,255,255,0.15); flex-direction: column" data-element-id="gh-premium-1769148718509-110">
+            <h3 style="color: #FFFFFF; font-size: 24px; font-weight: 400; margin-bottom: 16px" data-element-id="gh-premium-1769148718509-108">Trade-in</h3>
+            <p style="color: rgba(255,255,255,0.6); font-size: 15px; line-height: 1.7" data-element-id="gh-premium-1769148718509-109">Обменяйте вашу квартиру на новую с доплатой или без</p>
           </div>
-          <div style="border: 1px solid #E8E8E8; cursor: pointer; display: flex; overflow: hidden; flex-direction: column; background-color: #FFFFFF" data-element-id="gh-premium-1768393306926-92">
-            <div style="height: 300px; overflow: hidden; position: relative" data-element-id="gh-premium-1768393306926-87">
-              <img style="width: 100%; height: 100%; object-fit: cover" data-element-id="gh-premium-1768393306926-84" alt="Golden Plaza" src="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600" />
-              <div style="top: 20px; left: 20px; color: #FFFFFF; padding: 8px 16px; font-size: 12px; position: absolute; font-weight: 500; background-color: #D29F66" data-element-id="gh-premium-1768393306926-86">
-                <span style="color: #FFFFFF" data-element-id="gh-premium-1768393306926-85">Сдан</span>
-              </div>
-            </div>
-            <div style="display: flex; padding: 28px; flex-direction: column" data-element-id="gh-premium-1768393306926-91">
-              <h3 style="color: #1A1A1A; font-size: 22px; font-weight: 500; margin-bottom: 12px" data-element-id="gh-premium-1768393306926-88">Golden Plaza</h3>
-              <p style="color: #8A8A8A; font-size: 14px; margin-bottom: 20px" data-element-id="gh-premium-1768393306926-89">Чиланзар · до метро 3 мин</p>
-              <p style="color: #1A1A1A; font-size: 20px; font-weight: 500" data-element-id="gh-premium-1768393306926-90">от $65 000</p>
-            </div>
-          </div>
-          <div style="border: 1px solid #E8E8E8; cursor: pointer; display: flex; overflow: hidden; flex-direction: column; background-color: #FFFFFF" data-element-id="gh-premium-1768393306926-99">
-            <div style="height: 300px; overflow: hidden; position: relative" data-element-id="gh-premium-1768393306926-94">
-              <img style="width: 100%; height: 100%; object-fit: cover" data-element-id="gh-premium-1768393306926-93" alt="Golden Tower" src="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600" />
-            </div>
-            <div style="display: flex; padding: 28px; flex-direction: column" data-element-id="gh-premium-1768393306926-98">
-              <h3 style="color: #1A1A1A; font-size: 22px; font-weight: 500; margin-bottom: 12px" data-element-id="gh-premium-1768393306926-95">Golden Tower</h3>
-              <p style="color: #8A8A8A; font-size: 14px; margin-bottom: 20px" data-element-id="gh-premium-1768393306926-96">Сергели · до метро 15 мин</p>
-              <p style="color: #1A1A1A; font-size: 20px; font-weight: 500" data-element-id="gh-premium-1768393306926-97">от $58 000</p>
-            </div>
+          <div style="display: flex; padding: 40px; border-top: 1px solid rgba(255,255,255,0.15); flex-direction: column" data-element-id="gh-premium-1769148718509-113">
+            <h3 style="color: #FFFFFF; font-size: 24px; font-weight: 400; margin-bottom: 16px" data-element-id="gh-premium-1769148718509-111">Рассрочка</h3>
+            <p style="color: rgba(255,255,255,0.6); font-size: 15px; line-height: 1.7" data-element-id="gh-premium-1769148718509-112">Гибкие условия оплаты без переплат на срок до 24 месяцев</p>
           </div>
         </div>
       </div>
     </section>
-    <section style="padding: 120px 80px; background-color: #2D2D2D" data-element-id="gh-premium-1768393306926-116">
-      <div style="margin: 0 auto; display: flex; max-width: 1200px; align-items: center; flex-direction: column" data-element-id="gh-premium-1768393306926-115">
-        <p style="color: #D29F66; font-size: 12px; text-align: center; margin-bottom: 24px; letter-spacing: 3px; text-transform: uppercase" data-element-id="gh-premium-1768393306926-103">Покупателям</p>
-        <h2 style="color: #FFFFFF; font-size: 36px; text-align: center; font-weight: 300; margin-bottom: 80px" data-element-id="gh-premium-1768393306926-104">Удобные способы приобретения</h2>
-        <div style="gap: 48px; width: 100%; display: grid; grid-template-columns: repeat(3, 1fr)" data-element-id="gh-premium-1768393306926-114">
-          <div style="display: flex; padding: 40px; border-top: 1px solid rgba(255,255,255,0.15); flex-direction: column" data-element-id="gh-premium-1768393306926-107">
-            <h3 style="color: #FFFFFF; font-size: 24px; font-weight: 400; margin-bottom: 16px" data-element-id="gh-premium-1768393306926-105">Ипотека</h3>
-            <p style="color: rgba(255,255,255,0.6); font-size: 15px; line-height: 1.7" data-element-id="gh-premium-1768393306926-106">Помогаем подобрать оптимальную программу кредитования от ведущих банков</p>
+    <footer style="padding: 80px 80px 40px; background-color: #1A1A1A" data-element-id="gh-premium-1769148718509-154">
+      <div style="margin: 0 auto; display: flex; max-width: 1200px; flex-direction: column" data-element-id="gh-premium-1769148718509-153">
+        <div style="gap: 64px; display: grid; margin-bottom: 64px; grid-template-columns: 2fr 1fr 1fr 1fr" data-element-id="gh-premium-1769148718509-150">
+          <div style="display: flex; flex-direction: column" data-element-id="gh-premium-1769148718509-143">
+            <span style="color: #FFFFFF; font-size: 18px; font-weight: 600; margin-bottom: 24px; letter-spacing: 3px; text-transform: uppercase" data-element-id="gh-premium-1769148718509-141">Golden House</span>
+            <p style="color: rgba(255,255,255,0.5); font-size: 14px; line-height: 1.7" data-element-id="gh-premium-1769148718509-142">Девелопер премиальной недвижимости в Узбекистане.</p>
           </div>
-          <div style="display: flex; padding: 40px; border-top: 1px solid rgba(255,255,255,0.15); flex-direction: column" data-element-id="gh-premium-1768393306926-110">
-            <h3 style="color: #FFFFFF; font-size: 24px; font-weight: 400; margin-bottom: 16px" data-element-id="gh-premium-1768393306926-108">Trade-in</h3>
-            <p style="color: rgba(255,255,255,0.6); font-size: 15px; line-height: 1.7" data-element-id="gh-premium-1768393306926-109">Обменяйте вашу квартиру на новую с доплатой или без</p>
+          <div style="display: flex; flex-direction: column" data-element-id="gh-premium-1769148718509-145">
+            <span style="color: rgba(255,255,255,0.5); font-size: 12px; margin-bottom: 24px; letter-spacing: 2px; text-transform: uppercase" data-element-id="gh-premium-1769148718509-144">Проекты</span>
           </div>
-          <div style="display: flex; padding: 40px; border-top: 1px solid rgba(255,255,255,0.15); flex-direction: column" data-element-id="gh-premium-1768393306926-113">
-            <h3 style="color: #FFFFFF; font-size: 24px; font-weight: 400; margin-bottom: 16px" data-element-id="gh-premium-1768393306926-111">Рассрочка</h3>
-            <p style="color: rgba(255,255,255,0.6); font-size: 15px; line-height: 1.7" data-element-id="gh-premium-1768393306926-112">Гибкие условия оплаты без переплат на срок до 24 месяцев</p>
+          <div style="display: flex; flex-direction: column" data-element-id="gh-premium-1769148718509-147">
+            <span style="color: rgba(255,255,255,0.5); font-size: 12px; margin-bottom: 24px; letter-spacing: 2px; text-transform: uppercase" data-element-id="gh-premium-1769148718509-146">Компания</span>
           </div>
+          <div style="display: flex; flex-direction: column" data-element-id="gh-premium-1769148718509-149">
+            <span style="color: rgba(255,255,255,0.5); font-size: 12px; margin-bottom: 24px; letter-spacing: 2px; text-transform: uppercase" data-element-id="gh-premium-1769148718509-148">Покупателям</span>
+          </div>
+        </div>
+        <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 32px" data-element-id="gh-premium-1769148718509-152">
+          <p style="color: rgba(255,255,255,0.4); font-size: 13px" data-element-id="gh-premium-1769148718509-151">© 2026 Golden House. Все права защищены.</p>
         </div>
       </div>
-    </section>
-    <section style="padding: 160px 80px; background-color: #FAFAF8" data-element-id="gh-premium-1768393306926-140">
-      <div style="gap: 120px; margin: 0 auto; display: grid; max-width: 1200px; grid-template-columns: 1fr 1fr" data-element-id="gh-premium-1768393306926-139">
-        <div style="display: flex; flex-direction: column" data-element-id="gh-premium-1768393306926-123">
-          <p style="color: #D29F66; font-size: 12px; margin-bottom: 24px; letter-spacing: 3px; text-transform: uppercase" data-element-id="gh-premium-1768393306926-117">Контакты</p>
-          <h2 style="color: #1A1A1A; font-size: 36px; font-weight: 300; line-height: 1.4; margin-bottom: 48px" data-element-id="gh-premium-1768393306926-118">Мы всегда готовы ответить на ваши вопросы</h2>
-          <p style="color: #8A8A8A; font-size: 13px; margin-bottom: 12px; letter-spacing: 2px; text-transform: uppercase" data-element-id="gh-premium-1768393306926-119">Телефон</p>
-          <p style="color: #1A1A1A; font-size: 24px; font-weight: 300; margin-bottom: 40px" data-element-id="gh-premium-1768393306926-120">+998 78 150 11 11</p>
-          <p style="color: #8A8A8A; font-size: 13px; margin-bottom: 12px; letter-spacing: 2px; text-transform: uppercase" data-element-id="gh-premium-1768393306926-121">Офис продаж</p>
-          <p style="color: #1A1A1A; font-size: 16px; line-height: 1.6" data-element-id="gh-premium-1768393306926-122">г. Ташкент, ул. Амира Темура, 108</p>
+    </footer>
+    <section style="padding: 160px 80px; background-color: #FAFAF8" data-element-id="gh-premium-1769148718509-140">
+      <div style="gap: 120px; margin: 0 auto; display: grid; max-width: 1200px; grid-template-columns: 1fr 1fr" data-element-id="gh-premium-1769148718509-139">
+        <div style="display: flex; flex-direction: column" data-element-id="gh-premium-1769148718509-123">
+          <p style="color: #D29F66; font-size: 12px; margin-bottom: 24px; letter-spacing: 3px; text-transform: uppercase" data-element-id="gh-premium-1769148718509-117">Контакты</p>
+          <h2 style="color: #1A1A1A; font-size: 36px; font-weight: 300; line-height: 1.4; margin-bottom: 48px" data-element-id="gh-premium-1769148718509-118">Мы всегда готовы ответить на ваши вопросы</h2>
+          <p style="color: #8A8A8A; font-size: 13px; margin-bottom: 12px; letter-spacing: 2px; text-transform: uppercase" data-element-id="gh-premium-1769148718509-119">Телефон</p>
+          <p style="color: #1A1A1A; font-size: 24px; font-weight: 300; margin-bottom: 40px" data-element-id="gh-premium-1769148718509-120">+998 78 150 11 11</p>
+          <p style="color: #8A8A8A; font-size: 13px; margin-bottom: 12px; letter-spacing: 2px; text-transform: uppercase" data-element-id="gh-premium-1769148718509-121">Офис продаж</p>
+          <p style="color: #1A1A1A; font-size: 16px; line-height: 1.6" data-element-id="gh-premium-1769148718509-122">г. Ташкент, ул. Амира Темура, 108</p>
         </div>
-        <div style="display: flex; padding: 48px; flex-direction: column; background-color: #FFFFFF" data-element-id="gh-premium-1768393306926-138">
-          <h3 style="color: #1A1A1A; font-size: 20px; font-weight: 500; margin-bottom: 32px" data-element-id="gh-premium-1768393306926-124">Записаться на консультацию</h3>
-          <form data-element-id="gh-premium-1768393306926-137">
-            <div style="margin-bottom: 24px" data-element-id="gh-premium-1768393306926-126">
-              <input style="width: 100%; border: none; outline: none; padding: 16px 0; font-size: 15px; border-bottom: 1px solid #E8E8E8; background-color: transparent" data-element-id="gh-premium-1768393306926-125" type="text" placeholder="Ваше имя" />
+        <div style="display: flex; padding: 48px; flex-direction: column; background-color: #FFFFFF" data-element-id="gh-premium-1769148718509-138">
+          <h3 style="color: #1A1A1A; font-size: 20px; font-weight: 500; margin-bottom: 32px" data-element-id="gh-premium-1769148718509-124">Записаться на консультацию</h3>
+          <form data-element-id="gh-premium-1769148718509-137">
+            <div style="margin-bottom: 24px" data-element-id="gh-premium-1769148718509-126">
+              <input style="width: 100%; border: none; outline: none; padding: 16px 0; font-size: 15px; border-bottom: 1px solid #E8E8E8; background-color: transparent" data-element-id="gh-premium-1769148718509-125" type="text" placeholder="Ваше имя" />
             </div>
-            <div style="margin-bottom: 24px" data-element-id="gh-premium-1768393306926-128">
-              <input style="width: 100%; border: none; outline: none; padding: 16px 0; font-size: 15px; border-bottom: 1px solid #E8E8E8; background-color: transparent" data-element-id="gh-premium-1768393306926-127" type="tel" placeholder="Телефон" />
+            <div style="margin-bottom: 24px" data-element-id="gh-premium-1769148718509-128">
+              <input style="width: 100%; border: none; outline: none; padding: 16px 0; font-size: 15px; border-bottom: 1px solid #E8E8E8; background-color: transparent" data-element-id="gh-premium-1769148718509-127" type="tel" placeholder="Телефон" />
             </div>
-            <div style="margin-bottom: 32px" data-element-id="gh-premium-1768393306926-134">
-              <select style="color: #8A8A8A; width: 100%; border: none; cursor: pointer; outline: none; padding: 16px 0; font-size: 15px; border-bottom: 1px solid #E8E8E8; background-color: transparent" data-element-id="gh-premium-1768393306926-133">
-                <option data-element-id="gh-premium-1768393306926-129">Интересующий проект</option>
-                <option data-element-id="gh-premium-1768393306926-130">Golden Residence</option>
-                <option data-element-id="gh-premium-1768393306926-131">Golden Park</option>
-                <option data-element-id="gh-premium-1768393306926-132">Golden Tower</option>
+            <div style="margin-bottom: 32px" data-element-id="gh-premium-1769148718509-134">
+              <select style="color: #8A8A8A; width: 100%; border: none; cursor: pointer; outline: none; padding: 16px 0; font-size: 15px; border-bottom: 1px solid #E8E8E8; background-color: transparent" data-element-id="gh-premium-1769148718509-133">
+                <option data-element-id="gh-premium-1769148718509-129">Интересующий проект</option>
+                <option data-element-id="gh-premium-1769148718509-130">Golden Residence</option>
+                <option data-element-id="gh-premium-1769148718509-131">Golden Park</option>
+                <option data-element-id="gh-premium-1769148718509-132">Golden Tower</option>
               </select>
             </div>
-            <button style="color: #FFFFFF; width: 100%; border: none; cursor: pointer; padding: 18px; font-size: 14px; letter-spacing: 1px; background-color: #1A1A1A" data-element-id="gh-premium-1768393306926-135" type="submit">Отправить заявку</button>
-            <p style="color: #8A8A8A; font-size: 12px; margin-top: 16px; line-height: 1.6" data-element-id="gh-premium-1768393306926-136">Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности</p>
+            <button style="color: #FFFFFF; width: 100%; border: none; cursor: pointer; padding: 18px; font-size: 14px; letter-spacing: 1px; background-color: #1A1A1A" data-element-id="gh-premium-1769148718509-135" type="submit">Отправить заявку</button>
+            <p style="color: #8A8A8A; font-size: 12px; margin-top: 16px; line-height: 1.6" data-element-id="gh-premium-1769148718509-136">Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности</p>
           </form>
         </div>
       </div>
     </section>
-    <footer style="padding: 64px 48px 32px; background-color: #403E3D" data-element-id="1768472053813_osbul0lt7">
-      <div style="gap: 48px; margin: 0 auto; display: grid; max-width: 1440px; grid-template-columns: repeat(4, 1fr)" data-element-id="1768472053813_12l6w6dfu">
-        <div style="display: flex; flex-direction: column" data-element-id="1768472053813_bzlzvi5ki">
-          <div style="color: #D29F66; font-size: 24px; font-weight: 700; margin-bottom: 24px" data-element-id="1768472053813_dgn812t9x">GOLDEN HOUSE</div>
-          <p style="color: rgba(255,255,255,0.7); font-size: 14px; line-height: 1.6; margin-bottom: 16px" data-element-id="1768472053813_asv72lgyx">Строим качественное жильё с 2012 года. Более 500 000 м² сданной недвижимости.</p>
-          <a style="color: #FFFFFF; font-size: 20px; font-weight: 600; text-decoration: none" data-element-id="1768472053813_4467srwaj" href="tel:+998781501111">+998 78 150-11-11</a>
-        </div>
-        <div style="display: flex; flex-direction: column" data-element-id="1768472053813_trjw0qi1h">
-          <h4 style="color: #FFFFFF; font-size: 16px; font-weight: 600; margin-bottom: 20px" data-element-id="1768472053813_7y7zdcqon">Покупателям</h4>
-          <a style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 12px; text-decoration: none" data-element-id="1768472053813_twqvk6oi0" href="#">Квартиры</a>
-          <a style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 12px; text-decoration: none" data-element-id="1768472053813_4pxmyibjb" href="#">Коммерция</a>
-          <a style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 12px; text-decoration: none" data-element-id="1768472053813_v3p9j4fv3" href="#">Ипотека</a>
-          <a style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 12px; text-decoration: none" data-element-id="1768472053813_gl2q2idbc" href="#">Акции</a>
-        </div>
-        <div style="display: flex; flex-direction: column" data-element-id="1768472053813_3caizfhaq">
-          <h4 style="color: #FFFFFF; font-size: 16px; font-weight: 600; margin-bottom: 20px" data-element-id="1768472053813_cih1ikbch">Компания</h4>
-          <a style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 12px; text-decoration: none" data-element-id="1768472053813_e53rlufh5" href="#">О нас</a>
-          <a style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 12px; text-decoration: none" data-element-id="1768472053813_pzi9czz0d" href="#">Проекты</a>
-          <a style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 12px; text-decoration: none" data-element-id="1768472053813_13ojrxbyf" href="#">Новости</a>
-          <a style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 12px; text-decoration: none" data-element-id="1768472053813_z5qct6grc" href="#">Контакты</a>
-        </div>
-        <div style="display: flex; flex-direction: column" data-element-id="1768472053813_9xgnnqzpi">
-          <h4 style="color: #FFFFFF; font-size: 16px; font-weight: 600; margin-bottom: 20px" data-element-id="1768472053813_yyx8ggcn2">Документы</h4>
-          <a style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 12px; text-decoration: none" data-element-id="1768472053813_og90avpf5" href="#">Политика</a>
-          <a style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 12px; text-decoration: none" data-element-id="1768472053813_flj8no2o5" href="#">Оферта</a>
-          <a style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 12px; text-decoration: none" data-element-id="1768472053813_9sqobegg2" href="#">Реквизиты</a>
-        </div>
-      </div>
-      <div style="margin: 48px auto 0; display: flex; max-width: 1440px; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 48px; padding-top: 24px; justify-content: center" data-element-id="1768472053813_yg4upqod4">
-        <p style="color: rgba(255,255,255,0.5); display: block; font-size: 13px" data-element-id="1768472053813_0j0tquq04">© 2026 Golden House. Все права защищены.</p>
-      </div>
-    </footer>
   </div>
 
 
+<!-- Visual CMS Data Binding Runtime -->
+<script>
+(function() {
+  'use strict';
+  
+  // Variables store
+  const _variables = {};
+  
+  // Data store
+  const _dataStore = {};
+  
+  // Data sources config
+  const _dataSources = [{"alias":"123","dataSourceId":"fcf4abe2-e393-4b63-8d04-cc344831c6c5","endpoint":"http://localhost:5000/api/mock/projects","loadStrategy":"pageLoad","cacheEnabled":false}];
+  
+  // Bindings config
+  const _bindings = [{"blockId":"gh-premium-1769148718508-102","type":"repeater","sourceAlias":"123","fieldMappings":[{"sourceField":"project-image","targetProperty":"item.project-image"},{"sourceField":"element","targetProperty":"item.element"},{"sourceField":"project-name","targetProperty":"item.project-name"},{"sourceField":"project-location","targetProperty":"item.project-location"},{"sourceField":"project-price","targetProperty":"item.project-price"}],"repeaterConfig":{"itemTemplate":"1c3ae350-19ce-4844-8720-e3c516981837","containerSelector":"[data-element-id=\"gh-premium-1769148718508-102\"]"}}];
+  
+  // Variable getter/setter
+  window.$var = function(name, value) {
+    if (arguments.length === 1) {
+      return _variables[name];
+    }
+    _variables[name] = value;
+    updateBindings();
+    return value;
+  };
+  
+  // Data source getter
+  window.$data = function(alias) {
+    return _dataStore[alias] || null;
+  };
+  
+  // Fetch data from source
+  async function fetchData(source) {
+    try {
+      const response = await fetch(source.endpoint || '/api/data/' + source.dataSourceId);
+      const data = await response.json();
+      _dataStore[source.alias] = data;
+      return data;
+    } catch (error) {
+      console.error('Failed to fetch data for', source.alias, error);
+      return null;
+    }
+  }
+  
+  // Update all bindings
+  function updateBindings() {
+    _bindings.forEach(function(binding) {
+      const element = document.querySelector('[data-element-id="' + binding.blockId + '"]');
+      if (!element) {
+        console.warn('Element not found for binding:', binding.blockId);
+        return;
+      }
+      
+      const data = _dataStore[binding.sourceAlias];
+      if (!data) {
+        console.warn('No data for source alias:', binding.sourceAlias);
+        return;
+      }
+      
+      if (binding.type === 'input' && binding.fieldMappings) {
+        binding.fieldMappings.forEach(function(mapping) {
+          const value = getNestedValue(data, mapping.sourceField);
+          applyValue(element, mapping.targetProperty, value);
+        });
+      }
+      
+      if (binding.type === 'repeater' && binding.repeaterConfig) {
+        console.log('Rendering repeater:', binding.blockId, data);
+        renderRepeater(element, data, binding.repeaterConfig, binding.fieldMappings);
+      }
+    });
+  }
+  
+  // Get nested value from object
+  function getNestedValue(obj, path) {
+    return path.split('.').reduce(function(acc, key) {
+      return acc && acc[key];
+    }, obj);
+  }
+  
+  // Apply value to element property
+  function applyValue(element, property, value) {
+    switch (property) {
+      case 'textContent':
+        element.textContent = value;
+        break;
+      case 'innerHTML':
+        element.innerHTML = value;
+        break;
+      case 'src':
+      case 'href':
+      case 'alt':
+      case 'title':
+        element.setAttribute(property, value);
+        break;
+      default:
+        if (property.startsWith('style.')) {
+          element.style[property.slice(6)] = value;
+        } else if (property.startsWith('data-')) {
+          element.setAttribute(property, value);
+        }
+    }
+  }
+  
+  // Render repeater items
+  function renderRepeater(container, data, config, fieldMappings) {
+    // Данные должны быть массивом или объектом с массивом
+    let items = data;
+    
+    // Если data - это объект с вложенным массивом (например {success: true, data: [...]})
+    if (!Array.isArray(data)) {
+      if (data.data && Array.isArray(data.data)) {
+        items = data.data;
+      } else if (data.items && Array.isArray(data.items)) {
+        items = data.items;
+      } else {
+        console.error('Repeater data is not an array:', data);
+        return;
+      }
+    }
+    
+    // Находим Template блок
+    const templateElement = document.querySelector('[data-element-id="' + config.itemTemplate + '"]');
+    if (!templateElement) {
+      console.error('Template block not found:', config.itemTemplate);
+      return;
+    }
+    
+    // Скрываем оригинальный template
+    templateElement.style.display = 'none';
+    
+    // Очищаем контейнер (сохраняем только template)
+    Array.from(container.children).forEach(function(child) {
+      if (child !== templateElement) {
+        child.remove();
+      }
+    });
+    
+    console.log('Rendering ' + items.length + ' items with template:', config.itemTemplate);
+    
+    // Клонируем template для каждого элемента
+    items.forEach(function(item, index) {
+      const clone = templateElement.cloneNode(true);
+      clone.style.display = ''; // Показываем клон
+      clone.removeAttribute('data-element-id'); // Убираем ID чтобы не конфликтовать
+      clone.setAttribute('data-repeater-item', index);
+      
+      // Применяем field mappings если есть
+      if (fieldMappings && fieldMappings.length > 0) {
+        applyFieldMappingsToElement(clone, item, fieldMappings);
+      } else {
+        // Иначе пытаемся автоопределить через data-bind и {{template}}
+        updateElementContent(clone, item);
+      }
+      
+      container.appendChild(clone);
+    });
+  }
+  
+  // Применить field mappings к элементу
+  function applyFieldMappingsToElement(element, data, mappings) {
+    mappings.forEach(function(mapping) {
+      // targetProperty может быть вида:
+      // - "content" - текст элемента с ID из template
+      // - "children.0.content" - текст первого child
+      // - "children.title-xyz.content"
+      // - "attributes.href"
+      
+      const value = getNestedValue(data, mapping.sourceField);
+      if (value === undefined) return;
+      
+      // Парсим targetProperty
+      const parts = mapping.targetProperty.split('.');
+      
+      // Если targetProperty начинается с "children", ищем элемент
+      if (parts[0] === 'children' && parts.length >= 2) {
+        // children.title-xyz.content → ищем элемент с ID содержащим "title"
+        const childIdHint = parts[1]; // например "title-xyz" или "0"
+        const property = parts[2] || 'content'; // content, attributes, styles
+        
+        // Ищем элемент внутри template
+        let targetElement = null;
+        
+        // Пробуем найти по точному data-element-id
+        targetElement = element.querySelector('[data-element-id*="' + childIdHint + '"]');
+        
+        if (!targetElement && !isNaN(childIdHint)) {
+          // Если это число - берем N-й child
+          const index = parseInt(childIdHint);
+          targetElement = element.children[index];
+        }
+        
+        if (targetElement) {
+          applyValue(targetElement, property, value);
+        }
+      } else {
+        // Прямое свойство - применяем к корневому элементу
+        applyValue(element, mapping.targetProperty, value);
+      }
+    });
+  }
+  
+  // Обновить содержимое элемента данными (fallback для авто-обнаружения)
+  function updateElementContent(element, data) {
+    // Проходим по всем вложенным элементам
+    const walker = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_ELEMENT,
+      null,
+      false
+    );
+    
+    const nodes = [element];
+    let node;
+    while (node = walker.nextNode()) {
+      nodes.push(node);
+    }
+    
+    nodes.forEach(function(node) {
+      // Ищем data-bind атрибут для автоматического связывания
+      const bindField = node.getAttribute('data-bind');
+      if (bindField) {
+        const value = getNestedValue(data, bindField);
+        if (value !== undefined) {
+          if (node.tagName === 'IMG') {
+            node.src = value;
+          } else if (node.tagName === 'A') {
+            node.href = value;
+          } else {
+            node.textContent = value;
+          }
+        }
+      }
+      
+      // Проверяем textContent на шаблонные переменные {{field}}
+      if (node.childNodes.length > 0) {
+        node.childNodes.forEach(function(child) {
+          if (child.nodeType === Node.TEXT_NODE && child.textContent) {
+            const text = child.textContent;
+            const matches = text.match(/{{([^}]+)}}/g);
+            if (matches) {
+              let newText = text;
+              matches.forEach(function(match) {
+                const field = match.replace(/{{|}}/g, '').trim();
+                const value = getNestedValue(data, field);
+                if (value !== undefined) {
+                  newText = newText.replace(match, value);
+                }
+              });
+              child.textContent = newText;
+            }
+          }
+        });
+      }
+    });
+  }
+  
+  // ==================== OUTPUT BINDINGS ====================
+  
+  // Setup output binding for an element
+  function setupOutputBinding(binding) {
+    const element = document.querySelector('[data-element-id="' + binding.blockId + '"]');
+    if (!element || !binding.outputConfig) return;
+    
+    const config = binding.outputConfig;
+    
+    // Определяем событие триггера
+    const triggerEvent = {
+      'submit': 'submit',
+      'click': 'click',
+      'change': 'change',
+      'blur': 'blur'
+    }[config.trigger] || 'click';
+    
+    // Находим форму или элемент для триггера
+    const form = element.closest('form') || element.querySelector('form');
+    const targetElement = form || element;
+    
+    // Добавляем обработчик
+    targetElement.addEventListener(triggerEvent, async function(e) {
+      if (triggerEvent === 'submit') {
+        e.preventDefault();
+      }
+      
+      await handleOutputSubmit(element, binding, form);
+    });
+    
+    // Интервальный триггер
+    if (config.trigger === 'interval' && config.triggerInterval) {
+      setInterval(function() {
+        handleOutputSubmit(element, binding, form);
+      }, config.triggerInterval * 1000);
+    }
+  }
+  
+  // Обработка отправки данных
+  async function handleOutputSubmit(element, binding, form) {
+    const config = binding.outputConfig;
+    const button = element.querySelector('button[type="submit"]') || element.querySelector('button');
+    
+    // Состояние загрузки
+    setButtonState(button, 'loading');
+    
+    try {
+      // Собираем данные
+      const payload = collectPayload(element, form, config.payloadMappings);
+      
+      // Валидация
+      if (config.validations) {
+        const errors = validatePayload(payload, config.validations);
+        if (Object.keys(errors).length > 0) {
+          showValidationErrors(element, errors);
+          setButtonState(button, 'error');
+          return;
+        }
+      }
+      
+      // Получаем endpoint
+      const endpoint = config.endpoint || _dataSources.find(function(ds) {
+        return ds.alias === binding.sourceAlias;
+      })?.endpoint || '/api/data/submit';
+      
+      // Отправляем запрос
+      const response = await fetch(endpoint, {
+        method: config.method || 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          dataSourceId: binding.sourceAlias,
+          data: payload,
+          blockId: binding.blockId,
+          trigger: config.trigger,
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        setButtonState(button, 'success');
+        handleSuccessAction(element, config.onSuccess, result);
+        
+        // Сброс формы
+        if (form) form.reset();
+      } else {
+        setButtonState(button, 'error');
+        handleErrorAction(element, config.onError, result.error);
+      }
+    } catch (error) {
+      console.error('Output binding error:', error);
+      setButtonState(button, 'error');
+      handleErrorAction(element, config.onError, { message: error.message });
+    }
+  }
+  
+  // Сбор данных payload
+  function collectPayload(element, form, mappings) {
+    const payload = {};
+    
+    if (form) {
+      // Из формы
+      const formData = new FormData(form);
+      formData.forEach(function(value, key) {
+        payload[key] = value;
+      });
+    }
+    
+    // Применяем маппинги
+    if (mappings) {
+      mappings.forEach(function(m) {
+        if (m.type === 'direct') {
+          const input = element.querySelector('[name="' + m.sourceField + '"]');
+          if (input) payload[m.targetField] = input.value;
+        } else if (m.type === 'static') {
+          payload[m.targetField] = m.value;
+        } else if (m.type === 'computed' && m.value) {
+          try {
+            payload[m.targetField] = eval(m.value);
+          } catch (e) {
+            console.error('Computed field error:', e);
+          }
+        }
+      });
+    }
+    
+    return payload;
+  }
+  
+  // Валидация payload
+  function validatePayload(payload, validations) {
+    const errors = {};
+    
+    validations.forEach(function(v) {
+      const value = payload[v.field];
+      
+      v.rules.forEach(function(rule) {
+        switch (rule.type) {
+          case 'required':
+            if (!value || value.toString().trim() === '') {
+              errors[v.field] = errors[v.field] || [];
+              errors[v.field].push(rule.message || 'Обязательное поле');
+            }
+            break;
+          case 'email':
+            if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+              errors[v.field] = errors[v.field] || [];
+              errors[v.field].push(rule.message || 'Неверный email');
+            }
+            break;
+          case 'minLength':
+            if (value && value.length < rule.value) {
+              errors[v.field] = errors[v.field] || [];
+              errors[v.field].push(rule.message || 'Минимум ' + rule.value + ' символов');
+            }
+            break;
+          case 'maxLength':
+            if (value && value.length > rule.value) {
+              errors[v.field] = errors[v.field] || [];
+              errors[v.field].push(rule.message || 'Максимум ' + rule.value + ' символов');
+            }
+            break;
+          case 'pattern':
+            if (value && rule.value && !new RegExp(rule.value).test(value)) {
+              errors[v.field] = errors[v.field] || [];
+              errors[v.field].push(rule.message || 'Неверный формат');
+            }
+            break;
+        }
+      });
+    });
+    
+    return errors;
+  }
+  
+  // Показать ошибки валидации
+  function showValidationErrors(element, errors) {
+    // Удаляем старые ошибки
+    element.querySelectorAll('.validation-error').forEach(function(el) {
+      el.remove();
+    });
+    
+    // Показываем новые
+    Object.keys(errors).forEach(function(field) {
+      const input = element.querySelector('[name="' + field + '"]');
+      if (input) {
+        input.classList.add('border-red-500');
+        const errorEl = document.createElement('div');
+        errorEl.className = 'validation-error text-red-500 text-sm mt-1';
+        errorEl.textContent = errors[field][0];
+        input.parentNode.appendChild(errorEl);
+      }
+    });
+  }
+  
+  // Состояние кнопки
+  function setButtonState(button, state) {
+    if (!button) return;
+    
+    const originalText = button.getAttribute('data-original-text') || button.textContent;
+    button.setAttribute('data-original-text', originalText);
+    
+    button.classList.remove('loading', 'success', 'error');
+    
+    switch (state) {
+      case 'loading':
+        button.disabled = true;
+        button.classList.add('loading');
+        button.innerHTML = '<span class="spinner"></span> Отправка...';
+        break;
+      case 'success':
+        button.disabled = false;
+        button.classList.add('success');
+        button.innerHTML = '✓ Успешно';
+        setTimeout(function() {
+          button.textContent = originalText;
+          button.classList.remove('success');
+        }, 2000);
+        break;
+      case 'error':
+        button.disabled = false;
+        button.classList.add('error');
+        button.innerHTML = '✗ Ошибка';
+        setTimeout(function() {
+          button.textContent = originalText;
+          button.classList.remove('error');
+        }, 3000);
+        break;
+    }
+  }
+  
+  // Обработка успешного действия
+  function handleSuccessAction(element, onSuccess, result) {
+    if (!onSuccess) return;
+    
+    switch (onSuccess.action) {
+      case 'message':
+        alert(onSuccess.value || 'Успешно отправлено!');
+        break;
+      case 'redirect':
+        if (onSuccess.value) window.location.href = onSuccess.value;
+        break;
+      case 'refresh':
+        window.location.reload();
+        break;
+      case 'reset':
+        const form = element.querySelector('form');
+        if (form) form.reset();
+        break;
+      case 'hide':
+        element.style.display = 'none';
+        break;
+    }
+  }
+  
+  // Обработка ошибки
+  function handleErrorAction(element, onError, error) {
+    if (!onError) {
+      alert('Ошибка: ' + (error?.message || 'Неизвестная ошибка'));
+      return;
+    }
+    
+    switch (onError.action) {
+      case 'message':
+        alert(onError.value || error?.message || 'Произошла ошибка');
+        break;
+      case 'retry':
+        // Retry логика обрабатывается в handleOutputSubmit
+        break;
+    }
+  }
+  
+  // Initialize on page load
+  document.addEventListener('DOMContentLoaded', function() {
+    // Load data sources configured for page load
+    _dataSources.forEach(function(source) {
+      if (source.loadStrategy === 'pageLoad') {
+        fetchData(source).then(updateBindings);
+      }
+      
+      if (source.loadStrategy === 'interval' && source.loadInterval) {
+        setInterval(function() {
+          fetchData(source).then(updateBindings);
+        }, source.loadInterval * 1000);
+      }
+    });
+    
+    // Setup output bindings
+    _bindings.forEach(function(binding) {
+      if (binding.type === 'output') {
+        setupOutputBinding(binding);
+      }
+    });
+  });
+})();
+</script>
+
+<script>
+(function() {
+  const element = document.querySelector('[data-element-id="gh-premium-1769148718507-14"]');
+  if (!element) return;
+  // Обработчик клика
+element.addEventListener('click', function(e) {
+  console.log('Клик по элементу', element);
+  // Ваш код здесь
+});
+})();
+
+</script>
 </body>
 </html>

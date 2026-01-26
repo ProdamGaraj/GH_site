@@ -7,7 +7,8 @@ import { cn } from '@/shared/utils'
 import type { BlockNode } from '@/shared/types'
 import { CSS } from '@dnd-kit/utilities'
 import { BlockNodeWithViewport } from '../../utils/variationUtils'
-import { DataBindingIndicator } from '@/features/dataBindings'
+import { DataBindingIndicator, useBlockDataPreview } from '@/features/dataBindings'
+import { RepeaterRenderer } from './RepeaterRenderer'
 
 // Text elements that support inline editing
 const TEXT_ELEMENTS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'a', 'button', 'label', 'li']
@@ -37,6 +38,21 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
   const isSelected = selectedNodeId === node.id
   const isDragged = dragState.draggedNodeId === node.id
   const isLocked = node.metadata?.locked || false
+  
+  // Check for repeater binding
+  const { isRepeater } = useBlockDataPreview(node.id)
+  
+  // If this block has repeater binding, use RepeaterRenderer
+  if (isRepeater && !isRoot) {
+    return (
+      <RepeaterRenderer 
+        node={node}
+        editorType={editorType}
+        blockAlignment={blockAlignment}
+        rootNode={actualRootNode || undefined}
+      />
+    )
+  }
   
   // Inline text editing state
   const [isInlineEditing, setIsInlineEditing] = useState(false)

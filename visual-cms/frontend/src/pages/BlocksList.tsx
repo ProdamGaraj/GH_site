@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Header } from '@/shared/components/Header'
 import { ImportModal } from '@/shared/components/ImportModal'
-import { Plus, Loader2, Box, Calendar, Pencil, Trash2, Upload } from 'lucide-react'
+import { Plus, Loader2, Box, Calendar, Pencil, Trash2, Upload, Sparkles } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { 
   fetchBlocks, 
@@ -13,6 +13,7 @@ import {
   selectBlocksError 
 } from '@/features/blocks/blocksSlice'
 import type { BlockNode } from '@/shared/types'
+import { TemplateQuickToggle } from '@/features/blocks/components/TemplateQuickToggle'
 
 export const BlocksList: React.FC = () => {
   const dispatch = useAppDispatch()
@@ -113,9 +114,17 @@ export const BlocksList: React.FC = () => {
                 
                 {/* Info */}
                 <div className="p-4">
-                  <h3 className="font-medium text-gray-900 mb-1 truncate">
-                    {block.name}
-                  </h3>
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="font-medium text-gray-900 truncate flex-1">
+                      {block.name}
+                    </h3>
+                    {block.isTemplate && (
+                      <div className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
+                        <Sparkles size={12} />
+                        <span>Template</span>
+                      </div>
+                    )}
+                  </div>
                   
                   <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                     <Calendar size={12} />
@@ -125,6 +134,19 @@ export const BlocksList: React.FC = () => {
                         Переисп.
                       </span>
                     )}
+                    {block.isTemplate && block.detectedFields && (
+                      <span className="px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded">
+                        {block.detectedFields.length} fields
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Template Toggle Button */}
+                  <div className="mb-3">
+                    <TemplateQuickToggle
+                      block={block}
+                      onUpdate={() => dispatch(fetchBlocks())}
+                    />
                   </div>
                   
                   {/* Actions */}

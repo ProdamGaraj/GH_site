@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { selectNode, selectSelectedNodeId, deleteNode, selectBreakpoints, selectRootNode } from '@/features/editor/editorSlice'
 import * as Icons from 'lucide-react'
@@ -13,6 +14,17 @@ interface LayerItemProps {
   level: number
   expandedNodes: Set<string>
   onToggle: (nodeId: string) => void
+  parentId: string | null // ID родительского узла для обработки drop
+  index: number // Индекс в массиве children родителя
+  isLastChild?: boolean // Является ли последним дочерним элементом
+}
+
+interface LayerDragData {
+  type: 'layer-item'
+  nodeId: string
+  node: BlockNodeWithViewport
+  parentId: string | null
+  index: number
 }
 
 // Функция для проверки, является ли узел предком или потомком выбранного узла
@@ -24,7 +36,7 @@ const isNodeInPath = (node: BlockNodeWithViewport, targetId: string): boolean =>
   return false
 }
 
-export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes, onToggle }) => {
+export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes, onToggle, parentId = null, index = 0, isLastChild = false }) => {
   const dispatch = useAppDispatch()
   const selectedNodeId = useAppSelector(selectSelectedNodeId)
   const breakpoints = useAppSelector(selectBreakpoints)
@@ -38,6 +50,7 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
   const hasChildren = node.children && node.children.length > 0
   const isContainer = node.elementType === 'container'
   const isLocked = node.metadata?.locked || false
+  const isRoot = level === 0 // Корневой элемент нельзя перетаскивать
   
   // Определяем к какому breakpoint принадлежит элемент (если он специфичный)
   // Используем _viewportId из эффективного дерева, если есть, иначе ищем через getNodeBreakpoint
@@ -46,6 +59,81 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
   
   // Элемент является viewport-специфичным если у него есть nodeBreakpoint
   const isViewportSpecific = !!nodeBreakpoint
+
+  // === Drag-and-Drop Setup ===
+  const dragData: LayerDragData = {
+    type: 'layer-item',
+    nodeId: node.id,
+    node,
+    parentId,
+    index,
+  }
+
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+    id: `layer-drag-${node.id}`,
+    disabled: isRoot || isLocked,
+    data: dragData,
+  })
+
+  // Single drop zone for this item - position will be determined by cursor position
+  const { setNodeRef: setDropRef, isOver, active } = useDroppable({
+    id: `layer-drop-${node.id}`,
+    disabled: isRoot && !hasChildren, // Root can accept drops inside if it has children
+    data: {
+      type: 'layer-droppable',
+      nodeId: node.id,
+      parentId,
+      index,
+      isContainer: isContainer || hasChildren,
+      isRoot,
+    },
+  })
+
+  // Combine refs
+  const combinedRef = (el: HTMLDivElement | null) => {
+    setDragRef(el)
+    setDropRef(el)
+  }
+
+  // Determine drop position based on mouse position when hovering
+  const [dropPosition, setDropPosition] = React.useState<'before' | 'after' | 'inside' | null>(null)
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isOver || !active) {
+      setDropPosition(null)
+      return
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect()
+    const mouseY = e.clientY
+    const relativeY = mouseY - rect.top
+    const height = rect.height
+
+    // For root element, only allow 'inside'
+    if (isRoot) {
+      setDropPosition('inside')
+      return
+    }
+
+    // Divide into zones: top 30% = before, middle 40% = inside (for containers), bottom 30% = after
+    // Для последнего элемента расширяем зону "after" до 50% чтобы было проще попасть
+    const afterThreshold = isLastChild ? 0.5 : 0.7
+    
+    if (relativeY < height * 0.3) {
+      setDropPosition('before')
+    } else if (relativeY > height * afterThreshold) {
+      setDropPosition('after')
+    } else if (isContainer || hasChildren) {
+      setDropPosition('inside')
+    } else {
+      // For non-containers, use before/after based on which is closer
+      setDropPosition(relativeY < height * 0.5 ? 'before' : 'after')
+    }
+  }
+
+  const handleMouseLeave = () => {
+    setDropPosition(null)
+  }
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -142,20 +230,41 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
   const IconComponent = getIcon()
 
   return (
-    <div>
+    <div style={{ opacity: isDragging ? 0.4 : 1 }}>
+      {/* Drop indicator BEFORE */}
+      {!isRoot && dropPosition === 'before' && isOver && (
+        <div className="h-0.5 bg-primary-500 mx-2 my-0.5 rounded-full" />
+      )}
+
       <div
+        ref={combinedRef}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
         className={cn(
           'group flex items-center gap-1.5 py-1.5 pr-1 rounded cursor-pointer hover:bg-gray-100 transition-colors text-sm min-h-[28px] relative',
-          isSelected && 'bg-primary-50 hover:bg-primary-100'
+          isSelected && 'bg-primary-50 hover:bg-primary-100',
+          dropPosition === 'inside' && isOver && (isContainer || hasChildren) && 'bg-primary-100 ring-2 ring-primary-400'
         )}
         style={{ paddingLeft: `${level * 12 + 8}px` }}
         onClick={handleClick}
       >
+        {/* Drag Handle - отдельно слева */}
+        {!isRoot && !isLocked && (
+          <div
+            {...attributes}
+            {...listeners}
+            className="flex-shrink-0 w-4 h-4 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-gray-200 rounded transition-all z-10 opacity-0 group-hover:opacity-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Icons.GripVertical size={12} className="text-gray-500" />
+          </div>
+        )}
+        
         {/* Expand/Collapse Arrow */}
         {hasChildren ? (
           <button
             onClick={handleToggle}
-            className="flex-shrink-0 w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded transition-all"
+            className="flex-shrink-0 w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded transition-all z-10"
             style={{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
           >
             <Icons.ChevronRight size={12} className="text-gray-900" />
@@ -166,7 +275,7 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
 
         {/* Icon */}
         <div className={cn(
-          'flex-shrink-0 w-6 h-6 flex items-center justify-center rounded',
+          'flex-shrink-0 w-6 h-6 flex items-center justify-center rounded z-10',
           isContainer ? 'bg-primary-100' : 'bg-gray-100'
         )}>
           <IconComponent 
@@ -179,7 +288,7 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
 
         {/* Name */}
         <span className={cn(
-          'flex-1 truncate min-w-0',
+          'flex-1 truncate min-w-0 z-10',
           isSelected ? 'text-primary-900 font-medium' : 'text-gray-700'
         )}>
           {node.metadata?.name || node.tagName}
@@ -241,16 +350,24 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
       {/* Children */}
       {hasChildren && isExpanded && (
         <div>
-          {node.children.map((child) => (
+          {node.children.map((child, idx) => (
             <LayerItem 
               key={child.id} 
               node={child} 
               level={level + 1} 
               expandedNodes={expandedNodes}
+              isLastChild={idx === node.children.length - 1}
               onToggle={onToggle}
+              parentId={node.id}
+              index={idx}
             />
           ))}
         </div>
+      )}
+
+      {/* Drop indicator AFTER */}
+      {dropPosition === 'after' && isOver && (
+        <div className="h-0.5 bg-primary-500 mx-2 my-0.5 rounded-full" />
       )}
     </div>
   )

@@ -1,14 +1,14 @@
 # 📊 Visual CMS — Отчёт о состоянии проекта
 
-**Дата:** 22 января 2026  
-**Версия:** 1.0.0  
-**Статус:** ✅ MVP Complete + Data Binding System Complete
+**Дата:** 23 января 2026  
+**Версия:** 1.1.0  
+**Статус:** ✅ MVP Complete + Data Binding System Complete + Template-as-Block Complete
 
 ---
 
 ## 📋 Краткое описание
 
-Visual CMS — это no-code/low-code визуальный конструктор веб-страниц, позволяющий создавать динамические сайты без программирования. Проект включает полноценный drag & drop редактор, систему привязки данных (Data Binding), и инструменты для деплоя статических сайтов.
+Visual CMS — это no-code/low-code визуальный конструктор веб-страниц, позволяющий создавать динамические сайты без программирования. Проект включает полноценный drag & drop редактор, систему привязки данных (Data Binding), систему Template-as-Block для создания переиспользуемых компонентов, и инструменты для деплоя статических сайтов.
 
 ---
 
@@ -21,6 +21,7 @@ Visual CMS — это no-code/low-code визуальный конструкто
 | **1** | visual-constructor-implementation-plan.md | ✅ Завершено | **100%** |
 | **2** | visual-constructor-architecture.md | ✅ Завершено | **100%** |
 | **3** | data-binding-system-spec.md | ✅ Завершено | **100%** |
+| **4** | block-as-template-implementation.md | ✅ Завершено | **100%** |
 
 ---
 
@@ -196,6 +197,86 @@ Visual CMS — это no-code/low-code визуальный конструкто
   - Custom error classes
   - Centralized error handler
   - Error logging
+
+---
+
+### 3. Template-as-Block System
+
+#### Концепция
+Template — это **вторая роль Block**, а не отдельная сущность. Любой блок может быть переведён в Template режим с автоматическим определением bindable полей и синхронизацией с Data Bindings.
+
+**Ключевые принципы:**
+- Block.structure — единственный источник правды
+- HTML/CSS генерируются динамически
+- Поля обнаруживаются автоматически из элементов с metadata.name
+- Изменения структуры → автоматическая синхронизация Data Bindings
+
+#### Backend ✅
+- ✅ Block модель расширена полями:
+  - `isTemplate: boolean` — флаг Template режима
+  - `templateCategory: string` — категория (card, list-item, modal и т.д.)
+  - `detectedFields: DetectedField[]` — автообнаруженные bindable поля
+  - `templateSettings: TemplateSettings` — настройки (анимация, responsive)
+- ✅ **BlockTemplateService** (core logic):
+  - `generateHTMLFromStructure()` — генерация HTML с data-bind атрибутами
+  - `detectFieldsFromStructure()` — автоопределение полей из metadata.name
+  - `diffFields()` — сравнение старых/новых полей (added/removed/unchanged)
+  - `syncBindingsOnFieldChange()` — синхронизация DataBinding.fieldMappings при изменении полей
+- ✅ **BlockController endpoints**:
+  - `POST /api/blocks/:id/enable-template` — включить Template режим
+  - `POST /api/blocks/:id/disable-template` — отключить Template режим
+  - `GET /api/blocks/:id/html` — получить HTML/CSS + detectedFields
+  - `POST /api/blocks/:id/refresh-fields` — принудительно пересчитать поля
+  - `PUT /api/blocks/:id` — обновлён для автосинхронизации при изменении structure
+- ✅ **Database migration**:
+  - 4 новых поля в таблице `blocks`
+  - 2 индекса для производительности (is_template, template_category)
+
+#### Frontend ✅
+- ✅ **TemplateModeSwitch** component:
+  - Кнопка "Enable Template" / Badge "Template Mode"
+  - Диалог выбора категории Template
+  - Кнопка Refresh Fields с diff preview
+  - Кнопка Disable Template
+- ✅ **DetectedFieldsViewer** component:
+  - Отображение обнаруженных полей с иконками
+  - Цветовая кодировка по типу (text, image, link, number, date, list, object)
+  - Информация о selector, attribute
+  - Semantic hints
+  - Режимы: compact / full
+- ✅ **Integration в UI**:
+  - BlocksList: badge "Template" + "N fields" + TemplateModeSwitch
+  - PropertiesPanel: DetectedFieldsViewer в правой панели для Template блоков
+  - Editor: передача currentBlockData для отображения template информации
+
+#### Auto-Sync Flow ✅
+```
+User edits Block.structure (добавляет элемент с metadata.name)
+    ↓
+BlockController.update() → detects isTemplate === true
+    ↓
+BlockTemplateService.detectFieldsFromStructure() → [fields]
+    ↓
+BlockTemplateService.diffFields(oldFields, newFields) → {added, removed, unchanged}
+    ↓
+BlockTemplateService.syncBindingsOnFieldChange() → updates DataBinding.fieldMappings
+    ↓
+DataBinding automatically updated ✅
+```
+
+#### Features ✅
+- ✅ Автоматическое определение полей при включении Template режима
+- ✅ Diff-based синхронизация (только изменённые поля обновляются)
+- ✅ HTML генерация с data-bind атрибутами для рендеринга
+- ✅ Поддержка 8 типов полей: text, image, link, number, date, boolean, list, object
+- ✅ Semantic hints для умного маппинга
+- ✅ Refresh fields with diff preview
+- ✅ Template category (card, list-item, modal, section, hero и т.д.)
+
+#### Documentation ✅
+- ✅ [block-as-template-implementation.md](./docs/block-as-template-implementation.md) — детальная реализация
+- ✅ [TEMPLATE_TESTING.md](./docs/TEMPLATE_TESTING.md) — 6 сценариев тестирования
+- ✅ [TEMPLATE_SUMMARY.md](./docs/TEMPLATE_SUMMARY.md) — краткое резюме
 
 #### Этап 8: Documentation & Deployment ✅
 - ✅ OpenAPI 3.0.3 specification

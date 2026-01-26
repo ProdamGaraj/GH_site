@@ -118,26 +118,36 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
   // Fetch data from source
   async function fetchData(source) {
     try {
+      console.log('[DataBinding] Fetching data for source:', source.alias, 'from:', source.endpoint || '/api/data/' + source.dataSourceId);
       const response = await fetch(source.endpoint || '/api/data/' + source.dataSourceId);
       const data = await response.json();
+      console.log('[DataBinding] Data received for', source.alias, ':', data);
       _dataStore[source.alias] = data;
       return data;
     } catch (error) {
-      console.error('Failed to fetch data for', source.alias, error);
+      console.error('[DataBinding] Failed to fetch data for', source.alias, error);
       return null;
     }
   }
   
   // Update all bindings
   function updateBindings() {
+    console.log('[DataBinding] Updating bindings, total:', _bindings.length);
     _bindings.forEach(function(binding) {
       const element = document.querySelector('[data-element-id="' + binding.blockId + '"]');
-      if (!element) return;
+      if (!element) {
+        console.warn('[DataBinding] Element not found for binding:', binding.blockId);
+        return;
+      }
       
       const data = _dataStore[binding.sourceAlias];
-      if (!data) return;
+      if (!data) {
+        console.warn('[DataBinding] No data for source alias:', binding.sourceAlias);
+        return;
+      }
       
       if (binding.type === 'input' && binding.fieldMappings) {
+        console.log('[DataBinding] Applying input binding for:', binding.blockId);
         binding.fieldMappings.forEach(function(mapping) {
           const value = getNestedValue(data, mapping.sourceField);
           applyValue(element, mapping.targetProperty, value);
@@ -145,7 +155,8 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       }
       
       if (binding.type === 'repeater' && binding.repeaterConfig) {
-        renderRepeater(element, data, binding.repeaterConfig);
+        console.log('[DataBinding] Rendering repeater for:', binding.blockId, 'with data:', data);
+        renderRepeater(element, data, binding.repeaterConfig, binding.fieldMappings);
       }
     });
   }
@@ -182,27 +193,172 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
   }
   
   // Render repeater items
-  function renderRepeater(container, items, config) {
-    if (!Array.isArray(items)) return;
+  function renderRepeater(container, data, config, fieldMappings) {
+    console.log('[Repeater] Starting render with config:', config);
+    console.log('[Repeater] Container:', container);
+    console.log('[Repeater] Data received:', data);
     
-    const template = document.querySelector(config.itemTemplate);
-    if (!template) return;
+    // Данные должны быть массивом или объектом с массивом
+    let items = data;
     
-    container.innerHTML = '';
+    // Если data - это объект с вложенным массивом (например {success: true, data: [...]})
+    if (!Array.isArray(data)) {
+      if (data.data && Array.isArray(data.data)) {
+        items = data.data;
+      } else if (data.items && Array.isArray(data.items)) {
+        items = data.items;
+      } else {
+        console.error('[Repeater] Data is not an array:', data);
+        return;
+      }
+    }
     
+    console.log('[Repeater] Items to render:', items.length);
+    console.log('[Repeater] Looking for template with ID:', config.itemTemplate);
+    
+    // Находим Template блок
+    const templateElement = document.querySelector('[data-element-id="' + config.itemTemplate + '"]');
+    if (!templateElement) {
+      console.error('[Repeater] Template block not found with ID:', config.itemTemplate);
+      console.error('[Repeater] Available elements:', Array.from(document.querySelectorAll('[data-element-id]')).map(el => el.getAttribute('data-element-id')));
+      console.error('[Repeater] Container children:', Array.from(container.children).map(el => ({
+        tag: el.tagName,
+        id: el.getAttribute('data-element-id'),
+        classes: el.className
+      })));
+      return;
+    }
+    
+    console.log('[Repeater] Template found:', templateElement);
+    
+    // Скрываем оригинальный template
+    templateElement.style.display = 'none';
+    
+    // Очищаем контейнер (сохраняем только template)
+    Array.from(container.children).forEach(function(child) {
+      if (child !== templateElement) {
+        child.remove();
+      }
+    });
+    
+    console.log('[Repeater] Rendering', items.length, 'items with template:', config.itemTemplate);
+    
+    // Клонируем template для каждого элемента
     items.forEach(function(item, index) {
-      const clone = template.content.cloneNode(true);
+      const clone = templateElement.cloneNode(true);
+      clone.style.display = ''; // Показываем клон
+      clone.removeAttribute('data-element-id'); // Убираем ID чтобы не конфликтовать
+      clone.setAttribute('data-repeater-item', index);
       
-      // Replace template variables
-      clone.querySelectorAll('[data-bind]').forEach(function(el) {
-        const field = el.getAttribute('data-bind');
-        const value = getNestedValue(item, field);
-        if (value !== undefined) {
-          el.textContent = value;
-        }
-      });
+      // Применяем field mappings если есть
+      if (fieldMappings && fieldMappings.length > 0) {
+        applyFieldMappingsToElement(clone, item, fieldMappings);
+      } else {
+        // Иначе пытаемся автоопределить через data-bind и {{template}}
+        updateElementContent(clone, item);
+      }
       
       container.appendChild(clone);
+    });
+    
+    console.log('[Repeater] Render complete');
+  }
+  
+  // Применить field mappings к элементу
+  function applyFieldMappingsToElement(element, data, mappings) {
+    mappings.forEach(function(mapping) {
+      // targetProperty может быть вида:
+      // - "content" - текст элемента с ID из template
+      // - "children.0.content" - текст первого child
+      // - "children.title-xyz.content"
+      // - "attributes.href"
+      
+      const value = getNestedValue(data, mapping.sourceField);
+      if (value === undefined) return;
+      
+      // Парсим targetProperty
+      const parts = mapping.targetProperty.split('.');
+      
+      // Если targetProperty начинается с "children", ищем элемент
+      if (parts[0] === 'children' && parts.length >= 2) {
+        // children.title-xyz.content → ищем элемент с ID содержащим "title"
+        const childIdHint = parts[1]; // например "title-xyz" или "0"
+        const property = parts[2] || 'content'; // content, attributes, styles
+        
+        // Ищем элемент внутри template
+        let targetElement = null;
+        
+        // Пробуем найти по точному data-element-id
+        targetElement = element.querySelector('[data-element-id*="' + childIdHint + '"]');
+        
+        if (!targetElement && !isNaN(childIdHint)) {
+          // Если это число - берем N-й child
+          const index = parseInt(childIdHint);
+          targetElement = element.children[index];
+        }
+        
+        if (targetElement) {
+          applyValue(targetElement, property, value);
+        }
+      } else {
+        // Прямое свойство - применяем к корневому элементу
+        applyValue(element, mapping.targetProperty, value);
+      }
+    });
+  }
+  
+  // Обновить содержимое элемента данными (fallback для авто-обнаружения)
+  function updateElementContent(element, data) {
+    // Проходим по всем вложенным элементам
+    const walker = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_ELEMENT,
+      null,
+      false
+    );
+    
+    const nodes = [element];
+    let node;
+    while (node = walker.nextNode()) {
+      nodes.push(node);
+    }
+    
+    nodes.forEach(function(node) {
+      // Ищем data-bind атрибут для автоматического связывания
+      const bindField = node.getAttribute('data-bind');
+      if (bindField) {
+        const value = getNestedValue(data, bindField);
+        if (value !== undefined) {
+          if (node.tagName === 'IMG') {
+            node.src = value;
+          } else if (node.tagName === 'A') {
+            node.href = value;
+          } else {
+            node.textContent = value;
+          }
+        }
+      }
+      
+      // Проверяем textContent на шаблонные переменные {{field}}
+      if (node.childNodes.length > 0) {
+        node.childNodes.forEach(function(child) {
+          if (child.nodeType === Node.TEXT_NODE && child.textContent) {
+            const text = child.textContent;
+            const matches = text.match(/\{\{([^}]+)\}\}/g);
+            if (matches) {
+              let newText = text;
+              matches.forEach(function(match) {
+                const field = match.replace(/\{\{|\}\}/g, '').trim();
+                const value = getNestedValue(data, field);
+                if (value !== undefined) {
+                  newText = newText.replace(match, value);
+                }
+              });
+              child.textContent = newText;
+            }
+          }
+        });
+      }
     });
   }
   

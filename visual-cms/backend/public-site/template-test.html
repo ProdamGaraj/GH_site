@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Template Test Tool</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    
+    h1 {
+      margin-bottom: 10px;
+      color: #1a1a1a;
+    }
+    
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    
+    .panel {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .panel h2 {
+      font-size: 18px;
+      margin-bottom: 15px;
+      color: #1a1a1a;
+    }
+    
+    .form-group {
+      margin-bottom: 15px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #333;
+    }
+    
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      font-family: monospace;
+    }
+    
+    textarea {
+      min-height: 200px;
+      resize: vertical;
+    }
+    
+    button {
+      background: #1a1a1a;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+    
+    button:hover {
+      background: #333;
+    }
+    
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    
+    .preview-frame {
+      width: 100%;
+      height: 600px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: white;
+    }
+    
+    .error {
+      background: #fee;
+      border: 1px solid #fcc;
+      color: #c00;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    
+    .success {
+      background: #efe;
+      border: 1px solid #cfc;
+      color: #060;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    
+    .info {
+      background: #e3f2fd;
+      border: 1px solid #90caf9;
+      color: #1976d2;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+    
+    code {
+      background: #f5f5f5;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🧪 Template Test Tool</h1>
+      <p class="subtitle">Протестируйте работу Template блоков с тестовыми данными</p>
+    </div>
+    
+    <div class="content">
+      <div class="panel">
+        <h2>Настройки теста</h2>
+        
+        <div class="info">
+          Введите ID Template блока и тестовые данные в формате JSON. 
+          Система сгенерирует множественные экземпляры блока с подставленными данными.
+        </div>
+        
+        <div class="form-group">
+          <label for="templateBlockId">Template Block ID:</label>
+          <input 
+            type="text" 
+            id="templateBlockId" 
+            placeholder="1c3ae350-19ce-4844-8720-e3c516981837"
+            value="1c3ae350-19ce-4844-8720-e3c516981837"
+          >
+        </div>
+        
+        <div class="form-group">
+          <label for="testData">Тестовые данные (JSON массив):</label>
+          <textarea id="testData" placeholder='[{"title": "...", "description": "..."}]'>
+[
+  {
+    "title": "Golden Residence",
+    "description": "Премиальный жилой комплекс",
+    "price": "от $150,000",
+    "location": "Ташкент, район Мирзо-Улугбек",
+    "image": "/images/projects/golden-residence.jpg"
+  },
+  {
+    "title": "Golden Park",
+    "description": "Современные апартаменты",
+    "price": "от $120,000",
+    "location": "Ташкент, Юнусабадский район",
+    "image": "/images/projects/golden-park.jpg"
+  },
+  {
+    "title": "Golden Tower",
+    "description": "Элитная высотка в центре",
+    "price": "от $200,000",
+    "location": "Ташкент, центр города",
+    "image": "/images/projects/golden-tower.jpg"
+  }
+]</textarea>
+        </div>
+        
+        <div class="form-group">
+          <label for="fieldMappings">Field Mappings (опционально, JSON):</label>
+          <textarea id="fieldMappings" placeholder='[{"targetProperty": "content", "sourceField": "title"}]'>
+[
+  {
+    "id": "1",
+    "targetProperty": "content",
+    "sourceField": "title"
+  },
+  {
+    "id": "2",
+    "targetProperty": "content",
+    "sourceField": "description"
+  }
+]</textarea>
+        </div>
+        
+        <button onclick="testTemplate()">🚀 Запустить тест</button>
+        
+        <div id="status"></div>
+      </div>
+      
+      <div class="panel">
+        <h2>Результат</h2>
+        <iframe id="previewFrame" class="preview-frame"></iframe>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    async function testTemplate() {
+      const statusDiv = document.getElementById('status')
+      const previewFrame = document.getElementById('previewFrame')
+      
+      try {
+        statusDiv.innerHTML = '<div class="info">⏳ Отправка запроса...</div>'
+        
+        const templateBlockId = document.getElementById('templateBlockId').value
+        const testDataText = document.getElementById('testData').value
+        const fieldMappingsText = document.getElementById('fieldMappings').value
+        
+        if (!templateBlockId) {
+          throw new Error('Укажите Template Block ID')
+        }
+        
+        let testData
+        try {
+          testData = JSON.parse(testDataText)
+        } catch (e) {
+          throw new Error('Неверный формат тестовых данных (должен быть JSON массив)')
+        }
+        
+        let fieldMappings = null
+        if (fieldMappingsText.trim()) {
+          try {
+            fieldMappings = JSON.parse(fieldMappingsText)
+          } catch (e) {
+            throw new Error('Неверный формат field mappings (должен быть JSON массив)')
+          }
+        }
+        
+        const response = await fetch('http://localhost:3000/api/template-test/render', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            templateBlockId,
+            testData,
+            fieldMappings
+          })
+        })
+        
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.message || 'Ошибка запроса')
+        }
+        
+        const result = await response.json()
+        
+        statusDiv.innerHTML = `
+          <div class="success">
+            ✅ Успешно!<br>
+            Template: <code>${result.templateBlock.name}</code><br>
+            Сгенерировано элементов: <code>${result.itemsRendered}</code>
+          </div>
+        `
+        
+        // Отображаем результат в iframe
+        const iframeDoc = previewFrame.contentDocument || previewFrame.contentWindow.document
+        iframeDoc.open()
+        iframeDoc.write(result.html)
+        iframeDoc.close()
+        
+      } catch (error) {
+        statusDiv.innerHTML = `<div class="error">❌ ${error.message}</div>`
+        console.error('Test error:', error)
+      }
+    }
+    
+    // Автоматический тест при загрузке (опционально)
+    // window.addEventListener('load', () => testTemplate())
+  </script>
+</body>
+</html>

@@ -269,6 +269,52 @@ export const generateNodeTreeCSS = (node: BlockNode): { css: string; keyframes: 
     css += generateStateStyles(node.id, node.styles.states, node.styles.stateTransition)
   }
   
+  // Generate element scripts
+  if (node.scripts && node.scripts.length > 0) {
+    node.scripts.forEach(script => {
+      if (!script.enabled) return
+      
+      const scriptCode = `
+(function() {
+  const element = document.querySelector('[data-element-id="${node.id}"]');
+  if (!element) return;
+  
+  ${script.trigger === 'load' ? `
+  // Execute on load
+  ${script.code}
+  ` : script.trigger === 'click' ? `
+  // Execute on click
+  element.addEventListener('click', function(e) {
+    ${script.code}
+  });
+  ` : script.trigger === 'hover' ? `
+  // Execute on hover
+  element.addEventListener('mouseenter', function() {
+    ${script.code}
+  });
+  ` : script.trigger === 'scroll' ? `
+  // Execute on scroll into view
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        ${script.code}
+        observer.disconnect();
+      }
+    });
+  });
+  observer.observe(element);
+  ` : script.trigger === 'custom' && script.customTrigger ? `
+  // Execute on custom trigger
+  element.addEventListener('${script.customTrigger}', function(e) {
+    ${script.code}
+  });
+  ` : ''}
+})();`
+      
+      scripts += scriptCode + '\n'
+    })
+  }
+  
   // Generate animation styles
   if (node.animations && node.animations.length > 0) {
     const animStyles = generateAnimationStyles(node.id, node.animations)

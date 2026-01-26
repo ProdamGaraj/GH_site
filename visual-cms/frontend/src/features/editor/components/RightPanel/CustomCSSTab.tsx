@@ -182,6 +182,7 @@ export const CustomCSSTab: React.FC<CustomCSSTabProps> = ({ node }) => {
               automaticLayout: true,
               padding: { top: 8, bottom: 8 },
               renderLineHighlight: 'line',
+              fixedOverflowWidgets: true,
               scrollbar: {
                 vertical: 'auto',
                 horizontal: 'auto',

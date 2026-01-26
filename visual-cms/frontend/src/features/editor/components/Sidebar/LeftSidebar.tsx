@@ -47,20 +47,18 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ mode = 'block' }) => {
         <Package size={20} />
       </button>
 
-      {/* Saved Blocks (only for pages) */}
-      {mode === 'page' && (
-        <button
-          onClick={() => handlePanelClick('savedBlocks')}
-          className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${
-            activePanel === 'savedBlocks' 
-              ? 'bg-white shadow-sm text-gray-900 border border-gray-300' 
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-          }`}
-          title="Сохраненные блоки"
-        >
-          <Box size={20} />
-        </button>
-      )}
+      {/* Saved Blocks */}
+      <button
+        onClick={() => handlePanelClick('savedBlocks')}
+        className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${
+          activePanel === 'savedBlocks' 
+            ? 'bg-white shadow-sm text-gray-900 border border-gray-300' 
+            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+        }`}
+        title={mode === 'page' ? 'Сохраненные блоки' : 'Библиотека блоков'}
+      >
+        <Box size={20} />
+      </button>
     </div>
   )
 }

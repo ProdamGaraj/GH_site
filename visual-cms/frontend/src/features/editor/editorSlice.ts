@@ -470,32 +470,22 @@ const editorSlice = createSlice({
       const isResponsiveMode = state.editMode === 'responsive' && state.activeEditBreakpoint
       const targetBreakpoint = breakpoint || (isResponsiveMode ? state.activeEditBreakpoint : null)
       
-      const updateInNode = (current: BlockNode): BlockNode => {
-        if (current.id === nodeId) {
-          // Обрабатываем properties: удаляем свойства с пустыми значениями
-          const updatedProperties = properties ? { ...(current.styles.properties || {}) } : undefined
-          
-          if (properties && updatedProperties) {
-            Object.entries(properties).forEach(([key, value]) => {
-              if (value === '' || value === null || value === undefined) {
-                // Удаляем свойство, если значение пустое
-                delete updatedProperties[key]
-              } else {
-                // Обновляем свойство новым значением
-                updatedProperties[key] = value
-              }
-            })
-          }
-          
-          // Режим responsive - добавляем в inheritedOverrides
-          if (targetBreakpoint && isResponsiveMode) {
+      // Для responsive режима - ищем родительский узел для сохранения override
+      const isRootNode = state.rootNode.id === nodeId
+      const parentNode = !isRootNode ? findParentNode(state.rootNode, nodeId) : null
+      
+      // В responsive режиме для не-root узлов сохраняем override в родителе
+      if (targetBreakpoint && isResponsiveMode && parentNode && !isRootNode) {
+        // Обрабатываем свойства: формируем обновлённые стили
+        const updateOverrideInParent = (current: BlockNode): BlockNode => {
+          if (current.id === parentNode.id) {
             const variations = current.variations || {}
             const variation = variations[targetBreakpoint] || {}
             const inheritedOverrides = variation.inheritedOverrides || {}
             const currentOverride = inheritedOverrides[nodeId] || {}
             const currentOverrideStyles = currentOverride.styles || {}
             
-            // Для responsive режима также обрабатываем удаление пустых значений
+            // Обрабатываем удаление пустых значений
             const updatedOverrideStyles = { ...currentOverrideStyles }
             if (properties) {
               Object.entries(properties).forEach(([key, value]) => {
@@ -522,7 +512,36 @@ const editorSlice = createSlice({
                   },
                 },
               },
+              children: current.children.map(updateOverrideInParent),
             }
+          }
+          return {
+            ...current,
+            children: current.children.map(updateOverrideInParent),
+          }
+        }
+        
+        state.rootNode = updateOverrideInParent(state.rootNode)
+        state.isDirty = true
+        return
+      }
+      
+      // Базовый режим или root узел - обновляем base стили напрямую в узле
+      const updateInNode = (current: BlockNode): BlockNode => {
+        if (current.id === nodeId) {
+          // Обрабатываем properties: удаляем свойства с пустыми значениями
+          const updatedProperties = properties ? { ...(current.styles.properties || {}) } : undefined
+          
+          if (properties && updatedProperties) {
+            Object.entries(properties).forEach(([key, value]) => {
+              if (value === '' || value === null || value === undefined) {
+                // Удаляем свойство, если значение пустое
+                delete updatedProperties[key]
+              } else {
+                // Обновляем свойство новым значением
+                updatedProperties[key] = value
+              }
+            })
           }
           
           // Базовый режим - обновляем base стили
