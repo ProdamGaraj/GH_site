@@ -11,6 +11,7 @@ interface RepeaterRendererProps {
   editorType?: 'page' | 'block'
   blockAlignment?: 'left' | 'center' | 'right'
   rootNode?: BlockNode
+  libraryBlockId?: string // ID библиотечного блока при редактировании
 }
 
 interface InputConfig {
@@ -27,10 +28,11 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
   node,
   editorType,
   blockAlignment,
-  rootNode
+  rootNode,
+  libraryBlockId
 }) => {
-  // Получаем linkedBlockId из метаданных — привязка может быть сохранена по этому ID
-  const linkedBlockId = node.metadata?.linkedBlockId
+  // Получаем linkedBlockId из метаданных или из пропса libraryBlockId
+  const linkedBlockId = libraryBlockId || node.metadata?.linkedBlockId
   
   const { data, loading, error, binding } = useDataBinding<any[]>(node.id, { 
     autoFetch: true,

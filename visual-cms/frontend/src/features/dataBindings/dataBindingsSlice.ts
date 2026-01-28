@@ -224,6 +224,9 @@ const dataBindingsSlice = createSlice({
       .addCase(fetchBindingsForBlock.fulfilled, (state, action) => {
         state.loading = false
         state.currentBlockBindings = action.payload
+        // Also add to items for selectors to find
+        state.items = action.payload
+        console.log('[dataBindingsSlice] fetchBindingsForBlock fulfilled:', action.payload.length, 'bindings', action.payload)
       })
       .addCase(fetchBindingsForBlock.rejected, (state, action) => {
         state.loading = false

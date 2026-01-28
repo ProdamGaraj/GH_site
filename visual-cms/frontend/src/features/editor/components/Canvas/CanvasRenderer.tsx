@@ -26,7 +26,8 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
   isRoot = false, 
   editorType = 'block', 
   blockAlignment = 'center',
-  rootNode 
+  rootNode,
+  libraryBlockId
 }) => {
   const dispatch = useAppDispatch()
   const selectedNodeId = useAppSelector(selectSelectedNodeId)
@@ -40,7 +41,8 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
   const isLocked = node.metadata?.locked || false
   
   // Получаем linkedBlockId для поиска привязок по ID библиотечного блока
-  const linkedBlockId = node.metadata?.linkedBlockId
+  // Для root-элемента в редакторе блоков используем libraryBlockId
+  const linkedBlockId = isRoot && libraryBlockId ? libraryBlockId : node.metadata?.linkedBlockId
   
   // Check for repeater binding
   const { isRepeater, hasBinding, bindingType } = useBlockDataPreview(node.id, undefined, linkedBlockId)
@@ -168,6 +170,7 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
         editorType={editorType}
         blockAlignment={blockAlignment}
         rootNode={actualRootNode || undefined}
+        libraryBlockId={libraryBlockId}
       />
     )
   }
@@ -298,6 +301,7 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
           editorType={editorType} 
           blockAlignment={blockAlignment}
           rootNode={actualRootNode || undefined}
+          libraryBlockId={libraryBlockId}
         />
       ))}
       {/* Empty state indicator for containers - РїРѕРєР°Р·С‹РІР°РµРј С‚РѕР»СЊРєРѕ РїСЂРё СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРё */}

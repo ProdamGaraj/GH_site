@@ -11,13 +11,15 @@ interface CanvasProps {
   targetContainerRect?: DOMRect | null
   targetLayoutMode?: 'flex' | 'grid' | 'absolute' | 'table'
   editorType?: 'page' | 'block'
+  libraryBlockId?: string // ID библиотечного блока при редактировании блока
 }
 
 export const Canvas: React.FC<CanvasProps> = ({ 
   dropIndicator, 
   targetContainerRect,
   targetLayoutMode = 'flex',
-  editorType = 'block'
+  editorType = 'block',
+  libraryBlockId
 }) => {
   const dispatch = useAppDispatch()
   const rootNode = useAppSelector(selectRootNode)
@@ -233,6 +235,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             editorType={editorType} 
             blockAlignment={blockAlignment}
             rootNode={rootNode || undefined}
+            libraryBlockId={libraryBlockId}
           />
         </div>
       </div>

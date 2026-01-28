@@ -475,29 +475,53 @@ export class DeployService {
       console.log('🔗 Linked block IDs on page:', linkedBlockIds)
 
       // Загружаем активные bindings для этих блоков
-      // Ищем по blockId (прямые) ИЛИ по linkedBlockId (для library блоков)
+      // ВАЖНО: Берем ТОЛЬКО привязки для этой страницы (pageId = pageId)
+      // ИЛИ привязки где blockId напрямую присутствует на странице
+      // НЕ берем привязки библиотечных блоков (pageId = null, blockId = libraryBlockId)
       const bindings = await this.dataBindingRepository
         .createQueryBuilder('binding')
         .leftJoinAndSelect('binding.dataSource', 'dataSource')
-        .where('(binding.blockId IN (:...blockIds) OR binding.blockId IN (:...linkedBlockIds))', { 
-          blockIds, 
-          linkedBlockIds: linkedBlockIds.length ? linkedBlockIds : ['no-linked-blocks'] 
-        })
-        .andWhere('binding.isActive = :isActive', { isActive: true })
+        .where(
+          // Обязательно isActive = true И одно из условий
+          'binding.isActive = :isActive AND (' +
+          // Привязки для этой конкретной страницы
+          '(binding.pageId = :pageId AND binding.blockId IN (:...blockIds))' +
+          // ИЛИ привязки где blockId напрямую есть на странице (не через linked)
+          ' OR (binding.blockId IN (:...blockIds) AND binding.pageId IS NULL)' +
+          ')',
+          { 
+            pageId,
+            blockIds,
+            isActive: true
+          }
+        )
         .orderBy('binding.priority', 'ASC')
         .getMany()
+      
+      console.log('🔍 Raw bindings from DB:', bindings.map(b => ({ id: b.id, blockId: b.blockId, pageId: b.pageId })))
+      
+      // Фильтруем: если есть привязка с pageId, она имеет приоритет над привязкой без pageId
+      const bindingsByBlockId = new Map<string, any>()
+      for (const binding of bindings) {
+        const existingBinding = bindingsByBlockId.get(binding.blockId)
+        // Привязка с pageId имеет приоритет
+        if (!existingBinding || (binding.pageId && !existingBinding.pageId)) {
+          bindingsByBlockId.set(binding.blockId, binding)
+        }
+      }
+      const filteredBindings = Array.from(bindingsByBlockId.values())
 
-      if (!bindings.length) {
+      if (!filteredBindings.length) {
         console.log('❌ No active bindings found for blocks:', blockIds.slice(0, 5))
-        console.log('❌ Checked linkedBlockIds:', linkedBlockIds)
+        console.log('❌ Page ID:', pageId)
         return undefined
       }
 
-      console.log(`✅ Found ${bindings.length} bindings for ${blockIds.length} blocks (${linkedBlockIds.length} linked)`)
+      console.log(`✅ Found ${filteredBindings.length} bindings for ${blockIds.length} blocks`)
 
       // Собираем уникальные data sources
       const dataSourcesMap = new Map<string, DataSourceEntity>()
-      for (const binding of bindings) {
+      for (const binding of filteredBindings) {
         if (binding.dataSource && !dataSourcesMap.has(binding.dataSource.id)) {
           dataSourcesMap.set(binding.dataSource.id, binding.dataSource)
         }
@@ -515,7 +539,7 @@ export class DeployService {
             cacheEnabled: false,
           }
         }),
-        bindings: bindings.map(binding => {
+        bindings: filteredBindings.map(binding => {
           const config = binding.config as any
           const inputConfig = config.inputConfig
           const outputConfig = config.outputConfig

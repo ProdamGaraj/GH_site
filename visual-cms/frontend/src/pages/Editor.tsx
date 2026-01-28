@@ -248,6 +248,10 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
           // Load the block structure into editor
           const { loadEditor: loadEditorAction } = await import('@/features/editor/editorSlice')
           dispatch(loadEditorAction(result.structure))
+          
+          // Load data bindings for this library block
+          const { fetchBindingsForBlock } = await import('@/features/dataBindings/dataBindingsSlice')
+          dispatch(fetchBindingsForBlock({ blockId: id }))
         } catch (error) {
           console.error('Failed to load block:', error)
         } finally {
@@ -935,6 +939,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
             targetContainerRect={targetContainerRect}
             targetLayoutMode={targetLayoutMode}
             editorType={type}
+            libraryBlockId={type === 'block' ? id : undefined}
           />
           
           {/* Right Panel Content */}
