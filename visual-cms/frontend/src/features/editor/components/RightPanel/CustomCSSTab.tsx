@@ -206,7 +206,7 @@ export const CustomCSSTab: React.FC<CustomCSSTabProps> = ({ node }) => {
       {/* Current Styles Preview */}
       <div>
         <h4 className="text-xs font-medium text-gray-700 mb-2">Текущие стили (JSON)</h4>
-        <pre className="bg-gray-50 border border-gray-200 rounded p-3 text-xs overflow-auto max-h-[200px]">
+        <pre className="bg-gray-50 border border-gray-200 rounded p-3 text-xs overflow-auto max-h-[200px] text-gray-900">
           {JSON.stringify(node.styles.properties, null, 2)}
         </pre>
       </div>

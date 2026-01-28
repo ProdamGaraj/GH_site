@@ -76,7 +76,7 @@ export const TemplateBlockControls: React.FC<TemplateBlockControlsProps> = ({
     // Блок не в Template режиме - показываем кнопку включения
     return (
       <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles size={18} className="text-gray-400" />
             <div>

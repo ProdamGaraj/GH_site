@@ -61,7 +61,7 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({ mode = 'blocks' }) => {
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pl-2 pr-2">
         {mode === 'pages' ? (
           activeTab === 'savedBlocks' ? (
             <div className="p-3">

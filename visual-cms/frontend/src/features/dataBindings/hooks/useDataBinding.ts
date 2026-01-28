@@ -18,6 +18,8 @@ interface UseDataBindingOptions {
   pollingInterval?: number
   /** Transform function for data */
   transform?: (data: unknown) => unknown
+  /** LinkedBlockId for library blocks (bindings may be stored by library block ID) */
+  linkedBlockId?: string
 }
 
 interface UseDataBindingResult<T> {
@@ -41,7 +43,11 @@ export function useDataBinding<T = unknown>(
   const dispatch = useAppDispatch()
   
   // Create memoized selectors for this specific block
-  const inputBindingSelector = useMemo(() => selectInputBindingForBlock(blockId), [blockId])
+  // Also search by linkedBlockId if provided (for library blocks)
+  const inputBindingSelector = useMemo(
+    () => selectInputBindingForBlock(blockId, options?.linkedBlockId), 
+    [blockId, options?.linkedBlockId]
+  )
   
   // Get binding for this block
   const binding = useAppSelector(inputBindingSelector)
@@ -61,13 +67,25 @@ export function useDataBinding<T = unknown>(
 
   // Apply transform if provided
   useEffect(() => {
+    console.log('[useDataBinding] fetchedData changed:', { 
+      blockId, 
+      bindingId, 
+      fetchedData,
+      fetchedDataRaw: JSON.stringify(fetchedData, null, 2),
+      data: fetchedData?.data,
+      dataType: typeof fetchedData?.data,
+      isArray: Array.isArray(fetchedData?.data)
+    })
+    
     if (fetchedData?.data !== null && fetchedData?.data !== undefined) {
       const transformed = options?.transform ? options.transform(fetchedData.data) : fetchedData.data
+      console.log('[useDataBinding] Setting localData:', transformed, 'type:', typeof transformed, 'isArray:', Array.isArray(transformed))
       setLocalData(transformed as T)
     } else {
+      console.log('[useDataBinding] No data, setting null')
       setLocalData(null)
     }
-  }, [fetchedData, options?.transform])
+  }, [fetchedData, options?.transform, blockId, bindingId])
 
   // Fetch function
   const fetch = useCallback(async (params?: Record<string, unknown>) => {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { updateNode, deleteNode, selectViewport, selectBreakpoints, selectRootNode, moveNodeToViewport } from '@/features/editor/editorSlice'
+import { updateNode, deleteNode, selectViewport, selectBreakpoints, selectRootNode, moveNodeToViewport, selectActiveRightPanelTab, setActiveRightPanelTab } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
 import { Button } from '@/shared/components/Button'
 import { Trash2, Move, Palette, Type, Code, Monitor, Tablet, Smartphone, Laptop, Watch, Settings2, ArrowRightLeft, Globe, MousePointer, Sparkles, FileCode, Database } from 'lucide-react'
@@ -16,7 +16,6 @@ import { SmartDataBindingTab } from '@/features/dataBindings/components/SmartDat
 import { DetectedFieldsViewer } from '@/features/blocks/components/DetectedFieldsViewer'
 import { TemplateBlockControls } from '@/features/blocks/components/TemplateBlockControls'
 import { CreateBlockFromElement } from '@/features/blocks/components/CreateBlockFromElement'
-import { BlockInfoSection } from './BlockInfoSection'
 import { cn } from '@/shared/utils'
 import { getNodeBreakpoint } from '../../utils/variationUtils'
 
@@ -36,7 +35,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRo
   const viewport = useAppSelector(selectViewport)
   const breakpoints = useAppSelector(selectBreakpoints)
   const rootNode = useAppSelector(selectRootNode)
-  const [activeTab, setActiveTab] = useState<TabType>('positioning')
+  const activeTab = useAppSelector(selectActiveRightPanelTab)
   const [showMoveMenu, setShowMoveMenu] = useState(false)
   
   const currentBreakpoint = breakpoints.find(bp => bp.id === viewport)
@@ -110,9 +109,6 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRo
 
   return (
     <div className="h-full flex flex-col">
-      {/* Block Info Section - показываем если блок связан с библиотекой */}
-      <BlockInfoSection node={node} pageId={pageId} />
-      
       {/* Header */}
       <div className="p-4 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center justify-between mb-3">
@@ -122,6 +118,18 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRo
               <Trash2 size={16} className="text-red-600" />
             </Button>
           )}
+        </div>
+        
+        {/* Element Name */}
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            Имя элемента
+          </label>
+          <Input
+            value={node.metadata?.name || ''}
+            onChange={(e) => handleNameChange(e.target.value)}
+            placeholder="Введите имя элемента"
+          />
         </div>
         
         {/* Viewport indicator */}
@@ -257,7 +265,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRo
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => dispatch(setActiveRightPanelTab(tab.id))}
               className={cn(
                 'flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 px-2 py-2 text-[10px] font-medium transition-colors',
                 activeTab === tab.id

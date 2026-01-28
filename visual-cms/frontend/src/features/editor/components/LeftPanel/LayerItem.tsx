@@ -295,7 +295,7 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
         </span>
         
         {/* Правая часть - абсолютное позиционирование с прозрачностью */}
-        <div className="absolute right-1 top-0 bottom-0 flex items-center gap-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white">
+        <div className="absolute right-1 top-0 bottom-0 flex items-center gap-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white z-20 pointer-events-none group-hover:pointer-events-auto">
           {/* Viewport-specific indicator */}
           {isViewportSpecific && nodeBreakpoint && (
             <span 

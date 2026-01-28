@@ -169,7 +169,7 @@ ${scripts ? `<script>\n${scripts}\n</script>` : ''}
   }
 
   /**
-   * Р РµРєСѓСЂСЃРёРІРЅРѕ СЂРµРЅРґРµСЂРёС‚ СѓР·РµР» РІ HTML
+   * РќРµРєСѓСЂСЃРёРІРЅРѕ СЂРµРЅРґРµСЂРёС‚ СѓР·РµР» РІ HTML
    */
   private renderNode(node: BlockNode, indent: string = '  '): string {
     if (!node) return ''
@@ -178,8 +178,8 @@ ${scripts ? `<script>\n${scripts}\n</script>` : ''}
     const styles = this.renderStyles(node.styles?.properties || {})
     const attributes = this.renderAttributes(node.attributes || {})
     
-    // Р”РѕР±Р°РІР»СЏРµРј data-element-id РґР»СЏ CSS СЃРµР»РµРєС‚РѕСЂРѕРІ (hover, Р°РЅРёРјР°С†РёРё)
-    const dataAttr = ` data-element-id="${node.id}"`
+    // Р"РѕР±Р°РІР»СЏРµРј data-element-id РґР»СЏ CSS СЃРµР»РµРєС‚РѕСЂРѕРІ (hover, Р°РЅРёРјР°С†РёРї) Рё data-element-name
+    const dataAttr = ` data-element-id="${node.id}"` + (node.metadata?.name ? ` data-element-name="${node.metadata.name.replace(/"/g, '&quot;')}"` : '')
     
     // Void elements (СЃР°РјРѕР·Р°РєСЂС‹РІР°СЋС‰РёРµСЃСЏ)
     const voidElements = ['input', 'img', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr']

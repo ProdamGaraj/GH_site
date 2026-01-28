@@ -245,6 +245,7 @@ export interface BlockNodeVariation {
 
 // Block Node structure
 export interface BlockNode {
+  tag: string
   id: string
   elementType: ElementType
   tagName: string

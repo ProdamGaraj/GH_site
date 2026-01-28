@@ -27,6 +27,7 @@ interface EditorState {
   zoom: number
   activeLeftPanel: string | null
   activeRightPanel: string | null
+  activeRightPanelTab: 'positioning' | 'colors' | 'content' | 'states' | 'animations' | 'scripts' | 'data' | 'css'
   panOffset: { x: number; y: number }
   blockAlignment: 'left' | 'center' | 'right'
   // Режим редактирования
@@ -93,6 +94,7 @@ const initialState: EditorState = {
   zoom: 100,
   activeLeftPanel: 'layers',
   activeRightPanel: 'properties',
+  activeRightPanelTab: 'positioning',
   panOffset: { x: 0, y: 0 },
   blockAlignment: 'center',
   editMode: 'base',
@@ -983,6 +985,10 @@ const editorSlice = createSlice({
       state.isDirty = false
     },
     
+    markAsDirty: (state) => {
+      state.isDirty = true
+    },
+    
     // Загрузить структуру из импорта
     loadRootNode: (state, action: PayloadAction<BlockNode>) => {
       state.rootNode = action.payload
@@ -1004,6 +1010,10 @@ const editorSlice = createSlice({
     
     setActiveRightPanel: (state, action: PayloadAction<string | null>) => {
       state.activeRightPanel = action.payload
+    },
+    
+    setActiveRightPanelTab: (state, action: PayloadAction<'positioning' | 'colors' | 'content' | 'states' | 'animations' | 'scripts' | 'data' | 'css'>) => {
+      state.activeRightPanelTab = action.payload
     },
     
     setPanOffset: (state, action: PayloadAction<{ x: number; y: number }>) => {
@@ -1282,11 +1292,13 @@ export const {
   removeStandardMonitor,
   updateStandardMonitor,
   markAsSaved,
+  markAsDirty,
   loadRootNode,
   setZoom,
   setSelectedBrowser,
   setActiveLeftPanel,
   setActiveRightPanel,
+  setActiveRightPanelTab,
   setPanOffset,
   setBlockAlignment,
   setEditMode,
@@ -1326,6 +1338,7 @@ export const selectSelectedBrowser = (state: RootState) => state.editor.selected
 export const selectZoom = (state: RootState) => state.editor.zoom
 export const selectActiveLeftPanel = (state: RootState) => state.editor.activeLeftPanel
 export const selectActiveRightPanel = (state: RootState) => state.editor.activeRightPanel
+export const selectActiveRightPanelTab = (state: RootState) => state.editor.activeRightPanelTab
 export const selectPanOffset = (state: RootState) => state.editor.panOffset
 export const selectBlockAlignment = (state: RootState) => state.editor.blockAlignment
 export const selectEditMode = (state: RootState) => state.editor.editMode

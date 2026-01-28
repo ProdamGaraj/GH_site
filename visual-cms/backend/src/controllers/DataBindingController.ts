@@ -423,6 +423,8 @@ class DataBindingController {
         authConfig as unknown as AuthConfig
       )
 
+      console.log('[fetchWithBinding] result from secureDataSourceService:', JSON.stringify(result, null, 2))
+
       if (!result.success) {
         // Обновляем статус binding
         await dataBindingRepository.update(binding.id, {
@@ -439,11 +441,20 @@ class DataBindingController {
 
       // Извлекаем данные по arrayPath для Repeater
       let data = result.data
+      console.log('[fetchWithBinding] BEFORE arrayPath - data type:', typeof data, 'arrayPath:', inputConfig.arrayPath)
+      console.log('[fetchWithBinding] BEFORE arrayPath - data keys:', data ? Object.keys(data) : 'null')
+      
       if (inputConfig.mode === 'repeater' && inputConfig.arrayPath) {
+        console.log('[fetchWithBinding] Extracting arrayPath:', inputConfig.arrayPath, 'from data')
         data = dataFilterService.getValueByPath(data, inputConfig.arrayPath)
+        console.log('[fetchWithBinding] AFTER getValueByPath - data type:', typeof data, 'isArray:', Array.isArray(data))
       }
 
+      console.log('[fetchWithBinding] data after arrayPath extraction:', JSON.stringify(data, null, 2)?.substring(0, 500))
+
       const dataArray = Array.isArray(data) ? data : [data]
+
+      console.log('[fetchWithBinding] dataArray:', dataArray.length, 'items')
 
       // Подготавливаем фильтры
       let preparedFilters = inputConfig.filters
@@ -492,9 +503,11 @@ class DataBindingController {
           { variables }
         )
       } else {
-        // �� Repeater ���������� ������, ��� Single ��� �������� - ������ �������
+        // Для Repeater возвращаем массив, для Single без маппинга - первый элемент
         mappedData = inputConfig.mode === 'single' ? finalItems[0] : finalItems
       }
+
+      console.log('[fetchWithBinding] mappedData for mode=' + inputConfig.mode + ':', JSON.stringify(mappedData, null, 2))
 
       // Вычисляемые поля
       if (config.computedFields && config.computedFields.length > 0) {

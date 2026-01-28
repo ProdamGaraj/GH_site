@@ -39,22 +39,26 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
   const isDragged = dragState.draggedNodeId === node.id
   const isLocked = node.metadata?.locked || false
   
-  // Check for repeater binding
-  const { isRepeater } = useBlockDataPreview(node.id)
+  // Получаем linkedBlockId для поиска привязок по ID библиотечного блока
+  const linkedBlockId = node.metadata?.linkedBlockId
   
-  // If this block has repeater binding, use RepeaterRenderer
-  if (isRepeater && !isRoot) {
-    return (
-      <RepeaterRenderer 
-        node={node}
-        editorType={editorType}
-        blockAlignment={blockAlignment}
-        rootNode={actualRootNode || undefined}
-      />
-    )
+  // Check for repeater binding
+  const { isRepeater, hasBinding, bindingType } = useBlockDataPreview(node.id, undefined, linkedBlockId)
+  
+  // Debug log for containers with potential bindings
+  if (node.elementType === 'container' && node.id.includes('1769591959232')) {
+    console.log('[CanvasRenderer] Checking container:', { 
+      nodeId: node.id, 
+      nodeName: node.metadata?.name,
+      linkedBlockId, 
+      hasBinding, 
+      bindingType, 
+      isRepeater,
+      isRoot
+    })
   }
   
-  // Inline text editing state
+  // Inline text editing state - MUST be before any conditional returns
   const [isInlineEditing, setIsInlineEditing] = useState(false)
   const [editText, setEditText] = useState(node.content || '')
   
@@ -63,14 +67,14 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
 
   const computedStyles = useComputedStyles(node)
   
-  // РџСЂРёРјРµРЅСЏРµРј СЃС‚РёР»Рё СЃРѕСЃС‚РѕСЏРЅРёСЏ РµСЃР»Рё СЂРµР¶РёРј РїСЂРµРІСЊСЋ Р°РєС‚РёРІРµРЅ
+  // Применяем стили состояния если режим превью активен
   const getStateStyles = (): React.CSSProperties => {
     if (statePreviewMode === 'none') return {}
     
     const stateStyles = node.styles?.states?.[statePreviewMode]
     if (!stateStyles) return {}
     
-    // РљРѕРЅРІРµСЂС‚РёСЂСѓРµРј СЃС‚РёР»Рё СЃРѕСЃС‚РѕСЏРЅРёСЏ РІ React.CSSProperties
+    // Конвертируем стили состояния в React.CSSProperties
     return stateStyles as React.CSSProperties
   }
   
@@ -118,6 +122,56 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
     },
   })
 
+  // Double click to start inline editing - MUST be before conditional return
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (canEditInline && !isLocked) {
+      setEditText(node.content || '')
+      setIsInlineEditing(true)
+    }
+  }, [canEditInline, isLocked, node.content])
+
+  // Handle inline edit input - MUST be before conditional return
+  const handleInlineInput = useCallback((e: React.FormEvent<HTMLElement>) => {
+    setEditText(e.currentTarget.textContent || '')
+  }, [])
+
+  // Save inline edit - MUST be before conditional return
+  const saveInlineEdit = useCallback(() => {
+    if (editText !== node.content) {
+      dispatch(updateNode({
+        id: node.id,
+        updates: { content: editText },
+      }))
+    }
+    setIsInlineEditing(false)
+  }, [dispatch, editText, node.content, node.id])
+
+  // Handle inline edit keyboard events - MUST be before conditional return
+  const handleInlineKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      saveInlineEdit()
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      setIsInlineEditing(false)
+    }
+  }, [saveInlineEdit])
+
+  // If this block has repeater binding, use RepeaterRenderer
+  // This check MUST be after all hooks
+  if (isRepeater && !isRoot) {
+    return (
+      <RepeaterRenderer 
+        node={node}
+        editorType={editorType}
+        blockAlignment={blockAlignment}
+        rootNode={actualRootNode || undefined}
+      />
+    )
+  }
+
   // Combine refs
   const combinedRef = (el: HTMLElement | null) => {
     setDropRef(el)
@@ -130,43 +184,6 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
       dispatch(selectNode(node.id))
     }
   }
-
-  // Double click to start inline editing
-  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (canEditInline && !isLocked) {
-      setEditText(node.content || '')
-      setIsInlineEditing(true)
-    }
-  }, [canEditInline, isLocked, node.content])
-
-  // Handle inline edit input
-  const handleInlineInput = useCallback((e: React.FormEvent<HTMLElement>) => {
-    setEditText(e.currentTarget.textContent || '')
-  }, [])
-
-  // Save inline edit
-  const saveInlineEdit = useCallback(() => {
-    if (editText !== node.content) {
-      dispatch(updateNode({
-        id: node.id,
-        updates: { content: editText },
-      }))
-    }
-    setIsInlineEditing(false)
-  }, [dispatch, editText, node.content, node.id])
-
-  // Handle inline edit keyboard events
-  const handleInlineKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      saveInlineEdit()
-    }
-    if (e.key === 'Escape') {
-      e.preventDefault()
-      setIsInlineEditing(false)
-    }
-  }, [saveInlineEdit])
 
   // Void elements that cannot have children
   const voidElements = ['input', 'img', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr']

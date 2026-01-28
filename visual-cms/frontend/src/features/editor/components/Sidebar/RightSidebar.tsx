@@ -1,5 +1,5 @@
 import React from 'react'
-import { Settings, FileText } from 'lucide-react'
+import { Settings, FileText, Move, Palette, Type, MousePointer, Zap, Code2, Database, Info } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { setActiveRightPanel, selectActiveRightPanel } from '@/features/editor/editorSlice'
 
@@ -35,19 +35,129 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ mode = 'block' }) =>
         </button>
       )}
       
-      {mode === 'block' && (
-        <button
-          onClick={() => handlePanelClick('properties')}
-          className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${
-            activePanel === 'properties' 
-              ? 'bg-white shadow-sm text-gray-900 border border-gray-300' 
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-          }`}
-          title="Свойства элемента"
-        >
-          <Settings size={20} />
-        </button>
-      )}
+      {/* Basic Settings - always first */}
+      <button
+        onClick={() => handlePanelClick('basicSettings')}
+        className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${
+          activePanel === 'basicSettings' 
+            ? 'bg-white shadow-sm text-gray-900 border border-gray-300' 
+            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+        }`}
+        title="Основные настройки"
+      >
+        <Info size={20} />
+      </button>
+      
+      <div className="h-px w-8 bg-gray-300 my-1" />
+      
+      {/* Panel buttons */}
+      <button
+        onClick={() => handlePanelClick('elementProperties')}
+        className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${
+          activePanel === 'elementProperties' 
+            ? 'bg-white shadow-sm text-gray-900 border border-gray-300' 
+            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+        }`}
+        title="Свойства"
+      >
+        <Settings size={20} />
+      </button>
+      
+      <button
+        onClick={() => handlePanelClick('positioning')}
+        className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${
+          activePanel === 'positioning'
+            ? 'bg-white shadow-sm text-gray-900 border border-gray-300' 
+            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+        }`}
+        title="Позиция и размеры"
+      >
+        <Move size={20} />
+      </button>
+      
+      <button
+        onClick={() => handlePanelClick('colors')}
+        className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${
+          activePanel === 'colors'
+            ? 'bg-white shadow-sm text-gray-900 border border-gray-300' 
+            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+        }`}
+        title="Цвета"
+      >
+        <Palette size={20} />
+      </button>
+      
+      <button
+        onClick={() => handlePanelClick('content')}
+        className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${
+          activePanel === 'content'
+            ? 'bg-white shadow-sm text-gray-900 border border-gray-300' 
+            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+        }`}
+        title="Контент и текст"
+      >
+        <Type size={20} />
+      </button>
+      
+      <button
+        onClick={() => handlePanelClick('states')}
+        className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${
+          activePanel === 'states'
+            ? 'bg-white shadow-sm text-gray-900 border border-gray-300' 
+            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+        }`}
+        title="Hover и состояния"
+      >
+        <MousePointer size={20} />
+      </button>
+      
+      <button
+        onClick={() => handlePanelClick('animations')}
+        className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${
+          activePanel === 'animations'
+            ? 'bg-white shadow-sm text-gray-900 border border-gray-300' 
+            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+        }`}
+        title="Анимации"
+      >
+        <Zap size={20} />
+      </button>
+      
+      <button
+        onClick={() => handlePanelClick('scripts')}
+        className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${
+          activePanel === 'scripts'
+            ? 'bg-white shadow-sm text-gray-900 border border-gray-300' 
+            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+        }`}
+        title="Скрипты"
+      >
+        <Code2 size={20} />
+      </button>
+      
+      <button
+        onClick={() => handlePanelClick('data')}
+        className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${
+          activePanel === 'data'
+            ? 'bg-white shadow-sm text-gray-900 border border-gray-300' 
+            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+        }`}
+        title="Привязка данных"
+      >
+        <Database size={20} />
+      </button>
+      
+      <button
+        onClick={() => handlePanelClick('css')}
+        className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${
+          activePanel === 'css'
+            ? 'bg-white shadow-sm text-gray-900 border border-gray-300' 
+            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+        }`}
+        title="CSS код"
+      >
+        <Code2 size={20} />
+      </button>
     </div>
   )
 }

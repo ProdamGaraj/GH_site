@@ -41,6 +41,16 @@ import { Canvas } from '@/features/editor/components/Canvas/Canvas'
 import { RightPanel } from '@/features/editor/components/RightPanel/RightPanel'
 import { LibraryPanel } from '@/features/editor/components/LibraryPanel/LibraryPanel'
 import { PageSettingsPanel } from '@/features/editor/components/PageSettings/PageSettingsPanel'
+import { BasicSettingsPanel } from '@/features/editor/components/RightPanel/BasicSettingsPanel'
+import { ElementPropertiesPanel } from '@/features/editor/components/RightPanel/ElementPropertiesPanel'
+import { PositioningPanel } from '@/features/editor/components/RightPanel/PositioningPanel'
+import { ColorsPanel } from '@/features/editor/components/RightPanel/ColorsPanel'
+import { ContentPanel } from '@/features/editor/components/RightPanel/ContentPanel'
+import { StatesPanel } from '@/features/editor/components/RightPanel/StatesPanel'
+import { AnimationsPanel } from '@/features/editor/components/RightPanel/AnimationsPanel'
+import { ScriptsPanel } from '@/features/editor/components/RightPanel/ScriptsPanel'
+import { DataPanel } from '@/features/editor/components/RightPanel/DataPanel'
+import { CSSPanel } from '@/features/editor/components/RightPanel/CSSPanel'
 import { LeftSidebar } from '@/features/editor/components/Sidebar/LeftSidebar'
 import { RightSidebar } from '@/features/editor/components/Sidebar/RightSidebar'
 import { SavedBlocksLibrary } from '@/features/editor/components/SavedBlocksLibrary/SavedBlocksLibrary'
@@ -268,6 +278,10 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
           // Load data bindings for all blocks on this page
           const { fetchBindingsForPage } = await import('@/features/dataBindings/dataBindingsSlice')
           dispatch(fetchBindingsForPage(id))
+
+          // Load all blocks (needed for repeater templates)
+          const { fetchBlocks } = await import('@/features/blocks/blocksSlice')
+          dispatch(fetchBlocks())
         } finally {
           setLoading(false)
         }
@@ -944,7 +958,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                 <ChevronRight size={14} className="text-gray-600" />
               </button>
               
-              <div className="flex-1 overflow-y-auto overflow-x-auto">
+              <div className="flex-1 overflow-y-auto overflow-x-auto ">
                 {type === 'page' && activeRightPanel === 'pageSettings' && !inlineBlockEdit.active && (
                   <PageSettingsPanel 
                     settings={pageSettings}
@@ -952,7 +966,59 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                   />
                 )}
                 
-                {/* Показываем панель свойств элемента */}
+                {/* Basic Settings Panel */}
+                {activeRightPanel === 'basicSettings' && (
+                  <BasicSettingsPanel 
+                    pageId={type === 'page' ? id : undefined}
+                  />
+                )}
+                
+                {/* Element Properties Panel */}
+                {activeRightPanel === 'elementProperties' && (
+                  <ElementPropertiesPanel />
+                )}
+                
+                {/* Positioning Panel */}
+                {activeRightPanel === 'positioning' && (
+                  <PositioningPanel />
+                )}
+                
+                {/* Colors Panel */}
+                {activeRightPanel === 'colors' && (
+                  <ColorsPanel />
+                )}
+                
+                {/* Content Panel */}
+                {activeRightPanel === 'content' && (
+                  <ContentPanel />
+                )}
+                
+                {/* States Panel */}
+                {activeRightPanel === 'states' && (
+                  <StatesPanel />
+                )}
+                
+                {/* Animations Panel */}
+                {activeRightPanel === 'animations' && (
+                  <AnimationsPanel />
+                )}
+                
+                {/* Scripts Panel */}
+                {activeRightPanel === 'scripts' && (
+                  <ScriptsPanel />
+                )}
+                
+                {/* Data Panel */}
+                {activeRightPanel === 'data' && (
+                  <DataPanel pageId={type === 'page' ? id : undefined} />
+                )}
+                
+                {/* CSS Panel */}
+                {activeRightPanel === 'css' && (
+                  <CSSPanel />
+                )}
+                
+                {/* Показываем панель свойств элемента (old properties with tabs - deprecated) */}
                 {(activeRightPanel === 'properties' || inlineBlockEdit.active) && (
                   <RightPanel 
                     pageSettings={type === 'page' ? pageSettings : undefined}

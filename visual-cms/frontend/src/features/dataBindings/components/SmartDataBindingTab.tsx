@@ -8,6 +8,7 @@ import {
 } from '@/features/dataBindings/dataBindingsSlice'
 import { fetchDataSources, selectDataSources } from '@/features/data-sources/dataSourcesSlice'
 import { fetchBlockById, selectBlocks } from '@/features/blocks/blocksSlice'
+import { markAsDirty } from '@/features/editor/editorSlice'
 import { BlockTemplateSelector } from '@/features/blocks/components/BlockTemplateSelector'
 import { Database, Link, Sparkles, CheckCircle, AlertCircle, ArrowRight, Loader2 } from 'lucide-react'
 import type { DetectedField } from '@/shared/types/template'
@@ -33,6 +34,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
   const [selectedDataSourceId, setSelectedDataSourceId] = useState<string>('')
   const [mode, setMode] = useState<InputMode>('single')
   const [selectedTemplateBlockId, setSelectedTemplateBlockId] = useState<string>('')
+  const [arrayPath, setArrayPath] = useState<string>('data')
   const [mappings, setMappings] = useState<FieldMapping[]>([])
   const [loading, setLoading] = useState(false)
   const [testResult, setTestResult] = useState<any>(null)
@@ -62,10 +64,15 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
       setSelectedDataSourceId(existingBinding.dataSourceId)
       setMode(existingBinding.config.inputConfig.mode || 'single')
       
+      // Восстанавливаем arrayPath если есть
+      if (existingBinding.config.inputConfig.arrayPath) {
+        setArrayPath(existingBinding.config.inputConfig.arrayPath)
+      }
+      
       // Восстанавливаем Template блок для Repeater режима
-      const templateBlockId = (existingBinding.config as any)?.templateBlockId
-      if (templateBlockId) {
-        setSelectedTemplateBlockId(templateBlockId)
+      const templateId = existingBinding.config.inputConfig.templateId
+      if (templateId) {
+        setSelectedTemplateBlockId(templateId)
       }
     }
   }, [existingBinding])
@@ -96,11 +103,18 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
     
     // Если выбран Template блок, создать mappings на основе его полей
     if (block && block.detectedFields && block.detectedFields.length > 0) {
-      const autoMappings: FieldMapping[] = block.detectedFields.map((field: DetectedField) => ({
-        id: `mapping-${field.id}`,
-        sourceField: field.name,
-        targetProperty: `item.${field.name}`, // Для Repeater используем item.fieldName
-      }))
+      const autoMappings: FieldMapping[] = block.detectedFields.map((field: DetectedField) => {
+        // Извлекаем data-bind значение из selector (например [data-bind="project-image"] -> project-image)
+        const selectorMatch = field.selector?.match(/\[data-bind="([^"]+)"\]/)
+        const dataBindValue = selectorMatch ? selectorMatch[1] : field.name
+        
+        return {
+          id: `mapping-${field.id}`,
+          sourceField: field.name, // Поле из API (image, title, location и т.д.)
+          targetProperty: `item.${dataBindValue}`, // data-bind значение (project-image, project-name и т.д.)
+        }
+      })
+
       setMappings(autoMappings)
     }
   }
@@ -129,6 +143,13 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
     try {
       if (existingBinding) {
         // Обновить существующую привязку
+        console.log('Updating existing binding:', {
+          id: existingBinding.id,
+          dataSourceId: selectedDataSourceId,
+          mode,
+          templateId: selectedTemplateBlockId,
+          mappings
+        })
         await dispatch(updateBinding({
           id: existingBinding.id,
           data: {
@@ -137,11 +158,15 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
               inputConfig: {
                 mode,
                 fieldMappings: mappings,
+                ...(mode === 'repeater' && selectedTemplateBlockId && { templateId: selectedTemplateBlockId }),
+                ...(mode === 'repeater' && arrayPath && { arrayPath }),
               },
-              ...(mode === 'repeater' && { templateBlockId: selectedTemplateBlockId }),
             },
           },
         })).unwrap()
+        
+        // Помечаем страницу как изменённую
+        dispatch(markAsDirty())
       } else {
         // Создать новую привязку
         const newBinding: CreateDataBindingRequest = {
@@ -153,16 +178,41 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
             inputConfig: {
               mode,
               fieldMappings: mappings,
+              ...(mode === 'repeater' && selectedTemplateBlockId && { templateId: selectedTemplateBlockId }),
+              ...(mode === 'repeater' && arrayPath && { arrayPath }),
             },
-            ...(mode === 'repeater' && { templateBlockId: selectedTemplateBlockId }),
           },
         }
+        console.log('Creating new binding:', newBinding)
         await dispatch(createBinding(newBinding)).unwrap()
+        
+        // Помечаем страницу как изменённую
+        dispatch(markAsDirty())
       }
       alert('✅ Привязка данных сохранена!')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save binding:', error)
-      alert('❌ Ошибка сохранения привязки')
+      console.error('Error details:', {
+        message: error?.message,
+        response: error?.response,
+        data: error?.response?.data,
+        status: error?.response?.status,
+        stack: error?.stack,
+        fullError: error
+      })
+      
+      let errorMessage = 'Unknown error'
+      if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message
+      } else if (error?.response?.data?.error) {
+        errorMessage = error.response.data.error
+      } else if (error?.message) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      }
+      
+      alert(`❌ Ошибка сохранения привязки: ${errorMessage}`)
     } finally {
       setLoading(false)
     }
@@ -366,19 +416,38 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
 
       {/* Template Block Selector - только для Repeater режима */}
       {selectedDataSourceId && mode === 'repeater' && (
-        <div className="space-y-3">
-          <label className="block text-sm font-medium text-gray-700">
-            Template блок
-          </label>
-          <BlockTemplateSelector
-            value={selectedTemplateBlockId}
-            onChange={handleTemplateBlockChange}
-            placeholder="Выберите Template блок для повторения..."
-          />
-          <p className="text-xs text-gray-500">
-            Template блок будет повторяться для каждого элемента из массива данных
-          </p>
-        </div>
+        <>
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-700">
+              Template блок
+            </label>
+            <BlockTemplateSelector
+              value={selectedTemplateBlockId}
+              onChange={handleTemplateBlockChange}
+              placeholder="Выберите Template блок для повторения..."
+            />
+            <p className="text-xs text-gray-500">
+              Template блок будет повторяться для каждого элемента из массива данных
+            </p>
+          </div>
+
+          {/* Array Path - путь к массиву в данных API */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-700">
+              Array Path
+            </label>
+            <input
+              type="text"
+              value={arrayPath}
+              onChange={(e) => setArrayPath(e.target.value)}
+              placeholder="data"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
+            />
+            <p className="text-xs text-gray-500">
+              Путь к массиву в ответе API (например, "data" для {`{success: true, data: [...]}`})
+            </p>
+          </div>
+        </>
       )}
 
       {/* Field Mappings */}

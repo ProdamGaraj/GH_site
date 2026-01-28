@@ -17,6 +17,11 @@ export interface BlockDataPreviewResult {
 
 interface BindingConfig {
   mode?: 'single' | 'repeater'
+  inputConfig?: {
+    mode?: 'single' | 'repeater'
+    templateId?: string
+    fieldMappings?: Array<{ sourceField: string; targetProperty: string }>
+  }
   sourceConfig?: {
     alias?: string
     pageDataSourceId?: string
@@ -26,22 +31,30 @@ interface BindingConfig {
 
 /**
  * Хук для получения превью данных привязанных к блоку
+ * @param linkedBlockId - Опциональный ID библиотечного блока (привязка может быть по этому ID)
  */
-export function useBlockDataPreview(blockId: string, _pageId?: string): BlockDataPreviewResult {
-  const bindings = useAppSelector(selectBindingsByBlockId(blockId))
+export function useBlockDataPreview(blockId: string, _pageId?: string, linkedBlockId?: string): BlockDataPreviewResult {
+  const bindings = useAppSelector(selectBindingsByBlockId(blockId, linkedBlockId))
+
+  // Debug log - только для интересующих нас блоков
+  if (blockId.includes('1769591959232')) {
+    console.log('[useBlockDataPreview] Checking block:', { blockId, linkedBlockId, bindings })
+  }
 
   const mainBinding = useMemo((): DataBinding | undefined => {
     if (!bindings || !Array.isArray(bindings)) return undefined
     return bindings.find((b: DataBinding) => {
       const config = b.config as BindingConfig | undefined
-      return b.bindingType === 'input' || config?.mode === 'repeater'
+      const inputMode = config?.inputConfig?.mode
+      return b.bindingType === 'input' || inputMode === 'repeater' || config?.mode === 'repeater'
     })
   }, [bindings])
 
   const bindingType = useMemo((): 'input' | 'output' | 'repeater' | null => {
     if (!mainBinding) return null
     const config = mainBinding.config as BindingConfig | undefined
-    if (config?.mode === 'repeater') return 'repeater'
+    const inputMode = config?.inputConfig?.mode
+    if (inputMode === 'repeater' || config?.mode === 'repeater') return 'repeater'
     if (mainBinding.bindingType === 'input') return 'input'
     if (mainBinding.bindingType === 'output') return 'output'
     return null

@@ -235,10 +235,12 @@ const dataBindingsSlice = createSlice({
       .addCase(fetchBindingsForPage.pending, (state) => {
         state.loading = true
         state.error = null
+        console.log('[dataBindingsSlice] fetchBindingsForPage pending...')
       })
       .addCase(fetchBindingsForPage.fulfilled, (state, action) => {
         state.loading = false
         state.items = action.payload
+        console.log('[dataBindingsSlice] fetchBindingsForPage fulfilled:', action.payload.length, 'bindings', action.payload)
       })
       .addCase(fetchBindingsForPage.rejected, (state, action) => {
         state.loading = false
@@ -316,7 +318,8 @@ const dataBindingsSlice = createSlice({
       .addCase(fetchDataDirect.fulfilled, (state, action) => {
         const { key, result } = action.payload
         state.fetching[key] = false
-        state.fetchedData[key] = result
+        // Извлекаем data из обёрнутого ответа {success, data, metadata}
+        state.fetchedData[key] = { success: result.success, data: result.data, metadata: result.metadata }
       })
       .addCase(fetchDataDirect.rejected, (state, action) => {
         const key = action.meta.arg.key
@@ -333,8 +336,18 @@ const dataBindingsSlice = createSlice({
       })
       .addCase(fetchDataWithBinding.fulfilled, (state, action) => {
         const { key, result } = action.payload
+        console.log('[dataBindingsSlice] fetchDataWithBinding.fulfilled:', {
+          key,
+          result,
+          resultData: result.data,
+          resultDataType: typeof result.data,
+          resultDataIsArray: Array.isArray(result.data),
+          resultDataStringified: JSON.stringify(result, null, 2)
+        })
         state.fetching[key] = false
-        state.fetchedData[key] = result
+        // Извлекаем data из обёрнутого ответа {success, data, metadata}
+        state.fetchedData[key] = { success: result.success, data: result.data, metadata: result.metadata }
+        console.log('[dataBindingsSlice] Saved to fetchedData[' + key + ']:', state.fetchedData[key])
       })
       .addCase(fetchDataWithBinding.rejected, (state, action) => {
         const key = action.meta.arg.key
@@ -364,19 +377,25 @@ export const selectFetchedData = (key: string) => (state: RootState) => state.da
 export const selectIsFetching = (key: string) => (state: RootState) => state.dataBindings.fetching[key] || false
 export const selectFetchError = (key: string) => (state: RootState) => state.dataBindings.fetchErrors[key]
 
-// Мемоизированный селектор для получения привязки по blockId
-export const selectBindingsByBlockId = (blockId: string) =>
+// Мемоизированный селектор для получения привязки по blockId или linkedBlockId
+export const selectBindingsByBlockId = (blockId: string, linkedBlockId?: string) =>
   createSelector(
     [selectAllBindings],
-    (items) => items.filter(b => b.blockId === blockId)
+    (items) => items.filter(b => 
+      b.isActive !== false && // Только активные привязки
+      (b.blockId === blockId || (linkedBlockId && b.blockId === linkedBlockId))
+    )
   )
 
 // Мемоизированный селектор для Input binding блока
-export const selectInputBindingForBlock = (blockId: string) =>
+// Ищет привязку по blockId ИЛИ linkedBlockId (для библиотечных блоков)
+export const selectInputBindingForBlock = (blockId: string, linkedBlockId?: string) =>
   createSelector(
-    [selectCurrentBlockBindings],
-    (bindings) => bindings.find(
-      b => b.blockId === blockId && (b.bindingType === 'input' || b.bindingType === 'bidirectional')
+    [selectAllBindings],
+    (items) => items.find(
+      b => b.isActive !== false && // Только активные привязки
+           (b.bindingType === 'input' || b.bindingType === 'bidirectional') && 
+           (b.blockId === blockId || (linkedBlockId && b.blockId === linkedBlockId))
     )
   )
 

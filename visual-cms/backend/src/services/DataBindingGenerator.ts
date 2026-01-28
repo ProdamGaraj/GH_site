@@ -133,16 +133,19 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
   // Update all bindings
   function updateBindings() {
     console.log('[DataBinding] Updating bindings, total:', _bindings.length);
+    console.log('[DataBinding] Available data sources:', Object.keys(_dataStore));
     _bindings.forEach(function(binding) {
       const element = document.querySelector('[data-element-id="' + binding.blockId + '"]');
       if (!element) {
         console.warn('[DataBinding] Element not found for binding:', binding.blockId);
+        console.log('[DataBinding] Available elements:', Array.from(document.querySelectorAll('[data-element-id]')).slice(0, 10).map(el => el.getAttribute('data-element-id')));
         return;
       }
       
       const data = _dataStore[binding.sourceAlias];
       if (!data) {
         console.warn('[DataBinding] No data for source alias:', binding.sourceAlias);
+        console.warn('[DataBinding] Available aliases:', Object.keys(_dataStore));
         return;
       }
       
@@ -201,8 +204,14 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     // Данные должны быть массивом или объектом с массивом
     let items = data;
     
+    // Если указан arrayPath, используем его для извлечения массива
+    if (config.arrayPath && !Array.isArray(data)) {
+      items = getNestedValue(data, config.arrayPath);
+      console.log('[Repeater] Extracted items using arrayPath "' + config.arrayPath + '":', items);
+    }
+    
     // Если data - это объект с вложенным массивом (например {success: true, data: [...]})
-    if (!Array.isArray(data)) {
+    if (!Array.isArray(items)) {
       if (data.data && Array.isArray(data.data)) {
         items = data.data;
       } else if (data.items && Array.isArray(data.items)) {
@@ -234,9 +243,10 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     // Скрываем оригинальный template
     templateElement.style.display = 'none';
     
-    // Очищаем контейнер (сохраняем только template)
+    // Удаляем только старые повторяемые элементы (те что имеют data-repeater-item атрибут)
+    // Остальные элементы контейнера (фильтры, заголовки) остаются на месте
     Array.from(container.children).forEach(function(child) {
-      if (child !== templateElement) {
+      if (child.hasAttribute('data-repeater-item')) {
         child.remove();
       }
     });
@@ -247,8 +257,10 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     items.forEach(function(item, index) {
       const clone = templateElement.cloneNode(true);
       clone.style.display = ''; // Показываем клон
-      clone.removeAttribute('data-element-id'); // Убираем ID чтобы не конфликтовать
+      // Сохраняем originalId для возможности обновления
+      const originalId = clone.getAttribute('data-element-id');
       clone.setAttribute('data-repeater-item', index);
+      clone.setAttribute('data-repeater-item-id', originalId);
       
       // Применяем field mappings если есть
       if (fieldMappings && fieldMappings.length > 0) {
@@ -258,6 +270,8 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         updateElementContent(clone, item);
       }
       
+      // Вставляем клон в конец контейнера
+      // Не используем insertBefore, так как шаблон может быть в другом контейнере
       container.appendChild(clone);
     });
     
@@ -266,33 +280,116 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
   
   // Применить field mappings к элементу
   function applyFieldMappingsToElement(element, data, mappings) {
+    console.log('[FieldMapping] Applying mappings:', mappings);
+    console.log('[FieldMapping] Data:', data);
+    
     mappings.forEach(function(mapping) {
-      // targetProperty может быть вида:
-      // - "content" - текст элемента с ID из template
-      // - "children.0.content" - текст первого child
-      // - "children.title-xyz.content"
-      // - "attributes.href"
-      
       const value = getNestedValue(data, mapping.sourceField);
-      if (value === undefined) return;
+      if (value === undefined) {
+        console.log('[FieldMapping] No value for field:', mapping.sourceField);
+        return;
+      }
       
-      // Парсим targetProperty
+      console.log('[FieldMapping] Applying', mapping.sourceField, '=', value, 'to', mapping.targetProperty);
+      
+      // targetProperty может быть:
+      // - "item.project-image" - ищем элемент с data-bind="project-image"
+      // - "item.title" - ищем элемент с data-bind="title" 
+      // - "children.0.content" - N-й child элемент
+      
       const parts = mapping.targetProperty.split('.');
       
-      // Если targetProperty начинается с "children", ищем элемент
-      if (parts[0] === 'children' && parts.length >= 2) {
-        // children.title-xyz.content → ищем элемент с ID содержащим "title"
-        const childIdHint = parts[1]; // например "title-xyz" или "0"
-        const property = parts[2] || 'content'; // content, attributes, styles
+      // Формат "item.field-name" - ищем по data-bind ИЛИ по metadata.name
+      if (parts[0] === 'item' && parts.length === 2) {
+        const fieldName = parts[1]; // например "project-image" или "image"
         
-        // Ищем элемент внутри template
-        let targetElement = null;
+        // Сначала ищем элемент с data-bind атрибутом, который содержит название поля
+        let targetElement = element.querySelector('[data-bind="' + fieldName + '"]');
         
-        // Пробуем найти по точному data-element-id
-        targetElement = element.querySelector('[data-element-id*="' + childIdHint + '"]');
+        // Синонимы для полей (поле данных -> возможные названия элементов)
+        const fieldSynonyms = {
+          'title': ['name', 'title', 'heading', 'header', 'заголовок', 'название'],
+          'name': ['title', 'name', 'heading', 'header', 'заголовок', 'название'],
+          'status': ['status', 'badge', 'tag', 'label', 'статус', 'element'],
+          'image': ['image', 'img', 'photo', 'picture', 'картинка', 'изображение', 'container'],
+          'price': ['price', 'cost', 'цена', 'стоимость'],
+          'location': ['location', 'address', 'place', 'локация', 'адрес', 'место']
+        };
+        
+        // Получаем возможные синонимы для текущего поля
+        const synonyms = fieldSynonyms[fieldName.toLowerCase()] || [fieldName.toLowerCase()];
+        
+        // Если не нашли - ищем по metadata.name в data-element-name (more robust)
+        if (!targetElement) {
+          const allElements = element.querySelectorAll('[data-element-name]');
+          for (let i = 0; i < allElements.length; i++) {
+            const elementName = allElements[i].getAttribute('data-element-name').toLowerCase();
+            
+            // Проверяем прямое совпадение или частичное
+            if (elementName.includes(fieldName.toLowerCase()) || 
+                fieldName.toLowerCase().includes(elementName)) {
+              targetElement = allElements[i];
+              console.log('[FieldMapping] Found element by name match:', elementName, 'for field:', fieldName);
+              break;
+            }
+            
+            // Проверяем синонимы
+            for (let syn of synonyms) {
+              if (elementName.includes(syn) || syn.includes(elementName.split(' ').pop())) {
+                targetElement = allElements[i];
+                console.log('[FieldMapping] Found element by synonym match:', elementName, 'for field:', fieldName, '(synonym:', syn + ')');
+                break;
+              }
+            }
+            if (targetElement) break;
+          }
+        }
+        
+        // Fallback: ищем элемент который содержит часть названия в data-bind
+        if (!targetElement) {
+          const allBindElements = element.querySelectorAll('[data-bind]');
+          for (let i = 0; i < allBindElements.length; i++) {
+            const bindValue = allBindElements[i].getAttribute('data-bind');
+            if (bindValue && (bindValue.includes(fieldName) || fieldName.includes(bindValue.split('-').pop()))) {
+              targetElement = allBindElements[i];
+              console.log('[FieldMapping] Found element by partial match:', bindValue, 'for field:', fieldName);
+              break;
+            }
+          }
+        }
+        
+        if (targetElement) {
+          // Определяем как применить значение в зависимости от типа элемента
+          if (targetElement.tagName === 'IMG') {
+            targetElement.setAttribute('src', value);
+            console.log('[FieldMapping] Set image src:', value);
+          } else if (targetElement.tagName === 'A') {
+            targetElement.setAttribute('href', value);
+          } else {
+            targetElement.textContent = value;
+            console.log('[FieldMapping] Set text content:', value);
+          }
+        } else {
+          console.log('[FieldMapping] Target element not found for field:', fieldName);
+          // Fallback: пытаемся найти первый элемент содержащий имя поля в каком-либо атрибуте
+          const allElements = Array.from(element.querySelectorAll('*'));
+          for (let el of allElements) {
+            if (el.className && el.className.includes(fieldName)) {
+              el.textContent = value;
+              console.log('[FieldMapping] Applied to element by class match:', el.className);
+              break;
+            }
+          }
+        }
+      }
+      // Формат "children.N.property" - обращение к N-му child
+      else if (parts[0] === 'children' && parts.length >= 2) {
+        const childIdHint = parts[1];
+        const property = parts[2] || 'content';
+        
+        let targetElement = element.querySelector('[data-element-id*="' + childIdHint + '"]');
         
         if (!targetElement && !isNaN(childIdHint)) {
-          // Если это число - берем N-й child
           const index = parseInt(childIdHint);
           targetElement = element.children[index];
         }
@@ -300,8 +397,9 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         if (targetElement) {
           applyValue(targetElement, property, value);
         }
-      } else {
-        // Прямое свойство - применяем к корневому элементу
+      }
+      // Прямое свойство
+      else {
         applyValue(element, mapping.targetProperty, value);
       }
     });

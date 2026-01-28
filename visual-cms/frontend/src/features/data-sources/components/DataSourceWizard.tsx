@@ -1017,7 +1017,7 @@ export const DataSourceWizard: React.FC = () => {
     <div className="h-screen flex flex-col bg-gray-50">
       <Header />
       
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pl-2 pr-2">
         <div className="max-w-4xl mx-auto p-8">
           {/* Back button */}
           <button
