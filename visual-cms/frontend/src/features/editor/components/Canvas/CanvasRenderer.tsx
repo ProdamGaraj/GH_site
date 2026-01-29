@@ -19,6 +19,7 @@ interface CanvasRendererProps {
   editorType?: 'page' | 'block'
   blockAlignment?: 'left' | 'center' | 'right'
   rootNode?: BlockNode  // РџРµСЂРµРґР°РµРј root РґР»СЏ РїСЂРѕРІРµСЂРєРё РІР°СЂРёР°С†РёР№
+  libraryBlockId?: string // ID библиотечного блока для поиска привязок
 }
 
 const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({ 
@@ -48,7 +49,7 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
   const { isRepeater, hasBinding, bindingType } = useBlockDataPreview(node.id, undefined, linkedBlockId)
   
   // Debug log for containers with potential bindings
-  if (node.elementType === 'container' && node.id.includes('1769591959232')) {
+  if (node.elementType === 'container' && (node.id.includes('1769405707337') || node.id.includes('1769591959232'))) {
     console.log('[CanvasRenderer] Checking container:', { 
       nodeId: node.id, 
       nodeName: node.metadata?.name,
@@ -56,7 +57,8 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
       hasBinding, 
       bindingType, 
       isRepeater,
-      isRoot
+      isRoot,
+      libraryBlockIdProp: libraryBlockId
     })
   }
   

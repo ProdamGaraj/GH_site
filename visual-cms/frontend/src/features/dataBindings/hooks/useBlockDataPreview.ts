@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useAppSelector } from '@/app/hooks'
-import { selectBindingsByBlockId } from '../dataBindingsSlice'
+import { selectAllBindings } from '../dataBindingsSlice'
 import type { DataBinding } from '@/shared/types/dataBinding'
 
 export interface BlockDataPreviewResult {
@@ -34,11 +34,27 @@ interface BindingConfig {
  * @param linkedBlockId - Опциональный ID библиотечного блока (привязка может быть по этому ID)
  */
 export function useBlockDataPreview(blockId: string, _pageId?: string, linkedBlockId?: string): BlockDataPreviewResult {
-  const bindings = useAppSelector(selectBindingsByBlockId(blockId, linkedBlockId))
+  // Получаем все биндинги напрямую (не через createSelector в функции)
+  const allBindings = useAppSelector(selectAllBindings)
+  
+  // Фильтруем биндинги в useMemo для стабильности
+  const bindings = useMemo(() => {
+    return allBindings.filter(b => 
+      b.isActive !== false && 
+      (b.blockId === blockId || (linkedBlockId && b.blockId === linkedBlockId))
+    )
+  }, [allBindings, blockId, linkedBlockId])
 
-  // Debug log - только для интересующих нас блоков
-  if (blockId.includes('1769591959232')) {
-    console.log('[useBlockDataPreview] Checking block:', { blockId, linkedBlockId, bindings })
+  // Debug log - для отслеживания загрузки биндингов
+  if (blockId.includes('1769405707337') || blockId.includes('1769591959232') || blockId === 'Projects Grid') {
+    console.log('[useBlockDataPreview] Checking block:', { 
+      blockId, 
+      linkedBlockId, 
+      bindingsCount: bindings?.length, 
+      bindings,
+      allBindingsCount: allBindings.length,
+      allBindingBlockIds: allBindings.map(b => b.blockId)
+    })
   }
 
   const mainBinding = useMemo((): DataBinding | undefined => {

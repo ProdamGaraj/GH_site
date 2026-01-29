@@ -189,6 +189,7 @@ const dataBindingsSlice = createSlice({
       .addCase(fetchAllBindings.fulfilled, (state, action) => {
         state.loading = false
         state.items = action.payload
+        console.log('[dataBindingsSlice] fetchAllBindings fulfilled:', action.payload.length, 'bindings')
       })
       .addCase(fetchAllBindings.rejected, (state, action) => {
         state.loading = false
@@ -224,9 +225,22 @@ const dataBindingsSlice = createSlice({
       .addCase(fetchBindingsForBlock.fulfilled, (state, action) => {
         state.loading = false
         state.currentBlockBindings = action.payload
-        // Also add to items for selectors to find
-        state.items = action.payload
-        console.log('[dataBindingsSlice] fetchBindingsForBlock fulfilled:', action.payload.length, 'bindings', action.payload)
+        
+        // MERGE bindings instead of replacing - add new bindings, update existing ones
+        const newBindings = action.payload
+        const existingIds = new Set(state.items.map(b => b.id))
+        
+        // Update existing and add new
+        for (const binding of newBindings) {
+          const idx = state.items.findIndex(b => b.id === binding.id)
+          if (idx !== -1) {
+            state.items[idx] = binding
+          } else {
+            state.items.push(binding)
+          }
+        }
+        
+        console.log('[dataBindingsSlice] fetchBindingsForBlock fulfilled:', action.payload.length, 'bindings, total items:', state.items.length)
       })
       .addCase(fetchBindingsForBlock.rejected, (state, action) => {
         state.loading = false

@@ -249,9 +249,13 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
           const { loadEditor: loadEditorAction } = await import('@/features/editor/editorSlice')
           dispatch(loadEditorAction(result.structure))
           
-          // Load data bindings for this library block
-          const { fetchBindingsForBlock } = await import('@/features/dataBindings/dataBindingsSlice')
-          dispatch(fetchBindingsForBlock({ blockId: id }))
+          // Load ALL data bindings (needed for nested blocks like Projects Grid inside Projects Section)
+          const { fetchAllBindings } = await import('@/features/dataBindings/dataBindingsSlice')
+          dispatch(fetchAllBindings())
+          
+          // Load all blocks (needed for repeater templates)
+          const { fetchBlocks } = await import('@/features/blocks/blocksSlice')
+          dispatch(fetchBlocks())
         } catch (error) {
           console.error('Failed to load block:', error)
         } finally {

@@ -5,7 +5,7 @@ import {
   selectFetchedData, 
   selectIsFetching, 
   selectFetchError,
-  selectInputBindingForBlock 
+  selectAllBindings 
 } from '../dataBindingsSlice'
 import type { DataBinding, InputBindingConfig } from '@/shared/types/dataBinding'
 
@@ -42,15 +42,25 @@ export function useDataBinding<T = unknown>(
 ): UseDataBindingResult<T> {
   const dispatch = useAppDispatch()
   
-  // Create memoized selectors for this specific block
-  // Also search by linkedBlockId if provided (for library blocks)
-  const inputBindingSelector = useMemo(
-    () => selectInputBindingForBlock(blockId, options?.linkedBlockId), 
-    [blockId, options?.linkedBlockId]
-  )
+  // Get all bindings and filter locally (fixes memoization issue with createSelector in factory)
+  const allBindings = useAppSelector(selectAllBindings)
   
-  // Get binding for this block
-  const binding = useAppSelector(inputBindingSelector)
+  // Find input binding for this block (memoized)
+  const binding = useMemo(() => {
+    const linkedBlockId = options?.linkedBlockId
+    const found = allBindings.find(
+      b => b.isActive !== false &&
+           (b.bindingType === 'input' || b.bindingType === 'bidirectional') && 
+           (b.blockId === blockId || (linkedBlockId && b.blockId === linkedBlockId))
+    ) || null
+    
+    // Debug log for Projects Grid
+    if (blockId.includes('1769405707337') || blockId.includes('1769591959232')) {
+      console.log('[useDataBinding] Finding binding:', { blockId, linkedBlockId, allBindingsCount: allBindings.length, found: found?.id })
+    }
+    
+    return found
+  }, [allBindings, blockId, options?.linkedBlockId])
   
   // Get data by binding id
   const bindingId = binding?.id || ''
@@ -104,9 +114,11 @@ export function useDataBinding<T = unknown>(
     }))
   }, [dispatch, bindingId, blockId, options?.params])
 
-  // Auto-fetch on mount
+  // Auto-fetch on mount or when bindingId becomes available
   useEffect(() => {
+    console.log('[useDataBinding] autoFetch effect:', { blockId, bindingId, autoFetch: options?.autoFetch })
     if (options?.autoFetch && bindingId) {
+      console.log('[useDataBinding] Triggering auto-fetch for binding:', bindingId)
       fetch()
     }
   }, [options?.autoFetch, bindingId, fetch])
