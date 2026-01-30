@@ -4,6 +4,7 @@
 
 export interface DataBindingConfig {
   blockId: string
+  bindingId?: string // ID привязки для использования fetch-with-transforms API
   type: 'input' | 'output' | 'repeater'
   sourceAlias: string
   fieldMappings?: Array<{
@@ -115,11 +116,25 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     return _dataStore[alias] || null;
   };
   
-  // Fetch data from source
-  async function fetchData(source) {
+  // Fetch data from source (uses fetch-with-transforms for bindings with transforms)
+  async function fetchData(source, bindingId) {
     try {
-      console.log('[DataBinding] Fetching data for source:', source.alias, 'from:', source.endpoint || '/api/data/' + source.dataSourceId);
-      const response = await fetch(source.endpoint || '/api/data/' + source.dataSourceId);
+      let url = source.endpoint || '/api/data/' + source.dataSourceId;
+      let options = { method: 'GET' };
+      
+      // Если есть bindingId, используем fetch-with-transforms API
+      if (bindingId) {
+        url = '/api/data/fetch-with-transforms';
+        options = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bindingId: bindingId })
+        };
+        console.log('[DataBinding] Using fetch-with-transforms for binding:', bindingId);
+      }
+      
+      console.log('[DataBinding] Fetching data for source:', source.alias, 'from:', url);
+      const response = await fetch(url, options);
       const data = await response.json();
       console.log('[DataBinding] Data received for', source.alias, ':', data);
       _dataStore[source.alias] = data;
@@ -736,15 +751,39 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
   
   // Initialize on page load
   document.addEventListener('DOMContentLoaded', function() {
-    // Load data sources configured for page load
-    _dataSources.forEach(function(source) {
-      if (source.loadStrategy === 'pageLoad') {
-        fetchData(source).then(updateBindings);
+    console.log('[DataBinding] Initializing with', _bindings.length, 'bindings');
+    
+    // Собираем уникальные пары (sourceAlias, bindingId)
+    const sourcesToLoad = new Map();
+    
+    _bindings.forEach(function(binding) {
+      if (binding.type === 'input' || binding.type === 'repeater') {
+        const source = _dataSources.find(s => s.alias === binding.sourceAlias);
+        if (source && source.loadStrategy === 'pageLoad') {
+          // Используем bindingId если есть, иначе только sourceAlias
+          const key = binding.bindingId || binding.sourceAlias;
+          if (!sourcesToLoad.has(key)) {
+            sourcesToLoad.set(key, { source: source, bindingId: binding.bindingId });
+          }
+        }
       }
-      
+    });
+    
+    // Загружаем данные для каждого уникального источника с bindingId
+    sourcesToLoad.forEach(function(config, key) {
+      console.log('[DataBinding] Loading data for:', key, 'bindingId:', config.bindingId);
+      fetchData(config.source, config.bindingId).then(updateBindings);
+    });
+    
+    // Setup interval loading
+    _dataSources.forEach(function(source) {
       if (source.loadStrategy === 'interval' && source.loadInterval) {
+        // Для интервальной загрузки находим соответствующий bindingId
+        const binding = _bindings.find(b => b.sourceAlias === source.alias);
+        const bindingId = binding ? binding.bindingId : null;
+        
         setInterval(function() {
-          fetchData(source).then(updateBindings);
+          fetchData(source, bindingId).then(updateBindings);
         }, source.loadInterval * 1000);
       }
     });

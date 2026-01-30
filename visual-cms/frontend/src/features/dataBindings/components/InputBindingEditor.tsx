@@ -9,10 +9,12 @@ import { RepeaterStatesEditor, type RepeaterStatesConfig } from './RepeaterState
 import { AdditionalDataSourcesEditor, type AdditionalDataSource } from './AdditionalDataSourcesEditor'
 import { ComputedFieldsEditor, type ComputedFieldConfig } from './ComputedFieldsEditor'
 import { ConditionalMappingEditor, type ConditionalFieldConfig } from './ConditionalMappingEditor'
+import { TransformsEditor } from './TransformsEditor'
 import { BlockTemplateSelector } from '@/features/blocks/components/BlockTemplateSelector'
 import { selectBlocks } from '@/features/blocks/blocksSlice'
 import type { Block } from '@/shared/types'
 import type { DetectedField } from '@/shared/types/template'
+import type { DataTransform, DynamicFilter } from '@/shared/types/transforms'
 // PaginationControlsEditor is imported but not yet used - will be integrated later
 
 interface InputBindingEditorProps {
@@ -46,6 +48,7 @@ export const InputBindingEditor: React.FC<InputBindingEditorProps> = ({ binding,
     { id: 'mapping', label: 'Mapping' },
     { id: 'filters', label: 'Filters' },
     { id: 'sorting', label: 'Sorting' },
+    { id: 'transforms', label: 'Transforms' },
     { id: 'pagination', label: 'Pagination' },
     { id: 'states', label: 'States' },
     { id: 'sources', label: 'Sources' },
@@ -167,6 +170,14 @@ export const InputBindingEditor: React.FC<InputBindingEditorProps> = ({ binding,
           )}
           {activeSection === 'filters' && <FilterBuilder filters={config.filters || []} onChange={(filters) => updateConfig({ filters })} />}
           {activeSection === 'sorting' && <SortBuilder sorting={config.sorting || []} onChange={(sorting) => updateConfig({ sorting })} />}
+          {activeSection === 'transforms' && (
+            <TransformsEditor
+              transforms={(config as InputBindingConfig & { transforms?: DataTransform[] }).transforms || []}
+              onChange={(transforms) => updateConfig({ transforms } as Partial<InputBindingConfig>)}
+              dynamicFilters={(config as InputBindingConfig & { dynamicFilters?: DynamicFilter[] }).dynamicFilters || []}
+              onDynamicFiltersChange={(dynamicFilters) => updateConfig({ dynamicFilters } as Partial<InputBindingConfig>)}
+            />
+          )}
           {activeSection === 'pagination' && (
             <div className="space-y-4">
               <label className="flex items-center gap-3">

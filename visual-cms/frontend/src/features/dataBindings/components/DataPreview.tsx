@@ -59,7 +59,7 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, loading, onRefre
               onClick={() => setViewMode('json')}
               className={`px-3 py-1 text-xs font-medium transition-colors ${
                 viewMode === 'json'
-                  ? 'bg-gray-800 text-white'
+                  ? 'bg-blue-100 text-blue-700 border-blue-300'
                   : 'bg-white text-gray-600 hover:bg-gray-100'
               }`}
             >
@@ -69,7 +69,7 @@ export const DataPreview: React.FC<DataPreviewProps> = ({ data, loading, onRefre
               onClick={() => setViewMode('table')}
               className={`px-3 py-1 text-xs font-medium transition-colors ${
                 viewMode === 'table'
-                  ? 'bg-gray-800 text-white'
+                  ? 'bg-blue-100 text-blue-700 border-blue-300'
                   : 'bg-white text-gray-600 hover:bg-gray-100'
               }`}
             >

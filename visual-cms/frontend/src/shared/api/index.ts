@@ -299,17 +299,31 @@ export const dataBindingApi = {
   delete: (id: string) => api.delete<void>(`/data-bindings/${id}`),
 
   /**
-   * РџРѕР»СѓС‡РёС‚СЊ РґР°РЅРЅС‹Рµ РЅР°РїСЂСЏРјСѓСЋ РёР· РёСЃС‚РѕС‡РЅРёРєР° (СЃ С„РёР»СЊС‚СЂР°РјРё)
+   * Получить данные напрямую из источника (с фильтрами)
    */
   fetchDirect: (data: DirectFetchRequest) => 
     api.post<FetchDataResult>('/data/fetch', data),
 
   /**
-   * РџРѕР»СѓС‡РёС‚СЊ РґР°РЅРЅС‹Рµ С‡РµСЂРµР· РїСЂРёРІСЏР·РєСѓ
+   * Получить данные через привязку
    */
   fetchWithBinding: (data: FetchWithBindingRequest) =>
     api.post<FetchDataResult>('/data/fetch-with-binding', data),
+
+  /**
+   * Получить данные с трансформациями, фильтрами, поиском и пагинацией
+   */
+  fetchWithTransforms: (data: FetchWithTransformsRequest) =>
+    api.post<FetchWithTransformsResponse>('/data/fetch-with-transforms', data),
 }
+
+// Import transform types
+import type { 
+  FetchWithTransformsRequest, 
+  FetchWithTransformsResponse,
+  FilterCondition,
+  DataTransform 
+} from '@/shared/types/transforms'
 
 // Re-export data binding types
 export type {
@@ -320,6 +334,15 @@ export type {
   FetchDataResult,
   DirectFetchRequest
 } from '@/shared/types/dataBinding'
+
+// Re-export transform types
+export type {
+  FetchWithTransformsRequest,
+  FetchWithTransformsResponse,
+  FilterCondition,
+  DataTransform
+} from '@/shared/types/transforms'
+
 // Page Data Settings Types
 export interface PageDataSource {
   id: string

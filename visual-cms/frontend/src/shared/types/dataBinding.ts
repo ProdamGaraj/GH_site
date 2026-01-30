@@ -153,6 +153,8 @@ export interface InputBindingConfig {
   computedFields?: ComputedField[] // Вычисляемые поля
   repeaterStates?: RepeaterStatesConfig    // Состояния: loading, empty, error
   paginationUI?: PaginationUIConfig        // Кастомный UI пагинации
+  transforms?: import('./transforms').DataTransform[]         // Серверные трансформации данных
+  dynamicFilters?: import('./transforms').DynamicFilter[]     // Динамические фильтры (связь с блоками)
   cacheSettings?: {
     enabled: boolean
     ttl: number                   // Сколь хранить кэш в секундах

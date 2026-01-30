@@ -137,6 +137,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         setShowSaveDialog(true)
       } else {
         try {
+          // Сначала синхронизируем вложенные linked блоки в библиотеку
+          await syncNestedLinkedBlocksToLibrary(rootNode)
+          
           await dispatch(updatePage({
             id: id!,
             data: {
@@ -172,7 +175,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             }
           })).unwrap()
           
-          // 2. Синхронизируем все страницы, которые используют этот блок
+          // 2. Синхронизируем вложенные linked блоки в библиотеку
+          await syncNestedLinkedBlocksToLibrary(rootNode)
+          
+          // 3. Синхронизируем все страницы, которые используют этот блок
           await syncBlockToPages(id!, rootNode)
           
           dispatch(markAsSaved())
@@ -181,6 +187,50 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         }
       }
     }
+  }
+  
+  // Функция для синхронизации вложенных linked блоков в библиотеку
+  // Когда редактируешь Projects Grid внутри Projects Section - изменения сохраняются в библиотеку Projects Grid
+  const syncNestedLinkedBlocksToLibrary = async (structure: BlockNode) => {
+    const linkedNodes = findAllLinkedNodes(structure)
+    
+    for (const node of linkedNodes) {
+      const linkedBlockId = node.metadata?.linkedBlockId
+      if (!linkedBlockId) continue
+      
+      try {
+        // Создаём копию структуры для библиотеки (без linkedBlockId)
+        const structureForLibrary = JSON.parse(JSON.stringify(node))
+        if (structureForLibrary.metadata) {
+          delete structureForLibrary.metadata.linkedBlockId
+          delete structureForLibrary.metadata.styleOverrides
+        }
+        
+        // Обновляем блок в библиотеке
+        await blockApi.update(linkedBlockId, {
+          structure: structureForLibrary
+        })
+        
+        console.log(`[Sync] Обновлён linked блок в библиотеке: ${linkedBlockId}`)
+      } catch (error) {
+        console.error(`[Sync] Ошибка обновления linked блока ${linkedBlockId}:`, error)
+      }
+    }
+  }
+  
+  // Найти все узлы с linkedBlockId в структуре
+  const findAllLinkedNodes = (node: BlockNode): BlockNode[] => {
+    const results: BlockNode[] = []
+    
+    if (node.metadata?.linkedBlockId) {
+      results.push(node)
+    }
+    
+    for (const child of node.children || []) {
+      results.push(...findAllLinkedNodes(child))
+    }
+    
+    return results
   }
   
   // Функция синхронизации блока со всеми страницами, где он используется

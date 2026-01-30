@@ -252,6 +252,11 @@ const editorSlice = createSlice({
       console.log('Previous selectedNodeId:', state.selectedNodeId)
       state.selectedNodeId = action.payload
       console.log('New selectedNodeId:', state.selectedNodeId)
+      
+      // При выборе узла открыть basicSettings если панель не выбрана или это elementProperties
+      if (action.payload !== null && (!state.activeRightPanel || state.activeRightPanel === 'elementProperties')) {
+        state.activeRightPanel = 'basicSettings'
+      }
     },
     
     hoverNode: (state, action: PayloadAction<string | null>) => {

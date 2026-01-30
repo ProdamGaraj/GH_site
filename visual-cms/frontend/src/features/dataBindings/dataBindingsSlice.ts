@@ -26,6 +26,8 @@ interface DataBindingsState {
   // Ошибки
   error: string | null
   fetchErrors: Record<string, string>
+  // Версия привязок (инкрементируется при обновлении для триггера перезагрузки данных)
+  bindingsVersion: number
 }
 
 const initialState: DataBindingsState = {
@@ -38,6 +40,7 @@ const initialState: DataBindingsState = {
   fetching: {},
   error: null,
   fetchErrors: {},
+  bindingsVersion: 0,
 }
 
 // ============ Async Thunks ============
@@ -64,22 +67,30 @@ export const fetchBindingById = createAsyncThunk(
 
 /**
  * Получить привязки для блока
+ * Поддерживает поиск по основному blockId и linkedBlockId (для связанных блоков)
  */
 export const fetchBindingsForBlock = createAsyncThunk(
   'dataBindings/fetchForBlock',
-  async ({ blockId, pageId }: { blockId: string; pageId?: string }) => {
-    return await dataBindingApi.getByBlockId(blockId, pageId)
+  async ({ blockId, linkedBlockId, pageId }: { blockId: string; linkedBlockId?: string; pageId?: string }) => {
+    // Если есть linkedBlockId и он отличается от blockId - запрашиваем оба
+    const effectiveBlockId = linkedBlockId && linkedBlockId !== blockId 
+      ? `${blockId},${linkedBlockId}` 
+      : blockId
+    return await dataBindingApi.getByBlockId(effectiveBlockId, pageId)
   }
 )
 
 /**
- * Получить все привязки для страницы
+ * Получить все привязки для страницы (включая привязки к библиотечным блокам без pageId)
  */
 export const fetchBindingsForPage = createAsyncThunk(
   'dataBindings/fetchForPage',
   async (pageId: string) => {
     const all = await dataBindingApi.getAll()
-    return all.filter(b => b.pageId === pageId)
+    // Возвращаем привязки для этой страницы ИЛИ привязки без pageId (привязаны к блокам из библиотеки)
+    const filtered = all.filter(b => b.pageId === pageId || !b.pageId)
+    console.log('[fetchBindingsForPage] pageId:', pageId, 'all:', all.length, 'filtered:', filtered.length)
+    return filtered
   }
 )
 
@@ -275,6 +286,8 @@ const dataBindingsSlice = createSlice({
         state.items.push(action.payload)
         state.currentBlockBindings.push(action.payload)
         state.currentBinding = action.payload
+        // Инкрементируем версию для триггера перезагрузки данных
+        state.bindingsVersion += 1
       })
       .addCase(createBinding.rejected, (state, action) => {
         state.saving = false
@@ -299,6 +312,8 @@ const dataBindingsSlice = createSlice({
         updateInList(state.items)
         updateInList(state.currentBlockBindings)
         state.currentBinding = action.payload
+        // Инкрементируем версию для триггера перезагрузки данных
+        state.bindingsVersion += 1
       })
       .addCase(updateBinding.rejected, (state, action) => {
         state.saving = false
@@ -393,6 +408,7 @@ export const selectBindingsError = (state: RootState) => state.dataBindings.erro
 export const selectFetchedData = (key: string) => (state: RootState) => state.dataBindings.fetchedData[key]
 export const selectIsFetching = (key: string) => (state: RootState) => state.dataBindings.fetching[key] || false
 export const selectFetchError = (key: string) => (state: RootState) => state.dataBindings.fetchErrors[key]
+export const selectBindingsVersion = (state: RootState) => state.dataBindings.bindingsVersion
 
 // Мемоизированный селектор для получения привязки по blockId или linkedBlockId
 export const selectBindingsByBlockId = (blockId: string, linkedBlockId?: string) =>

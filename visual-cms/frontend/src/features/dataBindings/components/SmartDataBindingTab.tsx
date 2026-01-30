@@ -10,20 +10,23 @@ import { fetchDataSources, selectDataSources } from '@/features/data-sources/dat
 import { fetchBlockById, selectBlocks } from '@/features/blocks/blocksSlice'
 import { markAsDirty } from '@/features/editor/editorSlice'
 import { BlockTemplateSelector } from '@/features/blocks/components/BlockTemplateSelector'
-import { Database, Link, Sparkles, CheckCircle, AlertCircle, ArrowRight, Loader2 } from 'lucide-react'
+import { TransformsEditor } from './TransformsEditor'
+import { Database, Link, Sparkles, CheckCircle, AlertCircle, ArrowRight, Loader2, ChevronDown, ChevronUp, Settings2 } from 'lucide-react'
 import type { DetectedField } from '@/shared/types/template'
 import type { CreateDataBindingRequest, FieldMapping, InputMode } from '@/shared/types/dataBinding'
 import type { Block } from '@/shared/types'
+import type { DataTransform, DynamicFilter } from '@/shared/types/transforms'
 
 interface SmartDataBindingTabProps {
   blockId: string
+  linkedBlockId?: string // ID библиотечного блока для поиска привязки
   pageId?: string
 }
 
 /**
  * Улучшенный таб для простой настройки привязки данных с Template блоками
  */
-export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockId, pageId }) => {
+export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockId, linkedBlockId, pageId }) => {
   const dispatch = useAppDispatch()
   
   // State
@@ -39,23 +42,32 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
   const [loading, setLoading] = useState(false)
   const [testResult, setTestResult] = useState<any>(null)
   const [testLoading, setTestLoading] = useState(false)
+  const [transforms, setTransforms] = useState<DataTransform[]>([])
+  const [dynamicFilters, setDynamicFilters] = useState<DynamicFilter[]>([])
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   // Найти блок и его Template Fields
   const block = blocks.find(b => b.id === blockId)
   const templateFields = block?.detectedFields || []
   const isTemplate = block?.isTemplate
 
-  // Существующая привязка (если есть)
-  const existingBinding = bindings.find(b => b.bindingType === 'input' || b.bindingType === 'bidirectional')
+  // Существующая привязка (если есть) - ищем по blockId или linkedBlockId
+  const existingBinding = bindings.find(b => 
+    (b.bindingType === 'input' || b.bindingType === 'bidirectional') &&
+    (b.blockId === blockId || (linkedBlockId && b.blockId === linkedBlockId))
+  )
 
-  // Загрузка данных
+  // Загрузка данных - загружаем биндинги для обоих ID одним запросом
   useEffect(() => {
-    dispatch(fetchBindingsForBlock({ blockId, pageId }))
+    dispatch(fetchBindingsForBlock({ blockId, linkedBlockId, pageId }))
     dispatch(fetchDataSources({}))
     if (blockId) {
       dispatch(fetchBlockById(blockId))
     }
-  }, [dispatch, blockId, pageId])
+    if (linkedBlockId && linkedBlockId !== blockId) {
+      dispatch(fetchBlockById(linkedBlockId))
+    }
+  }, [dispatch, blockId, linkedBlockId, pageId])
 
   // Загрузить существующие mappings
   useEffect(() => {
@@ -73,6 +85,16 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
       const templateId = existingBinding.config.inputConfig.templateId
       if (templateId) {
         setSelectedTemplateBlockId(templateId)
+      }
+
+      // Восстанавливаем transforms и dynamicFilters
+      if (existingBinding.config.inputConfig.transforms) {
+        setTransforms(existingBinding.config.inputConfig.transforms)
+        setShowAdvanced(true)
+      }
+      if (existingBinding.config.inputConfig.dynamicFilters) {
+        setDynamicFilters(existingBinding.config.inputConfig.dynamicFilters)
+        setShowAdvanced(true)
       }
     }
   }, [existingBinding])
@@ -141,6 +163,18 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
 
     setLoading(true)
     try {
+      // Формируем inputConfig
+      const inputConfig = {
+        mode,
+        fieldMappings: mappings,
+        transforms,
+        dynamicFilters,
+        ...(mode === 'repeater' && selectedTemplateBlockId && { templateId: selectedTemplateBlockId }),
+        ...(mode === 'repeater' && arrayPath && { arrayPath }),
+      }
+
+      console.log('💾 Saving binding with inputConfig:', inputConfig)
+
       if (existingBinding) {
         // Обновить существующую привязку
         console.log('Updating existing binding:', {
@@ -148,19 +182,16 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
           dataSourceId: selectedDataSourceId,
           mode,
           templateId: selectedTemplateBlockId,
-          mappings
+          mappings,
+          transforms,
+          dynamicFilters
         })
         await dispatch(updateBinding({
           id: existingBinding.id,
           data: {
             dataSourceId: selectedDataSourceId,
             config: {
-              inputConfig: {
-                mode,
-                fieldMappings: mappings,
-                ...(mode === 'repeater' && selectedTemplateBlockId && { templateId: selectedTemplateBlockId }),
-                ...(mode === 'repeater' && arrayPath && { arrayPath }),
-              },
+              inputConfig,
             },
           },
         })).unwrap()
@@ -175,12 +206,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
           dataSourceId: selectedDataSourceId,
           bindingType: 'input',
           config: {
-            inputConfig: {
-              mode,
-              fieldMappings: mappings,
-              ...(mode === 'repeater' && selectedTemplateBlockId && { templateId: selectedTemplateBlockId }),
-              ...(mode === 'repeater' && arrayPath && { arrayPath }),
-            },
+            inputConfig,
           },
         }
         console.log('Creating new binding:', newBinding)
@@ -218,11 +244,11 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
     }
   }
 
-  // Тест привязки
+  // Тест привязки с применением трансформаций
   const handleTest = async () => {
     console.log('🧪 handleTest вызвана')
     console.log('selectedDataSourceId:', selectedDataSourceId)
-    console.log('dataSources:', dataSources)
+    console.log('transforms:', transforms)
     
     if (!selectedDataSourceId) {
       alert('Выберите источник данных')
@@ -240,7 +266,49 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         throw new Error('Источник данных не найден')
       }
 
-      // Выполняем запрос к источнику данных
+      // Если есть существующая привязка - используем fetch-with-transforms через бэкенд
+      if (existingBinding) {
+        console.log('🧪 Тестирование через бэкенд с трансформациями:', existingBinding.id)
+        
+        const response = await fetch('/api/data/fetch-with-transforms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bindingId: existingBinding.id,
+            // Переопределяем трансформации текущими значениями из UI
+            transformsOverride: transforms.length > 0 ? transforms : undefined
+          })
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`)
+        }
+
+        const result = await response.json()
+        console.log('✅ Результат с трансформациями:', result)
+
+        setTestResult({
+          success: true,
+          dataSource: {
+            name: dataSource.name,
+            type: dataSource.type,
+            url: (dataSource.config as any)?.url
+          },
+          data: result.data,
+          items: result.data,
+          itemsCount: Array.isArray(result.data) ? result.data.length : 0,
+          mode: mode,
+          templateBlock: mode === 'repeater' ? blocks.find(b => b.id === selectedTemplateBlockId)?.name : null,
+          mappings: mappings,
+          meta: result.meta,
+          transformsApplied: transforms.length
+        })
+        
+        return
+      }
+
+      // Fallback: если нет привязки - прямой запрос без трансформаций
       const config = dataSource.config as any
       const url = config.endpoint || config.url
       
@@ -251,7 +319,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         throw new Error('URL не указан в конфигурации источника данных')
       }
 
-      console.log('🧪 Тестирование Data Source:', url)
+      console.log('🧪 Тестирование Data Source напрямую (без трансформаций):', url)
       const response = await fetch(url, {
         method: config.method || 'GET',
         headers: config.headers || {}
@@ -506,6 +574,42 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Advanced Settings - Transforms */}
+      {selectedDataSourceId && (
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Settings2 size={18} className="text-gray-600" />
+              <span className="text-sm font-medium text-gray-700">Расширенные настройки</span>
+              {(transforms.length > 0 || dynamicFilters.length > 0) && (
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                  {transforms.length + dynamicFilters.length}
+                </span>
+              )}
+            </div>
+            {showAdvanced ? (
+              <ChevronUp size={18} className="text-gray-500" />
+            ) : (
+              <ChevronDown size={18} className="text-gray-500" />
+            )}
+          </button>
+          
+          {showAdvanced && (
+            <div className="p-4 border-t border-gray-200">
+              <TransformsEditor
+                transforms={transforms}
+                onChange={setTransforms}
+                dynamicFilters={dynamicFilters}
+                onDynamicFiltersChange={setDynamicFilters}
+              />
+            </div>
+          )}
         </div>
       )}
 

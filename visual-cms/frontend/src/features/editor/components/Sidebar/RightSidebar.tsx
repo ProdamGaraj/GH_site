@@ -1,5 +1,5 @@
 import React from 'react'
-import { Settings, FileText, Move, Palette, Type, MousePointer, Zap, Code2, Database, Info } from 'lucide-react'
+import { FileText, Move, Palette, Type, MousePointer, Zap, Code2, Database, Info } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { setActiveRightPanel, selectActiveRightPanel } from '@/features/editor/editorSlice'
 
@@ -51,18 +51,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ mode = 'block' }) =>
       <div className="h-px w-8 bg-gray-300 my-1" />
       
       {/* Panel buttons */}
-      <button
-        onClick={() => handlePanelClick('elementProperties')}
-        className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${
-          activePanel === 'elementProperties' 
-            ? 'bg-white shadow-sm text-gray-900 border border-gray-300' 
-            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-        }`}
-        title="Свойства"
-      >
-        <Settings size={20} />
-      </button>
-      
       <button
         onClick={() => handlePanelClick('positioning')}
         className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${

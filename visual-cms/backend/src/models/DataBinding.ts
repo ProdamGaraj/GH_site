@@ -178,6 +178,42 @@ export interface InputBindingConfig {
   loadInterval?: number       // секунды (для interval)
   loadEvent?: string          // имя события (для onEvent)
   loadVariable?: string       // имя переменной (для onVariableChange)
+  
+  // Server-side transforms
+  transforms?: DataTransformConfig[]
+  dynamicFilters?: DynamicFilterConfig[]
+}
+
+/**
+ * Server-side transform config
+ */
+export interface DataTransformConfig {
+  id?: string
+  type: 'exclude' | 'include' | 'prepend' | 'append' | 'sort' | 'limit' | 'unique'
+  enabled?: boolean
+  filter?: {
+    field: string
+    operator: string
+    value: unknown
+  }
+  staticItems?: unknown[]
+  field?: string
+  order?: 'asc' | 'desc'
+  limit?: number
+  offset?: number
+  keepFirst?: boolean
+  description?: string
+}
+
+/**
+ * Dynamic filter (связь с блоком)
+ */
+export interface DynamicFilterConfig {
+  id: string
+  sourceBlockId: string
+  field: string
+  operator: string
+  skipIfEmpty?: boolean
 }
 
 /**

@@ -233,7 +233,7 @@ export const VariablesEditor: React.FC<VariablesEditorProps> = ({
               onClick={() => setFilterScope(s)}
               className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
                 filterScope === s
-                  ? 'bg-gray-900 text-white'
+                  ? 'bg-blue-100 text-blue-700'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >

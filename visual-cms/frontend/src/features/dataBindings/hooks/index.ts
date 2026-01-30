@@ -25,6 +25,24 @@ export {
 } from './useDataBinding'
 
 export {
+  useDataBindingWithTransforms,
+  useComputedValue,
+  type TransformOptions,
+  type UseDataBindingWithTransformsOptions,
+  type TransformMeta,
+  type UseDataBindingWithTransformsResult
+} from './useDataBindingWithTransforms'
+
+export {
+  useFilterBlocks,
+  useFilterBlockValue,
+  useSearchBlock,
+  type FilterBlockState,
+  type UseFilterBlocksOptions,
+  type UseFilterBlocksResult
+} from './useFilterBlocks'
+
+export {
   useBlockDataPreview,
   useResolvedContent,
   type BlockDataPreviewResult

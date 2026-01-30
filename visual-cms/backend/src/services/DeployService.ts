@@ -581,6 +581,7 @@ export class DeployService {
             
             return {
               blockId: actualBlockId,
+              bindingId: binding.id, // Для использования fetch-with-transforms
               type: inputConfig.mode === 'repeater' ? 'repeater' : 'input',
               sourceAlias: binding.dataSource?.name || '',
               fieldMappings: inputConfig.fieldMappings?.map((fm: any) => ({

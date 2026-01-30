@@ -6,6 +6,20 @@ import { linkedBlocksService } from '../services/LinkedBlocksService'
 const pageRepository = AppDataSource.getRepository(Page)
 
 export class PageController {
+  constructor() {
+    // Привязываем методы к контексту this
+    this.getAll = this.getAll.bind(this)
+    this.getById = this.getById.bind(this)
+    this.create = this.create.bind(this)
+    this.update = this.update.bind(this)
+    this.delete = this.delete.bind(this)
+    this.publish = this.publish.bind(this)
+    this.getDataSettings = this.getDataSettings.bind(this)
+    this.updateDataSettings = this.updateDataSettings.bind(this)
+    this.updateDataSources = this.updateDataSources.bind(this)
+    this.updateVariables = this.updateVariables.bind(this)
+  }
+
   async getAll(req: Request, res: Response) {
     try {
       const pages = await pageRepository.find({
@@ -21,18 +35,24 @@ export class PageController {
   async getById(req: Request, res: Response) {
     try {
       const { id } = req.params
+      console.log('[PageController] getById called for page:', id)
+      
       const page = await pageRepository.findOne({
         where: { id },
         relations: ['group'],
       })
 
       if (!page) {
+        console.log('[PageController] getById - page not found:', id)
         return res.status(404).json({ error: 'Page not found' })
       }
 
       // Обновляем связанные блоки перед отправкой
+      // Всегда берёт актуальную структуру из библиотеки
       if (page.structure) {
+        console.log('[PageController] getById - updating linked blocks for page:', id)
         page.structure = await linkedBlocksService.updateLinkedBlocks(page.structure)
+        console.log('[PageController] getById - linked blocks updated')
       }
 
       res.json(page)
@@ -54,18 +74,30 @@ export class PageController {
   async update(req: Request, res: Response) {
     try {
       const { id } = req.params
+      console.log('[PageController] update called for page:', id)
+      
       const page = await pageRepository.findOne({ where: { id } })
 
       if (!page) {
         return res.status(404).json({ error: 'Page not found' })
       }
 
+      // Если обновляется структура, синхронизируем linked блоки в библиотеку
+      if (req.body.structure) {
+        console.log('[PageController] syncing linked blocks to library...')
+        await linkedBlocksService.syncLinkedBlocksToLibrary(req.body.structure)
+        console.log('[PageController] linked blocks synced')
+      }
+
       Object.assign(page, req.body)
       page.version += 1
+      console.log('[PageController] saving page version:', page.version)
       await pageRepository.save(page)
+      console.log('[PageController] page saved successfully')
 
       res.json(page)
     } catch (error: any) {
+      console.error('[PageController] update error:', error)
       res.status(500).json({ error: error.message })
     }
   }

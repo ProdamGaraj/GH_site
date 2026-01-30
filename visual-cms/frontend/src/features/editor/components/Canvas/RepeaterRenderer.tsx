@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { useDataBinding } from '@/features/dataBindings'
-import { useAppSelector } from '@/app/hooks'
+import { useDataBindingWithTransforms } from '@/features/dataBindings/hooks/useDataBindingWithTransforms'
+import { useAppSelector, useAppDispatch } from '@/app/hooks'
 import { selectBlocks } from '@/features/blocks/blocksSlice'
+import { selectNode } from '@/features/editor/editorSlice'
 import { BlockNode, CSSProperties } from '@/shared/types'
 import { CanvasRenderer } from './CanvasRenderer'
 import { BlockNodeWithViewport } from '../../utils/variationUtils'
@@ -31,23 +32,28 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
   rootNode,
   libraryBlockId
 }) => {
+  const dispatch = useAppDispatch()
+  
   // Получаем linkedBlockId из метаданных или из пропса libraryBlockId
   const linkedBlockId = libraryBlockId || node.metadata?.linkedBlockId
   
-  const { data, loading, error, binding } = useDataBinding<any[]>(node.id, { 
+  const { data, loading, error, binding, meta } = useDataBindingWithTransforms<any>(node.id, { 
     autoFetch: true,
     linkedBlockId // Передаём linkedBlockId для поиска привязки по ID библиотечного блока
   })
   
-  console.log('[RepeaterRenderer] useDataBinding result:', { 
+  console.log('[RepeaterRenderer] useDataBindingWithTransforms result:', { 
     nodeId: node.id,
     linkedBlockId,
     data, 
     dataType: typeof data,
     isArray: Array.isArray(data),
+    dataLength: Array.isArray(data) ? data.length : 0,
+    meta,
     loading, 
     error,
-    binding: binding?.id 
+    binding: binding?.id,
+    transforms: binding?.config?.inputConfig?.transforms
   })
   
   const blocks = useAppSelector(selectBlocks)
@@ -72,35 +78,20 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
       templateBlock: templateBlock?.name,
       templateStructure: templateBlock?.structure,
       fieldMappings,
-      arrayPath
+      arrayPath,
+      meta
     })
 
-    if (!data) {
-      console.log('No data')
+    if (!data || data.length === 0) {
+      console.log('No data or empty array')
       setRepeaterItems([])
       return
     }
 
-    // Извлекаем массив из данных используя arrayPath если указан
+    // useDataBindingWithTransforms уже возвращает готовый массив
+    // Не нужно извлекать через arrayPath
     let items: any[] = data
-    if (arrayPath && !Array.isArray(data)) {
-      items = getValueByPath(data, arrayPath)
-      console.log(`Extracted array using arrayPath "${arrayPath}":`, items)
-    }
-
-    // Если всё ещё не массив, пытаемся найти в стандартных местах
-    if (!Array.isArray(items)) {
-      if ((data as any).data && Array.isArray((data as any).data)) {
-        items = (data as any).data
-      } else if ((data as any).items && Array.isArray((data as any).items)) {
-        items = (data as any).items
-      } else {
-        console.log('Data is not array and no items found', { data, arrayPath })
-        setRepeaterItems([])
-        return
-      }
-    }
-
+    
     console.log('Items array with length:', items.length, items)
 
     // Используем шаблон из библиотеки блоков (по templateId)
@@ -387,14 +378,22 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     )
   }
 
+  // Обработчик клика - при клике на карточки внутри репитера выбираем контейнер-родитель
+  const handleContainerClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    dispatch(selectNode(node.id))
+  }
+
   // Рендерим контейнер с клонированными template блоками
+  // Используем onClickCapture чтобы перехватить клики до дочерних элементов
   return React.createElement(
     node.tagName || 'div',
     {
       style: node.styles?.properties as React.CSSProperties,
       'data-element-id': node.id,
       'data-repeater': 'true',
-      className: node.attributes?.class || node.attributes?.className || 'repeater-container'
+      className: node.attributes?.class || node.attributes?.className || 'repeater-container',
+      onClickCapture: handleContainerClick
     },
     repeaterItems.map((item) => (
       <CanvasRenderer

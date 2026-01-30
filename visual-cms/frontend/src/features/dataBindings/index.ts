@@ -31,6 +31,21 @@ export {
   selectInputBindingForBlock,
 } from './dataBindingsSlice'
 
+// Computed Values Slice
+export {
+  default as computedValuesReducer,
+  setComputedValues,
+  subscribe as subscribeToComputed,
+  unsubscribe as unsubscribeFromComputed,
+  clearBlockComputed,
+  selectComputedByBlockId,
+  selectComputedByBindingId,
+  selectCount,
+  selectFilteredCount,
+  selectSum,
+  selectAvg
+} from './computedValuesSlice'
+
 // Components
 export { DataBindingTab } from './components/DataBindingTab'
 export { SmartDataBindingTab } from './components/SmartDataBindingTab'
@@ -38,6 +53,7 @@ export { InputBindingEditor } from './components/InputBindingEditor'
 export { FieldMappingEditor } from './components/FieldMappingEditor'
 export { FilterBuilder } from './components/FilterBuilder'
 export { SortBuilder } from './components/SortBuilder'
+export { TransformsEditor } from './components/TransformsEditor'
 export { DataPreview } from './components/DataPreview'
 export { OutputBindingEditor } from './components/OutputBindingEditor'
 export { RepeaterStatesEditor } from './components/RepeaterStatesEditor'
@@ -68,7 +84,21 @@ export {
   useFormSubmit,
   useBlockBindings,
   useBlockDataPreview,
-  useResolvedContent
+  useResolvedContent,
+  // Новые хуки с поддержкой transforms
+  useDataBindingWithTransforms,
+  useComputedValue,
+  type TransformOptions,
+  type UseDataBindingWithTransformsOptions,
+  type TransformMeta,
+  type UseDataBindingWithTransformsResult,
+  // Хуки для блоков-фильтров
+  useFilterBlocks,
+  useFilterBlockValue,
+  useSearchBlock,
+  type FilterBlockState,
+  type UseFilterBlocksOptions,
+  type UseFilterBlocksResult
 } from './hooks'
 
 // Runtime Components (for published pages)
@@ -77,7 +107,8 @@ export {
   TemplateText,
   ConditionalRender,
   Repeater,
-  LoadMoreRepeater
+  LoadMoreRepeater,
+  ComputedBlock
 } from './components/runtime'
 
 // Types re-exports

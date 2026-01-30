@@ -6,6 +6,21 @@ import { blockTemplateService } from '../services/BlockTemplateService'
 const blockRepository = AppDataSource.getRepository(Block)
 
 export class BlockController {
+  constructor() {
+    // Привязываем методы к контексту this
+    this.getAll = this.getAll.bind(this)
+    this.getReusable = this.getReusable.bind(this)
+    this.getById = this.getById.bind(this)
+    this.create = this.create.bind(this)
+    this.createFromElement = this.createFromElement.bind(this)
+    this.update = this.update.bind(this)
+    this.delete = this.delete.bind(this)
+    this.enableTemplate = this.enableTemplate.bind(this)
+    this.disableTemplate = this.disableTemplate.bind(this)
+    this.getHTML = this.getHTML.bind(this)
+    this.refreshFields = this.refreshFields.bind(this)
+  }
+
   async getAll(req: Request, res: Response) {
     try {
       const blocks = await blockRepository.find({

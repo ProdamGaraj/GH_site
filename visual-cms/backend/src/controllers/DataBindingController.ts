@@ -23,6 +23,7 @@ class DataBindingController {
   /**
    * GET /api/data-bindings
    * Получить все bindings (опционально по blockId или pageId)
+   * blockId может быть одним ID или массивом ID (для поиска по nodeId и linkedBlockId)
    */
   async getAll(req: Request, res: Response) {
     try {
@@ -33,7 +34,16 @@ class DataBindingController {
         .orderBy('binding.priority', 'ASC')
 
       if (blockId) {
-        queryBuilder.andWhere('binding.blockId = :blockId', { blockId })
+        // blockId может быть строкой или массивом (через запятую)
+        const blockIds = typeof blockId === 'string' && blockId.includes(',') 
+          ? blockId.split(',').map(id => id.trim())
+          : [blockId as string]
+        
+        if (blockIds.length === 1) {
+          queryBuilder.andWhere('binding.blockId = :blockId', { blockId: blockIds[0] })
+        } else {
+          queryBuilder.andWhere('binding.blockId IN (:...blockIds)', { blockIds })
+        }
       }
 
       if (pageId) {
@@ -148,6 +158,9 @@ class DataBindingController {
       const { id } = req.params
       const updates = req.body
 
+      console.log('📝 Updating binding:', id)
+      console.log('📝 Updates received:', JSON.stringify(updates, null, 2))
+
       const binding = await dataBindingRepository.findOne({ where: { id } })
 
       if (!binding) {
@@ -163,12 +176,16 @@ class DataBindingController {
         updatedAt: new Date()
       })
 
+      console.log('📝 Binding after assign:', JSON.stringify(binding.config, null, 2))
+
       await dataBindingRepository.save(binding)
 
       const updatedBinding = await dataBindingRepository.findOne({
         where: { id },
         relations: ['dataSource']
       })
+
+      console.log('✅ Saved binding config:', JSON.stringify(updatedBinding?.config, null, 2))
 
       res.json(updatedBinding)
     } catch (error: any) {
@@ -834,7 +851,7 @@ class DataBindingController {
   }
 
   /**
-   * ������� credentials ��� DataSource
+   * Получить credentials для DataSource
    */
   private async resolveCredentials(dataSource: DataSourceEntity): Promise<Record<string, string>> {
     const credentials: Record<string, string> = {}
@@ -848,7 +865,7 @@ class DataBindingController {
     }
 
     if (dataSource.config.password) {
-      //  �������� ���������� password �������� �� �������������
+      //  возможно необходимо password получать из зашифрованного
       credentials.password = dataSource.config.password as string
     }
 
@@ -857,6 +874,143 @@ class DataBindingController {
     }
 
     return credentials
+  }
+
+  /**
+   * POST /api/data/fetch-with-transforms
+   * Получить данные с применением трансформаций, фильтров, поиска и пагинации
+   * 
+   * Body:
+   * - bindingId: string - ID привязки
+   * - filters: FilterCondition[] - динамические фильтры
+   * - search: { query: string, fields: string[] } - поиск
+   * - sort: { field: string, order: 'asc' | 'desc' } - сортировка
+   * - pagination: { page: number, pageSize: number } - пагинация
+   * - computeFields: string[] - поля для вычисления агрегатов
+   */
+  async fetchWithTransforms(req: Request, res: Response) {
+    try {
+      const { 
+        bindingId, 
+        filters, 
+        search, 
+        sort, 
+        pagination,
+        computeFields,
+        transformsOverride 
+      } = req.body
+
+      if (!bindingId) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          message: 'bindingId is required'
+        })
+      }
+
+      // Получаем binding
+      const binding = await dataBindingRepository.findOne({
+        where: { id: bindingId },
+        relations: ['dataSource']
+      })
+
+      if (!binding) {
+        return res.status(404).json({
+          error: 'Binding not found',
+          message: `Data binding with id "${bindingId}" does not exist`
+        })
+      }
+
+      const config = binding.config as DataBindingFullConfig
+      const inputConfig = config.inputConfig
+
+      if (!inputConfig) {
+        return res.status(400).json({
+          error: 'Invalid binding',
+          message: 'Binding has no input configuration'
+        })
+      }
+
+      // Расшифровываем credentials
+      let authConfig = undefined
+      if (binding.dataSource.authConfig) {
+        authConfig = await CredentialsManager.decryptAuthConfig(binding.dataSource.authConfig)
+      }
+
+      // Fetch данных из источника
+      const fetchResult = await secureDataSourceService.fetchData(
+        binding.dataSource.config as unknown as FetchConfig,
+        authConfig as unknown as AuthConfig
+      )
+
+      if (!fetchResult.success) {
+        await dataBindingRepository.update(binding.id, {
+          lastFetchAt: new Date(),
+          lastFetchStatus: 'error',
+          lastFetchError: fetchResult.error?.message
+        })
+
+        return res.status(502).json({
+          error: 'Fetch failed',
+          message: fetchResult.error?.message
+        })
+      }
+
+      // Получаем responseMapping из DataSource config или используем дефолт
+      const dsConfig = binding.dataSource.config as any
+      const responseMapping = dsConfig.responseMapping || {
+        dataPath: inputConfig.arrayPath || 'data',
+        fieldMappings: undefined
+      }
+
+      // Получаем трансформации - приоритет у transformsOverride (для тестирования)
+      const transforms = transformsOverride || (inputConfig as any).transforms || []
+
+      console.log('📊 fetchWithTransforms - bindingId:', bindingId)
+      console.log('📊 fetchWithTransforms - using transformsOverride:', !!transformsOverride)
+      console.log('📊 fetchWithTransforms - transforms count:', transforms.length)
+      console.log('📊 fetchWithTransforms - transforms:', JSON.stringify(transforms, null, 2))
+
+      // Применяем трансформации через DataTransformService
+      const transformResult = await dataTransformService.processWithTransforms(
+        fetchResult.data,
+        {
+          dataPath: responseMapping.dataPath,
+          fieldMappings: responseMapping.fieldMappings,
+          transforms,
+          filters,
+          search,
+          sort,
+          pagination,
+          computeFields
+        }
+      )
+
+      // Обновляем статус binding
+      await dataBindingRepository.update(binding.id, {
+        lastFetchAt: new Date(),
+        lastFetchStatus: transformResult.success ? 'success' : 'error',
+        lastFetchError: transformResult.error || null
+      })
+
+      if (!transformResult.success) {
+        return res.status(500).json({
+          error: 'Transform failed',
+          message: transformResult.error
+        })
+      }
+
+      res.json({
+        success: true,
+        data: transformResult.data,
+        meta: transformResult.meta
+      })
+    } catch (error: any) {
+      console.error('Error in fetchWithTransforms:', error)
+      res.status(500).json({
+        error: 'Failed to fetch and transform data',
+        message: error.message
+      })
+    }
   }
 }
 

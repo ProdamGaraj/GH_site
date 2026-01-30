@@ -17,6 +17,10 @@ export {
   LoadMoreRepeater 
 } from './Repeater'
 
+// Computed Values
+export { ComputedBlock } from './ComputedBlock'
+
 // Re-export types
 export type { } from './DataBoundElement'
 export type { } from './Repeater'
+export type { ComputeType } from './ComputedBlock'

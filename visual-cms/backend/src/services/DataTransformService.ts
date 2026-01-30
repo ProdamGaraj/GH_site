@@ -777,6 +777,391 @@ class DataTransformService {
       })
     }
 
+    // ============ НОВЫЕ МЕТОДЫ ДЛЯ TRANSFORMS ============
+
+    /**
+     * Полная обработка данных с трансформациями, фильтрами, поиском и пагинацией
+     */
+    async processWithTransforms(
+      rawData: unknown,
+      options: {
+        dataPath?: string
+        fieldMappings?: Record<string, string>
+        transforms?: DataTransformConfig[]
+        filters?: FilterConditionConfig[]
+        search?: { query: string; fields: string[] }
+        sort?: { field: string; order: 'asc' | 'desc' }
+        pagination?: { page: number; pageSize: number }
+        computeFields?: string[]
+      }
+    ): Promise<TransformResult> {
+      const startTime = Date.now()
+      
+      try {
+        // 1. Извлекаем массив из ответа
+        let items = this.extractArrayFromPath(rawData, options.dataPath || 'data')
+        const originalCount = items.length
+        
+        // 2. Нормализуем поля если есть маппинг
+        if (options.fieldMappings) {
+          items = this.normalizeFieldNames(items, options.fieldMappings)
+        }
+        
+        // 3. Применяем статические трансформации
+        if (options.transforms?.length) {
+          for (const transform of options.transforms) {
+            if (transform.enabled === false) continue
+            items = this.applyDataTransform(items, transform)
+          }
+        }
+        
+        // 4. Применяем динамические фильтры
+        if (options.filters?.length) {
+          for (const filter of options.filters) {
+            items = this.applyFilterCondition(items, filter)
+          }
+        }
+        
+        // 5. Применяем поиск
+        if (options.search?.query && options.search.query.length > 0) {
+          items = this.applySearchFilter(items, options.search.query, options.search.fields)
+        }
+        
+        const filteredCount = items.length
+        
+        // 6. Вычисляем агрегаты ДО пагинации
+        const computed = this.computeDataAggregates(items, options.computeFields)
+        
+        // 7. Применяем сортировку
+        if (options.sort) {
+          items = this.applySortOrder(items, options.sort.field, options.sort.order)
+        }
+        
+        // 8. Применяем пагинацию
+        let paginationMeta: PaginationMeta = {}
+        if (options.pagination) {
+          const { page, pageSize } = options.pagination
+          const totalPages = Math.ceil(filteredCount / pageSize)
+          const offset = (page - 1) * pageSize
+          
+          items = items.slice(offset, offset + pageSize)
+          
+          paginationMeta = {
+            page,
+            pageSize,
+            totalPages,
+            hasNextPage: page < totalPages,
+            hasPrevPage: page > 1
+          }
+        }
+        
+        const responseTime = Date.now() - startTime
+        
+        return {
+          success: true,
+          data: items,
+          meta: {
+            totalCount: originalCount,
+            filteredCount,
+            returnedCount: items.length,
+            ...paginationMeta,
+            computed: {
+              count: filteredCount,
+              ...computed
+            },
+            responseTime
+          }
+        }
+      } catch (error: any) {
+        console.error('Transform error:', error)
+        return {
+          success: false,
+          data: [],
+          meta: {
+            totalCount: 0,
+            filteredCount: 0,
+            returnedCount: 0,
+            responseTime: Date.now() - startTime
+          },
+          error: error.message
+        }
+      }
+    }
+
+    /**
+     * Извлечь массив по пути
+     */
+    extractArrayFromPath(data: unknown, path: string): unknown[] {
+      if (!path || path === '') {
+        return Array.isArray(data) ? data : []
+      }
+      
+      const value = dataFilterService.getValueByPath(data, path)
+      return Array.isArray(value) ? value : []
+    }
+
+    /**
+     * Нормализовать имена полей
+     */
+    normalizeFieldNames(items: unknown[], mappings: Record<string, string>): unknown[] {
+      return items.map(item => {
+        const normalized = { ...(item as Record<string, unknown>) }
+        
+        for (const [ourField, sourceField] of Object.entries(mappings)) {
+          const value = dataFilterService.getValueByPath(item, sourceField)
+          if (value !== undefined) {
+            normalized[ourField] = value
+          }
+        }
+        
+        return normalized
+      })
+    }
+
+    /**
+     * Применить одну трансформацию
+     */
+    applyDataTransform(items: unknown[], transform: DataTransformConfig): unknown[] {
+      console.log('⚙️ applyDataTransform:', { type: transform.type, filter: transform.filter, itemsCount: items.length })
+      
+      switch (transform.type) {
+        case 'exclude':
+          const excludedResult = items.filter(item => !this.matchesFilterCondition(item, transform.filter!))
+          console.log(`⚙️ exclude result: ${items.length} -> ${excludedResult.length} items`)
+          return excludedResult
+          
+        case 'include':
+          return items.filter(item => this.matchesFilterCondition(item, transform.filter!))
+          
+        case 'prepend':
+          return [...(transform.staticItems || []), ...items]
+          
+        case 'append':
+          return [...items, ...(transform.staticItems || [])]
+          
+        case 'sort':
+          return this.applySortOrder(items, transform.field!, transform.order || 'asc')
+          
+        case 'limit':
+          const offset = transform.offset || 0
+          return items.slice(offset, offset + (transform.limit || 10))
+          
+        case 'unique':
+          return this.applyUniqueFilter(items, transform.field!, transform.keepFirst !== false)
+          
+        default:
+          console.warn(`Unknown transform type: ${(transform as any).type}`)
+          return items
+      }
+    }
+
+    /**
+     * Применить фильтр
+     */
+    applyFilterCondition(items: unknown[], filter: FilterConditionConfig): unknown[] {
+      return items.filter(item => this.matchesFilterCondition(item, filter))
+    }
+
+    /**
+     * Проверить соответствие условию
+     */
+    matchesFilterCondition(item: unknown, condition: FilterConditionConfig): boolean {
+      const value = dataFilterService.getValueByPath(item, condition.field)
+      const targetValue = condition.value
+      
+      console.log('🔍 matchesFilterCondition:', { field: condition.field, value, targetValue, operator: condition.operator })
+      
+      switch (condition.operator) {
+        case 'eq':
+          // Нестрогое сравнение для чисел и строк (1 == "1")
+          return value == targetValue
+        case 'neq':
+          return value != targetValue
+        case 'gt':
+          return Number(value) > Number(targetValue)
+        case 'gte':
+          return Number(value) >= Number(targetValue)
+        case 'lt':
+          return Number(value) < Number(targetValue)
+        case 'lte':
+          return Number(value) <= Number(targetValue)
+        case 'contains':
+          return String(value).toLowerCase().includes(String(targetValue).toLowerCase())
+        case 'notContains':
+          return !String(value).toLowerCase().includes(String(targetValue).toLowerCase())
+        case 'startsWith':
+          return String(value).toLowerCase().startsWith(String(targetValue).toLowerCase())
+        case 'endsWith':
+          return String(value).toLowerCase().endsWith(String(targetValue).toLowerCase())
+        case 'in':
+          return Array.isArray(targetValue) && targetValue.includes(value)
+        case 'notIn':
+          return Array.isArray(targetValue) && !targetValue.includes(value)
+        case 'between':
+          if (Array.isArray(targetValue) && targetValue.length === 2) {
+            const num = Number(value)
+            return num >= Number(targetValue[0]) && num <= Number(targetValue[1])
+          }
+          return false
+        case 'exists':
+          return value !== undefined && value !== null
+        case 'isEmpty':
+          return this.isEmpty(value)
+        default:
+          console.warn(`Unknown operator: ${condition.operator}`)
+          return true
+      }
+    }
+
+    /**
+     * Применить поиск
+     */
+    applySearchFilter(items: unknown[], query: string, fields: string[]): unknown[] {
+      const lowerQuery = query.toLowerCase().trim()
+      if (!lowerQuery) return items
+      
+      return items.filter(item => {
+        return fields.some(field => {
+          const value = dataFilterService.getValueByPath(item, field)
+          if (value === null || value === undefined) return false
+          return String(value).toLowerCase().includes(lowerQuery)
+        })
+      })
+    }
+
+    /**
+     * Применить сортировку
+     */
+    applySortOrder(items: unknown[], field: string, order: 'asc' | 'desc'): unknown[] {
+      return [...items].sort((a, b) => {
+        const aVal = dataFilterService.getValueByPath(a, field)
+        const bVal = dataFilterService.getValueByPath(b, field)
+        
+        // Обработка null/undefined
+        if (aVal === null || aVal === undefined) return order === 'asc' ? 1 : -1
+        if (bVal === null || bVal === undefined) return order === 'asc' ? -1 : 1
+        
+        // Числовое сравнение
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          return order === 'asc' ? aVal - bVal : bVal - aVal
+        }
+        
+        // Строковое сравнение
+        const comparison = String(aVal).localeCompare(String(bVal))
+        return order === 'asc' ? comparison : -comparison
+      })
+    }
+
+    /**
+     * Убрать дубликаты
+     */
+    applyUniqueFilter(items: unknown[], field: string, keepFirst: boolean): unknown[] {
+      const seen = new Map<unknown, unknown>()
+      
+      for (const item of items) {
+        const key = dataFilterService.getValueByPath(item, field)
+        if (!seen.has(key)) {
+          seen.set(key, item)
+        } else if (!keepFirst) {
+          seen.set(key, item)
+        }
+      }
+      
+      return Array.from(seen.values())
+    }
+
+    /**
+     * Вычислить агрегаты
+     */
+    computeDataAggregates(items: unknown[], fields?: string[]): AggregateValues {
+      const result: AggregateValues = {
+        sum: {},
+        avg: {},
+        min: {},
+        max: {}
+      }
+      
+      if (!fields || fields.length === 0) {
+        return result
+      }
+      
+      for (const field of fields) {
+        const values = items
+          .map(item => dataFilterService.getValueByPath(item, field))
+          .filter(v => v !== null && v !== undefined && !isNaN(Number(v)))
+          .map(v => Number(v))
+        
+        if (values.length === 0) continue
+        
+        result.sum[field] = values.reduce((a, b) => a + b, 0)
+        result.avg[field] = result.sum[field] / values.length
+        result.min[field] = Math.min(...values)
+        result.max[field] = Math.max(...values)
+      }
+      
+      return result
+    }
+
+}
+
+// Типы для новых методов
+export interface DataTransformConfig {
+  id?: string
+  type: 'exclude' | 'include' | 'prepend' | 'append' | 'sort' | 'limit' | 'unique'
+  enabled?: boolean
+  filter?: FilterConditionConfig
+  staticItems?: unknown[]
+  field?: string
+  order?: 'asc' | 'desc'
+  limit?: number
+  offset?: number
+  keepFirst?: boolean
+}
+
+export interface FilterConditionConfig {
+  field: string
+  operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'notContains' | 
+            'startsWith' | 'endsWith' | 'in' | 'notIn' | 'between' | 'exists' | 'isEmpty'
+  value: unknown
+}
+
+export interface PaginationMeta {
+  page?: number
+  pageSize?: number
+  totalPages?: number
+  hasNextPage?: boolean
+  hasPrevPage?: boolean
+}
+
+export interface AggregateValues {
+  sum: Record<string, number>
+  avg: Record<string, number>
+  min: Record<string, number>
+  max: Record<string, number>
+}
+
+export interface TransformResult {
+  success: boolean
+  data: unknown[]
+  meta: {
+    totalCount: number
+    filteredCount: number
+    returnedCount: number
+    page?: number
+    pageSize?: number
+    totalPages?: number
+    hasNextPage?: boolean
+    hasPrevPage?: boolean
+    computed?: {
+      count: number
+      sum?: Record<string, number>
+      avg?: Record<string, number>
+      min?: Record<string, number>
+      max?: Record<string, number>
+    }
+    responseTime: number
+  }
+  error?: string
 }
 
 export const dataTransformService = new DataTransformService()
