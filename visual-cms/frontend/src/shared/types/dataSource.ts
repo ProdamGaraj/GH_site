@@ -147,23 +147,26 @@ export type AuthConfig =
 // ============================================
 
 /**
- * Базовые настройки запроса
+ * Базовые настройки подключения к сервису.
+ * Это ORIGIN — общие параметры для ЛЮБОГО запроса к этому сервису.
+ * Конкретные endpoint/метод настраиваются на уровне привязки (DataBinding).
  */
 export interface BaseRequestConfig {
-  url: string
-  headers?: Record<string, string>
-  queryParams?: Record<string, string>
-  timeout?: number  // ms
+  url: string                              // Base URL / Origin: https://api.example.com
+  headers?: Record<string, string>         // Общие заголовки для всех запросов
+  queryParams?: Record<string, string>     // Общие query-параметры
+  timeout?: number                         // ms
 }
 
 /**
- * Конфигурация REST API источника
+ * Конфигурация REST API источника — ТОЛЬКО подключение.
+ * method/body/bodyFormat — deprecated, конкретный endpoint настраивается в привязке.
  */
 export interface RestApiConfig extends BaseRequestConfig {
   type: 'rest-api'
-  method: HttpMethod
-  body?: string
-  bodyFormat?: RequestBodyFormat
+  method?: HttpMethod         // @deprecated — переносится в EndpointConfig привязки
+  body?: string               // @deprecated
+  bodyFormat?: RequestBodyFormat  // @deprecated
 }
 
 /**

@@ -14,6 +14,8 @@ import { DataSourceWizard } from '@/features/data-sources/components/DataSourceW
 import { DataBindingDemo } from '@/pages/DataBindingDemo'
 import TemplatesPage from '@/pages/TemplatesPage'
 import TemplateBlocksPage from '@/pages/TemplateBlocksPage'
+import { FormsPage } from '@/pages/FormsPage'
+import { FormBuilderPage } from '@/pages/FormBuilderPage'
 
 export const router = createBrowserRouter([
   {
@@ -47,6 +49,14 @@ export const router = createBrowserRouter([
       {
         path: 'settings',
         element: <Settings />,
+      },
+      {
+        path: 'forms',
+        element: <FormsPage />,
+      },
+      {
+        path: 'forms/:id',
+        element: <FormBuilderPage />,
       },
       {
         path: 'data-binding-demo',

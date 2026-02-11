@@ -8,6 +8,7 @@ import dataBindingsReducer from '@/features/dataBindings/dataBindingsSlice'
 import computedValuesReducer from '@/features/dataBindings/computedValuesSlice'
 import templatesReducer from '@/features/templates/templatesSlice'
 import variablesReducer from '@/features/variables/variablesSlice'
+import formsReducer from '@/features/forms/formsSlice'
 
 export const store = configureStore({
   reducer: {
@@ -20,6 +21,7 @@ export const store = configureStore({
     computedValues: computedValuesReducer,
     templates: templatesReducer,
     variables: variablesReducer,
+    forms: formsReducer,
   },
 })
 

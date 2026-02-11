@@ -625,8 +625,8 @@ export class DeployService {
               sourceAlias: binding.dataSource?.name || '',
               outputConfig: {
                 trigger: outputConfig.trigger === 'formSubmit' ? 'submit' : 'click',
-                method: outputConfig.method,
-                endpoint: outputConfig.endpointPath,
+                method: outputConfig.method || outputConfig.endpoint?.method || 'POST',
+                endpoint: outputConfig.endpoint?.path || outputConfig.endpointPath,
                 payloadMappings: outputConfig.payloadMappings?.map((pm: any) => ({
                   sourceField: pm.sourceField,
                   targetField: pm.targetField,

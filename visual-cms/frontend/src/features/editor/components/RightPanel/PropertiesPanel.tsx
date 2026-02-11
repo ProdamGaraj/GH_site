@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { updateNode, deleteNode, selectViewport, selectBreakpoints, selectRootNode, moveNodeToViewport, selectActiveRightPanelTab, setActiveRightPanelTab } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
 import { Button } from '@/shared/components/Button'
-import { Trash2, Move, Palette, Type, Code, Monitor, Tablet, Smartphone, Laptop, Watch, Settings2, ArrowRightLeft, Globe, MousePointer, Sparkles, FileCode, Database } from 'lucide-react'
+import { Trash2, Move, Palette, Type, Code, Monitor, Tablet, Smartphone, Laptop, Watch, Settings2, ArrowRightLeft, Globe, MousePointer, Sparkles, FileCode, Database, Send } from 'lucide-react'
 import type { BlockNode, EditorPageSettings } from '@/shared/types'
 import { PositioningTab } from './PositioningTab'
 import { ColorsTab } from './ColorsTab'
@@ -13,6 +13,7 @@ import { StatesTab } from './StatesTab'
 import { AnimationsTab } from './AnimationsTab'
 import { ScriptsTab } from './ScriptsTab'
 import { SmartDataBindingTab } from '@/features/dataBindings/components/SmartDataBindingTab'
+import { OutputBindingSubTab } from '@/features/dataBindings/components/OutputBindingSubTab'
 import { DetectedFieldsViewer } from '@/features/blocks/components/DetectedFieldsViewer'
 import { TemplateBlockControls } from '@/features/blocks/components/TemplateBlockControls'
 import { CreateBlockFromElement } from '@/features/blocks/components/CreateBlockFromElement'
@@ -37,6 +38,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRo
   const rootNode = useAppSelector(selectRootNode)
   const activeTab = useAppSelector(selectActiveRightPanelTab)
   const [showMoveMenu, setShowMoveMenu] = useState(false)
+  const [dataSubTab, setDataSubTab] = useState<'input' | 'output'>('input')
   
   const currentBreakpoint = breakpoints.find(bp => bp.id === viewport)
   
@@ -297,7 +299,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRo
           />
         )}
         {activeTab === 'data' && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Template Mode Controls - только для блоков с UUID */}
             {currentBlockData && currentBlockData.id && (
               <TemplateBlockControls
@@ -307,22 +309,56 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRo
                 templateCategory={currentBlockData.templateCategory}
                 detectedFieldsCount={currentBlockData.detectedFields?.length || 0}
                 onToggle={() => {
-                  // Перезагрузить данные блока после изменения
                   window.location.reload()
                 }}
               />
             )}
-            
-            {/* Data Binding Tab - только если есть реальный блок */}
+
+            {/* Sub-tabs: Получение / Отправка */}
+            <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
+              <button
+                onClick={() => setDataSubTab('input')}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md transition-colors',
+                  dataSubTab === 'input'
+                    ? 'bg-white text-primary-700 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                <Database size={13} />
+                Получение данных
+              </button>
+              <button
+                onClick={() => setDataSubTab('output')}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md transition-colors',
+                  dataSubTab === 'output'
+                    ? 'bg-white text-orange-700 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                <Send size={13} />
+                Отправка данных
+              </button>
+            </div>
+
+            {/* Sub-tab content */}
             {currentBlockData && currentBlockData.id ? (
-              <SmartDataBindingTab 
-                blockId={currentBlockData.id}
-                pageId={pageId}
-              />
+              dataSubTab === 'input' ? (
+                <SmartDataBindingTab
+                  blockId={currentBlockData.id}
+                  pageId={pageId}
+                />
+              ) : (
+                <OutputBindingSubTab
+                  blockId={currentBlockData.id}
+                  pageId={pageId}
+                />
+              )
             ) : (
               <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <p className="text-sm text-yellow-800">
-                  ⚠️ Data Binding доступен только для блоков, а не для элементов внутри блока.
+                  ⚠️ Привязка данных доступна только для блоков, а не для элементов внутри блока.
                 </p>
                 <p className="text-xs text-yellow-600 mt-2">
                   Выберите блок целиком для настройки привязки данных.

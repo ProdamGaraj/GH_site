@@ -142,8 +142,23 @@ export interface PaginationUIConfig {
   position?: 'top' | 'bottom' | 'both'
 }
 
+/**
+ * Конфигурация конкретного endpoint запроса.
+ * DataSource хранит подключение (origin, auth), а EndpointConfig — конкретный запрос.
+ */
+export interface EndpointConfig {
+  path: string                             // Путь: /api/users, /submit, /graphql
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+  headers?: Record<string, string>         // Дополнительные заголовки для этого запроса
+  queryParams?: Record<string, string>     // Query-параметры для этого запроса
+  body?: string                            // Тело запроса (шаблон)
+  bodyFormat?: 'json' | 'form-data' | 'form-urlencoded' | 'raw'
+  contentType?: string                     // Content-Type
+}
+
 export interface InputBindingConfig {
   mode: InputMode
+  endpoint?: EndpointConfig               // Конфигурация конкретного запроса к источнику
   arrayPath?: string              // Путь к массиву для Repeater: data.items
   templateId?: string             // ID шаблона для рендеринга элементов Repeater
   filters?: FilterConfig[]        // Настройки фильтрации
@@ -208,10 +223,8 @@ export interface ButtonStates {
  */
 export interface OutputBindingConfig {
   trigger: 'submit' | 'click' | 'change' | 'blur' | 'interval' | 'custom'
-  endpoint?: string               // URL ��� ������������� endpoint
-  method?: 'POST' | 'PUT' | 'PATCH' | 'DELETE'
-  contentType?: string            // Content-Type ���������
-  payloadMappings: FieldMapping[] // ������ ������� ����� -> ���� �������
+  endpoint?: EndpointConfig        // Конфигурация конкретного запроса (path, method, headers)
+  payloadMappings: FieldMapping[] // Маппинг полей блока -> поля запроса
   debounce?: number               // ������� ��� change trigger
   intervalSeconds?: number        // ������� ��� ������������
   customTrigger?: string          // �� ���������� �������

@@ -274,11 +274,8 @@ export const DataSourceWizard: React.FC = () => {
         return {
           type: 'rest-api',
           url: formData.url,
-          method: formData.method,
           headers: Object.keys(headersObj).length > 0 ? headersObj : undefined,
           queryParams: Object.keys(queryParamsObj).length > 0 ? queryParamsObj : undefined,
-          body: formData.body || undefined,
-          bodyFormat: formData.bodyFormat,
           timeout: formData.timeout
         }
       
@@ -533,46 +530,31 @@ export const DataSourceWizard: React.FC = () => {
   // REST API / Feed подключение
   const renderRestApiConnection = () => (
     <div className="max-w-2xl">
-      <h2 className="text-xl font-semibold text-gray-900 mb-2">Connection Settings</h2>
-      <p className="text-gray-600 mb-6">Configure how to connect to the API</p>
+      <h2 className="text-xl font-semibold text-gray-900 mb-2">Настройка подключения</h2>
+      <p className="text-gray-600 mb-6">
+        Укажите базовый URL сервиса и общие параметры. Конкретные endpointы и методы настраиваются при подключении к блоку.
+      </p>
       
       <div className="space-y-4">
-        {/* URL */}
+        {/* Base URL */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            API URL <span className="text-red-500">*</span>
+            Base URL (Origin) <span className="text-red-500">*</span>
           </label>
           <Input
             value={formData.url}
             onChange={(e) => updateForm({ url: e.target.value })}
-            placeholder="https://api.example.com/data"
+            placeholder="https://api.example.com"
           />
+          <p className="mt-1 text-xs text-gray-500">
+            Базовый адрес сервиса без конкретного endpoint. Например: https://api.example.com
+          </p>
         </div>
 
-        {/* Method (only for REST API) */}
-        {formData.type === 'rest-api' && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              HTTP Method
-            </label>
-            <select
-              value={formData.method}
-              onChange={(e) => updateForm({ method: e.target.value as FormData['method'] })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="GET">GET</option>
-              <option value="POST">POST</option>
-              <option value="PUT">PUT</option>
-              <option value="DELETE">DELETE</option>
-              <option value="PATCH">PATCH</option>
-            </select>
-          </div>
-        )}
-
-        {/* Headers */}
+        {/* Default Headers */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Headers
+            Общие заголовки (для всех запросов)
           </label>
           {formData.headers.map((header, index) => (
             <div key={index} className="flex gap-2 mb-2">

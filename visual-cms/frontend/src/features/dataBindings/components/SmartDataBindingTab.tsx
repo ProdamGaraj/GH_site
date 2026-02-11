@@ -12,8 +12,9 @@ import { markAsDirty } from '@/features/editor/editorSlice'
 import { BlockTemplateSelector } from '@/features/blocks/components/BlockTemplateSelector'
 import { TransformsEditor } from './TransformsEditor'
 import { Database, Link, Sparkles, CheckCircle, AlertCircle, ArrowRight, Loader2, ChevronDown, ChevronUp, Settings2 } from 'lucide-react'
+import { EndpointConfigEditor, DEFAULT_ENDPOINT_CONFIG } from './EndpointConfigEditor'
 import type { DetectedField } from '@/shared/types/template'
-import type { CreateDataBindingRequest, FieldMapping, InputMode } from '@/shared/types/dataBinding'
+import type { CreateDataBindingRequest, FieldMapping, InputMode, EndpointConfig } from '@/shared/types/dataBinding'
 import type { Block } from '@/shared/types'
 import type { DataTransform, DynamicFilter } from '@/shared/types/transforms'
 
@@ -45,6 +46,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
   const [transforms, setTransforms] = useState<DataTransform[]>([])
   const [dynamicFilters, setDynamicFilters] = useState<DynamicFilter[]>([])
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [endpointConfig, setEndpointConfig] = useState<EndpointConfig>(DEFAULT_ENDPOINT_CONFIG)
 
   // Найти блок и его Template Fields
   const block = blocks.find(b => b.id === blockId)
@@ -85,6 +87,11 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
       const templateId = existingBinding.config.inputConfig.templateId
       if (templateId) {
         setSelectedTemplateBlockId(templateId)
+      }
+
+      // Восстанавливаем endpoint config
+      if (existingBinding.config.inputConfig.endpoint) {
+        setEndpointConfig(existingBinding.config.inputConfig.endpoint)
       }
 
       // Восстанавливаем transforms и dynamicFilters
@@ -166,6 +173,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
       // Формируем inputConfig
       const inputConfig = {
         mode,
+        endpoint: endpointConfig.path ? endpointConfig : undefined,
         fieldMappings: mappings,
         transforms,
         dynamicFilters,
@@ -476,6 +484,25 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
           </p>
         )}
       </div>
+
+      {/* Endpoint настройка */}
+      {selectedDataSourceId && (
+        <div className="space-y-3">
+          <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
+            <Link size={14} />
+            Настройка запроса
+          </label>
+          <p className="text-xs text-gray-500 -mt-1">
+            Укажите конкретный endpoint и метод для получения данных из этого источника
+          </p>
+          <EndpointConfigEditor
+            value={endpointConfig}
+            onChange={setEndpointConfig}
+            showBody={true}
+            baseUrl={(dataSources.find(ds => ds.id === selectedDataSourceId)?.config as any)?.url}
+          />
+        </div>
+      )}
 
       {/* Режим */}
       {selectedDataSourceId && (

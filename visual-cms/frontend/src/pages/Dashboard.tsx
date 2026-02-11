@@ -2,12 +2,13 @@ import React, { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Header } from '@/shared/components/Header'
-import { FileText, Box, Plus, Loader2, Database, Layout } from 'lucide-react'
+import { FileText, Box, Plus, Loader2, Database, Layout, Send } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { fetchBlocks, selectBlocks, selectBlocksLoading } from '@/features/blocks/blocksSlice'
 import { fetchPages, selectPages, selectPagesLoading } from '@/features/pages/pagesSlice'
 import { fetchDataSources, selectDataSources, selectDataSourcesLoading } from '@/features/data-sources/dataSourcesSlice'
 import { fetchTemplates, selectTemplates, selectTemplatesLoading } from '@/features/templates'
+import { fetchForms } from '@/features/forms/formsSlice'
 
 export const Dashboard: React.FC = () => {
   const dispatch = useAppDispatch()
@@ -19,12 +20,15 @@ export const Dashboard: React.FC = () => {
   const dataSourcesLoading = useAppSelector(selectDataSourcesLoading)
   const templates = useAppSelector(selectTemplates)
   const templatesLoading = useAppSelector(selectTemplatesLoading)
+  const forms = useAppSelector((state) => state.forms.items)
+  const formsLoading = useAppSelector((state) => state.forms.loading)
 
   useEffect(() => {
     dispatch(fetchBlocks())
     dispatch(fetchPages())
     dispatch(fetchDataSources({}))
     dispatch(fetchTemplates({}))
+    dispatch(fetchForms())
   }, [dispatch])
 
   const publishedPages = pages.filter(p => p.status === 'published')
@@ -146,10 +150,36 @@ export const Dashboard: React.FC = () => {
             </Link>
           </div>
         </div>
+
+        {/* Forms Card */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-orange-100 rounded-lg">
+              <Send className="text-orange-600" size={24} />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Формы</h2>
+              <p className="text-sm text-gray-600">Формы обратной связи и передача данных</p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Link to="/forms" className="flex-1">
+              <Button variant="secondary" className="w-full">
+                Все формы
+              </Button>
+            </Link>
+            <Link to="/forms/new">
+              <Button>
+                <Plus size={16} className="mr-2" />
+                Создать
+              </Button>
+            </Link>
+          </div>
+        </div>
       </div>
 
       {/* Quick Stats */}
-      <div className="mt-8 grid grid-cols-5 gap-6">
+      <div className="mt-8 grid grid-cols-6 gap-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <p className="text-sm text-gray-600 mb-1">Всего страниц</p>
           {pagesLoading ? (
@@ -188,6 +218,14 @@ export const Dashboard: React.FC = () => {
             <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
           ) : (
             <p className="text-3xl font-bold text-gray-900">{publishedPages.length}</p>
+          )}
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <p className="text-sm text-gray-600 mb-1">Форм</p>
+          {formsLoading ? (
+            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+          ) : (
+            <p className="text-3xl font-bold text-gray-900">{forms.length}</p>
           )}
         </div>
       </div>
