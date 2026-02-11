@@ -887,6 +887,8 @@ class DataBindingController {
    * - sort: { field: string, order: 'asc' | 'desc' } - сортировка
    * - pagination: { page: number, pageSize: number } - пагинация
    * - computeFields: string[] - поля для вычисления агрегатов
+   * - transformsOverride: DataTransform[] - переопределение трансформаций (для тестирования)
+   * - configOverride: { arrayPath?, transforms?, mode? } - переопределение конфигурации (для тестирования без сохранения)
    */
   async fetchWithTransforms(req: Request, res: Response) {
     try {
@@ -897,7 +899,8 @@ class DataBindingController {
         sort, 
         pagination,
         computeFields,
-        transformsOverride 
+        transformsOverride,
+        configOverride
       } = req.body
 
       if (!bindingId) {
@@ -957,16 +960,21 @@ class DataBindingController {
 
       // Получаем responseMapping из DataSource config или используем дефолт
       const dsConfig = binding.dataSource.config as any
-      const responseMapping = dsConfig.responseMapping || {
-        dataPath: inputConfig.arrayPath || 'data',
-        fieldMappings: undefined
+      
+      // Приоритет: configOverride.arrayPath > inputConfig.arrayPath > dsConfig.responseMapping.dataPath > 'data'
+      const effectiveArrayPath = configOverride?.arrayPath || inputConfig.arrayPath || dsConfig.responseMapping?.dataPath || 'data'
+      
+      const responseMapping = {
+        dataPath: effectiveArrayPath,
+        fieldMappings: dsConfig.responseMapping?.fieldMappings
       }
 
-      // Получаем трансформации - приоритет у transformsOverride (для тестирования)
-      const transforms = transformsOverride || (inputConfig as any).transforms || []
+      // Получаем трансформации - приоритет: configOverride.transforms > transformsOverride > inputConfig.transforms
+      const transforms = configOverride?.transforms || transformsOverride || (inputConfig as any).transforms || []
 
       console.log('📊 fetchWithTransforms - bindingId:', bindingId)
-      console.log('📊 fetchWithTransforms - using transformsOverride:', !!transformsOverride)
+      console.log('📊 fetchWithTransforms - using configOverride:', !!configOverride)
+      console.log('📊 fetchWithTransforms - effectiveArrayPath:', effectiveArrayPath)
       console.log('📊 fetchWithTransforms - transforms count:', transforms.length)
       console.log('📊 fetchWithTransforms - transforms:', JSON.stringify(transforms, null, 2))
 

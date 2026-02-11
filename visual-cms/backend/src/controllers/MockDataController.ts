@@ -24,7 +24,7 @@ export class MockDataController {
           area: '65-180 м²',
           rooms: '1-4 комнаты',
           completion: '2024 Q4',
-          image: '/images/projects/golden-residence.jpg',
+          image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600',
           features: ['Паркинг', 'Детская площадка', 'Фитнес-центр', 'Консьерж'],
           status: 'available'
         },
@@ -39,7 +39,7 @@ export class MockDataController {
           area: '45-120 м²',
           rooms: '1-3 комнаты',
           completion: '2025 Q2',
-          image: '/images/projects/golden-park.jpg',
+          image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600',
           features: ['Парковая зона', 'Охрана 24/7', 'Торговый центр', 'Школа'],
           status: 'available'
         },
@@ -54,7 +54,7 @@ export class MockDataController {
           area: '80-250 м²',
           rooms: '2-5 комнат',
           completion: '2024 Q3',
-          image: '/images/projects/golden-tower.jpg',
+          image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600',
           features: ['Панорамные окна', 'SPA-центр', 'Ресторан', 'Бассейн на крыше'],
           status: 'selling-fast'
         },
@@ -69,7 +69,7 @@ export class MockDataController {
           area: '40-100 м²',
           rooms: '1-2 комнаты',
           completion: '2025 Q4',
-          image: '/images/projects/golden-plaza.jpg',
+          image: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600',
           features: ['Метро 2 минуты', 'Офисы', 'Кафе', 'Магазины'],
           status: 'pre-sale'
         },
@@ -84,7 +84,7 @@ export class MockDataController {
           area: '120-300 м²',
           rooms: '3-6 комнат',
           completion: '2025 Q3',
-          image: '/images/projects/golden-gardens.jpg',
+          image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600',
           features: ['Собственный двор', 'Бассейн', 'Барбекю зона', 'Сад'],
           status: 'available'
         }
@@ -242,7 +242,7 @@ export class MockDataController {
         description: 'Современный жилой комплекс с развитой инфраструктурой',
         price: 'от $150,000',
         location: 'Ташкент, район Мирзо-Улугбек',
-        image: '/images/projects/golden-residence.jpg'
+        image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600'
       },
       {
         id: 2,
@@ -251,7 +251,7 @@ export class MockDataController {
         description: 'Уютный комплекс с зелеными зонами',
         price: 'от $120,000',
         location: 'Ташкент, Юнусабадский район',
-        image: '/images/projects/golden-park.jpg'
+        image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600'
       }
     ]
   }

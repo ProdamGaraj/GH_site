@@ -971,6 +971,14 @@ class DataTransformService {
       
       console.log('🔍 matchesFilterCondition:', { field: condition.field, value, targetValue, operator: condition.operator })
       
+      // Извлечь число из строки ("от $120,000" → 120000, "2025 Q2" → 2025)
+      function extractNumber(val: unknown): number {
+        if (typeof val === 'number') return val
+        const s = String(val).replace(/[^0-9.,-]/g, '').replace(/,/g, '')
+        const n = parseFloat(s)
+        return isNaN(n) ? NaN : n
+      }
+
       switch (condition.operator) {
         case 'eq':
           // Нестрогое сравнение для чисел и строк (1 == "1")
@@ -978,14 +986,19 @@ class DataTransformService {
         case 'neq':
           return value != targetValue
         case 'gt':
-          return Number(value) > Number(targetValue)
+          return extractNumber(value) > extractNumber(targetValue)
         case 'gte':
-          return Number(value) >= Number(targetValue)
+          return extractNumber(value) >= extractNumber(targetValue)
         case 'lt':
-          return Number(value) < Number(targetValue)
+          return extractNumber(value) < extractNumber(targetValue)
         case 'lte':
-          return Number(value) <= Number(targetValue)
+          return extractNumber(value) <= extractNumber(targetValue)
         case 'contains':
+          return String(value).toLowerCase().includes(String(targetValue).toLowerCase())
+        case 'containsAny':
+          if (Array.isArray(targetValue)) {
+            return targetValue.some(tv => String(value).toLowerCase().includes(String(tv).toLowerCase()))
+          }
           return String(value).toLowerCase().includes(String(targetValue).toLowerCase())
         case 'notContains':
           return !String(value).toLowerCase().includes(String(targetValue).toLowerCase())
@@ -1120,7 +1133,7 @@ export interface DataTransformConfig {
 
 export interface FilterConditionConfig {
   field: string
-  operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'notContains' | 
+  operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'containsAny' | 'notContains' | 
             'startsWith' | 'endsWith' | 'in' | 'notIn' | 'between' | 'exists' | 'isEmpty'
   value: unknown
 }

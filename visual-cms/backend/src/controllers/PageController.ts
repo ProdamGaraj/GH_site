@@ -126,10 +126,21 @@ export class PageController {
         return res.status(404).json({ error: 'Page not found' })
       }
 
-      page.status = 'published'
-      await pageRepository.save(page)
+      // Deploy the page to generate static HTML
+      const { deployService } = await import('../services/DeployService')
+      const deployResult = await deployService.deployPage(id)
+      
+      if (!deployResult.success) {
+        return res.status(500).json({ 
+          error: 'Deploy failed', 
+          message: deployResult.message,
+          errors: deployResult.errors 
+        })
+      }
 
-      res.json(page)
+      // Reload page to get updated status
+      const updatedPage = await pageRepository.findOne({ where: { id } })
+      res.json(updatedPage)
     } catch (error: any) {
       res.status(500).json({ error: error.message })
     }

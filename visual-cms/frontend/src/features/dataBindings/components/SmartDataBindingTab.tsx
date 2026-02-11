@@ -248,9 +248,13 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
   const handleTest = async () => {
     console.log('🧪 handleTest вызвана')
     console.log('selectedDataSourceId:', selectedDataSourceId)
+    console.log('existingBinding:', existingBinding?.id)
     console.log('transforms:', transforms)
     
-    if (!selectedDataSourceId) {
+    // Используем выбранный источник или источник из существующей привязки
+    const effectiveDataSourceId = selectedDataSourceId || existingBinding?.dataSourceId
+    
+    if (!effectiveDataSourceId && !existingBinding) {
       alert('Выберите источник данных')
       return
     }
@@ -259,24 +263,35 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
     setTestResult(null)
 
     try {
-      const dataSource = dataSources.find(ds => ds.id === selectedDataSourceId)
-      console.log('Найден Data Source:', dataSource)
-      
-      if (!dataSource) {
-        throw new Error('Источник данных не найден')
-      }
-
       // Если есть существующая привязка - используем fetch-with-transforms через бэкенд
       if (existingBinding) {
-        console.log('🧪 Тестирование через бэкенд с трансформациями:', existingBinding.id)
+        console.log('🧪 Тестирование через бэкенд с текущими настройками:', existingBinding.id)
+        console.log('🧪 Текущие настройки из UI:', { arrayPath, transforms, mode, mappings })
+        
+        // Проверяем, есть ли несохранённые изменения
+        const savedConfig = existingBinding.config?.inputConfig
+        const savedArrayPath = savedConfig?.arrayPath || ''
+        const savedTransforms = (savedConfig as any)?.transforms || []
+        const savedMode = savedConfig?.mode || 'single'
+        
+        const hasUnsavedChanges = 
+          arrayPath !== savedArrayPath ||
+          JSON.stringify(transforms) !== JSON.stringify(savedTransforms) ||
+          mode !== savedMode
+        
+        console.log('🧪 Есть несохранённые изменения:', hasUnsavedChanges)
         
         const response = await fetch('/api/data/fetch-with-transforms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             bindingId: existingBinding.id,
-            // Переопределяем трансформации текущими значениями из UI
-            transformsOverride: transforms.length > 0 ? transforms : undefined
+            // Передаём текущие настройки из UI только если они отличаются
+            configOverride: hasUnsavedChanges ? {
+              arrayPath: arrayPath || undefined,
+              transforms: transforms.length > 0 ? transforms : undefined,
+              mode: mode
+            } : undefined
           })
         })
 
@@ -286,15 +301,17 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         }
 
         const result = await response.json()
-        console.log('✅ Результат с трансформациями:', result)
+        console.log('✅ Результат с текущими настройками:', result)
 
+        const dataSource = dataSources.find(ds => ds.id === existingBinding.dataSourceId)
+        
         setTestResult({
           success: true,
-          dataSource: {
+          dataSource: dataSource ? {
             name: dataSource.name,
             type: dataSource.type,
             url: (dataSource.config as any)?.url
-          },
+          } : { name: 'Источник данных', type: 'unknown' },
           data: result.data,
           items: result.data,
           itemsCount: Array.isArray(result.data) ? result.data.length : 0,
@@ -302,13 +319,26 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
           templateBlock: mode === 'repeater' ? blocks.find(b => b.id === selectedTemplateBlockId)?.name : null,
           mappings: mappings,
           meta: result.meta,
-          transformsApplied: transforms.length
+          transformsApplied: transforms.length,
+          // Показываем configUsed только если есть несохранённые изменения
+          configUsed: hasUnsavedChanges ? {
+            arrayPath,
+            transformsCount: transforms.length,
+            mode
+          } : undefined
         })
         
         return
       }
 
       // Fallback: если нет привязки - прямой запрос без трансформаций
+      const dataSource = dataSources.find(ds => ds.id === effectiveDataSourceId)
+      console.log('Найден Data Source:', dataSource)
+      
+      if (!dataSource) {
+        throw new Error('Источник данных не найден')
+      }
+      
       const config = dataSource.config as any
       const url = config.endpoint || config.url
       
@@ -614,22 +644,28 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
       )}
 
       {/* Действия */}
-      {selectedDataSourceId && (
+      {(selectedDataSourceId || existingBinding) && (
         <div className="flex gap-3 pt-4 border-t border-gray-200">
-          <button
-            onClick={handleSave}
-            disabled={loading || mappings.length === 0}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? 'Сохранение...' : existingBinding ? 'Обновить привязку' : 'Создать привязку'}
-          </button>
+          {selectedDataSourceId && (
+            <button
+              onClick={handleSave}
+              disabled={loading || mappings.length === 0}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? 'Сохранение...' : existingBinding ? 'Обновить привязку' : 'Создать привязку'}
+            </button>
+          )}
           <button
             onClick={handleTest}
-            disabled={testLoading}
-            className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2"
+            disabled={testLoading || (!selectedDataSourceId && !existingBinding)}
+            className="px-4 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
           >
-            {testLoading && <Loader2 size={16} className="animate-spin" />}
-            Тест
+            {testLoading ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <span>🔍</span>
+            )}
+            Протестировать привязку
           </button>
         </div>
       )}
@@ -651,6 +687,17 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
               {testResult.success ? (
                 <>
                   <h4 className="font-medium text-green-900 mb-2">✅ Данные успешно загружены</h4>
+                  {testResult.configUsed && (
+                    <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                      <span className="font-medium">⚠️ Использованы текущие настройки из редактора (несохранённые)</span>
+                      <div className="mt-1 text-yellow-700">
+                        arrayPath: <code className="bg-yellow-100 px-1 rounded">{testResult.configUsed.arrayPath || 'не указан'}</code>
+                        {testResult.configUsed.transformsCount > 0 && (
+                          <>, трансформаций: <code className="bg-yellow-100 px-1 rounded">{testResult.configUsed.transformsCount}</code></>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2">
                       <span className="text-green-700">Источник:</span>

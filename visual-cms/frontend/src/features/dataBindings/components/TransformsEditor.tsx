@@ -24,9 +24,18 @@ import type {
   DynamicFilter
 } from '@/shared/types/transforms'
 import { useAppSelector } from '@/app/hooks'
-import { selectBlocks } from '@/features/blocks/blocksSlice'
+import { selectRootNode } from '@/features/editor/editorSlice'
+import type { BlockNode } from '@/shared/types'
 
 // ============ Типы ============
+
+interface InputElementInfo {
+  id: string
+  path: string
+  name: string
+  type: string // tagName or elementType
+  depth: number
+}
 
 interface TransformsEditorProps {
   transforms: DataTransform[]
@@ -68,6 +77,75 @@ const FILTER_OPERATORS: { value: TransformFilterOperator; label: string }[] = [
 
 const generateId = () => `transform-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
+/**
+ * Собирает все элементы, которые могут быть источником значений (input, select, textarea и т.д.)
+ * Рекурсивно обходит дерево блоков включая вложенные
+ */
+const collectInputElements = (node: BlockNode | null, path: string = '', depth: number = 0): InputElementInfo[] => {
+  if (!node) return []
+  
+  const results: InputElementInfo[] = []
+  
+  // Типы элементов которые могут содержать value
+  const inputTypes = ['input', 'select', 'textarea', 'button']
+  const inputElementTypes = ['input', 'button']
+  
+  const isInputElement = 
+    inputTypes.includes(node.tagName?.toLowerCase() || '') ||
+    inputElementTypes.includes(node.elementType)
+  
+  const nodeName = node.metadata?.name || node.tagName || node.elementType
+  const currentPath = path ? `${path} > ${nodeName}` : nodeName
+  
+  if (isInputElement) {
+    results.push({
+      id: node.id,
+      path: currentPath,
+      name: node.metadata?.name || `${node.tagName || node.elementType} (${node.id.slice(-6)})`,
+      type: node.tagName || node.elementType,
+      depth
+    })
+  }
+  
+  // Рекурсивно обходим детей
+  if (node.children && node.children.length > 0) {
+    for (const child of node.children) {
+      results.push(...collectInputElements(child, currentPath, depth + 1))
+    }
+  }
+  
+  return results
+}
+
+/**
+ * Собирает ВСЕ блоки для возможности выбора любого элемента
+ */
+const collectAllElements = (node: BlockNode | null, path: string = '', depth: number = 0): InputElementInfo[] => {
+  if (!node) return []
+  
+  const results: InputElementInfo[] = []
+  
+  const nodeName = node.metadata?.name || node.tagName || node.elementType
+  const currentPath = path ? `${path} > ${nodeName}` : nodeName
+  
+  results.push({
+    id: node.id,
+    path: currentPath,
+    name: node.metadata?.name || `${node.tagName || node.elementType} (${node.id.slice(-6)})`,
+    type: node.tagName || node.elementType,
+    depth
+  })
+  
+  // Рекурсивно обходим детей
+  if (node.children && node.children.length > 0) {
+    for (const child of node.children) {
+      results.push(...collectAllElements(child, currentPath, depth + 1))
+    }
+  }
+  
+  return results
+}
+
 // ============ Компонент ============
 
 export const TransformsEditor: React.FC<TransformsEditorProps> = ({
@@ -78,7 +156,13 @@ export const TransformsEditor: React.FC<TransformsEditorProps> = ({
 }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [addingType, setAddingType] = useState<DataTransform['type'] | null>(null)
-  const blocks = useAppSelector(selectBlocks)
+  const [showAllElements, setShowAllElements] = useState(false)
+  const rootNode = useAppSelector(selectRootNode)
+  
+  // Собираем элементы из текущей структуры
+  const inputElements = React.useMemo(() => collectInputElements(rootNode), [rootNode])
+  const allElements = React.useMemo(() => collectAllElements(rootNode), [rootNode])
+  const availableElements = showAllElements ? allElements : inputElements
 
   // Debug: логируем изменения transforms
   React.useEffect(() => {
@@ -541,89 +625,125 @@ export const TransformsEditor: React.FC<TransformsEditorProps> = ({
             <div>
               <h4 className="font-medium text-gray-800">Динамические фильтры</h4>
               <p className="text-sm text-gray-500">
-                Связь с блоками-фильтрами (значение берётся из блока в реальном времени)
+                Связь с элементами ввода на странице (значение берётся в реальном времени)
               </p>
             </div>
             <button
               onClick={addDynamicFilter}
               className="px-3 py-1.5 bg-purple-100 text-purple-700 text-sm font-medium rounded-lg hover:bg-purple-200 transition-colors"
             >
-              + Связать с блоком
+              + Добавить фильтр
             </button>
           </div>
 
+          {/* Переключатель: показывать все элементы или только input */}
+          {dynamicFilters.length > 0 && (
+            <div className="mb-3 flex items-center gap-2">
+              <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showAllElements}
+                  onChange={(e) => setShowAllElements(e.target.checked)}
+                  className="w-3 h-3"
+                />
+                Показать все элементы (не только input/select)
+              </label>
+              <span className="text-xs text-gray-400">
+                ({availableElements.length} элементов)
+              </span>
+            </div>
+          )}
+
           {dynamicFilters.length > 0 ? (
             <div className="space-y-3">
-              {dynamicFilters.map(filter => (
-                <div key={filter.id} className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                  {/* Кнопка удаления в правом верхнем углу */}
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-xs font-medium text-purple-700">Динамический фильтр</span>
-                    <button
-                      onClick={() => removeDynamicFilter(filter.id)}
-                      className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-100 rounded transition-colors"
-                      title="Удалить фильтр"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                  
-                  {/* Поля в вертикальном layout */}
-                  <div className="space-y-2">
-                    {/* Field - поле данных для фильтрации */}
-                    <input
-                      type="text"
-                      value={filter.field}
-                      onChange={(e) => updateDynamicFilter(filter.id, { field: e.target.value })}
-                      placeholder="Поле данных (id, name...)"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
-                    />
-
-                    {/* Operator и Source block в одной строке */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <select
-                        value={filter.operator}
-                        onChange={(e) => updateDynamicFilter(filter.id, { operator: e.target.value as TransformFilterOperator })}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
+              {dynamicFilters.map(filter => {
+                const selectedElement = availableElements.find(e => e.id === filter.sourceBlockId)
+                
+                return (
+                  <div key={filter.id} className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    {/* Кнопка удаления в правом верхнем углу */}
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-xs font-medium text-purple-700">Динамический фильтр</span>
+                      <button
+                        onClick={() => removeDynamicFilter(filter.id)}
+                        className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-100 rounded transition-colors"
+                        title="Удалить фильтр"
                       >
-                        {FILTER_OPERATORS.map(op => (
-                          <option key={op.value} value={op.value}>{op.label}</option>
-                        ))}
-                      </select>
-
-                      <select
-                        value={filter.sourceBlockId}
-                        onChange={(e) => updateDynamicFilter(filter.id, { sourceBlockId: e.target.value })}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
-                      >
-                        <option value="">Блок-источник...</option>
-                        {blocks.filter(b => b.isTemplate || b.isReusable).map(b => (
-                          <option key={b.id} value={b.id}>
-                            {b.name || b.id.slice(-8)}{b.isTemplate ? ' (T)' : ''}
-                          </option>
-                        ))}
-                      </select>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
                     </div>
+                    
+                    {/* Поля в вертикальном layout */}
+                    <div className="space-y-2">
+                      {/* Элемент-источник значения */}
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Элемент-источник (откуда брать значение)</label>
+                        <select
+                          value={filter.sourceBlockId}
+                          onChange={(e) => updateDynamicFilter(filter.id, { sourceBlockId: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
+                        >
+                          <option value="">Выберите элемент...</option>
+                          {availableElements.map(el => (
+                            <option key={el.id} value={el.id}>
+                              {'  '.repeat(el.depth)}{el.name} [{el.type}]
+                            </option>
+                          ))}
+                        </select>
+                        {selectedElement && (
+                          <div className="mt-1 text-xs text-purple-600">
+                            Путь: {selectedElement.path}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Field - поле данных для фильтрации */}
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Поле данных (что фильтровать)</label>
+                        <input
+                          type="text"
+                          value={filter.field}
+                          onChange={(e) => updateDynamicFilter(filter.id, { field: e.target.value })}
+                          placeholder="id, name, category..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
+                        />
+                      </div>
 
-                    {/* Checkbox */}
-                    <label className="flex items-center gap-2 text-xs text-gray-600">
-                      <input
-                        type="checkbox"
-                        checked={filter.skipIfEmpty ?? true}
-                        onChange={(e) => updateDynamicFilter(filter.id, { skipIfEmpty: e.target.checked })}
-                        className="w-3 h-3"
-                      />
-                      Пропустить если пусто
-                    </label>
+                      {/* Operator */}
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Оператор сравнения</label>
+                        <select
+                          value={filter.operator}
+                          onChange={(e) => updateDynamicFilter(filter.id, { operator: e.target.value as TransformFilterOperator })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
+                        >
+                          {FILTER_OPERATORS.map(op => (
+                            <option key={op.value} value={op.value}>{op.label}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Checkbox */}
+                      <label className="flex items-center gap-2 text-xs text-gray-600 mt-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={filter.skipIfEmpty ?? true}
+                          onChange={(e) => updateDynamicFilter(filter.id, { skipIfEmpty: e.target.checked })}
+                          className="w-3 h-3"
+                        />
+                        Пропустить фильтр если значение пустое
+                      </label>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <div className="text-center py-4 text-gray-500 border border-dashed border-purple-200 rounded-lg bg-purple-50/50">
               <p className="text-sm">Нет динамических фильтров</p>
+              <p className="text-xs mt-1">Добавьте фильтр для связи данных с элементами ввода на странице</p>
             </div>
           )}
         </div>

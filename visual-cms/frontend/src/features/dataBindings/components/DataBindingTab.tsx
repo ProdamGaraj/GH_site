@@ -11,6 +11,7 @@ import {
   selectBindingsSaving,
   selectBindingsError,
   fetchDataWithBinding,
+  testBindingWithCurrentConfig,
   selectFetchedData,
   selectIsFetching,
 } from '@/features/dataBindings/dataBindingsSlice'
@@ -19,8 +20,10 @@ import type {
   DataBinding, 
   CreateDataBindingRequest, 
   BindingType,
-  InputMode 
+  InputMode,
+  InputBindingConfig
 } from '@/shared/types/dataBinding'
+import type { DataTransform } from '@/shared/types/transforms'
 import { InputBindingEditor } from './InputBindingEditor'
 import { OutputBindingEditor } from './OutputBindingEditor'
 import { DataPreview } from './DataPreview'
@@ -101,13 +104,27 @@ export const DataBindingTab: React.FC<DataBindingTabProps> = ({ blockId, pageId 
     }
   }
 
-  // Тестирование привязки
-  const handleTestBinding = async () => {
+  // Тестирование привязки с текущими настройками (включая несохранённые)
+  const handleTestBinding = async (currentConfig?: InputBindingConfig) => {
     if (!inputBinding) return
-    dispatch(fetchDataWithBinding({
-      key: previewKey,
-      request: { bindingId: inputBinding.id }
-    }))
+    
+    // Если передана текущая конфигурация - используем тест с transforms override
+    if (currentConfig) {
+      const transforms = (currentConfig as InputBindingConfig & { transforms?: DataTransform[] }).transforms || []
+      dispatch(testBindingWithCurrentConfig({
+        key: previewKey,
+        request: { 
+          bindingId: inputBinding.id,
+          transformsOverride: transforms.length > 0 ? transforms : undefined
+        }
+      }))
+    } else {
+      // Fallback - стандартный запрос с сохранённой привязкой
+      dispatch(fetchDataWithBinding({
+        key: previewKey,
+        request: { bindingId: inputBinding.id }
+      }))
+    }
   }
 
   // Выбор привязки для редактирования

@@ -19,7 +19,7 @@ import type { DataTransform, DynamicFilter } from '@/shared/types/transforms'
 
 interface InputBindingEditorProps {
   binding: DataBinding
-  onTest: () => void
+  onTest: (currentConfig: InputBindingConfig) => void
 }
 
 export const InputBindingEditor: React.FC<InputBindingEditorProps> = ({ binding, onTest }) => {
@@ -81,7 +81,9 @@ export const InputBindingEditor: React.FC<InputBindingEditorProps> = ({ binding,
       <div className="flex items-center justify-between">
         <h4 className="font-medium text-gray-800">Input Binding Settings</h4>
         <div className="flex gap-2">
-          <button onClick={onTest} className="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200">Test</button>
+          <button onClick={() => onTest(config)} className="px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 flex items-center gap-1">
+            <span>🔍</span> Протестировать привязку
+          </button>
           {hasChanges && <button onClick={handleSave} disabled={saving} className="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>}
         </div>
       </div>

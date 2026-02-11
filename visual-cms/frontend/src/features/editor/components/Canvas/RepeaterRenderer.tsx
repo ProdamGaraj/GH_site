@@ -135,6 +135,9 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     // Применяем field mappings из data binding
     const updatedContent = applyFieldMappings(template, dataItem, mappings)
     const updatedStyles = applyStyleMappings(template, dataItem, mappings)
+    
+    // Применяем атрибутные маппинги (src для img, href для a)
+    const updatedAttributes = applyAttributeMappings(template, dataItem, mappings)
 
     console.log(`[cloneBlockNode] Block ${template.id}:`, {
       id: template.id,
@@ -153,6 +156,7 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
       id: newId,
       content: updatedContent,
       styles: updatedStyles,
+      attributes: updatedAttributes,
       children: clonedChildren,
       metadata: {
         ...template.metadata,
@@ -165,6 +169,79 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
   const getValueByPath = (obj: any, path: string): any => {
     if (!obj || !path) return undefined
     return path.split('.').reduce((acc, key) => acc?.[key], obj)
+  }
+
+  // Нормализуем targetProperty: "item.project.-image" → "project-image"
+  const normalizeTargetProp = (tp: string): string => {
+    // Убираем префикс "item."
+    let result = tp.startsWith('item.') ? tp.slice(5) : tp
+    // Заменяем ".-" на "-" (артефакт формата)
+    result = result.split('.-').join('-')
+    return result.toLowerCase()
+  }
+
+  // Применяем маппинги к атрибутам (src для img, alt, href для a)
+  const applyAttributeMappings = (
+    block: BlockNodeWithViewport,
+    dataItem: any,
+    mappings: Array<{ sourceField: string; targetProperty: string; elementId?: string; id?: string }>
+  ): typeof block.attributes => {
+    if (!block.attributes && block.tagName !== 'img') return block.attributes
+    
+    const attrs = { ...block.attributes }
+    const elementName = (block.metadata?.name || '').toLowerCase()
+    
+    // Для <img> элементов — ищем маппинг для image и ставим src
+    if (block.tagName === 'img') {
+      // 1) По data-field
+      const dataField = attrs['data-field']
+      if (dataField) {
+        const mapping = mappings.find(m => 
+          m.targetProperty.endsWith(dataField) || 
+          m.targetProperty === `item.${dataField}`
+        )
+        if (mapping) {
+          const value = getValueByPath(dataItem, mapping.sourceField)
+          if (value !== undefined) {
+            attrs.src = String(value)
+            console.log(`[applyAttributeMappings] Set img src by data-field "${dataField}":`, value)
+            return attrs
+          }
+        }
+      }
+      
+      // 2) По имени элемента: "Project Image" содержит "image"
+      if (elementName.includes('image')) {
+        const imageMapping = mappings.find(m => {
+          const norm = normalizeTargetProp(m.targetProperty)
+          return norm.includes('image') || m.sourceField.toLowerCase().includes('image')
+        })
+        if (imageMapping) {
+          const value = getValueByPath(dataItem, imageMapping.sourceField)
+          if (value !== undefined) {
+            attrs.src = String(value)
+            console.log(`[applyAttributeMappings] Set img src by element name "${elementName}":`, value)
+            return attrs
+          }
+        }
+      }
+      
+      // 3) Любой маппинг с "image" в targetProperty или sourceField
+      const imageMapping = mappings.find(m => {
+        const norm = normalizeTargetProp(m.targetProperty)
+        return norm.includes('image') || m.sourceField.toLowerCase() === 'image'
+      })
+      if (imageMapping) {
+        const value = getValueByPath(dataItem, imageMapping.sourceField)
+        if (value !== undefined) {
+          attrs.src = String(value)
+          console.log(`[applyAttributeMappings] Set img src by image mapping fallback:`, value)
+          return attrs
+        }
+      }
+    }
+    
+    return attrs
   }
 
   // Применяем field mappings к контенту блока

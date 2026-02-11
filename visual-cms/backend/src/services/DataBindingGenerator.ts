@@ -12,6 +12,14 @@ export interface DataBindingConfig {
     targetProperty: string
     transform?: string
   }>
+  // Динамические фильтры - получают значения из form-элементов
+  dynamicFilters?: Array<{
+    id: string
+    sourceBlockId: string  // ID элемента (input/select) откуда брать значение
+    field: string          // Поле данных для фильтрации
+    operator: string       // Оператор сравнения (eq, gte, lte, etc)
+    skipIfEmpty?: boolean  // Пропустить фильтр если значение пустое
+  }>
   repeaterConfig?: {
     itemTemplate: string
     containerSelector: string
@@ -116,28 +124,232 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     return _dataStore[alias] || null;
   };
   
+  // Собрать значение из DOM элемента по его ID
+  function getElementValue(elementId) {
+    const element = document.querySelector('[data-element-id="' + elementId + '"]');
+    if (!element) {
+      console.log('[DynamicFilter] Element not found:', elementId);
+      return null;
+    }
+    
+    // Для select - получаем value
+    if (element.tagName === 'SELECT') {
+      var selectedOption = element.options[element.selectedIndex];
+      // Если выбран placeholder (первый option без value или с пустым value) - считаем пустым
+      if (!element.value || element.selectedIndex === 0 && (!selectedOption.value || selectedOption.disabled)) {
+        return null;
+      }
+      return element.value;
+    }
+    
+    // Для input
+    if (element.tagName === 'INPUT') {
+      // Checkbox/radio - возвращаем value только если checked
+      if (element.type === 'checkbox' || element.type === 'radio') {
+        return element.checked ? (element.value || element.textContent?.trim() || 'true') : null;
+      }
+      return element.value || null;
+    }
+    
+    // Для textarea
+    if (element.tagName === 'TEXTAREA') {
+      return element.value || null;
+    }
+    
+    // Для button - проверяем класс active / aria-pressed
+    if (element.tagName === 'BUTTON') {
+      var isActive = element.classList.contains('active') || element.getAttribute('aria-pressed') === 'true';
+      return isActive ? (element.value || element.textContent?.trim() || null) : null;
+    }
+    
+    // Для других элементов (div, span, option) - ищем вложенный input/select/checkbox
+    var nestedCheckbox = element.querySelector('input[type="checkbox"], input[type="radio"]');
+    if (nestedCheckbox) {
+      return nestedCheckbox.checked ? (nestedCheckbox.value || element.textContent?.trim() || 'true') : null;
+    }
+    
+    var nestedInput = element.querySelector('select, input, textarea');
+    if (nestedInput) {
+      if (nestedInput.tagName === 'SELECT') {
+        return nestedInput.value || null;
+      }
+      return nestedInput.value || null;
+    }
+    
+    // Для неинтерактивных элементов (div, span, p) - проверяем состояние "выбранности"
+    // Если элемент имеет aria-checked, data-selected, или класс active/selected - считаем выбранным
+    var isSelected = element.getAttribute('aria-checked') === 'true' 
+      || element.getAttribute('aria-selected') === 'true'
+      || element.dataset.selected === 'true'
+      || element.dataset.checked === 'true'
+      || element.classList.contains('active') 
+      || element.classList.contains('selected');
+    
+    if (isSelected) {
+      return element.textContent?.trim() || null;
+    }
+    
+    // Неинтерактивный элемент без явного состояния - не возвращаем значение
+    console.log('[DynamicFilter] Element is not interactive and not selected, skipping:', elementId, 'tag:', element.tagName);
+    return null;
+  }
+  
+  // Собрать динамические фильтры из DOM
+  function collectDynamicFilters(binding) {
+    if (!binding.dynamicFilters || binding.dynamicFilters.length === 0) {
+      return [];
+    }
+    
+    var filters = [];
+    binding.dynamicFilters.forEach(function(df) {
+      // Пропускаем фильтры без sourceBlockId или field
+      if (!df.sourceBlockId || !df.field) {
+        return;
+      }
+      
+      var value = getElementValue(df.sourceBlockId);
+      console.log('[DynamicFilter] Collecting:', df.field, '=', value, 'from element:', df.sourceBlockId);
+      
+      // По умолчанию skipIfEmpty = true (пропускаем пустые/null значения)
+      var shouldSkipEmpty = df.skipIfEmpty !== false;
+      if (shouldSkipEmpty && (value === null || value === '' || value === undefined)) {
+        console.log('[DynamicFilter] Skipping empty filter for field:', df.field);
+        return;
+      }
+      
+      // Для динамических фильтров с оператором eq - используем contains для частичного совпадения
+      // (значение "Юнусабад" найдёт "Ташкент, Юнусабадский район", "2025" найдёт "2025 Q2")
+      var operator = df.operator;
+      if (operator === 'eq' && typeof value === 'string' && value.length > 0) {
+        // Если значение не UUID - используем contains
+        if (!value.match(/^[0-9a-f-]{36}$/i)) {
+          operator = 'contains';
+          console.log('[DynamicFilter] Upgraded operator from eq to contains for value:', value);
+        }
+      }
+      
+      filters.push({
+        field: df.field,
+        operator: operator,
+        value: value
+      });
+    });
+    
+    // Объединяем несколько contains-фильтров одного поля в containsAny (OR вместо AND)
+    // Например: completion contains "2026" + completion contains "2027" → completion containsAny ["2026", "2027"]
+    var merged = {};
+    var result = [];
+    filters.forEach(function(f) {
+      if (f.operator === 'contains') {
+        if (!merged[f.field]) {
+          merged[f.field] = { field: f.field, values: [f.value] };
+        } else {
+          merged[f.field].values.push(f.value);
+        }
+      } else {
+        result.push(f);
+      }
+    });
+    Object.keys(merged).forEach(function(field) {
+      var m = merged[field];
+      if (m.values.length === 1) {
+        result.push({ field: m.field, operator: 'contains', value: m.values[0] });
+      } else {
+        result.push({ field: m.field, operator: 'containsAny', value: m.values });
+      }
+    });
+    
+    return result;
+  }
+  
+  // Заполнить select-элементы уникальными значениями из загруженных данных
+  function populateSelectsFromData(binding, rawData) {
+    if (!binding || !binding.dynamicFilters || !rawData) return;
+    
+    // Извлекаем массив данных
+    var items = rawData;
+    if (binding.repeaterConfig && binding.repeaterConfig.arrayPath) {
+      items = getNestedValue(rawData, binding.repeaterConfig.arrayPath);
+    }
+    if (!Array.isArray(items) || items.length === 0) return;
+    
+    binding.dynamicFilters.forEach(function(df) {
+      if (!df.sourceBlockId || !df.field) return;
+      
+      var element = document.querySelector('[data-element-id="' + df.sourceBlockId + '"]');
+      if (!element || element.tagName !== 'SELECT') return;
+      
+      // Собираем уникальные значения поля
+      var uniqueValues = [];
+      var seen = {};
+      items.forEach(function(item) {
+        var val = getNestedValue(item, df.field);
+        if (val !== null && val !== undefined && val !== '' && !seen[val]) {
+          seen[val] = true;
+          uniqueValues.push(String(val));
+        }
+      });
+      
+      if (uniqueValues.length === 0) return;
+      
+      // Сохраняем текст плейсхолдера (первый option)
+      var placeholderText = element.options.length > 0 ? element.options[0].text : 'Все';
+      
+      // Очищаем и пересоздаём
+      element.innerHTML = '';
+      
+      // Плейсхолдер с пустым value — для сброса фильтра
+      var placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = placeholderText;
+      element.appendChild(placeholder);
+      
+      // Добавляем options из данных
+      uniqueValues.sort().forEach(function(val) {
+        var option = document.createElement('option');
+        option.value = val;
+        option.textContent = val;
+        element.appendChild(option);
+      });
+      
+      console.log('[DynamicFilter] Populated select for field:', df.field, 'with', uniqueValues.length, 'options from data');
+    });
+  }
+  
   // Fetch data from source (uses fetch-with-transforms for bindings with transforms)
-  async function fetchData(source, bindingId) {
+  async function fetchData(source, bindingId, binding) {
     try {
-      let url = source.endpoint || '/api/data/' + source.dataSourceId;
-      let options = { method: 'GET' };
+      var url = source.endpoint || '/api/data/' + source.dataSourceId;
+      var options = { method: 'GET' };
       
       // Если есть bindingId, используем fetch-with-transforms API
       if (bindingId) {
         url = '/api/data/fetch-with-transforms';
+        
+        // Собираем динамические фильтры из DOM
+        var filters = binding ? collectDynamicFilters(binding) : [];
+        
+        var requestBody = { 
+          bindingId: bindingId,
+          filters: filters.length > 0 ? filters : undefined
+        };
+        
         options = {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bindingId: bindingId })
+          body: JSON.stringify(requestBody)
         };
-        console.log('[DataBinding] Using fetch-with-transforms for binding:', bindingId);
+        console.log('[DataBinding] Using fetch-with-transforms for binding:', bindingId, 'with filters:', filters);
       }
       
-      console.log('[DataBinding] Fetching data for source:', source.alias, 'from:', url);
-      const response = await fetch(url, options);
-      const data = await response.json();
-      console.log('[DataBinding] Data received for', source.alias, ':', data);
-      _dataStore[source.alias] = data;
+      // Ключ хранилища: bindingId (уникален) или sourceAlias (общий) 
+      var storeKey = bindingId || source.alias;
+      
+      console.log('[DataBinding] Fetching data for source:', source.alias, 'storeKey:', storeKey, 'from:', url);
+      var response = await fetch(url, options);
+      var data = await response.json();
+      console.log('[DataBinding] Data received for', storeKey, ':', data);
+      _dataStore[storeKey] = data;
       return data;
     } catch (error) {
       console.error('[DataBinding] Failed to fetch data for', source.alias, error);
@@ -150,17 +362,17 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     console.log('[DataBinding] Updating bindings, total:', _bindings.length);
     console.log('[DataBinding] Available data sources:', Object.keys(_dataStore));
     _bindings.forEach(function(binding) {
-      const element = document.querySelector('[data-element-id="' + binding.blockId + '"]');
+      var element = document.querySelector('[data-element-id="' + binding.blockId + '"]');
       if (!element) {
         console.warn('[DataBinding] Element not found for binding:', binding.blockId);
-        console.log('[DataBinding] Available elements:', Array.from(document.querySelectorAll('[data-element-id]')).slice(0, 10).map(el => el.getAttribute('data-element-id')));
         return;
       }
       
-      const data = _dataStore[binding.sourceAlias];
+      // Ищем данные сначала по bindingId, потом по sourceAlias
+      var data = _dataStore[binding.bindingId] || _dataStore[binding.sourceAlias];
       if (!data) {
-        console.warn('[DataBinding] No data for source alias:', binding.sourceAlias);
-        console.warn('[DataBinding] Available aliases:', Object.keys(_dataStore));
+        console.warn('[DataBinding] No data for binding:', binding.bindingId, 'or alias:', binding.sourceAlias);
+        console.warn('[DataBinding] Available keys:', Object.keys(_dataStore));
         return;
       }
       
@@ -173,6 +385,11 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       }
       
       if (binding.type === 'repeater' && binding.repeaterConfig) {
+        // Не рендерим repeater если контейнер - form-элемент (select, input и т.д.)
+        if (element.tagName === 'SELECT' || element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+          console.log('[DataBinding] Skipping repeater for form element:', binding.blockId, 'tag:', element.tagName);
+          return;
+        }
         console.log('[DataBinding] Rendering repeater for:', binding.blockId, 'with data:', data);
         renderRepeater(element, data, binding.repeaterConfig, binding.fieldMappings);
       }
@@ -240,8 +457,12 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     console.log('[Repeater] Items to render:', items.length);
     console.log('[Repeater] Looking for template with ID:', config.itemTemplate);
     
-    // Находим Template блок
-    const templateElement = document.querySelector('[data-element-id="' + config.itemTemplate + '"]');
+    // Находим Template блок — ищем ВНУТРИ контейнера, чтобы не найти дубликат в другом месте
+    var templateElement = container.querySelector('[data-element-id="' + config.itemTemplate + '"]');
+    // Если в контейнере нет — fallback на document
+    if (!templateElement) {
+      templateElement = document.querySelector('[data-element-id="' + config.itemTemplate + '"]');
+    }
     if (!templateElement) {
       console.error('[Repeater] Template block not found with ID:', config.itemTemplate);
       console.error('[Repeater] Available elements:', Array.from(document.querySelectorAll('[data-element-id]')).map(el => el.getAttribute('data-element-id')));
@@ -315,8 +536,14 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       const parts = mapping.targetProperty.split('.');
       
       // Формат "item.field-name" - ищем по data-bind ИЛИ по metadata.name
-      if (parts[0] === 'item' && parts.length === 2) {
-        const fieldName = parts[1]; // например "project-image" или "image"
+      if (parts[0] === 'item' && parts.length >= 2) {
+        var rawFieldName = parts.slice(1).join('.'); // например "project-image" или "project.-image"
+        // Нормализуем: убираем лишние точки между дефисами
+        var fieldName = rawFieldName;
+        while (fieldName.indexOf('.-') !== -1) fieldName = fieldName.split('.-').join('-');
+        while (fieldName.indexOf('-.') !== -1) fieldName = fieldName.split('-.').join('-');
+        while (fieldName.charAt(0) === '.' || fieldName.charAt(0) === '-') fieldName = fieldName.substring(1);
+        while (fieldName.charAt(fieldName.length - 1) === '.' || fieldName.charAt(fieldName.length - 1) === '-') fieldName = fieldName.substring(0, fieldName.length - 1);
         
         // Сначала ищем элемент с data-bind атрибутом, который содержит название поля
         let targetElement = element.querySelector('[data-bind="' + fieldName + '"]');
@@ -331,8 +558,10 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
           'location': ['location', 'address', 'place', 'локация', 'адрес', 'место']
         };
         
-        // Получаем возможные синонимы для текущего поля
-        const synonyms = fieldSynonyms[fieldName.toLowerCase()] || [fieldName.toLowerCase()];
+        // Получаем возможные синонимы: пробуем и полный fieldName, и последний сегмент (после последнего дефиса)
+        var fieldNameLower = fieldName.toLowerCase();
+        var lastSegment = fieldName.split('-').pop().toLowerCase();
+        var synonyms = fieldSynonyms[fieldNameLower] || fieldSynonyms[lastSegment] || [fieldNameLower];
         
         // Если не нашли - ищем по metadata.name в data-element-name (more robust)
         if (!targetElement) {
@@ -374,6 +603,21 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         }
         
         if (targetElement) {
+          // Если значение похоже на URL/путь к изображению, а targetElement — не IMG, ищем <img> внутри
+          var looksLikeImage = typeof value === 'string' && (
+            value.match(/\\.(jpg|jpeg|png|gif|svg|webp|avif)(\\?|$)/i) ||
+            value.startsWith('data:image/') ||
+            value.match(/images\\.unsplash\\.com/i) ||
+            (value.match(/^https?:\\/\\//i) && fieldName && fieldName.toLowerCase().indexOf('image') !== -1)
+          );
+          if (looksLikeImage && targetElement.tagName !== 'IMG') {
+            var nestedImg = targetElement.querySelector('img');
+            if (nestedImg) {
+              console.log('[FieldMapping] Value looks like image, using nested <img> instead of container');
+              targetElement = nestedImg;
+            }
+          }
+          
           // Определяем как применить значение в зависимости от типа элемента
           if (targetElement.tagName === 'IMG') {
             targetElement.setAttribute('src', value);
@@ -753,7 +997,7 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
   document.addEventListener('DOMContentLoaded', function() {
     console.log('[DataBinding] Initializing with', _bindings.length, 'bindings');
     
-    // Собираем уникальные пары (sourceAlias, bindingId)
+    // Собираем уникальные пары (sourceAlias, bindingId, binding)
     const sourcesToLoad = new Map();
     
     _bindings.forEach(function(binding) {
@@ -763,27 +1007,82 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
           // Используем bindingId если есть, иначе только sourceAlias
           const key = binding.bindingId || binding.sourceAlias;
           if (!sourcesToLoad.has(key)) {
-            sourcesToLoad.set(key, { source: source, bindingId: binding.bindingId });
+            sourcesToLoad.set(key, { source: source, bindingId: binding.bindingId, binding: binding });
           }
         }
       }
     });
     
+    // Функция для перезагрузки данных с фильтрами
+    function reloadWithFilters(config) {
+      console.log('[DataBinding] Reloading data with filters for:', config.bindingId);
+      fetchData(config.source, config.bindingId, config.binding).then(updateBindings);
+    }
+    
     // Загружаем данные для каждого уникального источника с bindingId
     sourcesToLoad.forEach(function(config, key) {
       console.log('[DataBinding] Loading data for:', key, 'bindingId:', config.bindingId);
-      fetchData(config.source, config.bindingId).then(updateBindings);
+      // Первая загрузка БЕЗ динамических фильтров (select-ы ещё содержат placeholder-текст,
+      // который будет ошибочно отправлен как фильтр). После загрузки populateSelectsFromData
+      // заменит options на реальные значения с пустым placeholder.
+      fetchData(config.source, config.bindingId, null).then(function(data) {
+        // Заполняем select-ы уникальными значениями из данных
+        populateSelectsFromData(config.binding, data);
+        updateBindings();
+      });
+      
+      // Если есть dynamicFilters - настраиваем слушатели изменений
+      if (config.binding && config.binding.dynamicFilters && config.binding.dynamicFilters.length > 0) {
+        config.binding.dynamicFilters.forEach(function(df) {
+          const filterElement = document.querySelector('[data-element-id="' + df.sourceBlockId + '"]');
+          if (!filterElement) return;
+          
+          // Для BUTTON - toggle класс active по клику
+          if (filterElement.tagName === 'BUTTON') {
+            filterElement.addEventListener('click', function() {
+              filterElement.classList.toggle('active');
+              // Визуальный feedback
+              if (filterElement.classList.contains('active')) {
+                filterElement.style.backgroundColor = 'rgba(210,159,102,0.3)';
+                filterElement.style.borderColor = '#D29F66';
+                filterElement.style.fontWeight = '600';
+              } else {
+                filterElement.style.backgroundColor = '';
+                filterElement.style.borderColor = '';
+                filterElement.style.fontWeight = '';
+              }
+              console.log('[DynamicFilter] Button toggled:', df.field, '=', filterElement.textContent?.trim(), 'active:', filterElement.classList.contains('active'));
+              reloadWithFilters(config);
+            });
+            console.log('[DynamicFilter] Attached click toggle to button:', df.sourceBlockId);
+            return;
+          }
+          
+          // Для select/input добавляем обработчик change
+          const input = filterElement.tagName === 'SELECT' || filterElement.tagName === 'INPUT' 
+            ? filterElement 
+            : filterElement.querySelector('select, input');
+          
+          if (input) {
+            input.addEventListener('change', function() {
+              console.log('[DynamicFilter] Filter changed:', df.field, '=', input.value);
+              reloadWithFilters(config);
+            });
+            console.log('[DynamicFilter] Attached change listener to:', df.sourceBlockId);
+          }
+        });
+      }
     });
     
     // Setup interval loading
     _dataSources.forEach(function(source) {
       if (source.loadStrategy === 'interval' && source.loadInterval) {
-        // Для интервальной загрузки находим соответствующий bindingId
+        // Для интервальной загрузки находим соответствующий binding
         const binding = _bindings.find(b => b.sourceAlias === source.alias);
         const bindingId = binding ? binding.bindingId : null;
         
         setInterval(function() {
-          fetchData(source, bindingId).then(updateBindings);
+          fetchData(source, bindingId, binding).then(updateBindings);
         }, source.loadInterval * 1000);
       }
     });

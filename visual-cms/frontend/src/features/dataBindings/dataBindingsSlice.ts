@@ -9,6 +9,7 @@ import type {
   DirectFetchRequest,
   FetchWithBindingRequest
 } from '@/shared/types/dataBinding'
+import type { FetchWithTransformsRequest } from '@/shared/types/transforms'
 
 interface DataBindingsState {
   // Все привязки
@@ -144,6 +145,32 @@ export const fetchDataWithBinding = createAsyncThunk(
   async ({ key, request }: { key: string; request: FetchWithBindingRequest }) => {
     const result = await dataBindingApi.fetchWithBinding(request)
     return { key, result }
+  }
+)
+
+/**
+ * Тестировать привязку с текущими настройками (включая несохранённые transforms)
+ * Используется для кнопки "Протестировать привязку" в редакторе
+ */
+export const testBindingWithCurrentConfig = createAsyncThunk(
+  'dataBindings/testWithCurrentConfig',
+  async ({ key, request }: { key: string; request: FetchWithTransformsRequest }) => {
+    const result = await dataBindingApi.fetchWithTransforms(request)
+    // Преобразуем ответ в формат FetchDataResult для совместимости с существующим UI
+    const fetchResult: FetchDataResult = {
+      success: result.success,
+      data: result.data,
+      error: result.error,
+      metadata: {
+        total: result.meta.totalCount,
+        filtered: result.meta.filteredCount,
+        mode: undefined,
+        page: result.meta.page,
+        totalPages: result.meta.totalPages,
+        responseTime: result.meta.responseTime || 0
+      }
+    }
+    return { key, result: fetchResult }
   }
 )
 
@@ -385,6 +412,28 @@ const dataBindingsSlice = createSlice({
         const key = action.meta.arg.key
         state.fetching[key] = false
         state.fetchErrors[key] = action.error.message || 'Failed to fetch data'
+      })
+
+    // ============ testBindingWithCurrentConfig ============
+    builder
+      .addCase(testBindingWithCurrentConfig.pending, (state, action) => {
+        const key = action.meta.arg.key
+        state.fetching[key] = true
+        delete state.fetchErrors[key]
+      })
+      .addCase(testBindingWithCurrentConfig.fulfilled, (state, action) => {
+        const { key, result } = action.payload
+        console.log('[dataBindingsSlice] testBindingWithCurrentConfig.fulfilled:', {
+          key,
+          result
+        })
+        state.fetching[key] = false
+        state.fetchedData[key] = result
+      })
+      .addCase(testBindingWithCurrentConfig.rejected, (state, action) => {
+        const key = action.meta.arg.key
+        state.fetching[key] = false
+        state.fetchErrors[key] = action.error.message || 'Failed to test binding'
       })
   },
 })

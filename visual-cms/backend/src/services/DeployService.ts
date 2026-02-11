@@ -61,16 +61,12 @@ export class DeployService {
       // Создаём папку public-site если не существует
       this.ensureDirectoryExists(PUBLIC_DIR)
 
-      // Обновляем структуру, подставляя актуальные блоки из библиотеки
+      // Сначала инжектируем library templates (нужно до preparePageDataConfig)
       let updatedStructure = await linkedBlocksService.updateLinkedBlocks(page.structure)
+      updatedStructure = await this.injectLibraryTemplates(updatedStructure, pageId)
 
-      // Загружаем data bindings для страницы
-      const dataConfig = await this.preparePageDataConfig(pageId)
-      
-      // Inject library templates into containers with repeater bindings
-      if (dataConfig) {
-        updatedStructure = await this.injectLibraryTemplates(updatedStructure, pageId)
-      }
+      // Загружаем data bindings для страницы, используя обновлённую структуру с templates
+      const dataConfig = await this.preparePageDataConfig(pageId, updatedStructure)
       
       console.log('📋 DataConfig for deploy:', JSON.stringify(dataConfig, null, 2))
 
@@ -384,9 +380,14 @@ export class DeployService {
       console.log(`📦 Loaded library template: ${template.id} (${template.name})`)
     }
 
-    // Recursively inject templates into containers
+    // Recursively inject templates into containers (BOTTOM-UP: children first, then parent)
     const injectTemplates = (node: any): any => {
       if (!node) return node
+
+      // СНАЧАЛА обрабатываем детей (bottom-up), чтобы вложенные контейнеры получили template первыми
+      if (node.children && Array.isArray(node.children)) {
+        node = { ...node, children: node.children.map(injectTemplates) }
+      }
 
       // Check if this node has a binding with libraryTemplateId
       const binding = bindings.find((b: any) => {
@@ -412,9 +413,19 @@ export class DeployService {
               updatedNode.children = []
             }
             
-            // Check if template already exists in children (by linkedBlockId)
+            // Рекурсивная проверка: template может быть глубже (внутри вложенного контейнера)
+            const hasTemplateRecursive = (n: any, targetLinkedId: string): boolean => {
+              if (!n) return false
+              if (n.metadata?.linkedBlockId === targetLinkedId) return true
+              if (n.children && Array.isArray(n.children)) {
+                return n.children.some((child: any) => hasTemplateRecursive(child, targetLinkedId))
+              }
+              return false
+            }
+            
+            // Check if template already exists anywhere in descendants (by linkedBlockId)
             const templateExists = updatedNode.children.some(
-              (child: any) => child.metadata?.linkedBlockId === libraryTemplateId
+              (child: any) => hasTemplateRecursive(child, libraryTemplateId)
             )
             
             if (!templateExists) {
@@ -428,6 +439,8 @@ export class DeployService {
                 }
               }
               updatedNode.children = [templateWithMeta, ...updatedNode.children]
+            } else {
+              console.log(`⏭️ Template ${libraryTemplateId} already exists in descendants of ${node.id}, skipping injection`)
             }
             
             node = updatedNode
@@ -435,11 +448,6 @@ export class DeployService {
             console.warn(`⚠️ Template ${libraryTemplateId} not found in database`)
           }
         }
-      }
-
-      // Recursively process children
-      if (node.children && Array.isArray(node.children)) {
-        node.children = node.children.map(injectTemplates)
       }
 
       return node
@@ -451,16 +459,19 @@ export class DeployService {
   /**
    * Готовит конфигурацию data bindings для страницы
    */
-  private async preparePageDataConfig(pageId: string): Promise<PageDataConfig | undefined> {
+  private async preparePageDataConfig(pageId: string, overrideStructure?: any): Promise<PageDataConfig | undefined> {
     try {
       // Загружаем страницу чтобы получить все blockId
       const page = await this.pageRepository.findOne({ where: { id: pageId } })
-      if (!page || !page.structure) {
+      if (!page || (!page.structure && !overrideStructure)) {
         return undefined
       }
 
+      // Используем переданную структуру (с инжектированными templates) или из БД
+      const structure = overrideStructure || page.structure
+
       // Собираем все blockId и linkedBlockId из структуры страницы
-      const { blockIds, linkedBlockIds } = this.collectBlockIdsWithLinks(page.structure)
+      const { blockIds, linkedBlockIds } = this.collectBlockIdsWithLinks(structure)
       
       if (!blockIds.length) {
         console.log('No blocks found in page structure')
@@ -468,7 +479,7 @@ export class DeployService {
       }
 
       // Создаем маппинг linkedBlockId -> реальный blockId на странице ПЕРЕД загрузкой привязок
-      const linkedBlockIdMapping = this.buildLinkedBlockMapping(page.structure)
+      const linkedBlockIdMapping = this.buildLinkedBlockMapping(structure)
       
       console.log('🗺️ Linked block mapping:', linkedBlockIdMapping)
       console.log('📋 Block IDs on page:', blockIds.slice(0, 5))
@@ -568,7 +579,7 @@ export class DeployService {
             
             if (inputConfig.mode === 'repeater') {
               // Для repeater ищем template внутри контейнера по linkedBlockId
-              const foundTemplate = this.findTemplateInContainer(page.structure, actualBlockId, libraryTemplateId)
+              const foundTemplate = this.findTemplateInContainer(structure, actualBlockId, libraryTemplateId)
               if (foundTemplate) {
                 templateId = foundTemplate
                 console.log(`✅ Found template for container ${actualBlockId}: ${templateId}`)
@@ -588,6 +599,14 @@ export class DeployService {
                 sourceField: fm.sourceField,
                 targetProperty: fm.targetProperty,
                 transform: fm.transform
+              })),
+              // Динамические фильтры для runtime
+              dynamicFilters: inputConfig.dynamicFilters?.map((df: any) => ({
+                id: df.id,
+                sourceBlockId: df.sourceBlockId,
+                field: df.field,
+                operator: df.operator,
+                skipIfEmpty: df.skipIfEmpty
               })),
               repeaterConfig: inputConfig.mode === 'repeater' ? {
                 itemTemplate: templateId,
