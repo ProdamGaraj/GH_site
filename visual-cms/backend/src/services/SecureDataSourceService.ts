@@ -181,7 +181,13 @@ class SecureDataSourceService {
     authConfig?: AuthConfig,
     startTime: number = Date.now()
   ): Promise<FetchResult> {
+    console.log('🌐 [SecureDataSourceService.fetchRestApi] config.url:', config.url)
+    console.log('🌐 [SecureDataSourceService.fetchRestApi] config.method:', config.method)
+    console.log('🌐 [SecureDataSourceService.fetchRestApi] config.queryParams:', config.queryParams)
+    
     const url = this.buildUrl(config.url!, config.queryParams, authConfig)
+    console.log('🌐 [SecureDataSourceService.fetchRestApi] Built URL:', url)
+    
     const headers = this.buildHeaders(config.headers, authConfig)
     
     const fetchOptions: RequestInit = {
@@ -322,6 +328,14 @@ class SecureDataSourceService {
     queryParams?: Record<string, string>,
     authConfig?: AuthConfig
   ): string {
+    console.log('🔗 [buildUrl] Input baseUrl:', baseUrl)
+    console.log('🔗 [buildUrl] Input queryParams:', queryParams)
+    
+    if (!baseUrl) {
+      console.error('❌ [buildUrl] baseUrl is empty or undefined!')
+      throw new Error('baseUrl is required for API request')
+    }
+    
     const url = new URL(baseUrl)
     
     // Добавить query параметры
@@ -336,7 +350,9 @@ class SecureDataSourceService {
       url.searchParams.append(authConfig.keyName || 'api_key', authConfig.key || '')
     }
 
-    return url.toString()
+    const result = url.toString()
+    console.log('🔗 [buildUrl] Result URL:', result)
+    return result
   }
 
   /**

@@ -417,10 +417,10 @@ label {
   const _dataStore = {};
   
   // Data sources config
-  const _dataSources = [{"alias":"123","dataSourceId":"fcf4abe2-e393-4b63-8d04-cc344831c6c5","endpoint":"http://localhost:5000/api/mock/projects","loadStrategy":"pageLoad","cacheEnabled":false}];
+  const _dataSources = [{"alias":"123","dataSourceId":"fcf4abe2-e393-4b63-8d04-cc344831c6c5","endpoint":"http://localhost:5000/api/mock/","loadStrategy":"pageLoad","cacheEnabled":false}];
   
   // Bindings config
-  const _bindings = [{"blockId":"1769405707337_unm4vedmb","bindingId":"b9ab4701-a707-4099-976e-c8815d4cd163","type":"repeater","sourceAlias":"123","fieldMappings":[{"sourceField":"image","targetProperty":"item.project.-image"},{"sourceField":"status","targetProperty":"item.element"},{"sourceField":"title","targetProperty":"item.project-name"},{"sourceField":"location","targetProperty":"item.project-location"},{"sourceField":"price","targetProperty":"item.project-price"}],"dynamicFilters":[{"id":"transform-1770704309063-oig3hkhd5","sourceBlockId":"gh-premium-1769148718508-45","field":"location","operator":"eq","skipIfEmpty":true},{"id":"transform-1770705008860-598527lmg","sourceBlockId":"gh-premium-1769148718508-48","field":"price","operator":"gte","skipIfEmpty":true},{"id":"transform-1770705034946-ac68szups","sourceBlockId":"gh-premium-1769148718508-50","field":"price","operator":"lte","skipIfEmpty":true},{"id":"transform-1770705051760-9xavr5mwo","sourceBlockId":"gh-premium-1769148718508-54","field":"completion","operator":"contains","skipIfEmpty":true},{"id":"transform-1770705075415-yk9dz83rq","sourceBlockId":"gh-premium-1769148718508-55","field":"completion","operator":"contains","skipIfEmpty":true},{"id":"transform-1770705081173-tcihrgub0","sourceBlockId":"gh-premium-1769148718508-56","field":"completion","operator":"contains","skipIfEmpty":true}],"repeaterConfig":{"itemTemplate":"gh-premium-1769148718508-74","containerSelector":"[data-element-id=\"1769405707337_unm4vedmb\"]","arrayPath":"data"}}];
+  const _bindings = [{"blockId":"gh-premium-1769148718509-137","type":"output","sourceAlias":"123","outputConfig":{"trigger":"click","method":"POST","payloadMappings":[],"onError":{"action":"message"}}},{"blockId":"1769405707337_unm4vedmb","bindingId":"b9ab4701-a707-4099-976e-c8815d4cd163","type":"repeater","sourceAlias":"123","fieldMappings":[{"sourceField":"image","targetProperty":"item.project.-image"},{"sourceField":"status","targetProperty":"item.element"},{"sourceField":"title","targetProperty":"item.project-name"},{"sourceField":"location","targetProperty":"item.project-location"},{"sourceField":"price","targetProperty":"item.project-price"}],"dynamicFilters":[{"id":"transform-1770704309063-oig3hkhd5","sourceBlockId":"gh-premium-1769148718508-45","field":"location","operator":"eq","skipIfEmpty":true},{"id":"transform-1770705008860-598527lmg","sourceBlockId":"gh-premium-1769148718508-48","field":"price","operator":"gte","skipIfEmpty":true},{"id":"transform-1770705034946-ac68szups","sourceBlockId":"gh-premium-1769148718508-50","field":"price","operator":"lte","skipIfEmpty":true},{"id":"transform-1770705051760-9xavr5mwo","sourceBlockId":"gh-premium-1769148718508-54","field":"completion","operator":"contains","skipIfEmpty":true},{"id":"transform-1770705075415-yk9dz83rq","sourceBlockId":"gh-premium-1769148718508-55","field":"completion","operator":"contains","skipIfEmpty":true},{"id":"transform-1770705081173-tcihrgub0","sourceBlockId":"gh-premium-1769148718508-56","field":"completion","operator":"contains","skipIfEmpty":true}],"repeaterConfig":{"itemTemplate":"gh-premium-1769148718508-74","containerSelector":"[data-element-id=\"1769405707337_unm4vedmb\"]","arrayPath":"data"}}];
   
   // Variable getter/setter
   window.$var = function(name, value) {
@@ -804,6 +804,8 @@ label {
     
     // Клонируем template для каждого элемента
     items.forEach(function(item, index) {
+      console.log('[Repeater] Processing item #' + index + ':', JSON.stringify(item).substring(0, 200));
+      
       const clone = templateElement.cloneNode(true);
       clone.style.display = ''; // Показываем клон
       // Сохраняем originalId для возможности обновления
@@ -813,8 +815,10 @@ label {
       
       // Применяем field mappings если есть
       if (fieldMappings && fieldMappings.length > 0) {
+        console.log('[Repeater] Item #' + index + ' - applying ' + fieldMappings.length + ' field mappings');
         applyFieldMappingsToElement(clone, item, fieldMappings);
       } else {
+        console.log('[Repeater] Item #' + index + ' - NO field mappings, using auto-detection');
         // Иначе пытаемся автоопределить через data-bind и {{template}}
         updateElementContent(clone, item);
       }
@@ -829,17 +833,21 @@ label {
   
   // Применить field mappings к элементу
   function applyFieldMappingsToElement(element, data, mappings) {
-    console.log('[FieldMapping] Applying mappings:', mappings);
-    console.log('[FieldMapping] Data:', data);
+    console.log('[FieldMapping] ===== START =====');
+    console.log('[FieldMapping] Applying ' + mappings.length + ' mappings to element');
+    console.log('[FieldMapping] Data for this item:', JSON.stringify(data).substring(0, 300));
+    console.log('[FieldMapping] Mappings:', JSON.stringify(mappings).substring(0, 500));
     
     mappings.forEach(function(mapping) {
       const value = getNestedValue(data, mapping.sourceField);
+      console.log('[FieldMapping] Field "' + mapping.sourceField + '" -> value: "' + (value ? String(value).substring(0, 100) : 'undefined') + '"');
+      
       if (value === undefined) {
-        console.log('[FieldMapping] No value for field:', mapping.sourceField);
+        console.warn('[FieldMapping] ⚠️ No value for field:', mapping.sourceField, 'in data:', data);
         return;
       }
       
-      console.log('[FieldMapping] Applying', mapping.sourceField, '=', value, 'to', mapping.targetProperty);
+      console.log('[FieldMapping] ✓ Applying', mapping.sourceField, '->', mapping.targetProperty);
       
       // targetProperty может быть:
       // - "item.project-image" - ищем элемент с data-bind="project-image"

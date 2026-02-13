@@ -491,6 +491,8 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     
     // Клонируем template для каждого элемента
     items.forEach(function(item, index) {
+      console.log('[Repeater] Processing item #' + index + ':', JSON.stringify(item).substring(0, 200));
+      
       const clone = templateElement.cloneNode(true);
       clone.style.display = ''; // Показываем клон
       // Сохраняем originalId для возможности обновления
@@ -500,8 +502,10 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       
       // Применяем field mappings если есть
       if (fieldMappings && fieldMappings.length > 0) {
+        console.log('[Repeater] Item #' + index + ' - applying ' + fieldMappings.length + ' field mappings');
         applyFieldMappingsToElement(clone, item, fieldMappings);
       } else {
+        console.log('[Repeater] Item #' + index + ' - NO field mappings, using auto-detection');
         // Иначе пытаемся автоопределить через data-bind и {{template}}
         updateElementContent(clone, item);
       }
@@ -516,17 +520,21 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
   
   // Применить field mappings к элементу
   function applyFieldMappingsToElement(element, data, mappings) {
-    console.log('[FieldMapping] Applying mappings:', mappings);
-    console.log('[FieldMapping] Data:', data);
+    console.log('[FieldMapping] ===== START =====');
+    console.log('[FieldMapping] Applying ' + mappings.length + ' mappings to element');
+    console.log('[FieldMapping] Data for this item:', JSON.stringify(data).substring(0, 300));
+    console.log('[FieldMapping] Mappings:', JSON.stringify(mappings).substring(0, 500));
     
     mappings.forEach(function(mapping) {
       const value = getNestedValue(data, mapping.sourceField);
+      console.log('[FieldMapping] Field "' + mapping.sourceField + '" -> value: "' + (value ? String(value).substring(0, 100) : 'undefined') + '"');
+      
       if (value === undefined) {
-        console.log('[FieldMapping] No value for field:', mapping.sourceField);
+        console.warn('[FieldMapping] ⚠️ No value for field:', mapping.sourceField, 'in data:', data);
         return;
       }
       
-      console.log('[FieldMapping] Applying', mapping.sourceField, '=', value, 'to', mapping.targetProperty);
+      console.log('[FieldMapping] ✓ Applying', mapping.sourceField, '->', mapping.targetProperty);
       
       // targetProperty может быть:
       // - "item.project-image" - ищем элемент с data-bind="project-image"

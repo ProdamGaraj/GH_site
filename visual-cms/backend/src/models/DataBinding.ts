@@ -144,10 +144,25 @@ export interface SuccessAction {
 }
 
 /**
+ * Конфигурация конкретного endpoint запроса.
+ * DataSource хранит подключение (origin, auth), а EndpointConfig — конкретный запрос.
+ */
+export interface EndpointConfig {
+  path: string                             // Путь: /api/users, /submit, projects/
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+  headers?: Record<string, string>         // Дополнительные заголовки для этого запроса
+  queryParams?: Record<string, string>     // Query-параметры для этого запроса
+  body?: string                            // Тело запроса (шаблон)
+  bodyFormat?: 'json' | 'form-data' | 'form-urlencoded' | 'raw'
+  contentType?: string                     // Content-Type
+}
+
+/**
  * Конфигурация INPUT биндинга
  */
 export interface InputBindingConfig {
   mode: InputMode
+  endpoint?: EndpointConfig               // Конфигурация конкретного запроса к источнику
   
   // Single Item mode
   fieldMappings?: FieldMapping[]
@@ -230,8 +245,9 @@ export interface ValidationRule {
  * Конфигурация OUTPUT биндинга
  */
 export interface OutputBindingConfig {
-  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE'
-  endpointPath?: string       // Динамический путь (может содержать переменные)
+  endpoint?: EndpointConfig        // Конфигурация конкретного запроса (path, method, headers)
+  method?: 'POST' | 'PUT' | 'PATCH' | 'DELETE'  // @deprecated — используйте endpoint.method
+  endpointPath?: string       // @deprecated — используйте endpoint.path
   
   // Payload
   payloadMappings: FieldMapping[]

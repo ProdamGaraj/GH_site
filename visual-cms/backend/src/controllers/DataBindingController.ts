@@ -939,9 +939,45 @@ class DataBindingController {
         authConfig = await CredentialsManager.decryptAuthConfig(binding.dataSource.authConfig)
       }
 
+      // Собираем финальный URL из baseUrl data source + endpoint.path из binding
+      const dsConfig = binding.dataSource.config as any
+      let finalFetchConfig = { ...dsConfig } as unknown as FetchConfig
+      
+      console.log('📊 [fetchWithTransforms] Data Source config:', JSON.stringify(dsConfig, null, 2))
+      console.log('📊 [fetchWithTransforms] InputConfig:', JSON.stringify(inputConfig, null, 2))
+      
+      // Если в inputConfig есть endpoint, комбинируем baseUrl + endpoint.path
+      if (inputConfig.endpoint) {
+        const baseUrl = (dsConfig.url || '').replace(/\/$/, '') // Убираем trailing slash
+        const path = (inputConfig.endpoint.path || '').replace(/^\//, '') // Убираем leading slash
+        const fullUrl = path ? `${baseUrl}/${path}` : baseUrl
+        
+        console.log('📊 [fetchWithTransforms] BaseUrl:', baseUrl)
+        console.log('📊 [fetchWithTransforms] Endpoint path:', inputConfig.endpoint.path)
+        console.log('📊 [fetchWithTransforms] Full URL:', fullUrl)
+        
+        finalFetchConfig = {
+          ...dsConfig,
+          url: fullUrl,
+          method: inputConfig.endpoint.method || dsConfig.method || 'GET',
+          headers: {
+            ...dsConfig.headers,
+            ...inputConfig.endpoint.headers,
+          },
+          queryParams: {
+            ...dsConfig.queryParams,
+            ...inputConfig.endpoint.queryParams,
+          },
+        } as unknown as FetchConfig
+      } else {
+        console.log('📊 [fetchWithTransforms] No endpoint in inputConfig, using dsConfig.url:', dsConfig.url)
+      }
+      
+      console.log('📊 [fetchWithTransforms] Final fetch config:', JSON.stringify(finalFetchConfig, null, 2))
+
       // Fetch данных из источника
       const fetchResult = await secureDataSourceService.fetchData(
-        binding.dataSource.config as unknown as FetchConfig,
+        finalFetchConfig,
         authConfig as unknown as AuthConfig
       )
 
@@ -959,14 +995,14 @@ class DataBindingController {
       }
 
       // Получаем responseMapping из DataSource config или используем дефолт
-      const dsConfig = binding.dataSource.config as any
+      const dsResponseConfig = binding.dataSource.config as any
       
-      // Приоритет: configOverride.arrayPath > inputConfig.arrayPath > dsConfig.responseMapping.dataPath > 'data'
-      const effectiveArrayPath = configOverride?.arrayPath || inputConfig.arrayPath || dsConfig.responseMapping?.dataPath || 'data'
+      // Приоритет: configOverride.arrayPath > inputConfig.arrayPath > dsResponseConfig.responseMapping.dataPath > 'data'
+      const effectiveArrayPath = configOverride?.arrayPath || inputConfig.arrayPath || dsResponseConfig.responseMapping?.dataPath || 'data'
       
       const responseMapping = {
         dataPath: effectiveArrayPath,
-        fieldMappings: dsConfig.responseMapping?.fieldMappings
+        fieldMappings: dsResponseConfig.responseMapping?.fieldMappings
       }
 
       // Получаем трансформации - приоритет: configOverride.transforms > transformsOverride > inputConfig.transforms

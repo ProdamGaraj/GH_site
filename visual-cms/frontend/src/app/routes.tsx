@@ -11,6 +11,7 @@ import { GoldenHousePremium } from '@/pages/GoldenHousePremium'
 import GoldenHouseElite from '@/pages/GoldenHouseElite'
 import { DataSourcesList } from '@/pages/DataSourcesList'
 import { DataSourceWizard } from '@/features/data-sources/components/DataSourceWizard'
+import { DataSourceEditor } from '@/features/data-sources/components/DataSourceEditor'
 import { DataBindingDemo } from '@/pages/DataBindingDemo'
 import TemplatesPage from '@/pages/TemplatesPage'
 import TemplateBlocksPage from '@/pages/TemplateBlocksPage'
@@ -87,7 +88,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/data-sources/:id/edit',
-    element: <DataSourceWizard />,
+    element: <DataSourceEditor />,
   },
   {
     path: '/golden-house',

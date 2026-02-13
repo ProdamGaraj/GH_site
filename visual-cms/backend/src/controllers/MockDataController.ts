@@ -230,6 +230,79 @@ export class MockDataController {
     }
   }
 
+  // ─── In-memory storage for applications ─────────────────────
+  private applications: any[] = []
+  private nextAppId = 1
+
+  /**
+   * POST /api/mock/applications
+   * Принимает заявку и сохраняет в памяти
+   */
+  async submitApplication(req: Request, res: Response) {
+    try {
+      const { name, phone, email, projectId, projectName, message, source } = req.body
+
+      // Basic validation
+      if (!name || (!phone && !email)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Необходимо указать имя и хотя бы телефон или email'
+        })
+      }
+
+      const application = {
+        id: this.nextAppId++,
+        name,
+        phone: phone || null,
+        email: email || null,
+        projectId: projectId || null,
+        projectName: projectName || null,
+        message: message || null,
+        source: source || 'website',
+        status: 'new',
+        createdAt: new Date().toISOString(),
+      }
+
+      this.applications.push(application)
+
+      console.log(`[Mock] New application #${application.id} from ${name} (${phone || email})`)
+
+      res.status(201).json({
+        success: true,
+        message: 'Заявка успешно принята! Мы свяжемся с вами в ближайшее время.',
+        data: {
+          id: application.id,
+          status: application.status,
+          createdAt: application.createdAt,
+        }
+      })
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      })
+    }
+  }
+
+  /**
+   * GET /api/mock/applications
+   * Возвращает все принятые заявки (для отладки)
+   */
+  async getApplications(req: Request, res: Response) {
+    try {
+      res.json({
+        success: true,
+        data: this.applications,
+        total: this.applications.length
+      })
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      })
+    }
+  }
+
   /**
    * Вспомогательный метод для получения всех проектов
    */

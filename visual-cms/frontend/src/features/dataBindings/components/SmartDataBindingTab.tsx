@@ -117,11 +117,24 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
     
     // Автоматически создать mappings на основе template fields
     if (templateFields.length > 0 && dataSourceId) {
-      const autoMappings: FieldMapping[] = templateFields.map((field: DetectedField) => ({
-        id: `mapping-${field.id}`,
-        sourceField: field.name,
-        targetProperty: `data.${field.name}`, // Предполагаем что API возвращает объект
-      }))
+      const autoMappings: FieldMapping[] = templateFields.map((field: DetectedField) => {
+        // Извлекаем data-bind значение
+        const selectorMatch = field.selector?.match(/\[data-bind="([^"]+)"\]/)
+        const dataBindValue = selectorMatch ? selectorMatch[1] : field.name
+        
+        // Попытка извлечь имя поля API
+        const apiFieldName = dataBindValue.replace(/^(project|item|element|card|product)-/, '')
+          .replace('name', 'title')
+          .replace('location', 'location')
+          .replace('price', 'price')
+          .replace('image', 'image')
+        
+        return {
+          id: `mapping-field-${dataBindValue}`,
+          sourceField: apiFieldName, // Поле из API
+          targetProperty: `item.${dataBindValue}`, // item. + HTML элемент идентификатор
+        }
+      })
       setMappings(autoMappings)
     }
   }
@@ -137,10 +150,18 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         const selectorMatch = field.selector?.match(/\[data-bind="([^"]+)"\]/)
         const dataBindValue = selectorMatch ? selectorMatch[1] : field.name
         
+        // Попытка извлечь имя поля API из data-bind value
+        // Например: "project-image" -> "image", "project-name" -> "title"
+        const apiFieldName = dataBindValue.replace(/^(project|item|element|card|product)-/, '')
+          .replace('name', 'title')  // Частый случай: project-name -> title
+          .replace('location', 'location')
+          .replace('price', 'price')
+          .replace('image', 'image')
+        
         return {
-          id: `mapping-${field.id}`,
-          sourceField: field.name, // Поле из API (image, title, location и т.д.)
-          targetProperty: `item.${dataBindValue}`, // data-bind значение (project-image, project-name и т.д.)
+          id: `mapping-field-${dataBindValue}`,
+          sourceField: apiFieldName, // Поле из API
+          targetProperty: `item.${dataBindValue}`, // item. + data-bind значение (для client-side кода)
         }
       })
 

@@ -31,4 +31,16 @@ router.get('/news', (req, res) => mockDataController.getNews(req, res))
  */
 router.get('/team', (req, res) => mockDataController.getTeam(req, res))
 
+/**
+ * POST /api/mock/applications
+ * Принять заявку (лид / обратная связь)
+ */
+router.post('/applications', (req, res) => mockDataController.submitApplication(req, res))
+
+/**
+ * GET /api/mock/applications
+ * Получить все принятые заявки (для отладки)
+ */
+router.get('/applications', (req, res) => mockDataController.getApplications(req, res))
+
 export default router

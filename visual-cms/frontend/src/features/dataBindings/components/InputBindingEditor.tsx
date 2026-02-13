@@ -1,6 +1,6 @@
 ﻿import React, { useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { updateBinding, selectBindingsSaving } from '@/features/dataBindings/dataBindingsSlice'
+import { updateBinding, deleteBinding, selectBindingsSaving } from '@/features/dataBindings/dataBindingsSlice'
 import type { DataBinding, InputMode, InputBindingConfig } from '@/shared/types/dataBinding'
 import { FieldMappingEditor } from './FieldMappingEditor'
 import { FilterBuilder } from './FilterBuilder'
@@ -42,6 +42,17 @@ export const InputBindingEditor: React.FC<InputBindingEditorProps> = ({ binding,
     } catch (err) { console.error('Failed to save binding:', err) }
   }
 
+  const handleDelete = async () => {
+    if (!confirm('Удалить эту привязку данных? Это действие нельзя отменить.')) return
+    try {
+      await dispatch(deleteBinding(binding.id)).unwrap()
+      // Binding удален, компонент автоматически закроется через parent
+    } catch (err) {
+      console.error('Failed to delete binding:', err)
+      alert('Не удалось удалить привязку')
+    }
+  }
+
   const sections = [
     { id: 'mode', label: 'Mode' },
     { id: 'template', label: 'Template', show: config.mode === 'repeater' || config.mode === 'paginated' },
@@ -81,6 +92,12 @@ export const InputBindingEditor: React.FC<InputBindingEditorProps> = ({ binding,
       <div className="flex items-center justify-between">
         <h4 className="font-medium text-gray-800">Input Binding Settings</h4>
         <div className="flex gap-2">
+          <button 
+            onClick={handleDelete} 
+            className="px-3 py-1.5 bg-red-50 text-red-700 text-sm font-medium rounded-lg hover:bg-red-100 flex items-center gap-1 border border-red-200"
+          >
+            <span>🗑️</span> Удалить
+          </button>
           <button onClick={() => onTest(config)} className="px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 flex items-center gap-1">
             <span>🔍</span> Протестировать привязку
           </button>
