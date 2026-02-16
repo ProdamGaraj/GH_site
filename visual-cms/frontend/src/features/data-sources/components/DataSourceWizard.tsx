@@ -486,7 +486,7 @@ export const DataSourceWizard: React.FC = () => {
             value={formData.description}
             onChange={(e) => updateForm({ description: e.target.value })}
             placeholder="Optional description..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-white text-gray-700"
             rows={3}
           />
         </div>
@@ -498,7 +498,7 @@ export const DataSourceWizard: React.FC = () => {
           <select
             value={formData.status}
             onChange={(e) => updateForm({ status: e.target.value as 'active' | 'draft' })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
           >
             <option value="draft">Draft</option>
             <option value="active">Active</option>
@@ -754,7 +754,7 @@ export const DataSourceWizard: React.FC = () => {
           <select
             value={formData.authType}
             onChange={(e) => updateForm({ authType: e.target.value as AuthType })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
           >
             {AUTH_TYPES.map(auth => (
               <option key={auth.value} value={auth.value}>

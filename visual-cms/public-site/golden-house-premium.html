@@ -420,7 +420,7 @@ label {
   const _dataSources = [{"alias":"123","dataSourceId":"fcf4abe2-e393-4b63-8d04-cc344831c6c5","endpoint":"http://localhost:5000/api/mock/","loadStrategy":"pageLoad","cacheEnabled":false}];
   
   // Bindings config
-  const _bindings = [{"blockId":"gh-premium-1769148718509-137","type":"output","sourceAlias":"123","outputConfig":{"trigger":"click","method":"POST","payloadMappings":[],"onError":{"action":"message"}}},{"blockId":"1769405707337_unm4vedmb","bindingId":"b9ab4701-a707-4099-976e-c8815d4cd163","type":"repeater","sourceAlias":"123","fieldMappings":[{"sourceField":"image","targetProperty":"item.project.-image"},{"sourceField":"status","targetProperty":"item.element"},{"sourceField":"title","targetProperty":"item.project-name"},{"sourceField":"location","targetProperty":"item.project-location"},{"sourceField":"price","targetProperty":"item.project-price"}],"dynamicFilters":[{"id":"transform-1770704309063-oig3hkhd5","sourceBlockId":"gh-premium-1769148718508-45","field":"location","operator":"eq","skipIfEmpty":true},{"id":"transform-1770705008860-598527lmg","sourceBlockId":"gh-premium-1769148718508-48","field":"price","operator":"gte","skipIfEmpty":true},{"id":"transform-1770705034946-ac68szups","sourceBlockId":"gh-premium-1769148718508-50","field":"price","operator":"lte","skipIfEmpty":true},{"id":"transform-1770705051760-9xavr5mwo","sourceBlockId":"gh-premium-1769148718508-54","field":"completion","operator":"contains","skipIfEmpty":true},{"id":"transform-1770705075415-yk9dz83rq","sourceBlockId":"gh-premium-1769148718508-55","field":"completion","operator":"contains","skipIfEmpty":true},{"id":"transform-1770705081173-tcihrgub0","sourceBlockId":"gh-premium-1769148718508-56","field":"completion","operator":"contains","skipIfEmpty":true}],"repeaterConfig":{"itemTemplate":"gh-premium-1769148718508-74","containerSelector":"[data-element-id=\"1769405707337_unm4vedmb\"]","arrayPath":"data"}}];
+  const _bindings = [{"blockId":"1769405707337_unm4vedmb","bindingId":"b9ab4701-a707-4099-976e-c8815d4cd163","type":"repeater","sourceAlias":"123","fieldMappings":[{"sourceField":"image","targetProperty":"item.project.-image"},{"sourceField":"status","targetProperty":"item.element"},{"sourceField":"title","targetProperty":"item.project-name"},{"sourceField":"location","targetProperty":"item.project-location"},{"sourceField":"price","targetProperty":"item.project-price"}],"dynamicFilters":[{"id":"transform-1770704309063-oig3hkhd5","sourceBlockId":"gh-premium-1769148718508-45","field":"location","operator":"eq","skipIfEmpty":true},{"id":"transform-1770705008860-598527lmg","sourceBlockId":"gh-premium-1769148718508-48","field":"price","operator":"gte","skipIfEmpty":true},{"id":"transform-1770705034946-ac68szups","sourceBlockId":"gh-premium-1769148718508-50","field":"price","operator":"lte","skipIfEmpty":true},{"id":"transform-1770705051760-9xavr5mwo","sourceBlockId":"gh-premium-1769148718508-54","field":"completion","operator":"contains","skipIfEmpty":true},{"id":"transform-1770705075415-yk9dz83rq","sourceBlockId":"gh-premium-1769148718508-55","field":"completion","operator":"contains","skipIfEmpty":true},{"id":"transform-1770705081173-tcihrgub0","sourceBlockId":"gh-premium-1769148718508-56","field":"completion","operator":"contains","skipIfEmpty":true}],"repeaterConfig":{"itemTemplate":"gh-premium-1769148718508-74","containerSelector":"[data-element-id=\"1769405707337_unm4vedmb\"]","arrayPath":"data"}},{"blockId":"gh-premium-1769148718509-137","type":"output","sourceAlias":"123","outputConfig":{"trigger":"click","method":"POST","endpoint":"applications","payloadMappings":[{"sourceField":"name","type":"direct"},{"sourceField":"phone","type":"direct"},{"sourceField":"project","type":"direct"}],"onError":{"action":"message"}}}];
   
   // Variable getter/setter
   window.$var = function(name, value) {
@@ -1048,27 +1048,38 @@ label {
     if (!element || !binding.outputConfig) return;
     
     const config = binding.outputConfig;
-    
-    // Определяем событие триггера
-    const triggerEvent = {
-      'submit': 'submit',
-      'click': 'click',
-      'change': 'change',
-      'blur': 'blur'
-    }[config.trigger] || 'click';
-    
-    // Находим форму или элемент для триггера
     const form = element.closest('form') || element.querySelector('form');
-    const targetElement = form || element;
     
-    // Добавляем обработчик
-    targetElement.addEventListener(triggerEvent, async function(e) {
-      if (triggerEvent === 'submit') {
-        e.preventDefault();
+    if (config.trigger === 'submit' || config.trigger === 'click') {
+      // Для submit/click — НЕ вешаем на весь блок, иначе клик на input вызовет отправку
+      if (form) {
+        // Если есть форма — слушаем submit события формы
+        form.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          await handleOutputSubmit(element, binding, form);
+        });
+        console.log('[OutputBinding] Attached submit handler to <form> in block', binding.blockId);
+      } else {
+        // Нет формы — ищем кнопку и вешаем click только на неё
+        var submitBtn = element.querySelector('button[type="submit"]') || element.querySelector('button') || element.querySelector('a.btn, a[class*="button"], [role="button"]');
+        if (submitBtn) {
+          submitBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            await handleOutputSubmit(element, binding, form);
+          });
+          console.log('[OutputBinding] Attached click handler to button in block', binding.blockId);
+        } else {
+          console.warn('[OutputBinding] No <form> or <button> found in block', binding.blockId, '— cannot attach trigger safely');
+        }
       }
-      
-      await handleOutputSubmit(element, binding, form);
-    });
+    } else if (config.trigger === 'change' || config.trigger === 'blur') {
+      // Для change/blur — вешаем на сам элемент
+      element.addEventListener(config.trigger, async function(e) {
+        await handleOutputSubmit(element, binding, form);
+      });
+    }
     
     // Интервальный триггер
     if (config.trigger === 'interval' && config.triggerInterval) {
@@ -1101,9 +1112,52 @@ label {
       }
       
       // Получаем endpoint
-      const endpoint = config.endpoint || _dataSources.find(function(ds) {
+      var configEndpoint = config.endpoint || '';
+      var dataSource = _dataSources.find(function(ds) {
         return ds.alias === binding.sourceAlias;
-      })?.endpoint || '/api/data/submit';
+      });
+      var dsBaseUrl = dataSource ? dataSource.endpoint : '';
+      
+      // Собираем итоговый endpoint
+      var endpoint;
+      if (configEndpoint.startsWith('http://') || configEndpoint.startsWith('https://')) {
+        // Абсолютный URL — используем как есть
+        endpoint = configEndpoint;
+      } else if (configEndpoint.startsWith('/')) {
+        // Абсолютный путь — используем как есть
+        endpoint = configEndpoint;
+      } else if (configEndpoint && dsBaseUrl) {
+        // Относительный путь (например "applications") + есть базовый URL источника данных
+        // Склеиваем: http://localhost:5000/api/mock/ + applications
+        var base = dsBaseUrl.endsWith('/') ? dsBaseUrl : dsBaseUrl + '/';
+        endpoint = base + configEndpoint;
+      } else if (configEndpoint) {
+        // Относительный путь, но нет источника данных — пробуем /api/ prefix
+        endpoint = '/api/' + configEndpoint;
+      } else if (dsBaseUrl) {
+        // Нет пути в конфиге, но есть URL источника данных
+        endpoint = dsBaseUrl;
+      } else {
+        // Ничего не указано — fallback
+        endpoint = '/api/data/submit';
+      }
+      
+      console.log('[OutputBinding] Sending to endpoint:', endpoint);
+      
+      // Определяем формат тела запроса
+      // Если endpoint — это прямой API (не /api/data/submit), отправляем payload напрямую
+      var requestBody;
+      if (endpoint === '/api/data/submit') {
+        requestBody = {
+          dataSourceId: binding.sourceAlias,
+          data: payload,
+          blockId: binding.blockId,
+          trigger: config.trigger,
+        };
+      } else {
+        // Прямой API-эндпоинт — отправляем поля payload в корне body
+        requestBody = payload;
+      }
       
       // Отправляем запрос
       const response = await fetch(endpoint, {
@@ -1111,15 +1165,20 @@ label {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          dataSourceId: binding.sourceAlias,
-          data: payload,
-          blockId: binding.blockId,
-          trigger: config.trigger,
-        }),
+        body: JSON.stringify(requestBody),
       });
       
-      const result = await response.json();
+      // Проверяем content-type перед парсингом JSON
+      var contentType = response.headers.get('content-type') || '';
+      var result;
+      if (contentType.includes('application/json')) {
+        result = await response.json();
+      } else {
+        // Сервер вернул не JSON (возможно HTML ошибку)
+        var text = await response.text();
+        console.error('[OutputBinding] Server returned non-JSON response:', text.substring(0, 200));
+        result = { success: false, error: { message: 'Сервер вернул некорректный ответ (не JSON). Проверьте endpoint: ' + endpoint } };
+      }
       
       if (response.ok && result.success) {
         setButtonState(button, 'success');
@@ -1143,7 +1202,7 @@ label {
     const payload = {};
     
     if (form) {
-      // Из формы
+      // Из формы — собираем поля с атрибутом name
       const formData = new FormData(form);
       formData.forEach(function(value, key) {
         payload[key] = value;
@@ -1153,14 +1212,59 @@ label {
     // Применяем маппинги
     if (mappings) {
       mappings.forEach(function(m) {
+        var fieldKey = m.targetField || m.sourceField;
+        
         if (m.type === 'direct') {
-          const input = element.querySelector('[name="' + m.sourceField + '"]');
-          if (input) payload[m.targetField] = input.value;
+          // 1. Ищем по атрибуту name
+          var input = element.querySelector('[name="' + m.sourceField + '"]');
+          
+          // 2. Ищем по data-element-name (напр. "Name Input" для sourceField "name")
+          if (!input) {
+            var allInputs = element.querySelectorAll('input, select, textarea');
+            for (var i = 0; i < allInputs.length; i++) {
+              var elName = (allInputs[i].getAttribute('data-element-name') || '').toLowerCase();
+              if (elName.indexOf(m.sourceField.toLowerCase()) !== -1) {
+                input = allInputs[i];
+                break;
+              }
+            }
+          }
+          
+          // 3. Ищем по data-element-name у родительского контейнера
+          if (!input) {
+            var containers = element.querySelectorAll('[data-element-name]');
+            for (var j = 0; j < containers.length; j++) {
+              var cName = (containers[j].getAttribute('data-element-name') || '').toLowerCase();
+              if (cName.indexOf(m.sourceField.toLowerCase()) !== -1) {
+                var nested = containers[j].querySelector('input, select, textarea');
+                if (!nested && (containers[j].tagName === 'INPUT' || containers[j].tagName === 'SELECT' || containers[j].tagName === 'TEXTAREA')) {
+                  nested = containers[j];
+                }
+                if (nested) {
+                  input = nested;
+                  break;
+                }
+              }
+            }
+          }
+          
+          // 4. Ищем по placeholder
+          if (!input) {
+            var byPlaceholder = element.querySelector('[placeholder*="' + m.sourceField + '" i]');
+            if (byPlaceholder) input = byPlaceholder;
+          }
+          
+          if (input) {
+            payload[fieldKey] = input.value;
+            console.log('[OutputBinding] Collected field "' + fieldKey + '" =', input.value);
+          } else {
+            console.warn('[OutputBinding] Could not find input for sourceField "' + m.sourceField + '"');
+          }
         } else if (m.type === 'static') {
-          payload[m.targetField] = m.value;
+          payload[fieldKey] = m.value;
         } else if (m.type === 'computed' && m.value) {
           try {
-            payload[m.targetField] = eval(m.value);
+            payload[fieldKey] = eval(m.value);
           } catch (e) {
             console.error('Computed field error:', e);
           }
@@ -1168,6 +1272,7 @@ label {
       });
     }
     
+    console.log('[OutputBinding] Final payload:', JSON.stringify(payload));
     return payload;
   }
   
@@ -1426,6 +1531,155 @@ label {
 element.addEventListener('click', function(e) {
   console.log('Клик по элементу', element);
   // Ваш код здесь
+});
+})();
+(function() {
+  const element = document.querySelector('[data-element-id="gh-premium-1769148718509-137"]');
+  if (!element) return;
+  // Блокировка отправки без имени и телефона
+var form = element;
+if (element.tagName !== 'FORM') {
+  form = element.querySelector('form');
+}
+if (!form) return;
+
+var submitBtn = form.querySelector('button[type="submit"]') || form.querySelector('button');
+var nameInput = form.querySelector('[data-element-name="Name Input"]') || form.querySelector('input[type="text"]');
+var phoneInput = form.querySelector('[data-element-name="Phone Input"]') || form.querySelector('input[type="tel"]');
+
+function checkRequired() {
+  var nameOk = nameInput && nameInput.value.trim().length >= 2;
+  var phoneOk = phoneInput && phoneInput.value.replace(/\D/g, '').length >= 7;
+
+  if (submitBtn) {
+    submitBtn.style.opacity = (nameOk && phoneOk) ? '1' : '0.5';
+    submitBtn.style.pointerEvents = (nameOk && phoneOk) ? 'auto' : 'none';
+  }
+  return nameOk && phoneOk;
+}
+
+if (nameInput) nameInput.addEventListener('input', checkRequired);
+if (phoneInput) phoneInput.addEventListener('input', checkRequired);
+
+form.addEventListener('submit', function(e) {
+  form.querySelectorAll('.form-required-error').forEach(function(el) { el.remove(); });
+
+  var errors = [];
+  if (!nameInput || nameInput.value.trim().length < 2) {
+    errors.push('Введите имя');
+    if (nameInput) nameInput.style.borderBottomColor = '#e74c3c';
+  }
+  if (!phoneInput || phoneInput.value.replace(/\D/g, '').length < 7) {
+    errors.push('Введите телефон');
+    if (phoneInput) phoneInput.style.borderBottomColor = '#e74c3c';
+  }
+
+  if (errors.length > 0) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    var errDiv = document.createElement('div');
+    errDiv.className = 'form-required-error';
+    errDiv.style.cssText = 'color:#e74c3c;font-size:13px;margin-bottom:12px';
+    errDiv.textContent = errors.join('. ');
+    if (submitBtn) submitBtn.parentNode.insertBefore(errDiv, submitBtn);
+  }
+});
+
+checkRequired();
+})();
+(function() {
+  const element = document.querySelector('[data-element-id="gh-premium-1769148718509-125"]');
+  if (!element) return;
+  // Валидация поля "Имя"
+var input = element;
+// Если скрипт на контейнере — ищем input внутри
+if (element.tagName !== 'INPUT') {
+  input = element.querySelector('input');
+}
+if (!input) return;
+
+var errorEl = null;
+
+function validate() {
+  var value = input.value.trim();
+  if (errorEl) { errorEl.remove(); errorEl = null; }
+
+  if (value.length > 0 && value.length < 2) {
+    showError('Имя должно содержать минимум 2 символа');
+    input.style.borderBottomColor = '#e74c3c';
+    return false;
+  }
+
+  if (value && !/^[a-zA-Zа-яА-ЯёЁ\s\-]+$/.test(value)) {
+    showError('Имя может содержать только буквы');
+    input.style.borderBottomColor = '#e74c3c';
+    return false;
+  }
+
+  input.style.borderBottomColor = '#E8E8E8';
+  return true;
+}
+
+function showError(msg) {
+  errorEl = document.createElement('span');
+  errorEl.textContent = msg;
+  errorEl.style.cssText = 'color:#e74c3c;font-size:12px;margin-top:4px;display:block';
+  errorEl.className = 'validation-error-name';
+  input.parentNode.appendChild(errorEl);
+}
+
+input.addEventListener('blur', validate);
+input.addEventListener('input', function() {
+  if (errorEl) { errorEl.remove(); errorEl = null; input.style.borderBottomColor = '#E8E8E8'; }
+});
+})();
+(function() {
+  const element = document.querySelector('[data-element-id="gh-premium-1769148718509-127"]');
+  if (!element) return;
+  // Валидация поля "Телефон"
+var input = element;
+if (element.tagName !== 'INPUT') {
+  input = element.querySelector('input');
+}
+if (!input) return;
+
+var errorEl = null;
+
+function validate() {
+  var value = input.value.trim();
+  if (errorEl) { errorEl.remove(); errorEl = null; }
+
+  if (value.length > 0) {
+    var digitsOnly = value.replace(/\D/g, '');
+
+    if (!/^[\d\+\-\(\)\s]+$/.test(value)) {
+      showError('Некорректный формат телефона');
+      input.style.borderBottomColor = '#e74c3c';
+      return false;
+    }
+
+    if (digitsOnly.length < 7) {
+      showError('Телефон должен содержать минимум 7 цифр');
+      input.style.borderBottomColor = '#e74c3c';
+      return false;
+    }
+  }
+
+  input.style.borderBottomColor = '#E8E8E8';
+  return true;
+}
+
+function showError(msg) {
+  errorEl = document.createElement('span');
+  errorEl.textContent = msg;
+  errorEl.style.cssText = 'color:#e74c3c;font-size:12px;margin-top:4px;display:block';
+  errorEl.className = 'validation-error-phone';
+  input.parentNode.appendChild(errorEl);
+}
+
+input.addEventListener('blur', validate);
+input.addEventListener('input', function() {
+  if (errorEl) { errorEl.remove(); errorEl = null; input.style.borderBottomColor = '#E8E8E8'; }
 });
 })();
 

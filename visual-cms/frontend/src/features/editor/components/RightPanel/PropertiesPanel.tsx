@@ -353,6 +353,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRo
                 <OutputBindingSubTab
                   blockId={currentBlockData.id}
                   pageId={pageId}
+                  editorNode={node}
+                  currentBlockData={currentBlockData}
                 />
               )
             ) : (

@@ -2,6 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Global styles for better defaults */
+@layer base {
+  /* Черный цвет текста для всех select элементов по умолчанию */
+  select {
+    @apply text-gray-900;
+  }
+  
+  /* Черный цвет для option элементов */
+  option {
+    @apply text-gray-900;
+  }
+  
+  /* Черный цвет для input элементов */
+  input:not([type="checkbox"]):not([type="radio"]) {
+    @apply text-gray-900;
+  }
+  
+  textarea {
+    @apply text-gray-900;
+  }
+}
+
 /* Muller Font Family */
 @font-face {
   font-family: 'Muller';

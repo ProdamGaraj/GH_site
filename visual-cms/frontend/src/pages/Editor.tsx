@@ -1028,7 +1028,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                 )}
                 
                 {/* Показываем панель свойств элемента (old properties with tabs - deprecated) */}
-                {(activeRightPanel === 'properties' || inlineBlockEdit.active) && (
+                {activeRightPanel === 'properties' && (
                   <RightPanel 
                     pageSettings={type === 'page' ? pageSettings : undefined}
                     onPageSettingsChange={type === 'page' ? setPageSettings : undefined}

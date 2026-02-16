@@ -349,7 +349,7 @@ export const DataSourcesList: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -459,14 +459,16 @@ export const DataSourcesList: React.FC = () => {
                             onClick={() => handleTest(ds.id)}
                             disabled={testingId === ds.id}
                             title="Test Connection"
+                            
                           >
-                            <Play size={14} />
+                            <Play size={14} color='black' />
                           </Button>
                           
                           <div className="relative">
                             <Button
                               variant="ghost"
                               size="sm"
+                              style={{ color: 'black' }}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setOpenMenuId(openMenuId === ds.id ? null : ds.id)
@@ -476,37 +478,41 @@ export const DataSourcesList: React.FC = () => {
                             </Button>
 
                             {openMenuId === ds.id && (
-                              <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                              <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
                                 <button
                                   className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                                  color='black'
                                   onClick={() => {
                                     setOpenMenuId(null)
                                     navigate(`/data-sources/${ds.id}/edit`)
                                   }}
                                 >
-                                  <Edit size={14} className="mr-2" />
+                                  <Edit size={14} className="mr-2" color='black'/>
                                   Edit
                                 </button>
                                 <button
+                                color='black'
                                   className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center"
                                   onClick={() => handleDuplicate(ds.id)}
                                 >
-                                  <Copy size={14} className="mr-2" />
+                                  <Copy size={14} className="mr-2" color='black'/>
                                   Duplicate
                                 </button>
                                 <button
+                                color='black'
                                   className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center"
                                   onClick={() => handleTest(ds.id)}
                                 >
-                                  <Play size={14} className="mr-2" />
+                                  <Play size={14} className="mr-2" color="black" />
                                   Test Connection
                                 </button>
                                 <hr className="my-1" />
                                 <button
+                                color='black'
                                   className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center"
                                   onClick={() => handleDelete(ds.id, ds.name)}
                                 >
-                                  <Trash2 size={14} className="mr-2" />
+                                  <Trash2 size={14} className="mr-2" color='black' />
                                   Delete
                                 </button>
                               </div>
@@ -533,7 +539,7 @@ export const DataSourcesList: React.FC = () => {
                     disabled={page === 1}
                     onClick={() => handlePageChange(page - 1)}
                   >
-                    <ChevronLeft size={14} className="mr-1" />
+                    <ChevronLeft size={14} className="mr-1" color="black" />
                     Previous
                   </Button>
                   

@@ -147,7 +147,7 @@ export const EndpointConfigEditor: React.FC<EndpointConfigEditorProps> = ({
             value={value.path}
             onChange={e => update({ path: e.target.value })}
             placeholder="/api/users или /v2/products"
-            className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
           />
         </div>
 

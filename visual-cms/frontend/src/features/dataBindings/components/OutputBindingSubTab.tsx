@@ -22,6 +22,7 @@ import {
   selectBindingsError,
 } from '@/features/dataBindings/dataBindingsSlice'
 import { fetchDataSources, selectDataSources, selectDataSourceById } from '@/features/data-sources/dataSourcesSlice'
+import { selectBlocks } from '@/features/blocks/blocksSlice'
 import { markAsDirty } from '@/features/editor/editorSlice'
 import type {
   DataBinding,
@@ -61,6 +62,8 @@ import { cn } from '@/shared/utils'
 interface OutputBindingSubTabProps {
   blockId: string
   pageId?: string
+  editorNode?: any
+  currentBlockData?: any
 }
 
 // ─── Trigger/method constants ──────────────────────────────────
@@ -135,11 +138,140 @@ const DEFAULT_OUTPUT_CONFIG: OutputBindingConfig = {
   },
 }
 
+// ─── Helper: Extract form fields from block structure ─────────
+
+interface FormField {
+  name: string
+  type: 'text' | 'email' | 'tel' | 'number' | 'textarea' | 'select' | 'checkbox' | 'radio' | 'file' | 'other'
+  label?: string
+  placeholder?: string
+}
+
+/**
+ * Рекурсивно извлекает все поля формы из структуры блока
+ */
+function extractFormFields(structure: any): FormField[] {
+  const fields: FormField[] = []
+  const foundNames = new Set<string>() // Избегаем дубликатов
+  
+  console.log('[OutputBinding] Starting form fields extraction from structure:', structure)
+  
+  function traverse(element: any, depth = 0) {
+    if (!element) return
+    
+    const indent = '  '.repeat(depth)
+    
+    // Различные способы определения типа элемента
+    const tag = element.tag || element.type || element.elementType || ''
+    const tagLower = tag.toLowerCase()
+    const elementName = element.metadata?.name || element.name || tag || 'unnamed'
+    
+    console.log(`${indent}[Traverse] Element: "${elementName}", tag: "${tag}"`)
+    
+    // Проверяем, является ли элемент полем формы по тегу
+    const isFormField = ['input', 'textarea', 'select'].includes(tagLower)
+    
+    // Также проверяем metadata.name - часто поля называются "Name Input", "Email Input" и т.д.
+    const metadataName = element.metadata?.name || ''
+    const isInputByName = /input|select|textarea|field/i.test(metadataName)
+    
+    // Проверяем по классам и атрибутам
+    const className = element.attributes?.class || element.attributes?.className || element.className || ''
+    const hasFormClass = /input|textarea|select|field|form-control/.test(className)
+    
+    console.log(`${indent}  isFormField: ${isFormField}, isInputByName: ${isInputByName}, hasFormClass: ${hasFormClass}`)
+    
+    if (isFormField || isInputByName || hasFormClass) {
+      // Ищем имя поля в разных местах
+      let fieldName = 
+        element.attributes?.name || 
+        element.attributes?.id || 
+        element.props?.name ||
+        null
+      
+      // Если нет name/id, но есть metadata.name типа "Name Input" или "Email Field",
+      // извлекаем из него имя: "Name Input" -> "name"
+      if (!fieldName && element.metadata?.name) {
+        const metaName = element.metadata.name
+        // Убираем суффиксы типа "Input", "Field", "Select" и делаем lowercase
+        fieldName = metaName
+          .replace(/\s+(Input|Field|Select|Textarea|Container)$/i, '')
+          .toLowerCase()
+          .replace(/\s+/g, '')
+        
+        console.log(`${indent}  Extracted field name from metadata: "${metaName}" -> "${fieldName}"`)
+      }
+      
+      if (fieldName && !foundNames.has(fieldName)) {
+        foundNames.add(fieldName)
+        
+        // Определяем тип поля
+        let fieldType: FormField['type'] = 'text'
+        
+        if (tagLower === 'textarea' || /textarea/i.test(metadataName)) {
+          fieldType = 'textarea'
+        } else if (tagLower === 'select' || /select/i.test(metadataName)) {
+          fieldType = 'select'
+        } else if (tagLower === 'input' || /input/i.test(metadataName)) {
+          const inputType = element.attributes?.type || 'text'
+          // Пытаемся определить тип по имени
+          if (/email/i.test(fieldName)) fieldType = 'email'
+          else if (/phone|tel/i.test(fieldName)) fieldType = 'tel'
+          else if (/number|price|amount/i.test(fieldName)) fieldType = 'number'
+          else fieldType = inputType as FormField['type']
+        } else if (hasFormClass) {
+          // Попытка определить по классу
+          if (/email/.test(className)) fieldType = 'email'
+          else if (/tel|phone/.test(className)) fieldType = 'tel'
+          else if (/number/.test(className)) fieldType = 'number'
+          else if (/textarea/.test(className)) fieldType = 'textarea'
+          else if (/select/.test(className)) fieldType = 'select'
+        }
+        
+        // Используем оригинальное название из metadata как label
+        const label = element.metadata?.name || fieldName
+        
+        console.log(`${indent}  ✓ Found field: "${fieldName}" (${fieldType}), label: "${label}"`)
+        
+        fields.push({
+          name: fieldName,
+          type: fieldType,
+          label: label,
+          placeholder: element.attributes?.placeholder || element.props?.placeholder,
+        })
+      }
+    }
+    
+    // Рекурсивно обходим children
+    if (element.children && Array.isArray(element.children)) {
+      console.log(`${indent}  Traversing ${element.children.length} children...`)
+      element.children.forEach((child: any) => traverse(child, depth + 1))
+    }
+    
+    // Также проверяем elements (альтернативное название)
+    if (element.elements && Array.isArray(element.elements)) {
+      console.log(`${indent}  Traversing ${element.elements.length} elements...`)
+      element.elements.forEach((child: any) => traverse(child, depth + 1))
+    }
+  }
+  
+  traverse(structure)
+  
+  // Финальный отчёт
+  if (fields.length > 0) {
+    console.log('[OutputBinding] ✓ Found form fields:', fields)
+  } else {
+    console.warn('[OutputBinding] ⚠️ No form fields found in block structure')
+  }
+  
+  return fields
+}
+
 // ═════════════════════════════════════════════════════════════════
 // Component
 // ═════════════════════════════════════════════════════════════════
 
-export const OutputBindingSubTab: React.FC<OutputBindingSubTabProps> = ({ blockId, pageId }) => {
+export const OutputBindingSubTab: React.FC<OutputBindingSubTabProps> = ({ blockId, pageId, editorNode, currentBlockData }) => {
   const dispatch = useAppDispatch()
 
   // Redux selectors
@@ -148,6 +280,29 @@ export const OutputBindingSubTab: React.FC<OutputBindingSubTabProps> = ({ blockI
   const loading = useAppSelector(selectBindingsLoading)
   const saving = useAppSelector(selectBindingsSaving)
   const error = useAppSelector(selectBindingsError)
+  const blocks = useAppSelector(selectBlocks)
+
+  // Извлекаем поля формы из дерева редактора (editorNode) или из structure блока
+  const formFields = React.useMemo(() => {
+    // 1. editorNode — дерево BlockNode из редактора (приоритет)
+    if (editorNode) {
+      console.log('[OutputBinding] Using editorNode for field extraction:', editorNode.metadata?.name || editorNode.id)
+      return extractFormFields(editorNode)
+    }
+    // 2. currentBlockData.structure — структура из базы
+    if (currentBlockData?.structure) {
+      console.log('[OutputBinding] Using currentBlockData.structure')
+      return extractFormFields(currentBlockData.structure)
+    }
+    // 3. Redux блоки — fallback
+    const dbBlock = blocks.find(b => b.id === blockId)
+    if (dbBlock?.structure) {
+      console.log('[OutputBinding] Using Redux block.structure')
+      return extractFormFields(dbBlock.structure)
+    }
+    console.warn('[OutputBinding] No block structure available for field extraction')
+    return []
+  }, [editorNode, currentBlockData, blocks, blockId])
 
   // Filter only output bindings for this block
   const outputBindings = allBindings.filter(
@@ -322,7 +477,7 @@ export const OutputBindingSubTab: React.FC<OutputBindingSubTabProps> = ({ blockI
           <select
             value={newDataSourceId}
             onChange={e => setNewDataSourceId(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
           >
             <option value="">Выберите источник...</option>
             {dataSources.map(ds => (
@@ -487,7 +642,7 @@ export const OutputBindingSubTab: React.FC<OutputBindingSubTabProps> = ({ blockI
               </div>
             )}
             {activeSection === 'mapping' && (
-              <MappingSection config={config} onChange={updateConfig} />
+              <MappingSection config={config} onChange={updateConfig} formFields={formFields} />
             )}
             {activeSection === 'validation' && (
               <ValidationSection config={config} onChange={updateConfig} />
@@ -531,6 +686,7 @@ export const OutputBindingSubTab: React.FC<OutputBindingSubTabProps> = ({ blockI
 interface SectionProps {
   config: OutputBindingConfig
   onChange: (updates: Partial<OutputBindingConfig>) => void
+  formFields?: FormField[]
 }
 
 // ─── Trigger ──────────────────────────────────────────────────
@@ -616,7 +772,7 @@ const TriggerSection: React.FC<SectionProps> = ({ config, onChange }) => {
 
 // ─── Mapping ───────────────────────────────────────────────────
 
-const MappingSection: React.FC<SectionProps> = ({ config, onChange }) => {
+const MappingSection: React.FC<SectionProps> = ({ config, onChange, formFields = [] }) => {
   const mappings = config.payloadMappings || []
 
   const addMapping = () => {
@@ -649,6 +805,15 @@ const MappingSection: React.FC<SectionProps> = ({ config, onChange }) => {
         </button>
       </div>
 
+      {formFields.length > 0 && (
+        <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-[10px] text-blue-700">
+            Найдено полей в форме: <strong>{formFields.length}</strong>
+            {' '}({formFields.map(f => f.name).join(', ')})
+          </p>
+        </div>
+      )}
+
       {mappings.length === 0 ? (
         <div className="p-4 bg-gray-50 rounded-lg text-center">
           <p className="text-xs text-gray-500">Маппинг не задан — все поля формы будут отправлены как есть</p>
@@ -660,13 +825,38 @@ const MappingSection: React.FC<SectionProps> = ({ config, onChange }) => {
               <div className="flex gap-2 items-center">
                 <div className="flex-1">
                   <label className="block text-[10px] text-gray-500 mb-0.5">Поле формы</label>
-                  <input
-                    type="text"
-                    value={mapping.sourceField}
-                    onChange={e => updateMapping(index, { sourceField: e.target.value, targetProperty: mapping.targetProperty || e.target.value })}
-                    placeholder="name, email, phone..."
-                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
-                  />
+                  <select
+                    value={mapping.sourceField === '__custom' ? '__custom' : mapping.sourceField}
+                    onChange={e => {
+                      if (e.target.value === '__custom') {
+                        updateMapping(index, { sourceField: '__custom' })
+                      } else {
+                        updateMapping(index, { 
+                          sourceField: e.target.value, 
+                          targetProperty: mapping.targetProperty || e.target.value 
+                        })
+                      }
+                    }}
+                    className="w-full px-2 py-1.5 text-xs text-gray-900 border border-gray-300 rounded bg-white"
+                  >
+                    <option value="">-- Выберите поле --</option>
+                    {formFields.length > 0 && formFields.map(field => (
+                      <option key={field.name} value={field.name}>
+                        {field.label || field.name} ({field.type})
+                      </option>
+                    ))}
+                    {formFields.length > 0 && <option value="" disabled>──────────</option>}
+                    <option value="__custom">✏️ Ввести вручную...</option>
+                  </select>
+                  {mapping.sourceField === '__custom' && (
+                    <input
+                      type="text"
+                      placeholder="Введите имя поля..."
+                      onChange={e => updateMapping(index, { sourceField: e.target.value, targetProperty: mapping.targetProperty || e.target.value })}
+                      className="w-full px-2 py-1.5 text-xs border border-orange-300 rounded mt-1 focus:ring-2 focus:ring-orange-500"
+                      autoFocus
+                    />
+                  )}
                 </div>
                 <span className="text-gray-400 mt-4">→</span>
                 <div className="flex-1">
@@ -676,7 +866,7 @@ const MappingSection: React.FC<SectionProps> = ({ config, onChange }) => {
                     value={mapping.targetProperty}
                     onChange={e => updateMapping(index, { targetProperty: e.target.value })}
                     placeholder="fieldName"
-                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded bg-white text-gray-700"
                   />
                 </div>
                 <button
@@ -780,7 +970,7 @@ const ValidationSection: React.FC<SectionProps> = ({ config, onChange }) => {
                     <select
                       value={rule.type}
                       onChange={e => updateRule(index, { type: e.target.value as ValidationRule['type'] })}
-                      className="px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+                      className="px-2 py-1 text-xs text-gray-900 border border-gray-300 rounded bg-white"
                     >
                       {VALIDATION_TYPES.map(vt => (
                         <option key={vt.value} value={vt.value}>{vt.label}</option>
@@ -868,7 +1058,7 @@ const ResponseSection: React.FC<SectionProps> = ({ config, onChange }) => {
             <select
               value={config.onSuccess?.action || 'none'}
               onChange={e => onChange({ onSuccess: { ...config.onSuccess, action: e.target.value as SuccessAction['action'] } })}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"
+              className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white"
             >
               {SUCCESS_ACTION_OPTIONS.map(a => (
                 <option key={a.value} value={a.value}>{a.label}</option>
@@ -933,7 +1123,7 @@ const ResponseSection: React.FC<SectionProps> = ({ config, onChange }) => {
             <select
               value={config.onError?.action || 'showError'}
               onChange={e => onChange({ onError: { ...config.onError, action: e.target.value as ErrorAction['action'] } })}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"
+              className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg bg-white"
             >
               {ERROR_ACTION_OPTIONS.map(a => (
                 <option key={a.value} value={a.value}>{a.label}</option>

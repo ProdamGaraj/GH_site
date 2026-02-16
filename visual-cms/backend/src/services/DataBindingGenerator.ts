@@ -735,27 +735,38 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     if (!element || !binding.outputConfig) return;
     
     const config = binding.outputConfig;
-    
-    // Определяем событие триггера
-    const triggerEvent = {
-      'submit': 'submit',
-      'click': 'click',
-      'change': 'change',
-      'blur': 'blur'
-    }[config.trigger] || 'click';
-    
-    // Находим форму или элемент для триггера
     const form = element.closest('form') || element.querySelector('form');
-    const targetElement = form || element;
     
-    // Добавляем обработчик
-    targetElement.addEventListener(triggerEvent, async function(e) {
-      if (triggerEvent === 'submit') {
-        e.preventDefault();
+    if (config.trigger === 'submit' || config.trigger === 'click') {
+      // Для submit/click — НЕ вешаем на весь блок, иначе клик на input вызовет отправку
+      if (form) {
+        // Если есть форма — слушаем submit события формы
+        form.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          await handleOutputSubmit(element, binding, form);
+        });
+        console.log('[OutputBinding] Attached submit handler to <form> in block', binding.blockId);
+      } else {
+        // Нет формы — ищем кнопку и вешаем click только на неё
+        var submitBtn = element.querySelector('button[type="submit"]') || element.querySelector('button') || element.querySelector('a.btn, a[class*="button"], [role="button"]');
+        if (submitBtn) {
+          submitBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            await handleOutputSubmit(element, binding, form);
+          });
+          console.log('[OutputBinding] Attached click handler to button in block', binding.blockId);
+        } else {
+          console.warn('[OutputBinding] No <form> or <button> found in block', binding.blockId, '— cannot attach trigger safely');
+        }
       }
-      
-      await handleOutputSubmit(element, binding, form);
-    });
+    } else if (config.trigger === 'change' || config.trigger === 'blur') {
+      // Для change/blur — вешаем на сам элемент
+      element.addEventListener(config.trigger, async function(e) {
+        await handleOutputSubmit(element, binding, form);
+      });
+    }
     
     // Интервальный триггер
     if (config.trigger === 'interval' && config.triggerInterval) {
@@ -788,9 +799,52 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       }
       
       // Получаем endpoint
-      const endpoint = config.endpoint || _dataSources.find(function(ds) {
+      var configEndpoint = config.endpoint || '';
+      var dataSource = _dataSources.find(function(ds) {
         return ds.alias === binding.sourceAlias;
-      })?.endpoint || '/api/data/submit';
+      });
+      var dsBaseUrl = dataSource ? dataSource.endpoint : '';
+      
+      // Собираем итоговый endpoint
+      var endpoint;
+      if (configEndpoint.startsWith('http://') || configEndpoint.startsWith('https://')) {
+        // Абсолютный URL — используем как есть
+        endpoint = configEndpoint;
+      } else if (configEndpoint.startsWith('/')) {
+        // Абсолютный путь — используем как есть
+        endpoint = configEndpoint;
+      } else if (configEndpoint && dsBaseUrl) {
+        // Относительный путь (например "applications") + есть базовый URL источника данных
+        // Склеиваем: http://localhost:5000/api/mock/ + applications
+        var base = dsBaseUrl.endsWith('/') ? dsBaseUrl : dsBaseUrl + '/';
+        endpoint = base + configEndpoint;
+      } else if (configEndpoint) {
+        // Относительный путь, но нет источника данных — пробуем /api/ prefix
+        endpoint = '/api/' + configEndpoint;
+      } else if (dsBaseUrl) {
+        // Нет пути в конфиге, но есть URL источника данных
+        endpoint = dsBaseUrl;
+      } else {
+        // Ничего не указано — fallback
+        endpoint = '/api/data/submit';
+      }
+      
+      console.log('[OutputBinding] Sending to endpoint:', endpoint);
+      
+      // Определяем формат тела запроса
+      // Если endpoint — это прямой API (не /api/data/submit), отправляем payload напрямую
+      var requestBody;
+      if (endpoint === '/api/data/submit') {
+        requestBody = {
+          dataSourceId: binding.sourceAlias,
+          data: payload,
+          blockId: binding.blockId,
+          trigger: config.trigger,
+        };
+      } else {
+        // Прямой API-эндпоинт — отправляем поля payload в корне body
+        requestBody = payload;
+      }
       
       // Отправляем запрос
       const response = await fetch(endpoint, {
@@ -798,15 +852,20 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          dataSourceId: binding.sourceAlias,
-          data: payload,
-          blockId: binding.blockId,
-          trigger: config.trigger,
-        }),
+        body: JSON.stringify(requestBody),
       });
       
-      const result = await response.json();
+      // Проверяем content-type перед парсингом JSON
+      var contentType = response.headers.get('content-type') || '';
+      var result;
+      if (contentType.includes('application/json')) {
+        result = await response.json();
+      } else {
+        // Сервер вернул не JSON (возможно HTML ошибку)
+        var text = await response.text();
+        console.error('[OutputBinding] Server returned non-JSON response:', text.substring(0, 200));
+        result = { success: false, error: { message: 'Сервер вернул некорректный ответ (не JSON). Проверьте endpoint: ' + endpoint } };
+      }
       
       if (response.ok && result.success) {
         setButtonState(button, 'success');
@@ -830,7 +889,7 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     const payload = {};
     
     if (form) {
-      // Из формы
+      // Из формы — собираем поля с атрибутом name
       const formData = new FormData(form);
       formData.forEach(function(value, key) {
         payload[key] = value;
@@ -840,14 +899,59 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     // Применяем маппинги
     if (mappings) {
       mappings.forEach(function(m) {
+        var fieldKey = m.targetField || m.sourceField;
+        
         if (m.type === 'direct') {
-          const input = element.querySelector('[name="' + m.sourceField + '"]');
-          if (input) payload[m.targetField] = input.value;
+          // 1. Ищем по атрибуту name
+          var input = element.querySelector('[name="' + m.sourceField + '"]');
+          
+          // 2. Ищем по data-element-name (напр. "Name Input" для sourceField "name")
+          if (!input) {
+            var allInputs = element.querySelectorAll('input, select, textarea');
+            for (var i = 0; i < allInputs.length; i++) {
+              var elName = (allInputs[i].getAttribute('data-element-name') || '').toLowerCase();
+              if (elName.indexOf(m.sourceField.toLowerCase()) !== -1) {
+                input = allInputs[i];
+                break;
+              }
+            }
+          }
+          
+          // 3. Ищем по data-element-name у родительского контейнера
+          if (!input) {
+            var containers = element.querySelectorAll('[data-element-name]');
+            for (var j = 0; j < containers.length; j++) {
+              var cName = (containers[j].getAttribute('data-element-name') || '').toLowerCase();
+              if (cName.indexOf(m.sourceField.toLowerCase()) !== -1) {
+                var nested = containers[j].querySelector('input, select, textarea');
+                if (!nested && (containers[j].tagName === 'INPUT' || containers[j].tagName === 'SELECT' || containers[j].tagName === 'TEXTAREA')) {
+                  nested = containers[j];
+                }
+                if (nested) {
+                  input = nested;
+                  break;
+                }
+              }
+            }
+          }
+          
+          // 4. Ищем по placeholder
+          if (!input) {
+            var byPlaceholder = element.querySelector('[placeholder*="' + m.sourceField + '" i]');
+            if (byPlaceholder) input = byPlaceholder;
+          }
+          
+          if (input) {
+            payload[fieldKey] = input.value;
+            console.log('[OutputBinding] Collected field "' + fieldKey + '" =', input.value);
+          } else {
+            console.warn('[OutputBinding] Could not find input for sourceField "' + m.sourceField + '"');
+          }
         } else if (m.type === 'static') {
-          payload[m.targetField] = m.value;
+          payload[fieldKey] = m.value;
         } else if (m.type === 'computed' && m.value) {
           try {
-            payload[m.targetField] = eval(m.value);
+            payload[fieldKey] = eval(m.value);
           } catch (e) {
             console.error('Computed field error:', e);
           }
@@ -855,6 +959,7 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       });
     }
     
+    console.log('[OutputBinding] Final payload:', JSON.stringify(payload));
     return payload;
   }
   

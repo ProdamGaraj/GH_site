@@ -66,6 +66,7 @@ export const DataPanel: React.FC<DataPanelProps> = ({ pageId }) => {
           <OutputBindingSubTab
             blockId={selectedNode.id}
             pageId={pageId}
+            editorNode={selectedNode}
           />
         )}
       </div>

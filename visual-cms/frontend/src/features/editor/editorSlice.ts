@@ -93,7 +93,7 @@ const initialState: EditorState = {
   selectedBrowser: 'chrome',  // По умолчанию Chrome
   zoom: 100,
   activeLeftPanel: 'layers',
-  activeRightPanel: 'properties',
+  activeRightPanel: 'basicSettings',
   activeRightPanelTab: 'positioning',
   panOffset: { x: 0, y: 0 },
   blockAlignment: 'center',
@@ -1182,7 +1182,7 @@ const editorSlice = createSlice({
       if (action.payload) {
         state.selectedNodeId = action.payload
       }
-      state.activeRightPanel = 'properties'
+      state.activeRightPanel = 'basicSettings'
     },
     
     // Сохранить оригинальную структуру блока перед изменением (для возможности отмены)

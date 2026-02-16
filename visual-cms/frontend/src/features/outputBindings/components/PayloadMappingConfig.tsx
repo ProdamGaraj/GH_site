@@ -375,7 +375,7 @@ function FieldMappingRow({
           value={String(mapping.defaultValue ?? '')}
           onChange={(e) => onChange({ defaultValue: e.target.value || undefined })}
           placeholder="Оставьте пустым если не нужно"
-          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded"
+          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded bg-white text-gray-700"
         />
       </div>
     </div>
