@@ -4,14 +4,14 @@
  */
 
 import { Request, Response } from 'express'
+import { asyncHandler, NotFoundError } from '../middleware'
+import { logger } from '../services/Logger'
 
 export class MockDataController {
   /**
    * GET /api/mock/projects
-   * Возвращает список проектов Golden House
    */
-  async getProjects(req: Request, res: Response) {
-    try {
+  getProjects = asyncHandler(async (req: Request, res: Response) => {
       const projects = [
         {
           id: 1,
@@ -90,54 +90,35 @@ export class MockDataController {
         }
       ]
 
-      res.json({
-        success: true,
-        data: projects,
-        total: projects.length
-      })
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message
-      })
-    }
-  }
+    res.json({
+      success: true,
+      data: projects,
+      total: projects.length
+    })
+  })
 
   /**
    * GET /api/mock/projects/:id
-   * Возвращает один проект по ID
    */
-  async getProjectById(req: Request, res: Response) {
-    try {
-      const { id } = req.params
-      const projects = await this.getAllProjectsData()
-      const project = projects.find(p => p.id === parseInt(id))
+  getProjectById = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const projects = await this.getAllProjectsData()
+    const project = projects.find(p => p.id === parseInt(id))
 
-      if (!project) {
-        return res.status(404).json({
-          success: false,
-          error: 'Project not found'
-        })
-      }
-
-      res.json({
-        success: true,
-        data: project
-      })
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message
-      })
+    if (!project) {
+      throw new NotFoundError('Project', id)
     }
-  }
+
+    res.json({
+      success: true,
+      data: project
+    })
+  })
 
   /**
    * GET /api/mock/news
-   * Возвращает список новостей
    */
-  async getNews(req: Request, res: Response) {
-    try {
+  getNews = asyncHandler(async (req: Request, res: Response) => {
       const news = [
         {
           id: 1,
@@ -168,25 +149,17 @@ export class MockDataController {
         }
       ]
 
-      res.json({
-        success: true,
-        data: news,
-        total: news.length
-      })
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message
-      })
-    }
-  }
+    res.json({
+      success: true,
+      data: news,
+      total: news.length
+    })
+  })
 
   /**
    * GET /api/mock/team
-   * Возвращает список команды
    */
-  async getTeam(req: Request, res: Response) {
-    try {
+  getTeam = asyncHandler(async (req: Request, res: Response) => {
       const team = [
         {
           id: 1,
@@ -217,95 +190,62 @@ export class MockDataController {
         }
       ]
 
-      res.json({
-        success: true,
-        data: team,
-        total: team.length
-      })
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message
-      })
-    }
-  }
+    res.json({
+      success: true,
+      data: team,
+      total: team.length
+    })
+  })
 
-  // ─── In-memory storage for applications ─────────────────────
+  // In-memory storage for applications
   private applications: any[] = []
   private nextAppId = 1
 
   /**
    * POST /api/mock/applications
-   * Принимает заявку и сохраняет в памяти
    */
-  async submitApplication(req: Request, res: Response) {
-    try {
-      const { name, phone, email, projectId, projectName, message, source } = req.body
+  submitApplication = asyncHandler(async (req: Request, res: Response) => {
+    const { name, phone, email, projectId, projectName, message, source } = req.body
 
-      // Basic validation
-      if (!name || (!phone && !email)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Необходимо указать имя и хотя бы телефон или email'
-        })
-      }
-
-      const application = {
-        id: this.nextAppId++,
-        name,
-        phone: phone || null,
-        email: email || null,
-        projectId: projectId || null,
-        projectName: projectName || null,
-        message: message || null,
-        source: source || 'website',
-        status: 'new',
-        createdAt: new Date().toISOString(),
-      }
-
-      this.applications.push(application)
-
-      console.log(`[Mock] New application #${application.id} from ${name} (${phone || email})`)
-
-      res.status(201).json({
-        success: true,
-        message: 'Заявка успешно принята! Мы свяжемся с вами в ближайшее время.',
-        data: {
-          id: application.id,
-          status: application.status,
-          createdAt: application.createdAt,
-        }
-      })
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message
-      })
+    const application = {
+      id: this.nextAppId++,
+      name,
+      phone: phone || null,
+      email: email || null,
+      projectId: projectId || null,
+      projectName: projectName || null,
+      message: message || null,
+      source: source || 'website',
+      status: 'new',
+      createdAt: new Date().toISOString(),
     }
-  }
+
+    this.applications.push(application)
+
+    logger.info(`[Mock] New application #${application.id} from ${name} (${phone || email})`)
+
+    res.status(201).json({
+      success: true,
+      message: 'Заявка успешно принята! Мы свяжемся с вами в ближайшее время.',
+      data: {
+        id: application.id,
+        status: application.status,
+        createdAt: application.createdAt,
+      }
+    })
+  })
 
   /**
    * GET /api/mock/applications
-   * Возвращает все принятые заявки (для отладки)
    */
-  async getApplications(req: Request, res: Response) {
-    try {
-      res.json({
-        success: true,
-        data: this.applications,
-        total: this.applications.length
-      })
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        error: error.message
-      })
-    }
-  }
+  getApplications = asyncHandler(async (req: Request, res: Response) => {
+    res.json({
+      success: true,
+      data: this.applications,
+      total: this.applications.length
+    })
+  })
 
-  /**
-   * Вспомогательный метод для получения всех проектов
-   */
   private async getAllProjectsData() {
     return [
       {
@@ -313,7 +253,7 @@ export class MockDataController {
         title: 'Golden Residence',
         subtitle: 'Премиальный жилой комплекс',
         description: 'Современный жилой комплекс с развитой инфраструктурой',
-        price: 'от $150,000',
+        price: 'от ,000',
         location: 'Ташкент, район Мирзо-Улугбек',
         image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600'
       },
@@ -322,7 +262,7 @@ export class MockDataController {
         title: 'Golden Park',
         subtitle: 'Современные апартаменты',
         description: 'Уютный комплекс с зелеными зонами',
-        price: 'от $120,000',
+        price: 'от ,000',
         location: 'Ташкент, Юнусабадский район',
         image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600'
       }

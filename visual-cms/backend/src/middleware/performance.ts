@@ -27,13 +27,23 @@ interface RequestTimingInfo {
 // ==================== REQUEST TIMING ====================
 
 const requestTimings: Map<string, RequestTimingInfo[]> = new Map()
+const MAX_TIMING_KEYS = 500
+
+// Periodic cleanup: remove oldest entries when map exceeds limit
+setInterval(() => {
+  if (requestTimings.size > MAX_TIMING_KEYS) {
+    const keys = Array.from(requestTimings.keys())
+    const toRemove = keys.slice(0, keys.length - MAX_TIMING_KEYS)
+    toRemove.forEach(k => requestTimings.delete(k))
+  }
+}, 300000)  // every 5 minutes
 
 /**
  * Middleware для измерения времени выполнения запросов
  */
 export function requestTiming(req: Request, res: Response, next: NextFunction): void {
   const startTime = Date.now()
-  const requestId = `${req.method}:${req.path}`
+  const requestId = `${req.method}:${req.route?.path || req.path}`
 
   // Override res.end to capture timing
   const originalEnd = res.end.bind(res)

@@ -79,6 +79,15 @@ export function nodeToHTML(
     return `${comment}${indent}<${node.tagName} ${attrString} />`
   }
   
+  // HTML code elements - output raw content
+  if (node.elementType === 'html-code') {
+    const rawContent = node.content || ''
+    if (!rawContent) {
+      return `${comment}${indent}<${node.tagName} ${attrString}></${node.tagName}>`
+    }
+    return `${comment}${indent}<${node.tagName} ${attrString}>\n${rawContent}\n${indent}</${node.tagName}>`
+  }
+  
   // Children
   const childrenHTML = (node.children || [])
     .map(child => nodeToHTML(child, options, depth + 1))
@@ -213,6 +222,15 @@ function nodeToJSX(node: BlockNode, depth = 1): string {
   
   if (isVoid) {
     return `${indent}<${node.tagName} ${propsString} />`
+  }
+  
+  // HTML code elements - output raw HTML via dangerouslySetInnerHTML
+  if (node.elementType === 'html-code') {
+    const rawContent = node.content || ''
+    if (!rawContent) {
+      return `${indent}<${node.tagName} ${propsString} />`
+    }
+    return `${indent}<${node.tagName} ${propsString} dangerouslySetInnerHTML={{ __html: \`${rawContent.replace(/`/g, '\\`')}\` }} />`
   }
   
   // Children
@@ -760,4 +778,415 @@ export function importContent(content: string, format?: ImportFormat): BlockNode
   }
   
   return importFromHTML(content)
+}
+
+// =====================
+// Full Page Inline HTML (for Source Code editor)
+// =====================
+
+/**
+ * Генерирует HTML узла с inline-стилями (без классов)
+ * Используется для редактора исходного кода страницы
+ */
+function nodeToInlineHTML(node: BlockNode, depth = 1): string {
+  const indentSize = 2
+  const indent = ' '.repeat(depth * indentSize)
+
+  const tagName = node.tagName || 'div'
+
+  // Build inline style string
+  const styleProps = node.styles?.properties || {}
+  const styleString = Object.entries(styleProps)
+    .filter(([_, value]) => value !== undefined && value !== '')
+    .map(([key, value]) => {
+      const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase()
+      return `${cssKey}: ${value}`
+    })
+    .join('; ')
+
+  // Build attributes
+  const attrs: string[] = []
+  // Always include data-element-id for merging back
+  attrs.push(`data-element-id="${node.id}"`)
+  if (node.elementType === 'html-code') {
+    attrs.push(`data-element-type="html-code"`)
+  }
+  if (styleString) {
+    attrs.push(`style="${styleString}"`)
+  }
+  if (node.attributes) {
+    Object.entries(node.attributes).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') {
+        attrs.push(`${key}="${value}"`)
+      }
+    })
+  }
+
+  // Comment with element name
+  const comment = node.metadata?.name
+    ? `${indent}<!-- ${node.metadata.name} -->\n`
+    : ''
+
+  const attrString = attrs.length > 0 ? ' ' + attrs.join(' ') : ''
+
+  // Void elements
+  const voidElements = ['img', 'input', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr']
+  if (voidElements.includes(tagName.toLowerCase())) {
+    return `${comment}${indent}<${tagName}${attrString} />`
+  }
+
+  // HTML code elements — output raw content
+  if (node.elementType === 'html-code') {
+    const rawContent = node.content || ''
+    if (!rawContent) {
+      return `${comment}${indent}<${tagName}${attrString}></${tagName}>`
+    }
+    return `${comment}${indent}<${tagName}${attrString}>\n${rawContent}\n${indent}</${tagName}>`
+  }
+
+  // Children
+  const childrenHTML = (node.children || [])
+    .map(child => nodeToInlineHTML(child, depth + 1))
+    .join('\n')
+
+  const content = node.content || ''
+  const hasChildren = childrenHTML.length > 0
+
+  if (!hasChildren && !content) {
+    return `${comment}${indent}<${tagName}${attrString}></${tagName}>`
+  }
+
+  if (!hasChildren && content) {
+    return `${comment}${indent}<${tagName}${attrString}>${content}</${tagName}>`
+  }
+
+  return `${comment}${indent}<${tagName}${attrString}>\n${content ? `${indent}  ${content}\n` : ''}${childrenHTML}\n${indent}</${tagName}>`
+}
+
+/**
+ * Генерирует полный HTML-документ страницы с inline-стилями
+ * для редактора исходного кода
+ */
+export function generateFullPageHTML(
+  node: BlockNode,
+  title = 'Страница'
+): string {
+  const bodyHTML = nodeToInlineHTML(node, 1)
+
+  // Include custom head/body HTML stored in root node metadata
+  const customHead = node.metadata?.customHeadHtml || ''
+  const customBodyEnd = node.metadata?.customBodyEndHtml || ''
+
+  return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+${customHead ? '  ' + customHead.split('\n').join('\n  ') + '\n' : ''}</head>
+<body>
+${bodyHTML}
+${customBodyEnd ? '\n' + customBodyEnd + '\n' : ''}</body>
+</html>`
+}
+
+// =====================
+// Merge HTML back into existing BlockNode tree
+// Preserves metadata, scripts, animations, data bindings, etc.
+// Only updates: styles.properties, content, attributes, tagName, children structure
+// =====================
+
+/**
+ * Collect a flat map of all BlockNodes in the tree by their id
+ */
+function collectNodeMap(node: BlockNode): Map<string, BlockNode> {
+  const map = new Map<string, BlockNode>()
+  map.set(node.id, node)
+  for (const child of node.children || []) {
+    const childMap = collectNodeMap(child)
+    childMap.forEach((v, k) => map.set(k, v))
+  }
+  return map
+}
+
+/**
+ * Parse inline style string into camelCase CSSProperties object
+ */
+function parseInlineStyleToCamelCase(style: string): Record<string, string> {
+  const result: Record<string, string> = {}
+  if (!style) return result
+  
+  style.split(';').forEach(decl => {
+    const colonIdx = decl.indexOf(':')
+    if (colonIdx === -1) return
+    const prop = decl.substring(0, colonIdx).trim()
+    const val = decl.substring(colonIdx + 1).trim()
+    if (!prop || !val) return
+    // Convert kebab-case to camelCase
+    const camelProp = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase())
+    result[camelProp] = val
+  })
+  return result
+}
+
+/**
+ * Determine element type from tag name (same logic as htmlElementToBlockNode)
+ */
+function tagToElementType(tagName: string): BlockNode['elementType'] {
+  switch (tagName.toLowerCase()) {
+    case 'div': case 'section': case 'article': case 'header': case 'footer':
+    case 'nav': case 'main': case 'aside': case 'ul': case 'ol': case 'li':
+    case 'form': case 'textarea': case 'select':
+      return 'container'
+    case 'span': case 'p': case 'h1': case 'h2': case 'h3':
+    case 'h4': case 'h5': case 'h6': case 'label': case 'a':
+      return 'text'
+    case 'img': return 'image'
+    case 'button': return 'button'
+    case 'input': return 'input'
+    case 'video': return 'video'
+    default: return 'container'
+  }
+}
+
+/**
+ * Convert a DOM Element to a fresh BlockNode (for newly added elements)
+ */
+function domElementToNewBlockNode(el: Element): BlockNode | null {
+  const tagName = el.tagName.toLowerCase()
+  if (['script', 'style', 'meta', 'link', 'head', 'title', 'noscript'].includes(tagName)) {
+    return null
+  }
+  
+  const elementType = el.getAttribute('data-element-type') === 'html-code'
+    ? 'html-code' as const
+    : tagToElementType(tagName)
+
+  const inlineStyle = el.getAttribute('style') || ''
+  const stylesObj = parseInlineStyleToCamelCase(inlineStyle)
+
+  // Collect attributes (excluding data-element-id, data-element-type, style)
+  const attributes: Record<string, string> = {}
+  for (let i = 0; i < el.attributes.length; i++) {
+    const attr = el.attributes[i]
+    if (['style', 'data-element-id', 'data-element-type'].includes(attr.name)) continue
+    if (attr.value) attributes[attr.name] = attr.value
+  }
+
+  // Text content for text/button elements
+  let textContent = ''
+  if (['text', 'button'].includes(elementType)) {
+    el.childNodes.forEach(child => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        textContent += child.textContent?.trim() || ''
+      }
+    })
+  }
+
+  // For html-code: collect innerHTML as content
+  if (elementType === 'html-code') {
+    textContent = el.innerHTML
+  }
+
+  // Children
+  const children: BlockNode[] = []
+  if (elementType !== 'html-code') {
+    el.childNodes.forEach(child => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const childNode = domElementToNewBlockNode(child as Element)
+        if (childNode) children.push(childNode)
+      }
+    })
+  }
+
+  let layoutMode: BlockNode['layoutMode'] = undefined
+  if (stylesObj.display === 'flex') layoutMode = 'flex'
+  else if (stylesObj.display === 'grid') layoutMode = 'grid'
+
+  return {
+    id: generateUniqueId(),
+    elementType,
+    tagName,
+    styles: { properties: stylesObj as CSSProperties },
+    layoutMode,
+    children,
+    attributes,
+    content: textContent || undefined,
+    metadata: {},
+  }
+}
+
+/**
+ * Merge a DOM Element tree back into an existing BlockNode tree.
+ * - If an element has data-element-id matching an existing node, preserve all metadata/scripts/animations/bindings.
+ * - Only update: styles.properties, attributes, content, tagName, children structure.
+ * - New elements (no matching id) get created as fresh BlockNodes.
+ * - Removed elements (not in new HTML) are dropped.
+ */
+function mergeElement(
+  el: Element,
+  oldNodeMap: Map<string, BlockNode>
+): BlockNode | null {
+  const tagName = el.tagName.toLowerCase()
+  if (['script', 'style', 'meta', 'link', 'head', 'title', 'noscript'].includes(tagName)) {
+    return null
+  }
+
+  const existingId = el.getAttribute('data-element-id')
+  const oldNode = existingId ? oldNodeMap.get(existingId) : null
+
+  // Parse new styles from HTML
+  const inlineStyle = el.getAttribute('style') || ''
+  const newStyles = parseInlineStyleToCamelCase(inlineStyle)
+
+  // Collect new attributes (excluding data-element-id, data-element-type, style)
+  const newAttributes: Record<string, string> = {}
+  for (let i = 0; i < el.attributes.length; i++) {
+    const attr = el.attributes[i]
+    if (['style', 'data-element-id', 'data-element-type'].includes(attr.name)) continue
+    if (attr.value !== undefined) newAttributes[attr.name] = attr.value
+  }
+
+  const isHtmlCode = el.getAttribute('data-element-type') === 'html-code' ||
+    (oldNode?.elementType === 'html-code')
+
+  // Determine elementType
+  const elementType = isHtmlCode
+    ? 'html-code' as BlockNode['elementType']
+    : (oldNode?.elementType || tagToElementType(tagName))
+
+  // Text content
+  let textContent = ''
+  if (isHtmlCode) {
+    textContent = el.innerHTML
+  } else if (['text', 'button'].includes(elementType)) {
+    el.childNodes.forEach(child => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        textContent += child.textContent?.trim() || ''
+      }
+    })
+  }
+
+  // Recursively merge children
+  const mergedChildren: BlockNode[] = []
+  if (!isHtmlCode) {
+    el.childNodes.forEach(child => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const merged = mergeElement(child as Element, oldNodeMap)
+        if (merged) mergedChildren.push(merged)
+      }
+    })
+  }
+
+  if (oldNode) {
+    // MATCHED NODE — preserve all metadata, only update visual HTML properties
+    let layoutMode = oldNode.layoutMode
+    if (newStyles.display === 'flex') layoutMode = 'flex'
+    else if (newStyles.display === 'grid') layoutMode = 'grid'
+
+    return {
+      ...oldNode,
+      tagName,
+      elementType,
+      styles: {
+        ...oldNode.styles,
+        properties: newStyles as CSSProperties,
+        // Keep: customCSS, responsive, states, stateTransition
+      },
+      attributes: newAttributes,
+      content: textContent || undefined,
+      children: mergedChildren,
+      layoutMode,
+      // Preserved automatically via ...oldNode spread:
+      // metadata, scripts, animations, blockReference, variations
+    }
+  } else {
+    // NEW NODE — create fresh
+    let layoutMode: BlockNode['layoutMode'] = undefined
+    if (newStyles.display === 'flex') layoutMode = 'flex'
+    else if (newStyles.display === 'grid') layoutMode = 'grid'
+
+    return {
+      id: generateUniqueId(),
+      elementType,
+      tagName,
+      styles: { properties: newStyles as CSSProperties },
+      layoutMode,
+      children: mergedChildren,
+      attributes: newAttributes,
+      content: textContent || undefined,
+      metadata: {},
+    }
+  }
+}
+
+/**
+ * Merge edited HTML back into the existing BlockNode tree.
+ * This is the main entry point for the Source Code editor.
+ * Preserves: metadata, scripts, animations, data bindings, states, responsive styles, variations.
+ * Updates: styles.properties, content, attributes, tagName, children structure.
+ * Also extracts <script> and <style> tags and stores them in root metadata.
+ */
+export function mergeHtmlIntoTree(htmlString: string, existingRoot: BlockNode): BlockNode {
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(htmlString, 'text/html')
+
+  // Build map of all existing nodes by id
+  const oldNodeMap = collectNodeMap(existingRoot)
+
+  // --- Extract custom <script>/<style>/<link> tags from <head> and <body> ---
+  const headHtmlParts: string[] = []
+  const bodyEndHtmlParts: string[] = []
+
+  // Collect custom tags from <head> (skip meta charset, viewport, title — those are generated)
+  doc.head.childNodes.forEach(child => {
+    if (child.nodeType === Node.ELEMENT_NODE) {
+      const el = child as Element
+      const tag = el.tagName.toUpperCase()
+      // Keep user-added script, style, link tags
+      if (['SCRIPT', 'STYLE', 'LINK'].includes(tag)) {
+        headHtmlParts.push(el.outerHTML)
+      }
+    }
+  })
+
+  // Collect <script>/<style> tags from <body>
+  doc.body.childNodes.forEach(child => {
+    if (child.nodeType === Node.ELEMENT_NODE) {
+      const el = child as Element
+      const tag = el.tagName.toUpperCase()
+      if (['SCRIPT', 'STYLE'].includes(tag)) {
+        bodyEndHtmlParts.push(el.outerHTML)
+      }
+    }
+  })
+
+  const customHeadHtml = headHtmlParts.join('\n') || undefined
+  const customBodyEndHtml = bodyEndHtmlParts.join('\n') || undefined
+
+  // Find root content element in new HTML (excluding script/style)
+  let rootElement: Element | null = doc.body
+  const bodyChildren = Array.from(doc.body.children).filter(
+    el => !['SCRIPT', 'STYLE', 'META', 'LINK'].includes(el.tagName)
+  )
+  if (bodyChildren.length === 1) {
+    rootElement = bodyChildren[0]
+  }
+
+  if (!rootElement) {
+    return existingRoot // fallback: keep old tree
+  }
+
+  const merged = mergeElement(rootElement, oldNodeMap)
+  if (!merged) return existingRoot
+
+  // Store extracted custom HTML on root node metadata
+  return {
+    ...merged,
+    metadata: {
+      ...merged.metadata,
+      customHeadHtml,
+      customBodyEndHtml,
+    },
+  }
 }

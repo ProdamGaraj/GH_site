@@ -1,13 +1,11 @@
 /**
  * Variables Controller
  * 
- * Согласно ТЗ: docs/data-binding-system-spec.md
- * Этап 6: Reactive Variables
- * 
- * API для управления переменными страниц.
+ * API for managing page variables.
  */
 
 import { Request, Response } from 'express'
+import { asyncHandler, NotFoundError, ConflictError } from '../middleware'
 import { AppDataSource } from '../config/database'
 import { PageVariable, VariableScope, VariableType, VariableConfig } from '../models/PageVariable'
 import { Page } from '../models/Page'
@@ -43,462 +41,299 @@ interface UpdateVariableDTO {
 export class VariablesController {
   /**
    * GET /api/variables
-   * Получить переменные с фильтрацией
    */
-  static async getAll(req: Request, res: Response): Promise<void> {
-    try {
-      const { pageId, scope, type, isActive, search } = req.query
+  static getAll = asyncHandler(async (req: Request, res: Response) => {
+    const { pageId, scope, type, isActive, search } = req.query
 
-      const queryBuilder = variableRepository
-        .createQueryBuilder('variable')
-        .orderBy('variable.order', 'ASC')
-        .addOrderBy('variable.name', 'ASC')
+    const queryBuilder = variableRepository
+      .createQueryBuilder('variable')
+      .orderBy('variable.order', 'ASC')
+      .addOrderBy('variable.name', 'ASC')
 
-      // Filter by page
-      if (pageId) {
-        queryBuilder.andWhere('variable.pageId = :pageId', { pageId })
-      }
-
-      // Filter by scope
-      if (scope) {
-        queryBuilder.andWhere('variable.scope = :scope', { scope })
-      }
-
-      // Filter by type
-      if (type) {
-        queryBuilder.andWhere('variable.type = :type', { type })
-      }
-
-      // Filter by active status
-      if (isActive !== undefined) {
-        queryBuilder.andWhere('variable.isActive = :isActive', { 
-          isActive: isActive === 'true' 
-        })
-      }
-
-      // Search by name
-      if (search) {
-        queryBuilder.andWhere('variable.name ILIKE :search', { 
-          search: `%${search}%` 
-        })
-      }
-
-      const variables = await queryBuilder.getMany()
-
-      res.json({
-        success: true,
-        data: variables,
-        count: variables.length,
-      })
-    } catch (error) {
-      console.error('Error getting variables:', error)
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get variables',
-        details: error instanceof Error ? error.message : String(error),
+    if (pageId) {
+      queryBuilder.andWhere('variable.pageId = :pageId', { pageId })
+    }
+    if (scope) {
+      queryBuilder.andWhere('variable.scope = :scope', { scope })
+    }
+    if (type) {
+      queryBuilder.andWhere('variable.type = :type', { type })
+    }
+    if (isActive !== undefined) {
+      queryBuilder.andWhere('variable.isActive = :isActive', { 
+        isActive: isActive === 'true' 
       })
     }
-  }
+    if (search) {
+      queryBuilder.andWhere('variable.name ILIKE :search', { 
+        search: `%${search}%` 
+      })
+    }
+
+    const variables = await queryBuilder.getMany()
+
+    res.json({
+      success: true,
+      data: variables,
+      count: variables.length,
+    })
+  })
 
   /**
    * GET /api/variables/:id
-   * Получить одну переменную
    */
-  static async getOne(req: Request, res: Response): Promise<void> {
-    try {
-      const { id } = req.params
+  static getOne = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
 
-      const variable = await variableRepository.findOne({
-        where: { id },
-        relations: ['page'],
-      })
+    const variable = await variableRepository.findOne({
+      where: { id },
+      relations: ['page'],
+    })
 
-      if (!variable) {
-        res.status(404).json({
-          success: false,
-          error: 'Variable not found',
-        })
-        return
-      }
-
-      res.json({
-        success: true,
-        data: variable,
-      })
-    } catch (error) {
-      console.error('Error getting variable:', error)
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get variable',
-        details: error instanceof Error ? error.message : String(error),
-      })
+    if (!variable) {
+      throw new NotFoundError('Variable', id)
     }
-  }
+
+    res.json({
+      success: true,
+      data: variable,
+    })
+  })
 
   /**
    * GET /api/variables/page/:pageId
-   * Получить все переменные страницы (включая global)
    */
-  static async getByPage(req: Request, res: Response): Promise<void> {
-    try {
-      const { pageId } = req.params
-      const { includeGlobal = 'true' } = req.query
+  static getByPage = asyncHandler(async (req: Request, res: Response) => {
+    const { pageId } = req.params
+    const { includeGlobal = 'true' } = req.query
 
-      // Verify page exists
-      const page = await pageRepository.findOne({ where: { id: pageId } })
-      if (!page) {
-        res.status(404).json({
-          success: false,
-          error: 'Page not found',
-        })
-        return
-      }
-
-      const queryBuilder = variableRepository
-        .createQueryBuilder('variable')
-        .orderBy('variable.scope', 'ASC')
-        .addOrderBy('variable.order', 'ASC')
-        .addOrderBy('variable.name', 'ASC')
-
-      if (includeGlobal === 'true') {
-        queryBuilder.where(
-          '(variable.pageId = :pageId OR variable.scope = :globalScope)',
-          { pageId, globalScope: 'global' }
-        )
-      } else {
-        queryBuilder.where('variable.pageId = :pageId', { pageId })
-      }
-
-      const variables = await queryBuilder.getMany()
-
-      // Group by scope
-      const grouped = {
-        global: variables.filter(v => v.scope === 'global'),
-        session: variables.filter(v => v.scope === 'session'),
-        page: variables.filter(v => v.scope === 'page'),
-      }
-
-      res.json({
-        success: true,
-        data: variables,
-        grouped,
-        count: variables.length,
-      })
-    } catch (error) {
-      console.error('Error getting page variables:', error)
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get page variables',
-        details: error instanceof Error ? error.message : String(error),
-      })
+    const page = await pageRepository.findOne({ where: { id: pageId } })
+    if (!page) {
+      throw new NotFoundError('Page', pageId)
     }
-  }
+
+    const queryBuilder = variableRepository
+      .createQueryBuilder('variable')
+      .orderBy('variable.scope', 'ASC')
+      .addOrderBy('variable.order', 'ASC')
+      .addOrderBy('variable.name', 'ASC')
+
+    if (includeGlobal === 'true') {
+      queryBuilder.where(
+        '(variable.pageId = :pageId OR variable.scope = :globalScope)',
+        { pageId, globalScope: 'global' }
+      )
+    } else {
+      queryBuilder.where('variable.pageId = :pageId', { pageId })
+    }
+
+    const variables = await queryBuilder.getMany()
+
+    const grouped = {
+      global: variables.filter(v => v.scope === 'global'),
+      session: variables.filter(v => v.scope === 'session'),
+      page: variables.filter(v => v.scope === 'page'),
+    }
+
+    res.json({
+      success: true,
+      data: variables,
+      grouped,
+      count: variables.length,
+    })
+  })
 
   /**
    * POST /api/variables
-   * Создать переменную
    */
-  static async create(req: Request, res: Response): Promise<void> {
-    try {
-      const dto: CreateVariableDTO = req.body
+  static create = asyncHandler(async (req: Request, res: Response) => {
+    const dto: CreateVariableDTO = req.body
 
-      // Validate required fields
-      if (!dto.name) {
-        res.status(400).json({
-          success: false,
-          error: 'Name is required',
-        })
-        return
+    if (dto.pageId) {
+      const page = await pageRepository.findOne({ where: { id: dto.pageId } })
+      if (!page) {
+        throw new NotFoundError('Page', dto.pageId)
       }
+    }
 
-      // Validate page exists if pageId provided
-      if (dto.pageId) {
-        const page = await pageRepository.findOne({ where: { id: dto.pageId } })
-        if (!page) {
-          res.status(404).json({
-            success: false,
-            error: 'Page not found',
-          })
-          return
-        }
-      }
+    const existing = await variableRepository.findOne({
+      where: {
+        pageId: dto.pageId || undefined,
+        name: dto.name,
+      },
+    })
 
-      // Check for duplicate name
+    if (existing) {
+      throw new ConflictError(`Variable "${dto.name}" already exists`)
+    }
+
+    const variable = variableRepository.create({
+      pageId: dto.pageId || null,
+      name: dto.name,
+      scope: dto.scope || 'page',
+      type: dto.type || 'string',
+      defaultValue: dto.defaultValue,
+      description: dto.description || null,
+      config: dto.config || null,
+      order: dto.order ?? 0,
+      isActive: true,
+    })
+
+    await variableRepository.save(variable)
+
+    res.status(201).json({
+      success: true,
+      data: variable,
+    })
+  })
+
+  /**
+   * PUT /api/variables/:id
+   */
+  static update = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const dto: UpdateVariableDTO = req.body
+
+    const variable = await variableRepository.findOne({ where: { id } })
+
+    if (!variable) {
+      throw new NotFoundError('Variable', id)
+    }
+
+    if (dto.name && dto.name !== variable.name) {
       const existing = await variableRepository.findOne({
         where: {
-          pageId: dto.pageId || undefined,
+          pageId: variable.pageId || undefined,
           name: dto.name,
         },
       })
 
       if (existing) {
-        res.status(409).json({
-          success: false,
-          error: `Variable "${dto.name}" already exists`,
-        })
-        return
+        throw new ConflictError(`Variable "${dto.name}" already exists`)
       }
-
-      // Create variable
-      const variable = variableRepository.create({
-        pageId: dto.pageId || null,
-        name: dto.name,
-        scope: dto.scope || 'page',
-        type: dto.type || 'string',
-        defaultValue: dto.defaultValue,
-        description: dto.description || null,
-        config: dto.config || null,
-        order: dto.order ?? 0,
-        isActive: true,
-      })
-
-      await variableRepository.save(variable)
-
-      res.status(201).json({
-        success: true,
-        data: variable,
-      })
-    } catch (error) {
-      console.error('Error creating variable:', error)
-      res.status(500).json({
-        success: false,
-        error: 'Failed to create variable',
-        details: error instanceof Error ? error.message : String(error),
-      })
     }
-  }
 
-  /**
-   * PUT /api/variables/:id
-   * Обновить переменную
-   */
-  static async update(req: Request, res: Response): Promise<void> {
-    try {
-      const { id } = req.params
-      const dto: UpdateVariableDTO = req.body
-
-      const variable = await variableRepository.findOne({ where: { id } })
-
-      if (!variable) {
-        res.status(404).json({
-          success: false,
-          error: 'Variable not found',
-        })
-        return
-      }
-
-      // Check for duplicate name if renaming
-      if (dto.name && dto.name !== variable.name) {
-        const existing = await variableRepository.findOne({
-          where: {
-            pageId: variable.pageId || undefined,
-            name: dto.name,
-          },
-        })
-
-        if (existing) {
-          res.status(409).json({
-            success: false,
-            error: `Variable "${dto.name}" already exists`,
-          })
-          return
-        }
-      }
-
-      // Update fields
-      if (dto.name !== undefined) variable.name = dto.name
-      if (dto.type !== undefined) variable.type = dto.type
-      if (dto.defaultValue !== undefined) variable.defaultValue = dto.defaultValue
-      if (dto.description !== undefined) variable.description = dto.description
-      if (dto.config !== undefined) {
-        variable.config = { ...variable.config, ...dto.config }
-      }
-      if (dto.isActive !== undefined) variable.isActive = dto.isActive
-      if (dto.order !== undefined) variable.order = dto.order
-
-      await variableRepository.save(variable)
-
-      res.json({
-        success: true,
-        data: variable,
-      })
-    } catch (error) {
-      console.error('Error updating variable:', error)
-      res.status(500).json({
-        success: false,
-        error: 'Failed to update variable',
-        details: error instanceof Error ? error.message : String(error),
-      })
+    if (dto.name !== undefined) variable.name = dto.name
+    if (dto.type !== undefined) variable.type = dto.type
+    if (dto.defaultValue !== undefined) variable.defaultValue = dto.defaultValue
+    if (dto.description !== undefined) variable.description = dto.description
+    if (dto.config !== undefined) {
+      variable.config = { ...variable.config, ...dto.config }
     }
-  }
+    if (dto.isActive !== undefined) variable.isActive = dto.isActive
+    if (dto.order !== undefined) variable.order = dto.order
+
+    await variableRepository.save(variable)
+
+    res.json({
+      success: true,
+      data: variable,
+    })
+  })
 
   /**
    * DELETE /api/variables/:id
-   * Удалить переменную
    */
-  static async delete(req: Request, res: Response): Promise<void> {
-    try {
-      const { id } = req.params
+  static delete = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
 
-      const variable = await variableRepository.findOne({ where: { id } })
+    const variable = await variableRepository.findOne({ where: { id } })
 
-      if (!variable) {
-        res.status(404).json({
-          success: false,
-          error: 'Variable not found',
-        })
-        return
-      }
-
-      await variableRepository.remove(variable)
-
-      res.json({
-        success: true,
-        message: 'Variable deleted',
-      })
-    } catch (error) {
-      console.error('Error deleting variable:', error)
-      res.status(500).json({
-        success: false,
-        error: 'Failed to delete variable',
-        details: error instanceof Error ? error.message : String(error),
-      })
+    if (!variable) {
+      throw new NotFoundError('Variable', id)
     }
-  }
+
+    await variableRepository.remove(variable)
+
+    res.json({
+      success: true,
+      message: 'Variable deleted',
+    })
+  })
 
   /**
    * POST /api/variables/bulk
-   * Создать несколько переменных
    */
-  static async bulkCreate(req: Request, res: Response): Promise<void> {
-    try {
-      const { variables }: { variables: CreateVariableDTO[] } = req.body
+  static bulkCreate = asyncHandler(async (req: Request, res: Response) => {
+    const { variables }: { variables: CreateVariableDTO[] } = req.body
 
-      if (!Array.isArray(variables) || variables.length === 0) {
-        res.status(400).json({
-          success: false,
-          error: 'Variables array is required',
+    const created: PageVariable[] = []
+    const errors: { index: number; error: string }[] = []
+
+    for (let i = 0; i < variables.length; i++) {
+      const dto = variables[i]
+      try {
+        const variable = variableRepository.create({
+          pageId: dto.pageId || null,
+          name: dto.name,
+          scope: dto.scope || 'page',
+          type: dto.type || 'string',
+          defaultValue: dto.defaultValue,
+          description: dto.description || null,
+          config: dto.config || null,
+          order: dto.order ?? i,
+          isActive: true,
         })
-        return
+        await variableRepository.save(variable)
+        created.push(variable)
+      } catch (err) {
+        errors.push({
+          index: i,
+          error: err instanceof Error ? err.message : String(err),
+        })
       }
-
-      const created: PageVariable[] = []
-      const errors: { index: number; error: string }[] = []
-
-      for (let i = 0; i < variables.length; i++) {
-        const dto = variables[i]
-        try {
-          const variable = variableRepository.create({
-            pageId: dto.pageId || null,
-            name: dto.name,
-            scope: dto.scope || 'page',
-            type: dto.type || 'string',
-            defaultValue: dto.defaultValue,
-            description: dto.description || null,
-            config: dto.config || null,
-            order: dto.order ?? i,
-            isActive: true,
-          })
-          await variableRepository.save(variable)
-          created.push(variable)
-        } catch (err) {
-          errors.push({
-            index: i,
-            error: err instanceof Error ? err.message : String(err),
-          })
-        }
-      }
-
-      res.status(errors.length > 0 ? 207 : 201).json({
-        success: errors.length === 0,
-        data: created,
-        errors: errors.length > 0 ? errors : undefined,
-        count: created.length,
-      })
-    } catch (error) {
-      console.error('Error bulk creating variables:', error)
-      res.status(500).json({
-        success: false,
-        error: 'Failed to bulk create variables',
-        details: error instanceof Error ? error.message : String(error),
-      })
     }
-  }
+
+    res.status(errors.length > 0 ? 207 : 201).json({
+      success: errors.length === 0,
+      data: created,
+      errors: errors.length > 0 ? errors : undefined,
+      count: created.length,
+    })
+  })
 
   /**
    * PUT /api/variables/reorder
-   * Изменить порядок переменных
    */
-  static async reorder(req: Request, res: Response): Promise<void> {
-    try {
-      const { items }: { items: { id: string; order: number }[] } = req.body
+  static reorder = asyncHandler(async (req: Request, res: Response) => {
+    const { items }: { items: { id: string; order: number }[] } = req.body
 
-      if (!Array.isArray(items)) {
-        res.status(400).json({
-          success: false,
-          error: 'Items array is required',
-        })
-        return
-      }
-
-      for (const item of items) {
-        await variableRepository.update(item.id, { order: item.order })
-      }
-
-      res.json({
-        success: true,
-        message: 'Variables reordered',
-      })
-    } catch (error) {
-      console.error('Error reordering variables:', error)
-      res.status(500).json({
-        success: false,
-        error: 'Failed to reorder variables',
-        details: error instanceof Error ? error.message : String(error),
-      })
+    for (const item of items) {
+      await variableRepository.update(item.id, { order: item.order })
     }
-  }
+
+    res.json({
+      success: true,
+      message: 'Variables reordered',
+    })
+  })
 
   /**
    * POST /api/variables/:id/validate
-   * Валидировать значение переменной
    */
-  static async validateValue(req: Request, res: Response): Promise<void> {
-    try {
-      const { id } = req.params
-      const { value } = req.body
+  static validateValue = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const { value } = req.body
 
-      const variable = await variableRepository.findOne({ where: { id } })
+    const variable = await variableRepository.findOne({ where: { id } })
 
-      if (!variable) {
-        res.status(404).json({
-          success: false,
-          error: 'Variable not found',
-        })
-        return
-      }
-
-      const result = variable.validateValue(value)
-      const coerced = variable.coerceValue(value)
-
-      res.json({
-        success: true,
-        data: {
-          valid: result.valid,
-          error: result.error,
-          coercedValue: coerced,
-          originalValue: value,
-        },
-      })
-    } catch (error) {
-      console.error('Error validating variable value:', error)
-      res.status(500).json({
-        success: false,
-        error: 'Failed to validate value',
-        details: error instanceof Error ? error.message : String(error),
-      })
+    if (!variable) {
+      throw new NotFoundError('Variable', id)
     }
-  }
+
+    const result = variable.validateValue(value)
+    const coerced = variable.coerceValue(value)
+
+    res.json({
+      success: true,
+      data: {
+        valid: result.valid,
+        error: result.error,
+        coercedValue: coerced,
+        originalValue: value,
+      },
+    })
+  })
 }
 
 export default VariablesController

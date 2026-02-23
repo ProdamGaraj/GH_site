@@ -8,6 +8,7 @@
  */
 
 import type { BlockNode } from '@/shared/types'
+import { findParentNode } from '@/features/editor/utils/treeUtils'
 
 export interface DropValidationResult {
   isValid: boolean
@@ -31,44 +32,8 @@ export interface DropContext {
   rootNode: BlockNode
 }
 
-/**
- * Проверка на циклическую ссылку
- * Нельзя перемещать элемент в его собственных потомков
- */
-export const checkCyclicReference = (
-  draggedId: string,
-  targetNode: BlockNode
-): boolean => {
-  // Проверяем, является ли target потомком dragged
-  const checkChildren = (node: BlockNode): boolean => {
-    if (node.id === draggedId) return true
-    for (const child of node.children) {
-      if (checkChildren(child)) return true
-    }
-    return false
-  }
-  
-  // Начинаем с target и проверяем его детей
-  return checkChildren(targetNode)
-}
-
-/**
- * Найти родителя элемента
- */
-export const findParentNode = (
-  root: BlockNode,
-  nodeId: string
-): BlockNode | null => {
-  const findParent = (current: BlockNode): BlockNode | null => {
-    for (const child of current.children) {
-      if (child.id === nodeId) return current
-      const found = findParent(child)
-      if (found) return found
-    }
-    return null
-  }
-  return findParent(root)
-}
+// findParentNode is re-exported from treeUtils
+export { findParentNode }
 
 /**
  * Карта совместимости тегов

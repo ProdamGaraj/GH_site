@@ -1,3 +1,5 @@
+import { Parser } from "expr-eval"
+
 /**
  * ValidationService
  * 
@@ -349,22 +351,39 @@ class ValidationService {
   }
 
   /**
-   * Вычисление условия (простой eval для выражений типа "field1 === 'value'")
+   * Evaluation of conditions via safe expression evaluator (expr-eval).
+   * Supports: comparisons (==, !=, <, >, <=, >=), logic (and, or, not),
+   * arithmetic, string ops. Does NOT execute arbitrary JS.
    */
   private evaluateCondition(
     condition: string, 
     data: Record<string, unknown>
   ): boolean {
     try {
-      // Создаём контекст с данными
-      const context = { ...data }
-      
-      // Безопасный eval через Function
-      // В production стоит использовать более безопасный парсер
-      const fn = new Function(...Object.keys(context), `return ${condition}`)
-      return Boolean(fn(...Object.values(context)))
+      const parser = new Parser()
+      // Normalize JS operators to expr-eval supported ones
+      const normalizedCondition = condition
+        .replace(/===/g, "==")
+        .replace(/!==/g, "!=")
+        .replace(/&&/g, " and ")
+        .replace(/\|\|/g, " or ")
+      // Cast values to primitives for safe evaluation
+      const safeContext: Record<string, number | string> = {}
+      for (const [key, val] of Object.entries(data)) {
+        if (typeof val === "boolean") {
+          safeContext[key] = val ? 1 : 0
+        } else if (typeof val === "string" || typeof val === "number") {
+          safeContext[key] = val
+        } else if (val === null || val === undefined) {
+          safeContext[key] = 0
+        } else {
+          safeContext[key] = String(val)
+        }
+      }
+      const expr = parser.parse(normalizedCondition)
+      return Boolean(expr.evaluate(safeContext))
     } catch {
-      // При ошибке считаем условие истинным (применяем правило)
+      // On parse error, treat condition as true (apply the rule)
       return true
     }
   }

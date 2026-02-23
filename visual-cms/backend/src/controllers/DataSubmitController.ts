@@ -1,4 +1,5 @@
 import { Request, Response } from 'express'
+import { asyncHandler, NotFoundError } from '../middleware'
 import { AppDataSource } from '../config/database'
 import { DataSubmission, CreateSubmissionDto, UpdateSubmissionResultDto, SubmissionStatus } from '../models/DataSubmission'
 import { DataSource } from '../models/DataSource'
@@ -83,7 +84,7 @@ class DataSubmitController {
    * POST /api/data/submit
    * Отправка данных
    */
-  async submit(req: Request, res: Response) {
+  submit = asyncHandler(async (req: Request, res: Response) => {
     const startTime = Date.now()
     let submission: DataSubmission | null = null
     
@@ -332,14 +333,13 @@ class DataSubmitController {
         },
       } as SubmitResult)
     }
-  }
+  })
 
   /**
    * GET /api/data/submissions
    * Получить историю отправок (для аналитики)
    */
-  async getSubmissions(req: Request, res: Response) {
-    try {
+  getSubmissions = asyncHandler(async (req: Request, res: Response) => {
       const {
         pageId,
         blockId,
@@ -383,40 +383,27 @@ class DataSubmitController {
         limit: Number(limit),
         offset: Number(offset),
       })
-    } catch (error) {
-      console.error('Error fetching submissions:', error)
-      return res.status(500).json({
-        error: 'Ошибка получения истории отправок',
-      })
-    }
-  }
+  })
 
   /**
    * GET /api/data/submissions/:id
    * Получить одну запись
    */
-  async getSubmissionById(req: Request, res: Response) {
-    try {
+  getSubmissionById = asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params
       const submission = await submissionRepository.findOne({ where: { id } })
 
       if (!submission) {
-        return res.status(404).json({ error: 'Запись не найдена' })
+        throw new NotFoundError('Submission', id)
       }
-
       return res.json(submission)
-    } catch (error) {
-      console.error('Error fetching submission:', error)
-      return res.status(500).json({ error: 'Ошибка получения записи' })
-    }
-  }
+  })
 
   /**
    * GET /api/data/submissions/stats
    * Статистика отправок
    */
-  async getStats(req: Request, res: Response) {
-    try {
+  getStats = asyncHandler(async (req: Request, res: Response) => {
       const { pageId, dataSourceId, startDate, endDate } = req.query
 
       let whereClause = ''
@@ -460,11 +447,7 @@ class DataSubmitController {
         total: Number(total[0]?.total || 0),
         byStatus: stats,
       })
-    } catch (error) {
-      console.error('Error fetching stats:', error)
-      return res.status(500).json({ error: 'Ошибка получения статистики' })
-    }
-  }
+  })
 
   // ============ Helper Methods ============
 

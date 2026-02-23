@@ -1,74 +1,96 @@
 /**
  * Сервис для работы со связанными блоками
- * Обновляет блоки с linkedBlockId на актуальные версии из библиотеки
- * Двусторонняя синхронизация: библиотека <-> страницы
+ * бновляет блоки с linkedBlockId на актуальные версии из библиотеки
+ * вусторонняя синхронизация: библиотека <-> страницы
+ *
+ * птимизация: batch-загрузка всех linked блоков одним запросом (вместо N+1)
  */
 
 import { AppDataSource } from '../config/database'
 import { Block } from '../models/Block'
+import { In } from 'typeorm'
 
 const blockRepository = AppDataSource.getRepository(Block)
 
 export class LinkedBlocksService {
   /**
-   * Обновляет структуру, заменяя блоки с linkedBlockId на актуальные из библиотеки
-   * НЕ сохраняет локальные стили - всегда берёт из библиотеки
+   * бновляет структуру, заменяя блоки с linkedBlockId на актуальные из библиотеки.
+   * Batch-загрузка: собирает все linkedBlockId за один проход, делает один SELECT ... WHERE id IN (...),
+   * затем подставляет из Map.
    */
   async updateLinkedBlocks(structure: any): Promise<any> {
-    const processingIds = new Set<string>()
-    return this._updateLinkedBlocksInternal(structure, processingIds)
-  }
+    // Шаг 1: собрать все linkedBlockId из дерева
+    const linkedIds = new Set<string>()
+    this._collectLinkedIds(structure, linkedIds)
 
-  private async _updateLinkedBlocksInternal(
-    structure: any, 
-    processingIds: Set<string>
-  ): Promise<any> {
-    if (!structure) return structure
+    if (linkedIds.size === 0) return structure
 
-    // Если у узла есть linkedBlockId, загружаем актуальную структуру из библиотеки
-    if (structure.metadata?.linkedBlockId) {
-      const linkedId = structure.metadata.linkedBlockId
-      
-      // Защита от бесконечной рекурсии
-      if (processingIds.has(linkedId)) {
-        console.warn(`[LinkedBlocks] Circular reference detected for ${linkedId}, skipping`)
-        return structure
-      }
-      
-      processingIds.add(linkedId)
-      
-      try {
-        const block = await blockRepository.findOne({
-          where: { id: linkedId }
-        })
-        
-        if (block && block.structure) {
-          console.log(`[LinkedBlocks] Loaded library block ${linkedId}`)
-          
-          // Берём структуру из библиотеки (глубокая копия)
-          let libraryStructure = JSON.parse(JSON.stringify(block.structure))
-          
-          // Рекурсивно обрабатываем вложенные linkedBlockId
-          libraryStructure = await this._updateLinkedBlocksInternal(libraryStructure, processingIds)
-          
-          // Сохраняем только linkedBlockId в metadata
-          return {
-            ...libraryStructure,
-            metadata: {
-              ...libraryStructure.metadata,
-              linkedBlockId: linkedId
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`Failed to load linked block ${linkedId}:`, error)
+    // Шаг 2: один запрос к 
+    const blocks = await blockRepository.find({
+      where: { id: In(Array.from(linkedIds)) }
+    })
+    const blockMap = new Map<string, any>()
+    for (const block of blocks) {
+      if (block.structure) {
+        blockMap.set(block.id, block.structure)
       }
     }
 
-    // Рекурсивно обрабатываем дочерние элементы
+    // Шаг 3: подставить из Map (рекурсивно)
+    const processingIds = new Set<string>()
+    return this._applyLinkedBlocks(structure, blockMap, processingIds)
+  }
+
+  /** екурсивно собирает все linkedBlockId из дерева */
+  private _collectLinkedIds(node: any, ids: Set<string>): void {
+    if (!node) return
+    if (node.metadata?.linkedBlockId) {
+      ids.add(node.metadata.linkedBlockId)
+    }
+    if (node.children && Array.isArray(node.children)) {
+      for (const child of node.children) {
+        this._collectLinkedIds(child, ids)
+      }
+    }
+  }
+
+  /** екурсивно подставляет библиотечные структуры из Map */
+  private _applyLinkedBlocks(
+    structure: any,
+    blockMap: Map<string, any>,
+    processingIds: Set<string>
+  ): any {
+    if (!structure) return structure
+
+    if (structure.metadata?.linkedBlockId) {
+      const linkedId = structure.metadata.linkedBlockId
+
+      // ащита от бесконечной рекурсии
+      if (processingIds.has(linkedId)) {
+        return structure
+      }
+      processingIds.add(linkedId)
+
+      const libraryStructure = blockMap.get(linkedId)
+      if (libraryStructure) {
+        // лубокая копия
+        let result = JSON.parse(JSON.stringify(libraryStructure))
+        // екурсивно обрабатываем вложенные linkedBlockId
+        result = this._applyLinkedBlocks(result, blockMap, processingIds)
+        return {
+          ...result,
+          metadata: {
+            ...result.metadata,
+            linkedBlockId: linkedId
+          }
+        }
+      }
+    }
+
+    // екурсивно обрабатываем дочерние элементы
     if (structure.children && Array.isArray(structure.children)) {
-      structure.children = await Promise.all(
-        structure.children.map((child: any) => this._updateLinkedBlocksInternal(child, processingIds))
+      structure.children = structure.children.map(
+        (child: any) => this._applyLinkedBlocks(child, blockMap, processingIds)
       )
     }
 
@@ -76,44 +98,52 @@ export class LinkedBlocksService {
   }
 
   /**
-   * Синхронизирует изменения linked блоков со страницы в библиотеку
-   * Вызывается при сохранении страницы
+   * Синхронизирует изменения linked блоков со страницы в библиотеку.
+   * Batch-подход: собирает все linked блоки, загружает одним запросом, сохраняет массово.
    */
   async syncLinkedBlocksToLibrary(structure: any): Promise<void> {
     if (!structure) return
 
-    // Если у блока есть linkedBlockId, сохраняем его структуру в библиотеку
-    if (structure.metadata?.linkedBlockId) {
-      const linkedId = structure.metadata.linkedBlockId
-      
-      try {
-        const block = await blockRepository.findOne({ where: { id: linkedId } })
-        
-        if (block) {
-          // Создаём копию структуры для сохранения в библиотеку
-          const structureForLibrary = JSON.parse(JSON.stringify(structure))
-          
-          // Убираем linkedBlockId из сохраняемой структуры (он есть на уровне страницы)
-          if (structureForLibrary.metadata) {
-            delete structureForLibrary.metadata.linkedBlockId
-            delete structureForLibrary.metadata.styleOverrides
-          }
-          
-          // Обновляем блок в библиотеке
-          block.structure = structureForLibrary
-          await blockRepository.save(block)
-          
-          console.log(`[LinkedBlocks] Synced changes to library block ${linkedId}`)
+    // Шаг 1: собрать все linked узлы и их структуры
+    const linkedNodes = new Map<string, any>() // linkedId -> structure for library
+    this._collectLinkedNodes(structure, linkedNodes)
+
+    if (linkedNodes.size === 0) return
+
+    // Шаг 2: загрузить все блоки одним запросом
+    const blocks = await blockRepository.find({
+      where: { id: In(Array.from(linkedNodes.keys())) }
+    })
+
+    // Шаг 3: обновить структуры и сохранить массово
+    const toSave: Block[] = []
+    for (const block of blocks) {
+      const nodeStructure = linkedNodes.get(block.id)
+      if (nodeStructure) {
+        const structureForLibrary = JSON.parse(JSON.stringify(nodeStructure))
+        if (structureForLibrary.metadata) {
+          delete structureForLibrary.metadata.linkedBlockId
+          delete structureForLibrary.metadata.styleOverrides
         }
-      } catch (error) {
-        console.error(`Failed to sync linked block ${linkedId}:`, error)
+        block.structure = structureForLibrary
+        toSave.push(block)
       }
     }
 
-    // Рекурсивно для детей (ищем другие linked блоки)
-    if (structure.children && Array.isArray(structure.children)) {
-      for (const child of structure.children) {
-        await this.syncLinkedBlocksToLibrary(child)
+    if (toSave.length > 0) {
+      await blockRepository.save(toSave)
+    }
+  }
+
+  /** екурсивно собирает linked узлы: linkedId -> структура для библиотеки */
+  private _collectLinkedNodes(node: any, result: Map<string, any>): void {
+    if (!node) return
+    if (node.metadata?.linkedBlockId) {
+      result.set(node.metadata.linkedBlockId, node)
+    }
+    if (node.children && Array.isArray(node.children)) {
+      for (const child of node.children) {
+        this._collectLinkedNodes(child, result)
       }
     }
   }

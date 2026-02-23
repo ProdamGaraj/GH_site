@@ -81,6 +81,49 @@ class DataTransformService {
   }
 
   /**
+   * Built-in transforms (safe, no VM overhead)
+   */
+  private applyBuiltInTransform(
+    name: string,
+    value: unknown
+  ): { handled: boolean; result: unknown } {
+    // Don't transform null/undefined - let fallback logic handle it
+    if (value === null || value === undefined) {
+      return { handled: true, result: value }
+    }
+
+    switch (name) {
+      case 'uppercase':
+        return { handled: true, result: String(value).toUpperCase() }
+      case 'lowercase':
+        return { handled: true, result: String(value).toLowerCase() }
+      case 'trim':
+        return { handled: true, result: String(value).trim() }
+      case 'number':
+        return { handled: true, result: Number(value) }
+      case 'round':
+        return { handled: true, result: Math.round(Number(value)) }
+      case 'floor':
+        return { handled: true, result: Math.floor(Number(value)) }
+      case 'ceil':
+        return { handled: true, result: Math.ceil(Number(value)) }
+      case 'length':
+        return {
+          handled: true,
+          result: Array.isArray(value) ? value.length : String(value).length,
+        }
+      case 'json':
+        return { handled: true, result: JSON.stringify(value) }
+      case 'boolean':
+        return { handled: true, result: Boolean(value) }
+      case 'string':
+        return { handled: true, result: String(value) }
+      default:
+        return { handled: false, result: undefined }
+    }
+  }
+
+  /**
    * Разрешить значение маппинга
    */
   private resolveMapping(
@@ -97,7 +140,12 @@ class DataTransformService {
 
     // 3. Применяем трансформацию
     if (mapping.transform && value !== undefined) {
-      value = this.executeTransform(mapping.transform, value, context)
+      const builtIn = this.applyBuiltInTransform(mapping.transform, value)
+      if (builtIn.handled) {
+        value = builtIn.result
+      } else {
+        value = this.executeTransform(mapping.transform, value, context)
+      }
     }
 
     // 4. Проверяем fallback
@@ -266,30 +314,50 @@ class DataTransformService {
   }
 
   /**
-   * Выполнить async вычисляемое поле
+   * Выполнить async вычисляемое поле (безопасно через vm sandbox)
    */
   private async executeAsyncComputed(
     field: ComputedField,
     context: TransformContext
   ): Promise<unknown> {
-    // Для async полей используем обычный eval с Promise
-    // В продакшене это нужно заменить на более безопасное решение
     try {
-      const asyncFunction = new Function(
-        'value', 'item', 'index', 'items', 'variables', 'pageData',
-        `return (async () => { ${field.expression} })()`
-      )
+      // Используем vm sandbox вместо new Function для безопасности
+      const sandbox: Record<string, unknown> = {
+        value: context.item,
+        item: context.item,
+        index: context.index,
+        items: context.items,
+        variables: context.variables || {},
+        pageData: context.pageData || {},
+        JSON: { parse: JSON.parse, stringify: JSON.stringify },
+        String, Number, Boolean, Array, Object, Math, Date,
+        parseInt, parseFloat, isNaN, isFinite,
+        encodeURIComponent, decodeURIComponent,
+        Promise,
+        result: undefined,
+        __resolve: undefined as unknown,
+        __reject: undefined as unknown,
+      }
 
-      return await asyncFunction(
-        context.item,
-        context.item,
-        context.index,
-        context.items,
-        context.variables,
-        context.pageData
-      )
+      const wrappedCode = `
+        (async function() {
+          const value = item;
+          \${field.expression}
+        })().then(function(r) { result = r; __resolve(r); }).catch(__reject);
+      `
+
+      const vmContext = vm.createContext(sandbox)
+
+      return await new Promise((resolve, reject) => {
+        sandbox.__resolve = resolve
+        sandbox.__reject = reject
+        vm.runInContext(wrappedCode, vmContext, {
+          timeout: this.sandboxTimeout,
+          displayErrors: true,
+        })
+      })
     } catch (error: any) {
-      throw new Error(`Async compute error: ${error.message}`)
+      throw new Error(`Async compute error: \${error.message}`)
     }
   }
 
@@ -621,28 +689,42 @@ class DataTransformService {
     }
 
     /**
-     * Выполнить async вычисляемое поле
+     * Выполнить async вычисляемое поле (безопасно через vm sandbox)
      */
     private async executeComputedFieldAsync(
       expression: string,
       context: TransformContext
     ): Promise<unknown> {
-      // Для async полей используем eval с ограничениями
-      // В production лучше использовать более безопасный подход
-      const item = context.item
-      const index = context.index
-      const items = context.items
-      const $var = (name: string) => context.variables?.[name]
-      const $data = (alias: string) => context.dataSources?.[alias] || []
-      const $page = context.pageData
+      // Используем vm sandbox вместо new Function для безопасности
+      const sandbox = this.createSandbox(context)
+      Object.assign(sandbox, {
+        Promise,
+        __resolve: undefined as unknown,
+        __reject: undefined as unknown,
+        $var: (name: string) => (context.variables || {} as Record<string, unknown>)[name],
+        $data: (alias: string) => ((context.dataSources || {}) as Record<string, unknown[]>)[alias] || [],
+        $page: context.pageData || {},
+      })
 
-      // Создаём async функцию
-      const asyncFunc = new Function(
-        'item', 'index', 'items', '$var', '$data', '$page', 'fetch',
-        `return (async () => { ${expression} })()`
-      )
+      const wrappedCode = `
+        (async function() {
+          const $var = this.$var;
+          const $data = this.$data;
+          const $page = this.$page;
+          \${expression}
+        }).call(this).then(function(r) { result = r; __resolve(r); }).catch(__reject);
+      `
 
-      return await asyncFunc(item, index, items, $var, $data, $page, fetch)
+      const vmContext = vm.createContext(sandbox)
+
+      return await new Promise((resolve, reject) => {
+        sandbox.__resolve = resolve
+        sandbox.__reject = reject
+        vm.runInContext(wrappedCode, vmContext, {
+          timeout: this.sandboxTimeout,
+          displayErrors: true,
+        })
+      })
     }
 
     /**

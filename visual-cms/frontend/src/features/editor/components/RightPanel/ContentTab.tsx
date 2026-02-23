@@ -1,9 +1,10 @@
-import React from 'react'
+import React, { useState, useCallback } from 'react'
+import Editor from '@monaco-editor/react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { updateNode, updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
 import { ImageUpload } from './ImageUpload'
-import { Link as LinkIcon, Image as ImageIcon } from 'lucide-react'
+import { Link as LinkIcon, Image as ImageIcon, Code as CodeIcon } from 'lucide-react'
 import type { BlockNode } from '@/shared/types'
 
 interface ContentTabProps {
@@ -49,9 +50,74 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
   const isButtonElement = node.tagName === 'button'
   const isVideoElement = node.tagName === 'video'
   const isIframeElement = node.tagName === 'iframe'
+  const isHtmlCodeElement = node.elementType === 'html-code'
+
+  // Local state for HTML code editor with debounced save
+  const [htmlCode, setHtmlCode] = useState(node.content || '')
+  const [isHtmlDirty, setIsHtmlDirty] = useState(false)
+
+  // Sync from node when content changes externally
+  React.useEffect(() => {
+    if (!isHtmlDirty) {
+      setHtmlCode(node.content || '')
+    }
+  }, [node.content, isHtmlDirty])
+
+  const handleHtmlCodeChange = useCallback((value: string | undefined) => {
+    const code = value || ''
+    setHtmlCode(code)
+    setIsHtmlDirty(true)
+  }, [])
+
+  const applyHtmlCode = useCallback(() => {
+    dispatch(updateNode({
+      id: node.id,
+      updates: { content: htmlCode },
+    }))
+    setIsHtmlDirty(false)
+  }, [dispatch, node.id, htmlCode])
   
   return (
     <div className="space-y-4">
+      {/* HTML Code Editor */}
+      {isHtmlCodeElement && (
+        <div>
+          <h4 className="text-xs font-medium text-gray-700 flex items-center gap-1 mb-2">
+            <CodeIcon size={14} /> HTML код
+          </h4>
+          <p className="text-xs text-gray-500 mb-2">
+            Вставьте произвольный HTML код. Он будет отображён на странице как есть.
+          </p>
+          <div className="border border-gray-300 rounded overflow-hidden">
+            <Editor
+              height="300px"
+              language="html"
+              theme="vs-dark"
+              value={htmlCode}
+              onChange={handleHtmlCodeChange}
+              options={{
+                minimap: { enabled: false },
+                lineNumbers: 'on',
+                fontSize: 12,
+                wordWrap: 'on',
+                automaticLayout: true,
+                scrollBeyondLastLine: false,
+                tabSize: 2,
+                formatOnPaste: true,
+              }}
+            />
+          </div>
+          {isHtmlDirty && (
+            <button
+              onClick={applyHtmlCode}
+              className="mt-2 w-full px-3 py-2 bg-violet-600 text-white text-xs font-medium rounded hover:bg-violet-700 transition-colors"
+            >
+              Применить HTML
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Content for text elements */}
       {isTextElement && (
         <div>

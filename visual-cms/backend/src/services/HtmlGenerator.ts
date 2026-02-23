@@ -46,6 +46,10 @@ interface BlockNode {
   children: BlockNode[]
   metadata: {
     name?: string
+    /** Raw HTML to inject into <head> (scripts, styles, etc.) — only on root node */
+    customHeadHtml?: string
+    /** Raw HTML to inject before </body> (scripts, etc.) — only on root node */
+    customBodyEndHtml?: string
   }
   animations?: Animation[]
 }
@@ -64,8 +68,12 @@ export class HtmlGenerator {
   generatePage(structure: BlockNode, metadata: PageMetadata, slug: string, dataConfig?: PageDataConfig): string {
     const bodyContent = this.renderNode(structure)
     
-    // Р“РµРЅРµСЂРёСЂСѓРµРј CSS РґР»СЏ hover, Р°РЅРёРјР°С†РёР№ Рё С‚.Рґ.
+    // Генерируем CSS для hover, анимаций и т.д.
     const { css: dynamicCSS, keyframes, scripts } = styleGenerator.generateNodeTreeStyles(structure as any)
+
+    // Custom HTML injected by user via source code editor
+    const customHeadHtml = structure.metadata?.customHeadHtml || ''
+    const customBodyEndHtml = structure.metadata?.customBodyEndHtml || ''
     
     return `<!DOCTYPE html>
 <html lang="ru">
@@ -159,12 +167,12 @@ export class HtmlGenerator {
     /* Form and output binding styles */
     ${styleGenerator.generateFormStyles()}
   </style>
-</head>
+${customHeadHtml ? '  ' + customHeadHtml.split('\n').join('\n  ') + '\n' : ''}</head>
 <body>
 ${bodyContent}
 ${dataConfig ? generateDataBindingRuntime(dataConfig) : ''}
 ${scripts ? `<script>\n${scripts}\n</script>` : ''}
-</body>
+${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
 </html>`
   }
 
@@ -188,7 +196,16 @@ ${scripts ? `<script>\n${scripts}\n</script>` : ''}
       return `${indent}<${tagName}${styles}${dataAttr}${attributes} />\n`
     }
     
-    // РўРµРєСЃС‚РѕРІС‹Р№ РєРѕРЅС‚РµРЅС‚
+    // HTML code elements - output raw content without escaping
+    if (node.elementType === 'html-code') {
+      const rawContent = node.content || ''
+      if (!rawContent) {
+        return `${indent}<${tagName}${styles}${dataAttr}${attributes}></${tagName}>\n`
+      }
+      return `${indent}<${tagName}${styles}${dataAttr}${attributes}>\n${rawContent}\n${indent}</${tagName}>\n`
+    }
+    
+    // Текстовый контент
     const textContent = node.content ? this.escapeHtml(node.content) : ''
     
     // Р”РѕС‡РµСЂРЅРёРµ СЌР»РµРјРµРЅС‚С‹

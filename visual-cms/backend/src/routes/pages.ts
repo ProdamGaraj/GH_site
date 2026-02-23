@@ -1,20 +1,29 @@
 import { Router } from 'express'
 import { PageController } from '../controllers/PageController'
+import { validate } from '../middleware/validate'
+import {
+  createPageSchema,
+  updatePageSchema,
+  updatePageDataSourcesSchema,
+  updatePageVariablesSchema,
+  updateDataSettingsSchema,
+} from '../schemas/page.schema'
+import { responseCache } from '../middleware'
 
 const router = Router()
 const pageController = new PageController()
 
-router.get('/', pageController.getAll)
+router.get('/', responseCache({ ttl: 30, tags: ['pages'] }), pageController.getAll)
 router.get('/:id', pageController.getById)
-router.post('/', pageController.create)
-router.put('/:id', pageController.update)
+router.post('/', validate(createPageSchema), pageController.create)
+router.put('/:id', validate(updatePageSchema), pageController.update)
 router.delete('/:id', pageController.delete)
 router.post('/:id/publish', pageController.publish)
 
 // Data Binding routes (Stage 3.5 & 3.6)
 router.get('/:id/data-settings', pageController.getDataSettings)
-router.put('/:id/data-settings', pageController.updateDataSettings)
-router.put('/:id/data-sources', pageController.updateDataSources)
-router.put('/:id/variables', pageController.updateVariables)
+router.put('/:id/data-settings', validate(updateDataSettingsSchema), pageController.updateDataSettings)
+router.put('/:id/data-sources', validate(updatePageDataSourcesSchema), pageController.updateDataSources)
+router.put('/:id/variables', validate(updatePageVariablesSchema), pageController.updateVariables)
 
 export default router

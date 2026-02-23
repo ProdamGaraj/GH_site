@@ -3,6 +3,7 @@
  */
 
 import { Router, Request, Response } from 'express'
+import { asyncHandler } from '../middleware'
 import { deployService } from '../services/DeployService'
 
 const router = Router()
@@ -10,8 +11,7 @@ const router = Router()
 /**
  * POST /api/deploy/:pageId - Деплой одной страницы
  */
-router.post('/:pageId', async (req: Request, res: Response) => {
-  try {
+router.post('/:pageId', asyncHandler(async (req: Request, res: Response) => {
     const { pageId } = req.params
     const result = await deployService.deployPage(pageId)
     
@@ -20,21 +20,12 @@ router.post('/:pageId', async (req: Request, res: Response) => {
     } else {
       res.status(400).json(result)
     }
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: 'Ошибка сервера',
-      errors: [error.message],
-      deployedPages: []
-    })
-  }
-})
+}))
 
 /**
  * POST /api/deploy - Деплой всех опубликованных страниц
  */
-router.post('/', async (req: Request, res: Response) => {
-  try {
+router.post('/', asyncHandler(async (req: Request, res: Response) => {
     const result = await deployService.deployAll()
     
     if (result.success) {
@@ -42,36 +33,23 @@ router.post('/', async (req: Request, res: Response) => {
     } else {
       res.status(400).json(result)
     }
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: 'Ошибка сервера',
-      errors: [error.message],
-      deployedPages: []
-    })
-  }
-})
+}))
 
 /**
  * GET /api/deploy - Получить список опубликованных файлов
  */
-router.get('/', async (req: Request, res: Response) => {
-  try {
+router.get('/', asyncHandler(async (req: Request, res: Response) => {
     const files = deployService.getDeployedFiles()
     res.json({
       files,
       publicUrl: 'http://localhost:3001/'
     })
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
-  }
-})
+}))
 
 /**
  * DELETE /api/deploy/:slug - Удалить опубликованную страницу
  */
-router.delete('/:slug', async (req: Request, res: Response) => {
-  try {
+router.delete('/:slug', asyncHandler(async (req: Request, res: Response) => {
     const { slug } = req.params
     const success = await deployService.undeployPage(slug)
     
@@ -80,9 +58,6 @@ router.delete('/:slug', async (req: Request, res: Response) => {
     } else {
       res.status(404).json({ error: 'Файл не найден' })
     }
-  } catch (error: any) {
-    res.status(500).json({ error: error.message })
-  }
-})
+}))
 
 export default router

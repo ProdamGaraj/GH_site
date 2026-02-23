@@ -11,6 +11,7 @@ import { createBlock, updateBlock, selectBlocksSaving } from '@/features/blocks/
 import { createPage, updatePage, selectPagesSaving } from '@/features/pages/pagesSlice'
 import { BreakpointManager } from './BreakpointManager'
 import { ExportImportModal } from './ExportImportModal'
+import { FullPageHtmlEditor } from './FullPageHtmlEditor'
 import { deployApi, blockApi, pageApi } from '@/shared/api'
 import { generateNodeTreeCSS } from '../utils/styleGenerator'
 import { getEffectiveTree } from '../utils/variationUtils'
@@ -82,6 +83,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const [showViewportDropdown, setShowViewportDropdown] = useState(false)
   const [isSavingToLibrary, setIsSavingToLibrary] = useState(false)
   const [blockSaveResult, setBlockSaveResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [showHtmlEditor, setShowHtmlEditor] = useState(false)
 
   // Sync zoomInput with redux zoom when it changes externally
   React.useEffect(() => {
@@ -902,6 +904,14 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       />
       
       <ExpandableButton
+        icon={<Code2 size={16} />}
+        label="Исходный код"
+        onClick={() => setShowHtmlEditor(true)}
+        variant="secondary"
+        title="Редактировать полный HTML-код страницы"
+      />
+
+      <ExpandableButton
         icon={<Download size={16} />}
         label="Экспорт"
         onClick={() => { setShowExportModal(true); setImportTabActive(false) }}
@@ -996,6 +1006,13 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   // Модальные окна и диалоги
   const modalsContent = (
     <>
+      {/* Full Page HTML Editor */}
+      <FullPageHtmlEditor
+        isOpen={showHtmlEditor}
+        onClose={() => setShowHtmlEditor(false)}
+        pageTitle={isPageEditor ? (pageSettings?.name || 'Страница') : (blockName || 'Блок')}
+      />
+
       {/* Export/Import Modal */}
       {showExportModal && rootNode && (
         <ExportImportModal

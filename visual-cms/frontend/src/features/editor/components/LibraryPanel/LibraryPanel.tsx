@@ -31,6 +31,17 @@ const categories: LibraryCategoryType[] = [
       { type: 'link', label: 'Link', icon: 'Link', tagName: 'a' },
     ],
   },
+  {
+    name: 'Код',
+    items: [
+      { type: 'html-code', label: 'HTML код', icon: 'Code', tagName: 'div',
+        defaultProps: {
+          content: '<!-- Вставьте HTML код сюда -->\n<div style="padding: 20px;">\n  <p>Пример HTML</p>\n</div>',
+          metadata: { name: 'HTML код' },
+        },
+      },
+    ],
+  },
 ]
 
 interface LibraryPanelProps {

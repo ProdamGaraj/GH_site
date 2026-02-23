@@ -5,18 +5,14 @@ import { PagesList } from '@/pages/PagesList'
 import { BlocksList } from '@/pages/BlocksList'
 import { Settings } from '@/pages/Settings'
 import { Editor } from '@/pages/Editor'
-import { GoldenHouseHome } from '@/pages/GoldenHouseHome'
-import { GoldenHouseModern } from '@/pages/GoldenHouseModern'
-import { GoldenHousePremium } from '@/pages/GoldenHousePremium'
-import GoldenHouseElite from '@/pages/GoldenHouseElite'
 import { DataSourcesList } from '@/pages/DataSourcesList'
 import { DataSourceWizard } from '@/features/data-sources/components/DataSourceWizard'
 import { DataSourceEditor } from '@/features/data-sources/components/DataSourceEditor'
 import { DataBindingDemo } from '@/pages/DataBindingDemo'
 import TemplatesPage from '@/pages/TemplatesPage'
 import TemplateBlocksPage from '@/pages/TemplateBlocksPage'
-import { FormsPage } from '@/pages/FormsPage'
-import { FormBuilderPage } from '@/pages/FormBuilderPage'
+import AnalyticsPage from '@/pages/AnalyticsPage'
+
 
 export const router = createBrowserRouter([
   {
@@ -52,12 +48,8 @@ export const router = createBrowserRouter([
         element: <Settings />,
       },
       {
-        path: 'forms',
-        element: <FormsPage />,
-      },
-      {
-        path: 'forms/:id',
-        element: <FormBuilderPage />,
+        path: 'analytics',
+        element: <AnalyticsPage />,
       },
       {
         path: 'data-binding-demo',
@@ -89,21 +81,5 @@ export const router = createBrowserRouter([
   {
     path: '/data-sources/:id/edit',
     element: <DataSourceEditor />,
-  },
-  {
-    path: '/golden-house',
-    element: <GoldenHouseHome />,
-  },
-  {
-    path: '/golden-house-modern',
-    element: <GoldenHouseModern />,
-  },
-  {
-    path: '/golden-house-premium',
-    element: <GoldenHousePremium />,
-  },
-  {
-    path: '/golden-house-elite',
-    element: <GoldenHouseElite />,
   },
 ])

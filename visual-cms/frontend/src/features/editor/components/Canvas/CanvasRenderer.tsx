@@ -84,8 +84,8 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
   
   const stateStyles = getStateStyles()
 
-  // Only root and container elements should be droppable
-  const isContainer = node.elementType === 'container' || 
+  // Only root and container elements should be droppable (not html-code)
+  const isContainer = (node.elementType === 'container' || 
     node.tagName === 'div' || 
     node.tagName === 'section' ||
     node.tagName === 'article' ||
@@ -93,7 +93,7 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
     node.tagName === 'footer' ||
     node.tagName === 'main' ||
     node.tagName === 'nav' ||
-    node.tagName === 'aside'
+    node.tagName === 'aside') && node.elementType !== 'html-code'
 
   // Droppable setup - disable drop into locked blocks
   const { setNodeRef: setDropRef, isOver } = useDroppable({
@@ -285,6 +285,23 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
   // Textarea should not have children content
   if (node.tagName === 'textarea') {
     return React.createElement(node.tagName, elementProps)
+  }
+
+  // HTML code elements render raw HTML via dangerouslySetInnerHTML
+  if (node.elementType === 'html-code') {
+    const htmlContent = node.content || ''
+    return React.createElement(
+      node.tagName || 'div',
+      {
+        ...elementProps,
+        dangerouslySetInnerHTML: htmlContent ? { __html: htmlContent } : undefined,
+      },
+      htmlContent ? undefined : (
+        <div className="flex items-center justify-center min-h-[40px] text-xs text-gray-400 border border-dashed border-violet-300 rounded m-1 bg-violet-50">
+          <span className="flex items-center gap-1">{'</>'} HTML код — дважды кликни или используй панель справа</span>
+        </div>
+      )
+    )
   }
 
   // Regular elements with children

@@ -377,15 +377,18 @@ class DataJoinService {
     alias?: string
   ): Record<string, unknown> {
     if (!prefix && !alias) return record
-    
-    const result: Record<string, unknown> = {}
-    const actualPrefix = prefix || (alias ? `${alias}_` : '')
-    
-    for (const [key, value] of Object.entries(record)) {
-      result[`${actualPrefix}${key}`] = value
+
+    // Explicit prefix -> flat keys (dept_name, dept_budget)
+    if (prefix) {
+      const result: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries(record)) {
+        result[`${prefix}${key}`] = value
+      }
+      return result
     }
-    
-    return result
+
+    // Alias only -> nested object ({ department: { name, budget } })
+    return { [alias!]: { ...record } }
   }
 
   /**

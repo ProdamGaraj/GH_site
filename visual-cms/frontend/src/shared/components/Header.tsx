@@ -1,6 +1,6 @@
 ﻿import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Home, FileText, Box, Database, Settings, Menu, Send } from 'lucide-react'
+import { Home, FileText, Box, Database, Settings, Menu, BarChart3 } from 'lucide-react'
 
 interface HeaderProps {
   showActions?: React.ReactNode
@@ -17,7 +17,7 @@ export const Header: React.FC<HeaderProps> = ({ showActions, centerActions, righ
     { path: '/pages', icon: FileText, label: 'Страницы' },
     { path: '/blocks', icon: Box, label: 'Блоки' },
     { path: '/data-sources', icon: Database, label: 'Data Sources' },
-    { path: '/forms', icon: Send, label: 'Формы' },
+    { path: '/analytics', icon: BarChart3, label: 'Аналитика' },
     { path: '/settings', icon: Settings, label: 'Настройки' },
   ]
 

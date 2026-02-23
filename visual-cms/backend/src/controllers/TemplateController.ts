@@ -4,12 +4,14 @@ import { Template, TemplateCategory, TemplateStatus, DetectedField, DetectedFiel
 import { v4 as uuidv4 } from 'uuid'
 import * as cheerio from 'cheerio'
 import type { Element } from 'domhandler'
+import { asyncHandler, NotFoundError, AppError } from '../middleware'
+import { cacheService } from '../services/CacheService'
 
 /**
  * Template Controller
  * 
- * Согласно ТЗ: docs/data-binding-system-spec.md
- * Этап 3.1 Backend: Templates API
+ * Согласно Т: docs/data-binding-system-spec.md
+ * тап 3.1 Backend: Templates API
  * 
  * API для управления Templates с автоопределением полей
  */
@@ -19,337 +21,241 @@ const templateRepository = AppDataSource.getRepository(Template)
 class TemplateController {
   /**
    * GET /api/templates
-   * Получить список шаблонов
+   * олучить список шаблонов
    */
-  async getAll(req: Request, res: Response) {
-    try {
-      const { category, status, search, tags, isBuiltIn } = req.query
+  getAll = asyncHandler(async (req: Request, res: Response) => {
+    const { category, status, search, tags, isBuiltIn } = req.query
 
-      const queryBuilder = templateRepository.createQueryBuilder('template')
-        .orderBy('template.createdAt', 'DESC')
+    const queryBuilder = templateRepository.createQueryBuilder('template')
+      .orderBy('template.createdAt', 'DESC')
 
-      if (category) {
-        queryBuilder.andWhere('template.category = :category', { category })
-      }
+    if (category) {
+      queryBuilder.andWhere('template.category = :category', { category })
+    }
 
-      if (status) {
-        queryBuilder.andWhere('template.status = :status', { status })
-      }
+    if (status) {
+      queryBuilder.andWhere('template.status = :status', { status })
+    }
 
-      if (search) {
-        queryBuilder.andWhere(
-          '(template.name ILIKE :search OR template.description ILIKE :search)',
-          { search: `%${search}%` }
-        )
-      }
+    if (search) {
+      queryBuilder.andWhere(
+        '(template.name ILIKE :search OR template.description ILIKE :search)',
+        { search: `%${search}%` }
+      )
+    }
 
-      if (isBuiltIn !== undefined) {
-        queryBuilder.andWhere('template.isBuiltIn = :isBuiltIn', { 
-          isBuiltIn: isBuiltIn === 'true' 
-        })
-      }
-
-      // Filter by tags (PostgreSQL array contains)
-      if (tags) {
-        const tagList = (tags as string).split(',').map(t => t.trim())
-        queryBuilder.andWhere('template.tags && ARRAY[:...tags]', { tags: tagList })
-      }
-
-      const templates = await queryBuilder.getMany()
-
-      res.json(templates)
-    } catch (error: any) {
-      console.error('Error fetching templates:', error)
-      res.status(500).json({
-        error: 'Failed to fetch templates',
-        message: error.message
+    if (isBuiltIn !== undefined) {
+      queryBuilder.andWhere('template.isBuiltIn = :isBuiltIn', { 
+        isBuiltIn: isBuiltIn === 'true' 
       })
     }
-  }
+
+    // Filter by tags (PostgreSQL array contains)
+    if (tags) {
+      const tagList = (tags as string).split(',').map(t => t.trim())
+      queryBuilder.andWhere('template.tags && ARRAY[:...tags]', { tags: tagList })
+    }
+
+    const templates = await queryBuilder.getMany()
+
+    res.json(templates)
+  })
 
   /**
    * GET /api/templates/:id
-   * Получить шаблон по ID
+   * олучить шаблон по ID
    */
-  async getById(req: Request, res: Response) {
-    try {
-      const { id } = req.params
+  getById = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
 
-      const template = await templateRepository.findOne({
-        where: { id }
-      })
+    const template = await templateRepository.findOne({
+      where: { id }
+    })
 
-      if (!template) {
-        return res.status(404).json({
-          error: 'Template not found',
-          message: `Template with id "${id}" does not exist`
-        })
-      }
-
-      res.json(template)
-    } catch (error: any) {
-      console.error('Error fetching template:', error)
-      res.status(500).json({
-        error: 'Failed to fetch template',
-        message: error.message
-      })
+    if (!template) {
+      throw new NotFoundError('Template', id)
     }
-  }
+
+    res.json(template)
+  })
 
   /**
    * POST /api/templates
    * Создать новый шаблон
    */
-  async create(req: Request, res: Response) {
-    try {
-      const { 
-        name, 
-        description, 
-        category, 
-        htmlContent, 
-        cssContent,
-        settings,
-        previewData,
-        tags,
-        sourceBlockId,
-        autoDetectFields = true
-      } = req.body
+  create = asyncHandler(async (req: Request, res: Response) => {
+    const { 
+      name, 
+      description, 
+      category, 
+      htmlContent, 
+      cssContent,
+      settings,
+      previewData,
+      tags,
+      sourceBlockId,
+      autoDetectFields = true
+    } = req.body
 
-      // Валидация
-      if (!name || !htmlContent) {
-        return res.status(400).json({
-          error: 'Validation failed',
-          message: 'name and htmlContent are required'
-        })
-      }
-
-      // Автоопределение полей
-      let detectedFields: DetectedField[] = []
-      if (autoDetectFields) {
-        detectedFields = this.detectFields(htmlContent)
-      }
-
-      const template = templateRepository.create({
-        name,
-        description: description || null,
-        category: category || 'custom',
-        status: 'active' as TemplateStatus,
-        htmlContent,
-        cssContent: cssContent || null,
-        detectedFields,
-        settings: settings || null,
-        previewData: previewData || null,
-        tags: tags || null,
-        isBuiltIn: false,
-        sourceBlockId: sourceBlockId || null
-      })
-
-      await templateRepository.save(template)
-
-      res.status(201).json(template)
-    } catch (error: any) {
-      console.error('Error creating template:', error)
-      res.status(500).json({
-        error: 'Failed to create template',
-        message: error.message
-      })
+    // алидация
+    // втоопределение полей
+    let detectedFields: DetectedField[] = []
+    if (autoDetectFields) {
+      detectedFields = this.detectFields(htmlContent)
     }
-  }
+
+    const template = templateRepository.create({
+      name,
+      description: description || null,
+      category: category || 'custom',
+      status: 'active' as TemplateStatus,
+      htmlContent,
+      cssContent: cssContent || null,
+      detectedFields,
+      settings: settings || null,
+      previewData: previewData || null,
+      tags: tags || null,
+      isBuiltIn: false,
+      sourceBlockId: sourceBlockId || null
+    })
+
+    await cacheService.invalidateByTag('templates')
+
+    res.status(201).json(template)
+  })
 
   /**
    * PUT /api/templates/:id
-   * Обновить шаблон
+   * бновить шаблон
    */
-  async update(req: Request, res: Response) {
-    try {
-      const { id } = req.params
-      const { 
-        name, 
-        description, 
-        category, 
-        status,
-        htmlContent, 
-        cssContent,
-        settings,
-        previewData,
-        tags,
-        redetectFields = false
-      } = req.body
+  update = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const { 
+      name, 
+      description, 
+      category, 
+      status,
+      htmlContent, 
+      cssContent,
+      settings,
+      previewData,
+      tags,
+      redetectFields = false
+    } = req.body
 
-      const template = await templateRepository.findOne({ where: { id } })
+    const template = await templateRepository.findOne({ where: { id } })
 
-      if (!template) {
-        return res.status(404).json({
-          error: 'Template not found',
-          message: `Template with id "${id}" does not exist`
-        })
-      }
-
-      // Обновляем поля
-      if (name !== undefined) template.name = name
-      if (description !== undefined) template.description = description
-      if (category !== undefined) template.category = category
-      if (status !== undefined) template.status = status
-      if (htmlContent !== undefined) template.htmlContent = htmlContent
-      if (cssContent !== undefined) template.cssContent = cssContent
-      if (settings !== undefined) template.settings = settings
-      if (previewData !== undefined) template.previewData = previewData
-      if (tags !== undefined) template.tags = tags
-
-      // Переопределение полей при изменении HTML
-      if (redetectFields || (htmlContent !== undefined && htmlContent !== template.htmlContent)) {
-        template.detectedFields = this.detectFields(template.htmlContent)
-      }
-
-      await templateRepository.save(template)
-
-      res.json(template)
-    } catch (error: any) {
-      console.error('Error updating template:', error)
-      res.status(500).json({
-        error: 'Failed to update template',
-        message: error.message
-      })
+    if (!template) {
+      throw new NotFoundError('Template', id)
     }
-  }
+
+    // бновляем поля
+    if (name !== undefined) template.name = name
+    if (description !== undefined) template.description = description
+    if (category !== undefined) template.category = category
+    if (status !== undefined) template.status = status
+    if (htmlContent !== undefined) template.htmlContent = htmlContent
+    if (cssContent !== undefined) template.cssContent = cssContent
+    if (settings !== undefined) template.settings = settings
+    if (previewData !== undefined) template.previewData = previewData
+    if (tags !== undefined) template.tags = tags
+
+    // ереопределение полей при изменении HTML
+    if (redetectFields || (htmlContent !== undefined && htmlContent !== template.htmlContent)) {
+      template.detectedFields = this.detectFields(template.htmlContent)
+    }
+
+    await cacheService.invalidateByTag('templates')
+
+    res.json(template)
+  })
 
   /**
    * DELETE /api/templates/:id
-   * Удалить шаблон
+   * далить шаблон
    */
-  async delete(req: Request, res: Response) {
-    try {
-      const { id } = req.params
+  delete = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
 
-      const template = await templateRepository.findOne({ where: { id } })
+    const template = await templateRepository.findOne({ where: { id } })
 
-      if (!template) {
-        return res.status(404).json({
-          error: 'Template not found',
-          message: `Template with id "${id}" does not exist`
-        })
-      }
-
-      // Не позволяем удалять built-in шаблоны
-      if (template.isBuiltIn) {
-        return res.status(403).json({
-          error: 'Cannot delete built-in template',
-          message: 'Built-in templates cannot be deleted'
-        })
-      }
-
-      await templateRepository.remove(template)
-
-      res.status(204).send()
-    } catch (error: any) {
-      console.error('Error deleting template:', error)
-      res.status(500).json({
-        error: 'Failed to delete template',
-        message: error.message
-      })
+    if (!template) {
+      throw new NotFoundError('Template', id)
     }
-  }
+
+    // е позволяем удалять built-in шаблоны
+    if (template.isBuiltIn) {
+      throw new AppError('Built-in templates cannot be deleted', 403, 'BUILTIN_TEMPLATE')
+    }
+
+    await cacheService.invalidateByTag('templates')
+
+    res.status(204).send()
+  })
 
   /**
    * POST /api/templates/:id/duplicate
-   * Дублировать шаблон
+   * ублировать шаблон
    */
-  async duplicate(req: Request, res: Response) {
-    try {
-      const { id } = req.params
-      const { name: newName } = req.body
+  duplicate = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const { name: newName } = req.body
 
-      const original = await templateRepository.findOne({ where: { id } })
+    const original = await templateRepository.findOne({ where: { id } })
 
-      if (!original) {
-        return res.status(404).json({
-          error: 'Template not found',
-          message: `Template with id "${id}" does not exist`
-        })
-      }
-
-      const duplicate = templateRepository.create({
-        ...original,
-        id: undefined as any, // Будет сгенерирован новый UUID
-        name: newName || `${original.name} (копия)`,
-        isBuiltIn: false,
-        createdAt: undefined as any,
-        updatedAt: undefined as any
-      })
-
-      await templateRepository.save(duplicate)
-
-      res.status(201).json(duplicate)
-    } catch (error: any) {
-      console.error('Error duplicating template:', error)
-      res.status(500).json({
-        error: 'Failed to duplicate template',
-        message: error.message
-      })
+    if (!original) {
+      throw new NotFoundError('Template', id)
     }
-  }
+
+    const duplicate = templateRepository.create({
+      ...original,
+      id: undefined as any, // удет сгенерирован новый UUID
+      name: newName || `${original.name} (копия)`,
+      isBuiltIn: false,
+      createdAt: undefined as any,
+      updatedAt: undefined as any
+    })
+
+    await cacheService.invalidateByTag('templates')
+
+    res.status(201).json(duplicate)
+  })
 
   /**
    * POST /api/templates/:id/detect-fields
-   * Переопределить поля шаблона
+   * ереопределить поля шаблона
    */
-  async detectFieldsEndpoint(req: Request, res: Response) {
-    try {
-      const { id } = req.params
+  detectFieldsEndpoint = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
 
-      const template = await templateRepository.findOne({ where: { id } })
+    const template = await templateRepository.findOne({ where: { id } })
 
-      if (!template) {
-        return res.status(404).json({
-          error: 'Template not found',
-          message: `Template with id "${id}" does not exist`
-        })
-      }
-
-      const detectedFields = this.detectFields(template.htmlContent)
-      template.detectedFields = detectedFields
-
-      await templateRepository.save(template)
-
-      res.json({
-        templateId: id,
-        detectedFields
-      })
-    } catch (error: any) {
-      console.error('Error detecting fields:', error)
-      res.status(500).json({
-        error: 'Failed to detect fields',
-        message: error.message
-      })
+    if (!template) {
+      throw new NotFoundError('Template', id)
     }
-  }
+
+    const detectedFields = this.detectFields(template.htmlContent)
+    template.detectedFields = detectedFields
+
+    await cacheService.invalidateByTag('templates')
+
+    res.json({
+      templateId: id,
+      detectedFields
+    })
+  })
 
   /**
    * POST /api/templates/detect-fields
-   * Определить поля из HTML (без сохранения)
+   * пределить поля из HTML (без сохранения)
    */
-  async detectFieldsFromHtml(req: Request, res: Response) {
-    try {
-      const { html } = req.body
+  detectFieldsFromHtml = asyncHandler(async (req: Request, res: Response) => {
+    const { html } = req.body
 
-      if (!html) {
-        return res.status(400).json({
-          error: 'Validation failed',
-          message: 'html is required'
-        })
-      }
+    const detectedFields = this.detectFields(html)
 
-      const detectedFields = this.detectFields(html)
-
-      res.json({ detectedFields })
-    } catch (error: any) {
-      console.error('Error detecting fields from HTML:', error)
-      res.status(500).json({
-        error: 'Failed to detect fields',
-        message: error.message
-      })
-    }
-  }
+    res.json({ detectedFields })
+  })
 
   /**
    * Автоопределение bindable-полей в HTML

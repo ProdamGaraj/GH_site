@@ -206,6 +206,11 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
 
   // Get icon based on element type
   const getIcon = () => {
+    // Special icon for html-code elements
+    if (node.elementType === 'html-code') {
+      return Icons.Code
+    }
+    
     const iconMap: Record<string, keyof typeof Icons> = {
       div: 'Box',
       section: 'Layout',

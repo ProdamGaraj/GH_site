@@ -47,3 +47,9 @@ export {
   sanitizeRequest,
   buildCorsOptions,
 } from './security'
+
+// Zod Validation
+export {
+  validate,
+  validateQuery,
+} from './validate'

@@ -12,6 +12,7 @@ export type ElementType =
   | 'link'
   | 'video'
   | 'block-reference'
+  | 'html-code'
 
 export type BlockType = 
   | 'container'
@@ -284,6 +285,10 @@ export interface BlockNode {
     hidden?: boolean
     name?: string
     linkedBlockId?: string
+    /** Raw HTML to inject into <head> (scripts, styles, etc.) — only used on root node */
+    customHeadHtml?: string
+    /** Raw HTML to inject before </body> (scripts, etc.) — only used on root node */
+    customBodyEndHtml?: string
   }
   
   // Р’Р°СЂРёР°С†РёРё РґР»СЏ СЂР°Р·РЅС‹С… Р±СЂРµР№РєРїРѕРёРЅС‚РѕРІ (РЅРµР·Р°РІРёСЃРёРјС‹Рµ DOM РґРµСЂРµРІСЊСЏ)

@@ -12,9 +12,11 @@ import variablesRouter from './variables'
 import templateTestRouter from './template-test'
 import mockRouter from './mock'
 import formsRouter from './forms'
+import analyticsRouter from './analytics'
 
 const router = Router()
 
+router.use('/analytics', analyticsRouter)
 router.use('/pages', pagesRouter)
 router.use('/blocks', blocksRouter)
 router.use('/groups', groupsRouter)

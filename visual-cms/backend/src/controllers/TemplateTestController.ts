@@ -4,6 +4,7 @@
  */
 
 import { Request, Response } from 'express'
+import { asyncHandler, NotFoundError, ValidationError } from '../middleware'
 import { AppDataSource } from '../config/database'
 import { Block } from '../models/Block'
 import { htmlGenerator } from '../services/HtmlGenerator'
@@ -28,16 +29,8 @@ export class TemplateTestController {
    *   fieldMappings: FieldMapping[]
    * }
    */
-  async renderTemplate(req: Request, res: Response) {
-    try {
+  renderTemplate = asyncHandler(async (req: Request, res: Response) => {
       const { templateBlockId, testData, fieldMappings } = req.body
-
-      if (!templateBlockId || !testData || !Array.isArray(testData)) {
-        return res.status(400).json({
-          error: 'Validation failed',
-          message: 'templateBlockId and testData (array) are required'
-        })
-      }
 
       // Загружаем Template блок
       const templateBlock = await blockRepository.findOne({
@@ -45,21 +38,15 @@ export class TemplateTestController {
       })
 
       if (!templateBlock) {
-        return res.status(404).json({
-          error: 'Template block not found',
-          message: `Block with id "${templateBlockId}" does not exist`
-        })
+        throw new NotFoundError('Block', templateBlockId)
       }
 
       if (!templateBlock.isTemplate) {
-        return res.status(400).json({
-          error: 'Not a template',
-          message: 'The specified block is not marked as a template'
-        })
+        throw new ValidationError('The specified block is not marked as a template')
       }
 
       // Генерируем HTML для каждого элемента данных
-      const renderedItems = testData.map((item, index) => {
+      const renderedItems = (testData as Record<string, unknown>[]).map((item: Record<string, unknown>, index: number) => {
         // Клонируем структуру Template
         const itemStructure = JSON.parse(JSON.stringify(templateBlock.structure))
         
@@ -123,7 +110,7 @@ export class TemplateTestController {
       <p style="font-size: 14px; color: #666;">Template ID: ${templateBlockId}</p>
     </div>
     <div class="test-items">
-      ${renderedItems.map((html, index) => `
+      ${renderedItems.map((html: string, index: number) => `
         <div class="test-item">
           <div class="test-item-label">Item #${index + 1}</div>
           ${html}
@@ -145,35 +132,12 @@ export class TemplateTestController {
         html: fullHtml,
         items: renderedItems
       })
-    } catch (error: any) {
-      console.error('Template test error:', error)
-      res.status(500).json({
-        error: 'Failed to render template',
-        message: error.message
-      })
-    }
-  }
+  })
 
   /**
    * POST /api/template-test/preview
-   * Генерирует preview URL для Template с тестовыми данными
    */
-  async generatePreview(req: Request, res: Response) {
-    try {
-      const { templateBlockId, testData, fieldMappings } = req.body
-
-      // Используем тот же метод для генерации HTML
-      const renderResult = await this.renderTemplate(req, res)
-      
-      // В реальном приложении можно сохранить HTML во временный файл
-      // и вернуть URL для просмотра
-    } catch (error: any) {
-      res.status(500).json({
-        error: 'Failed to generate preview',
-        message: error.message
-      })
-    }
-  }
+  generatePreview = this.renderTemplate
 
   /**
    * Применяет field mappings к структуре блока
