@@ -1,9 +1,17 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAppDispatch } from '@/app/hooks'
 import { updateNode } from '@/features/editor/editorSlice'
+import { blockApi } from '@/shared/api'
 import { Button } from '@/shared/components/Button'
-import { Link2, Link2Off, AlertCircle } from 'lucide-react'
+import { Link2, Link2Off, AlertCircle, FileText, Puzzle, ExternalLink } from 'lucide-react'
 import type { BlockNode } from '@/shared/types'
+
+interface BlockUsage {
+  type: 'page' | 'block'
+  id: string
+  name: string
+  nodePath?: string
+}
 
 interface BlockInfoSectionProps {
   node: BlockNode
@@ -13,8 +21,32 @@ interface BlockInfoSectionProps {
 export const BlockInfoSection: React.FC<BlockInfoSectionProps> = ({ node }) => {
   const dispatch = useAppDispatch()
   const [loading, setLoading] = useState(false)
+  const [usages, setUsages] = useState<BlockUsage[]>([])
+  const [usagesLoading, setUsagesLoading] = useState(false)
 
   const isLinked = !!node.metadata?.linkedBlockId
+
+  // Загружаем usages при монтировании и когда меняется linkedBlockId
+  useEffect(() => {
+    if (!isLinked || !node.metadata?.linkedBlockId) return
+
+    let cancelled = false
+    setUsagesLoading(true)
+
+    blockApi.getUsages(node.metadata.linkedBlockId)
+      .then(data => {
+        if (!cancelled) setUsages(data)
+      })
+      .catch(err => {
+        console.error('Failed to load block usages:', err)
+        if (!cancelled) setUsages([])
+      })
+      .finally(() => {
+        if (!cancelled) setUsagesLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [isLinked, node.metadata?.linkedBlockId])
 
   const handleUnlink = async () => {
     if (!confirm(
@@ -89,6 +121,44 @@ export const BlockInfoSection: React.FC<BlockInfoSectionProps> = ({ node }) => {
               🔗 Linked
             </span>
           </div>
+        </div>
+
+        {/* Usages */}
+        <div className="bg-white rounded-lg border border-blue-200 p-3 space-y-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold text-gray-700">Используется на:</span>
+            {usagesLoading && (
+              <span className="text-xs text-gray-400 animate-pulse">загрузка...</span>
+            )}
+          </div>
+          {!usagesLoading && usages.length === 0 && (
+            <p className="text-xs text-gray-400 italic">Нет привязок к страницам</p>
+          )}
+          {!usagesLoading && usages.length > 0 && (
+            <ul className="space-y-1.5">
+              {usages.map((u, idx) => (
+                <li key={`${u.id}-${idx}`} className="flex items-center gap-2 text-xs">
+                  {u.type === 'page' ? (
+                    <FileText size={12} className="text-blue-500 flex-shrink-0" />
+                  ) : (
+                    <Puzzle size={12} className="text-purple-500 flex-shrink-0" />
+                  )}
+                  <span className="truncate text-gray-700" title={u.name}>
+                    {u.name || u.id.slice(0, 8)}
+                  </span>
+                  <a
+                    href={u.type === 'page' ? `/pages/${u.id}` : `/blocks/${u.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-auto text-blue-500 hover:text-blue-700 flex-shrink-0"
+                    title="Открыть"
+                  >
+                    <ExternalLink size={11} />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Warning */}

@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { AppDataSource } from '../config/database'
 import { Block } from '../models/Block'
 import { blockTemplateService } from '../services/BlockTemplateService'
+import { linkedBlocksService } from '../services/LinkedBlocksService'
 import { asyncHandler, NotFoundError, ValidationError } from '../middleware'
 import { cacheService } from '../services/CacheService'
 
@@ -74,7 +75,61 @@ export class BlockController {
 
     await blockRepository.save(block)
     await cacheService.invalidateByTag('blocks')
-    res.json(block)
+
+    // Синхронизируем обновлённый блок на все страницы, где он используется
+    if (req.body.structure) {
+      try {
+        const syncResult = await linkedBlocksService.syncBlockToAllPages(id, block.structure)
+        if (syncResult.updatedPages.length > 0) {
+          console.log(`[BlockSync] Блок ${block.name} синхронизирован на страницы: ${syncResult.updatedPages.join(', ')}`)
+        }
+        if (syncResult.errors.length > 0) {
+          console.error(`[BlockSync] Ошибки: ${syncResult.errors.join('; ')}`)
+        }
+        // Возвращаем результат синхронизации вместе с блоком
+        res.json({
+          ...block,
+          _syncResult: {
+            updatedPages: syncResult.updatedPages,
+            errors: syncResult.errors,
+          }
+        })
+      } catch (syncErr: any) {
+        console.error('[BlockSync] Sync failed:', syncErr)
+        // Блок уже сохранён — возвращаем его даже если синхронизация упала
+        res.json(block)
+      }
+    } else {
+      res.json(block)
+    }
+  })
+
+  getUsages = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const block = await blockRepository.findOne({ where: { id } })
+
+    if (!block) {
+      throw new NotFoundError('Block', id)
+    }
+
+    const usages = await linkedBlocksService.findBlockUsages(id)
+    res.json(usages)
+  })
+
+  getAllWithUsages = asyncHandler(async (req: Request, res: Response) => {
+    const blocks = await blockRepository.find({
+      relations: ['group'],
+      order: { updatedAt: 'DESC' },
+    })
+
+    const usagesMap = await linkedBlocksService.findAllBlockUsages()
+
+    const blocksWithUsages = blocks.map(block => ({
+      ...block,
+      usages: usagesMap.get(block.id) || [],
+    }))
+
+    res.json(blocksWithUsages)
   })
 
   delete = asyncHandler(async (req: Request, res: Response) => {

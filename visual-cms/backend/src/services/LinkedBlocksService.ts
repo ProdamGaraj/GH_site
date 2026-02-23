@@ -8,9 +8,11 @@
 
 import { AppDataSource } from '../config/database'
 import { Block } from '../models/Block'
+import { Page } from '../models/Page'
 import { In } from 'typeorm'
 
 const blockRepository = AppDataSource.getRepository(Block)
+const pageRepository = AppDataSource.getRepository(Page)
 
 export class LinkedBlocksService {
   /**
@@ -159,7 +161,7 @@ export class LinkedBlocksService {
     }
   }
 
-  /** екурсивно собирает linked узлы: linkedId -> структура для библиотеки */
+  /** Рекурсивно собирает linked узлы: linkedId -> структура для библиотеки */
   private _collectLinkedNodes(node: any, result: Map<string, any>): void {
     if (!node) return
     if (node.metadata?.linkedBlockId) {
@@ -180,6 +182,173 @@ export class LinkedBlocksService {
         }
       }
     }
+  }
+
+  /**
+   * Ищет все использования блока на страницах и внутри других блоков.
+   * Возвращает массив { type, id, name, nodePath? }
+   */
+  async findBlockUsages(blockId: string): Promise<Array<{
+    type: 'page' | 'block'
+    id: string
+    name: string
+    nodePath?: string
+  }>> {
+    const usages: Array<{ type: 'page' | 'block'; id: string; name: string; nodePath?: string }> = []
+
+    // 1. Поиск в страницах
+    const pages = await pageRepository.find({ select: ['id', 'name', 'structure'] })
+    for (const page of pages) {
+      if (!page.structure) continue
+      const paths = this._findLinkedBlockPaths(page.structure, blockId, '')
+      for (const path of paths) {
+        usages.push({ type: 'page', id: page.id, name: page.name, nodePath: path })
+      }
+    }
+
+    // 2. Поиск в других блоках библиотеки (вложенные linked блоки)
+    const blocks = await blockRepository.find({ select: ['id', 'name', 'structure'] })
+    for (const block of blocks) {
+      if (block.id === blockId) continue // Не считаем себя
+      if (!block.structure) continue
+      const paths = this._findLinkedBlockPaths(block.structure, blockId, '')
+      for (const path of paths) {
+        usages.push({ type: 'block', id: block.id, name: block.name, nodePath: path })
+      }
+    }
+
+    return usages
+  }
+
+  /**
+   * Ищет все использования блока на всех страницах и в других блоках (bulk).
+   * Возвращает Map<blockId, usages[]>
+   */
+  async findAllBlockUsages(): Promise<Map<string, Array<{
+    type: 'page' | 'block'
+    id: string
+    name: string
+  }>>> {
+    const result = new Map<string, Array<{ type: 'page' | 'block'; id: string; name: string }>>()
+
+    // Собираем linkedBlockId из всех страниц
+    const pages = await pageRepository.find({ select: ['id', 'name', 'structure'] })
+    for (const page of pages) {
+      if (!page.structure) continue
+      const linkedIds = new Set<string>()
+      this._collectLinkedIds(page.structure, linkedIds)
+      for (const bid of linkedIds) {
+        if (!result.has(bid)) result.set(bid, [])
+        result.get(bid)!.push({ type: 'page', id: page.id, name: page.name })
+      }
+    }
+
+    // Собираем linkedBlockId из всех блоков
+    const blocks = await blockRepository.find({ select: ['id', 'name', 'structure'] })
+    for (const block of blocks) {
+      if (!block.structure) continue
+      const linkedIds = new Set<string>()
+      this._collectLinkedIds(block.structure, linkedIds)
+      for (const bid of linkedIds) {
+        if (bid === block.id) continue // Не считаем себя
+        if (!result.has(bid)) result.set(bid, [])
+        result.get(bid)!.push({ type: 'block', id: block.id, name: block.name })
+      }
+    }
+
+    return result
+  }
+
+  /** Рекурсивно находит пути до узлов с заданным linkedBlockId */
+  private _findLinkedBlockPaths(node: any, blockId: string, currentPath: string): string[] {
+    if (!node) return []
+    const paths: string[] = []
+    const nodeName = node.metadata?.name || node.id || '?'
+    const path = currentPath ? `${currentPath} > ${nodeName}` : nodeName
+
+    if (node.metadata?.linkedBlockId === blockId) {
+      paths.push(path)
+    }
+
+    if (node.children && Array.isArray(node.children)) {
+      for (const child of node.children) {
+        paths.push(...this._findLinkedBlockPaths(child, blockId, path))
+      }
+    }
+
+    return paths
+  }
+
+  /**
+   * Синхронизирует обновлённый блок на все страницы, где он используется.
+   * Вызывается из BlockController.update при сохранении блока.
+   */
+  async syncBlockToAllPages(blockId: string, newStructure: any): Promise<{
+    updatedPages: string[]
+    errors: string[]
+  }> {
+    const updatedPages: string[] = []
+    const errors: string[] = []
+
+    const pages = await pageRepository.find()
+    for (const page of pages) {
+      if (!page.structure) continue
+
+      // Проверяем, есть ли этот блок на странице
+      const hasBlock = this._hasLinkedBlockId(page.structure, blockId)
+      if (!hasBlock) continue
+
+      try {
+        // Заменяем все вхождения блока в структуре страницы
+        page.structure = this._replaceLinkedBlock(page.structure, blockId, newStructure)
+        page.version += 1
+        await pageRepository.save(page)
+        updatedPages.push(page.name || page.id)
+      } catch (err: any) {
+        errors.push(`Page ${page.name}: ${err.message}`)
+      }
+    }
+
+    return { updatedPages, errors }
+  }
+
+  /** Проверяет, содержит ли дерево узел с данным linkedBlockId */
+  private _hasLinkedBlockId(node: any, blockId: string): boolean {
+    if (!node) return false
+    if (node.metadata?.linkedBlockId === blockId) return true
+    if (node.children && Array.isArray(node.children)) {
+      for (const child of node.children) {
+        if (this._hasLinkedBlockId(child, blockId)) return true
+      }
+    }
+    return false
+  }
+
+  /** Рекурсивно заменяет linked-блок новой структурой, сохраняя id и linkedBlockId */
+  private _replaceLinkedBlock(node: any, blockId: string, newStructure: any): any {
+    if (!node) return node
+
+    if (node.metadata?.linkedBlockId === blockId) {
+      // Глубокая копия новой структуры
+      const replacement = JSON.parse(JSON.stringify(newStructure))
+      return {
+        ...replacement,
+        id: node.id, // Сохраняем оригинальный id на странице
+        metadata: {
+          ...replacement.metadata,
+          linkedBlockId: blockId, // Сохраняем связь с библиотекой
+        },
+      }
+    }
+
+    // Рекурсивно обрабатываем детей
+    if (node.children && Array.isArray(node.children)) {
+      node.children = node.children.map(
+        (child: any) => this._replaceLinkedBlock(child, blockId, newStructure)
+      )
+    }
+
+    return node
   }
 }
 

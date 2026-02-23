@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Header } from '@/shared/components/Header'
 import { ImportModal } from '@/shared/components/ImportModal'
-import { Plus, Loader2, Box, Calendar, Pencil, Trash2, Upload, Sparkles } from 'lucide-react'
+import { Plus, Loader2, Box, Calendar, Pencil, Trash2, Upload, Sparkles, FileText } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { 
   fetchBlocks, 
@@ -12,8 +12,15 @@ import {
   selectBlocksLoading,
   selectBlocksError 
 } from '@/features/blocks/blocksSlice'
+import { blockApi } from '@/shared/api'
 import type { BlockNode } from '@/shared/types'
 import { TemplateQuickToggle } from '@/features/blocks/components/TemplateQuickToggle'
+
+interface BlockUsage {
+  type: 'page' | 'block'
+  id: string
+  name: string
+}
 
 export const BlocksList: React.FC = () => {
   const dispatch = useAppDispatch()
@@ -22,10 +29,26 @@ export const BlocksList: React.FC = () => {
   const loading = useAppSelector(selectBlocksLoading)
   const error = useAppSelector(selectBlocksError)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [usagesMap, setUsagesMap] = useState<Record<string, BlockUsage[]>>({})
 
   useEffect(() => {
     dispatch(fetchBlocks())
   }, [dispatch])
+
+  // Загружаем usages для всех блоков
+  useEffect(() => {
+    blockApi.getAllWithUsages()
+      .then(data => {
+        const map: Record<string, BlockUsage[]> = {}
+        for (const block of data) {
+          if (block.usages && block.usages.length > 0) {
+            map[block.id] = block.usages
+          }
+        }
+        setUsagesMap(map)
+      })
+      .catch(err => console.error('Failed to load block usages:', err))
+  }, [blocks.length])
 
   const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Удалить блок "${name}"?`)) {
@@ -126,7 +149,7 @@ export const BlocksList: React.FC = () => {
                     )}
                   </div>
                   
-                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-3 flex-wrap">
                     <Calendar size={12} />
                     <span>{formatDate(block.updatedAt)}</span>
                     {block.isReusable && (
@@ -140,6 +163,27 @@ export const BlocksList: React.FC = () => {
                       </span>
                     )}
                   </div>
+
+                  {/* Usages badge */}
+                  {usagesMap[block.id] && usagesMap[block.id].length > 0 && (
+                    <div className="mb-3 px-2 py-1.5 bg-blue-50 border border-blue-100 rounded-md">
+                      <div className="flex items-center gap-1.5 text-xs text-blue-700 font-medium mb-1">
+                        <FileText size={12} />
+                        <span>Используется на {usagesMap[block.id].length} стр.</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {usagesMap[block.id].map((u, idx) => (
+                          <span
+                            key={`${u.id}-${idx}`}
+                            className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded truncate max-w-[120px]"
+                            title={u.name}
+                          >
+                            {u.name || u.id.slice(0, 8)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Template Toggle Button */}
                   <div className="mb-3">
