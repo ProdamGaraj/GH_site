@@ -32,6 +32,18 @@ interface Animation {
   keyframes?: { offset: number; properties: CSSProperties }[]
 }
 
+interface BlockNodeVariation {
+  inheritedOverrides?: {
+    [nodeId: string]: {
+      hidden?: boolean
+      styles?: Record<string, string>
+      attributes?: Record<string, string>
+      content?: string
+    }
+  }
+  specificChildren?: BlockNode[]
+}
+
 interface BlockNode {
   id: string
   elementType: string
@@ -50,8 +62,13 @@ interface BlockNode {
     customHeadHtml?: string
     /** Raw HTML to inject before </body> (scripts, etc.) — only on root node */
     customBodyEndHtml?: string
+    /** Breakpoint definitions for responsive CSS — only on root node */
+    breakpoints?: Array<{ id: string; name: string; width: number; height?: number }>
   }
   animations?: Animation[]
+  variations?: {
+    [breakpointId: string]: BlockNodeVariation
+  }
 }
 
 interface PageMetadata {
@@ -66,10 +83,23 @@ export class HtmlGenerator {
    * Р“РµРЅРµСЂРёСЂСѓРµС‚ РїРѕР»РЅС‹Р№ HTML РґРѕРєСѓРјРµРЅС‚ РёР· СЃС‚СЂСѓРєС‚СѓСЂС‹ СЃС‚СЂР°РЅРёС†С‹
    */
   generatePage(structure: BlockNode, metadata: PageMetadata, slug: string, dataConfig?: PageDataConfig): string {
+    // Собираем ID specificChildren для базового скрытия
+    const specificChildrenIds = styleGenerator.collectSpecificChildrenIds(structure as any)
+    
     const bodyContent = this.renderNode(structure)
     
     // Генерируем CSS для hover, анимаций и т.д.
     const { css: dynamicCSS, keyframes, scripts } = styleGenerator.generateNodeTreeStyles(structure as any)
+
+    // Генерируем responsive CSS (@media queries) из variations
+    const responsiveCSS = styleGenerator.generateResponsiveCSS(structure as any)
+
+    // Базовый CSS для скрытия specificChildren (они показываются только в своём @media)
+    let specificHideCSS = ''
+    if (specificChildrenIds.size > 0) {
+      const selectors = Array.from(specificChildrenIds).map(id => `[data-element-id="${id}"]`)
+      specificHideCSS = `\n    /* Hide viewport-specific elements by default */\n    ${selectors.join(',\n    ')} { display: none !important; }\n`
+    }
 
     // Custom HTML injected by user via source code editor
     const customHeadHtml = structure.metadata?.customHeadHtml || ''
@@ -166,6 +196,7 @@ export class HtmlGenerator {
     
     /* Form and output binding styles */
     ${styleGenerator.generateFormStyles()}
+${specificHideCSS}${responsiveCSS}
   </style>
 ${customHeadHtml ? '  ' + customHeadHtml.split('\n').join('\n  ') + '\n' : ''}</head>
 <body>
@@ -213,17 +244,29 @@ ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
       this.renderNode(child, indent + '  ')
     ).join('') || ''
     
-    // Р•СЃР»Рё РЅРµС‚ РєРѕРЅС‚РµРЅС‚Р° Рё РґРµС‚РµР№ - РєРѕСЂРѕС‚РєР°СЏ Р·Р°РїРёСЃСЊ
-    if (!textContent && !childrenHtml) {
+    // Viewport-specific elements from variations (specificChildren)
+    let specificChildrenHtml = ''
+    if (node.variations) {
+      for (const variation of Object.values(node.variations)) {
+        if (variation.specificChildren) {
+          specificChildrenHtml += variation.specificChildren.map(child =>
+            this.renderNode(child, indent + '  ')
+          ).join('')
+        }
+      }
+    }
+    
+    const allChildrenHtml = childrenHtml + specificChildrenHtml
+    
+    if (!textContent && !allChildrenHtml) {
       return `${indent}<${tagName}${styles}${dataAttr}${attributes}></${tagName}>\n`
     }
     
-    // РџРѕР»РЅР°СЏ Р·Р°РїРёСЃСЊ СЃ РєРѕРЅС‚РµРЅС‚РѕРј
-    if (textContent && !childrenHtml) {
+    if (textContent && !allChildrenHtml) {
       return `${indent}<${tagName}${styles}${dataAttr}${attributes}>${textContent}</${tagName}>\n`
     }
     
-    return `${indent}<${tagName}${styles}${dataAttr}${attributes}>\n${textContent ? indent + '  ' + textContent + '\n' : ''}${childrenHtml}${indent}</${tagName}>\n`
+    return `${indent}<${tagName}${styles}${dataAttr}${attributes}>\n${textContent ? indent + '  ' + textContent + '\n' : ''}${allChildrenHtml}${indent}</${tagName}>\n`
   }
 
   /**

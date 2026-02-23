@@ -1,4 +1,4 @@
-import type { BlockNode, Animation, AnimationPreset, CSSProperties, StateStyles } from '@/shared/types'
+import type { BlockNode, Animation, AnimationPreset, CSSProperties, StateStyles, CustomBreakpoint } from '@/shared/types'
 
 // Animation preset keyframes
 const ANIMATION_KEYFRAMES: Record<AnimationPreset, string> = {
@@ -395,4 +395,148 @@ export const generateExportStyles = (rootNode: BlockNode, pageScripts?: { code: 
   }
   
   return { headCSS, bodyEndScripts, headScripts, bodyStartScripts }
+}
+
+// =====================
+// Responsive CSS Generation
+// =====================
+
+/**
+ * Генерирует responsive CSS (@media queries) из variations дерева узлов.
+ * Используется в Preview для отображения адаптивной вёрстки.
+ */
+export const generateResponsiveCSS = (
+  rootNode: BlockNode,
+  breakpoints: CustomBreakpoint[]
+): string => {
+  if (breakpoints.length === 0) return ''
+
+  // Сортируем от большего к меньшему для правильного каскадирования
+  const sortedBreakpoints = [...breakpoints].sort((a, b) => b.width - a.width)
+
+  const breakpointRules: Record<string, string[]> = {}
+  for (const bp of sortedBreakpoints) {
+    breakpointRules[bp.id] = []
+  }
+
+  collectResponsiveRules(rootNode, breakpointRules)
+
+  let css = ''
+  for (const bp of sortedBreakpoints) {
+    const rules = breakpointRules[bp.id]
+    if (!rules || rules.length === 0) continue
+    css += `@media (max-width: ${bp.width}px) {\n`
+    css += rules.map(r => `  ${r}`).join('\n')
+    css += '\n}\n'
+  }
+
+  return css
+}
+
+function collectResponsiveRules(
+  node: BlockNode,
+  breakpointRules: Record<string, string[]>
+): void {
+  if (node.variations) {
+    for (const [bpId, variation] of Object.entries(node.variations)) {
+      if (!breakpointRules[bpId]) continue
+
+      if (variation.inheritedOverrides) {
+        for (const [nodeId, override] of Object.entries(variation.inheritedOverrides)) {
+          const selector = `[data-element-id="${nodeId}"]`
+          if (override.hidden) {
+            breakpointRules[bpId].push(`${selector} { display: none !important; }`)
+          } else if (override.styles && Object.keys(override.styles).length > 0) {
+            const propsStr = Object.entries(override.styles)
+              .filter(([_, value]) => value !== undefined && value !== '')
+              .map(([key, value]) => `${toKebabCase(key)}: ${value} !important`)
+              .join('; ')
+            if (propsStr) {
+              breakpointRules[bpId].push(`${selector} { ${propsStr} }`)
+            }
+          }
+        }
+      }
+
+      if (variation.specificChildren) {
+        for (const child of variation.specificChildren) {
+          const selector = `[data-element-id="${child.id}"]`
+          breakpointRules[bpId].push(`${selector} { display: ${child.styles?.properties?.display || 'block'} !important; }`)
+          collectResponsiveRules(child, breakpointRules)
+        }
+      }
+    }
+  }
+
+  for (const child of node.children || []) {
+    collectResponsiveRules(child, breakpointRules)
+  }
+}
+
+/**
+ * Собирает все ID specificChildren из всех breakpoints, рекурсивно
+ */
+export const collectSpecificChildrenIds = (node: BlockNode): Set<string> => {
+  const ids = new Set<string>()
+  collectSpecificIdsRecursive(node, ids)
+  return ids
+}
+
+function collectSpecificIdsRecursive(node: BlockNode, ids: Set<string>): void {
+  if (node.variations) {
+    for (const variation of Object.values(node.variations)) {
+      if (variation.specificChildren) {
+        for (const child of variation.specificChildren) {
+          addAllIds(child, ids)
+        }
+      }
+    }
+  }
+  for (const child of node.children || []) {
+    collectSpecificIdsRecursive(child, ids)
+  }
+}
+
+function addAllIds(node: BlockNode, ids: Set<string>): void {
+  ids.add(node.id)
+  for (const child of node.children || []) {
+    addAllIds(child, ids)
+  }
+}
+
+/**
+ * Генерирует HTML из BlockNode, включая specificChildren из variations.
+ * Рендерит базовое дерево + viewport-specific элементы (они скрыты через CSS).
+ */
+export const generateFullHTML = (node: BlockNode): string => {
+  const styleString = Object.entries(node.styles.properties)
+    .filter(([_, value]) => value)
+    .map(([key, value]) => {
+      const cssKey = toKebabCase(key)
+      return `${cssKey}: ${value}`
+    })
+    .join('; ')
+
+  const attrs = Object.entries(node.attributes || {})
+    .map(([key, value]) => `${key}="${value}"`)
+    .join(' ')
+
+  const dataAttr = `data-element-id="${node.id}"`
+
+  // Рендерим базовые дочерние элементы
+  const childrenHTML = (node.children || []).map(child => generateFullHTML(child)).join('')
+
+  // Рендерим specificChildren из всех variations
+  let specificHTML = ''
+  if (node.variations) {
+    for (const variation of Object.values(node.variations)) {
+      if (variation.specificChildren) {
+        specificHTML += variation.specificChildren.map(child => generateFullHTML(child)).join('')
+      }
+    }
+  }
+
+  const content = node.content || ''
+
+  return `<${node.tagName} style="${styleString}" ${dataAttr} ${attrs}>${content}${childrenHTML}${specificHTML}</${node.tagName}>`
 }

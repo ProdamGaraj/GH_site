@@ -1,10 +1,10 @@
 import { z } from 'zod'
 
 const metadataSchema = z.object({
-  title: z.string().min(1).max(255),
+  title: z.string().max(255).optional().default(''),
   description: z.string().max(1000).optional().default(''),
   keywords: z.array(z.string()).optional().default([]),
-  ogImage: z.string().url().optional(),
+  ogImage: z.union([z.string().url(), z.literal('')]).optional(),
 })
 
 // POST /api/pages

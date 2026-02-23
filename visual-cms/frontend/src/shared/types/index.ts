@@ -289,6 +289,8 @@ export interface BlockNode {
     customHeadHtml?: string
     /** Raw HTML to inject before </body> (scripts, etc.) — only used on root node */
     customBodyEndHtml?: string
+    /** Breakpoint definitions for responsive CSS generation — only used on root node */
+    breakpoints?: Array<{ id: string; name: string; width: number; height?: number }>
   }
   
   // Р’Р°СЂРёР°С†РёРё РґР»СЏ СЂР°Р·РЅС‹С… Р±СЂРµР№РєРїРѕРёРЅС‚РѕРІ (РЅРµР·Р°РІРёСЃРёРјС‹Рµ DOM РґРµСЂРµРІСЊСЏ)

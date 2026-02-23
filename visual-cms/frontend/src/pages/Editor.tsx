@@ -22,7 +22,6 @@ import {
   moveNode,
   reorderNode,
   updateNodePosition,
-  updateNodeStyles,
   startDrag,
   endDrag,
   selectDragState,
@@ -135,13 +134,6 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
     },
   })
   
-  // Viewport widths
-  const viewportWidths = {
-    desktop: '1440px',
-    tablet: '768px',
-    mobile: '375px',
-  }
-
   // Keep ref in sync with state
   useEffect(() => {
     dropIndicatorRef.current = dropIndicator
@@ -306,32 +298,10 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
     }
   }, [type, dispatch])
 
-  // Update root container styles based on editor type and viewport
-  useEffect(() => {
-    if (!rootNode) return
-    
-    if (type === 'page') {
-      // Page editor: fixed width by viewport, height by content
-      dispatch(updateNodeStyles({
-        nodeId: rootNode.id,
-        properties: {
-          width: viewportWidths[viewport],
-          minHeight: '100px',
-          height: 'auto',
-        }
-      }))
-    } else {
-      // Block editor: fit-content
-      dispatch(updateNodeStyles({
-        nodeId: rootNode.id,
-        properties: {
-          width: 'fit-content',
-          minWidth: '200px',
-          minHeight: '100px',
-        }
-      }))
-    }
-  }, [type, viewport, rootNode?.id, dispatch])
+  // Root container width is managed by Canvas viewport wrapper (CSS-only).
+  // Do NOT dispatch updateNodeStyles here — it mutates base styles on every
+  // viewport switch, writes the viewport-specific width into the saved structure,
+  // and marks the page dirty.
 
   const sensors = useSensors(
     useSensor(MouseSensor, {

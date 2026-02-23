@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectRootNode, selectIsDirty, markAsSaved } from '@/features/editor/editorSlice'
+import { selectRootNode, selectIsDirty, selectBreakpoints, markAsSaved } from '@/features/editor/editorSlice'
 import { updatePage } from '@/features/pages/pagesSlice'
 import { updateBlock } from '@/features/blocks/blocksSlice'
 import type { BlockNode, EditorPageSettings } from '@/shared/types'
@@ -54,6 +54,7 @@ export function useAutoSave({
   const dispatch = useAppDispatch()
   const rootNode = useAppSelector(selectRootNode)
   const isDirty = useAppSelector(selectIsDirty)
+  const breakpoints = useAppSelector(selectBreakpoints)
   
   const [state, setState] = useState<AutoSaveState>({
     lastSavedAt: null,
@@ -86,18 +87,26 @@ export function useAutoSave({
     
     try {
       if (documentType === 'page' && pageSettings) {
+        // Inject breakpoints into root metadata (same as handleSave)
+        const structureWithBreakpoints = {
+          ...rootNode,
+          metadata: {
+            ...rootNode.metadata,
+            breakpoints: breakpoints.map(bp => ({ id: bp.id, name: bp.name, width: bp.width, height: bp.height })),
+          },
+        }
         await dispatch(updatePage({
           id: documentId,
           data: {
-            structure: rootNode,
+            structure: structureWithBreakpoints,
             name: pageSettings.name,
             slug: pageSettings.slug,
             status: pageSettings.status,
             metadata: {
-              title: pageSettings.metaTitle,
-              description: pageSettings.metaDescription,
+              title: pageSettings.metaTitle || undefined,
+              description: pageSettings.metaDescription || undefined,
               keywords: pageSettings.keywords ? pageSettings.keywords.split(',').map(k => k.trim()) : [],
-              ogImage: pageSettings.ogImage,
+              ogImage: pageSettings.ogImage || undefined,
             }
           }
         })).unwrap()
@@ -134,7 +143,7 @@ export function useAutoSave({
       
       onSaveError?.(error instanceof Error ? error : new Error(errorMessage))
     }
-  }, [documentId, documentType, rootNode, pageSettings, dispatch, serializeNode, onSaveSuccess, onSaveError])
+  }, [documentId, documentType, rootNode, breakpoints, pageSettings, dispatch, serializeNode, onSaveSuccess, onSaveError])
   
   // Обновляем состояние hasUnsavedChanges
   useEffect(() => {

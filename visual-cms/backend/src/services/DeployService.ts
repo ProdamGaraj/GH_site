@@ -389,6 +389,20 @@ export class DeployService {
         node = { ...node, children: node.children.map(injectTemplates) }
       }
 
+      // Traverse viewport-specific children (responsive variations)
+      if (node.variations) {
+        const updatedVariations: any = { ...node.variations }
+        for (const [bpId, variation] of Object.entries(updatedVariations) as [string, any][]) {
+          if (variation.specificChildren && Array.isArray(variation.specificChildren)) {
+            updatedVariations[bpId] = {
+              ...variation,
+              specificChildren: variation.specificChildren.map(injectTemplates)
+            }
+          }
+        }
+        node = { ...node, variations: updatedVariations }
+      }
+
       // Check if this node has a binding with libraryTemplateId
       const binding = bindings.find((b: any) => {
         const config = b.config as any

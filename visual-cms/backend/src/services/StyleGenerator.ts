@@ -43,6 +43,25 @@ interface BlockScript {
   enabled: boolean
 }
 
+interface BlockNodeVariation {
+  inheritedOverrides?: {
+    [nodeId: string]: {
+      hidden?: boolean
+      styles?: CSSProperties
+      attributes?: Record<string, string>
+      content?: string
+    }
+  }
+  specificChildren?: BlockNode[]
+}
+
+interface BreakpointDef {
+  id: string
+  name: string
+  width: number
+  height?: number
+}
+
 interface BlockNode {
   id: string
   tagName: string
@@ -54,6 +73,15 @@ interface BlockNode {
   }
   animations?: Animation[]
   scripts?: BlockScript[]
+  variations?: {
+    [breakpointId: string]: BlockNodeVariation
+  }
+  metadata?: {
+    name?: string
+    customHeadHtml?: string
+    customBodyEndHtml?: string
+    breakpoints?: BreakpointDef[]
+  }
 }
 
 // Animation preset keyframes
@@ -389,6 +417,124 @@ export class StyleGenerator {
     }
 
     return { css, keyframes, scripts }
+  }
+
+  /**
+   * Генерирует responsive CSS (@media queries) из variations дерева узлов.
+   * Обходит дерево рекурсивно, собирает все inheritedOverrides и specificChildren,
+   * группирует по breakpoint и генерирует @media (max-width) блоки.
+   */
+  generateResponsiveCSS(rootNode: BlockNode): string {
+    // Извлекаем breakpoints из metadata root-узла, с fallback на стандартные
+    let breakpoints: BreakpointDef[] = rootNode.metadata?.breakpoints || []
+    if (breakpoints.length === 0) {
+      // Fallback: default breakpoints matching frontend editorSlice defaults
+      breakpoints = [
+        { id: 'desktop-fhd', name: 'Desktop FHD', width: 1920 },
+        { id: 'desktop-hd', name: 'Desktop HD', width: 1440 },
+        { id: 'tablet', name: 'Tablet', width: 768 },
+        { id: 'mobile', name: 'Mobile', width: 375 },
+      ]
+    }
+
+    // Сортируем breakpoints от большего к меньшему для правильного каскада CSS
+    const sortedBreakpoints = [...breakpoints].sort((a, b) => b.width - a.width)
+
+    // Собираем CSS-правила для каждого breakpoint
+    const breakpointRules: Record<string, string[]> = {}
+    for (const bp of sortedBreakpoints) {
+      breakpointRules[bp.id] = []
+    }
+
+    // Рекурсивно собираем overrides из всего дерева
+    this.collectResponsiveRules(rootNode, breakpointRules)
+
+    // Генерируем итоговый CSS
+    let css = '\n    /* Responsive styles */\n'
+    for (const bp of sortedBreakpoints) {
+      const rules = breakpointRules[bp.id]
+      if (!rules || rules.length === 0) continue
+      css += `    @media (max-width: ${bp.width}px) {\n`
+      css += rules.map(r => `      ${r}`).join('\n')
+      css += '\n    }\n'
+    }
+
+    return css
+  }
+
+  /**
+   * Рекурсивно собирает CSS-правила из variations для каждого breakpoint
+   */
+  private collectResponsiveRules(
+    node: BlockNode,
+    breakpointRules: Record<string, string[]>
+  ): void {
+    if (node.variations) {
+      for (const [bpId, variation] of Object.entries(node.variations)) {
+        if (!breakpointRules[bpId]) continue
+
+        // Обрабатываем inheritedOverrides
+        if (variation.inheritedOverrides) {
+          for (const [nodeId, override] of Object.entries(variation.inheritedOverrides)) {
+            const selector = `[data-element-id="${nodeId}"]`
+            if (override.hidden) {
+              breakpointRules[bpId].push(`${selector} { display: none !important; }`)
+            } else if (override.styles && Object.keys(override.styles).length > 0) {
+              const propsStr = cssPropertiesToString(override.styles, true)
+              if (propsStr) {
+                breakpointRules[bpId].push(`${selector} { ${propsStr} }`)
+              }
+            }
+          }
+        }
+
+        // Обрабатываем specificChildren — показываем их только в этом breakpoint
+        if (variation.specificChildren) {
+          for (const child of variation.specificChildren) {
+            const selector = `[data-element-id="${child.id}"]`
+            breakpointRules[bpId].push(`${selector} { display: ${child.styles?.properties?.display || 'block'} !important; }`)
+            // Рекурсивно обходим specificChildren (у них тоже могут быть variations)
+            this.collectResponsiveRules(child, breakpointRules)
+          }
+        }
+      }
+    }
+
+    // Рекурсивно обрабатываем children
+    for (const child of node.children || []) {
+      this.collectResponsiveRules(child, breakpointRules)
+    }
+  }
+
+  /**
+   * Собирает все ID specificChildren из всех breakpoints, рекурсивно
+   */
+  collectSpecificChildrenIds(node: BlockNode): Set<string> {
+    const ids = new Set<string>()
+    this.collectSpecificIdsRecursive(node, ids)
+    return ids
+  }
+
+  private collectSpecificIdsRecursive(node: BlockNode, ids: Set<string>): void {
+    if (node.variations) {
+      for (const variation of Object.values(node.variations)) {
+        if (variation.specificChildren) {
+          for (const child of variation.specificChildren) {
+            this.addAllIds(child, ids)
+          }
+        }
+      }
+    }
+    for (const child of node.children || []) {
+      this.collectSpecificIdsRecursive(child, ids)
+    }
+  }
+
+  private addAllIds(node: BlockNode, ids: Set<string>): void {
+    ids.add(node.id)
+    for (const child of node.children || []) {
+      this.addAllIds(child, ids)
+    }
   }
 
   /**

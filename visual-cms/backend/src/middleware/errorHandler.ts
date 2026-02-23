@@ -168,7 +168,7 @@ export function errorHandler(
   if (!(error instanceof AppError) || !error.isOperational) {
     console.error('Unhandled error:', error)
   } else if (process.env.NODE_ENV !== 'production') {
-    console.error(`[${(error as AppError).code}] ${error.message}`)
+    console.error(`[${(error as AppError).code}] ${error.message}`, (error as AppError).details ? JSON.stringify((error as AppError).details, null, 2) : '')
   }
 
   // Determine status code

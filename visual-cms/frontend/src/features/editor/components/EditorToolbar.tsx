@@ -13,8 +13,7 @@ import { BreakpointManager } from './BreakpointManager'
 import { ExportImportModal } from './ExportImportModal'
 import { FullPageHtmlEditor } from './FullPageHtmlEditor'
 import { deployApi, blockApi, pageApi } from '@/shared/api'
-import { generateNodeTreeCSS } from '../utils/styleGenerator'
-import { getEffectiveTree } from '../utils/variationUtils'
+import { generateNodeTreeCSS, generateResponsiveCSS, collectSpecificChildrenIds, generateFullHTML } from '../utils/styleGenerator'
 import type { BlockNode } from '@/shared/types'
 
 interface EditorToolbarProps {
@@ -142,18 +141,27 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           // Сначала синхронизируем вложенные linked блоки в библиотеку
           await syncNestedLinkedBlocksToLibrary(rootNode)
           
+          // Сохраняем breakpoints в metadata root-узла для генерации responsive CSS при публикации
+          const structureWithBreakpoints = {
+            ...rootNode,
+            metadata: {
+              ...rootNode.metadata,
+              breakpoints: breakpoints.map(bp => ({ id: bp.id, name: bp.name, width: bp.width, height: bp.height })),
+            },
+          }
+          
           await dispatch(updatePage({
             id: id!,
             data: {
-              structure: rootNode,
+              structure: structureWithBreakpoints,
               name: pageSettings.name,
               slug: pageSettings.slug,
               status: pageSettings.status,
               metadata: {
-                title: pageSettings.metaTitle,
-                description: pageSettings.metaDescription,
+                title: pageSettings.metaTitle || undefined,
+                description: pageSettings.metaDescription || undefined,
                 keywords: pageSettings.keywords ? pageSettings.keywords.split(',').map(k => k.trim()) : [],
-                ogImage: pageSettings.ogImage,
+                ogImage: pageSettings.ogImage || undefined,
               }
             }
           })).unwrap()
@@ -315,10 +323,19 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       if (!pageSettings || !pageSettings.name.trim() || !pageSettings.slug.trim()) return
 
       try {
+        // Сохраняем breakpoints в metadata root-узла
+        const structureWithBreakpoints = {
+          ...rootNode,
+          metadata: {
+            ...rootNode.metadata,
+            breakpoints: breakpoints.map(bp => ({ id: bp.id, name: bp.name, width: bp.width, height: bp.height })),
+          },
+        }
+        
         const result = await dispatch(createPage({
           name: pageSettings.name.trim(),
           slug: pageSettings.slug.trim(),
-          structure: rootNode,
+          structure: structureWithBreakpoints,
           metadata: {
             title: pageSettings.metaTitle || pageSettings.name,
             description: pageSettings.metaDescription,
@@ -1276,40 +1293,35 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onCl
     return () => document.removeEventListener('wheel', handleWheel, { capture: true })
   }, [zoom])
 
-  // Получаем эффективное дерево с применёнными responsive стилями
-  const effectiveTree = useMemo(() => {
-    return getEffectiveTree(rootNode, selectedBreakpoint, 'responsive')
-  }, [rootNode, selectedBreakpoint])
-
-  // Generate HTML from BlockNode tree
-  const generateHTML = (node: import('@/shared/types').BlockNode): string => {
-    const styleString = Object.entries(node.styles.properties)
-      .filter(([_, value]) => value)
-      .map(([key, value]) => {
-        // Convert camelCase to kebab-case
-        const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase()
-        return `${cssKey}: ${value}`
-      })
-      .join('; ')
-
-    const attrs = Object.entries(node.attributes)
-      .map(([key, value]) => `${key}="${value}"`)
-      .join(' ')
+  // Генерируем HTML из базового дерева (включая specificChildren из всех breakpoints)
+  // и responsive CSS с @media queries — так при изменении ширины стили автоматически применяются
+  const { previewHTML, responsiveCSS, specificHideCSS, stateAnimCSS, keyframes, animScripts } = useMemo(() => {
+    // HTML из базового дерева со всеми specificChildren
+    const html = generateFullHTML(rootNode)
     
-    // Add data-element-id for state styles and animations
-    const dataAttr = `data-element-id="${node.id}"`
-
-    const childrenHTML = node.children.map(child => generateHTML(child)).join('')
-    const content = node.content || ''
-
-    return `<${node.tagName} style="${styleString}" ${dataAttr} ${attrs}>${content}${childrenHTML}</${node.tagName}>`
-  }
-
-  // Используем effectiveTree для генерации HTML с responsive стилями
-  const previewHTML = generateHTML(effectiveTree)
-  
-  // Generate CSS for states (hover, etc.) and animations
-  const { css: stateAnimCSS, keyframes, scripts: animScripts } = generateNodeTreeCSS(effectiveTree)
+    // Responsive @media CSS из variations
+    const respCSS = generateResponsiveCSS(rootNode, breakpoints)
+    
+    // Базовый CSS для скрытия specificChildren (по умолчанию скрыты, показываются через @media)
+    const specificIds = collectSpecificChildrenIds(rootNode)
+    let hideCSS = ''
+    if (specificIds.size > 0) {
+      const selectors = Array.from(specificIds).map(id => `[data-element-id="${id}"]`)
+      hideCSS = selectors.join(', ') + ' { display: none !important; }\n'
+    }
+    
+    // CSS для hover/animations
+    const { css: stateAnim, keyframes: kf, scripts: animSc } = generateNodeTreeCSS(rootNode)
+    
+    return {
+      previewHTML: html,
+      responsiveCSS: respCSS,
+      specificHideCSS: hideCSS,
+      stateAnimCSS: stateAnim,
+      keyframes: kf,
+      animScripts: animSc,
+    }
+  }, [rootNode, breakpoints])
 
   return (
     <div 
@@ -1496,6 +1508,10 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onCl
                       body { font-family: system-ui, -apple-system, sans-serif; }
                       ${keyframes}
                       ${stateAnimCSS}
+                      /* Hide viewport-specific elements by default */
+                      ${specificHideCSS}
+                      /* Responsive @media queries */
+                      ${responsiveCSS}
                     </style>
                   </head>
                   <body>

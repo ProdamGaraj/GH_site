@@ -52,6 +52,16 @@ export class LinkedBlocksService {
         this._collectLinkedIds(child, ids)
       }
     }
+    // Traverse viewport-specific children (responsive variations)
+    if (node.variations) {
+      for (const variation of Object.values(node.variations) as any[]) {
+        if (variation.specificChildren && Array.isArray(variation.specificChildren)) {
+          for (const child of variation.specificChildren) {
+            this._collectLinkedIds(child, ids)
+          }
+        }
+      }
+    }
   }
 
   /** екурсивно подставляет библиотечные структуры из Map */
@@ -92,6 +102,20 @@ export class LinkedBlocksService {
       structure.children = structure.children.map(
         (child: any) => this._applyLinkedBlocks(child, blockMap, processingIds)
       )
+    }
+
+    // Traverse viewport-specific children (responsive variations)
+    if (structure.variations) {
+      for (const [bpId, variation] of Object.entries(structure.variations) as [string, any][]) {
+        if (variation.specificChildren && Array.isArray(variation.specificChildren)) {
+          structure.variations[bpId] = {
+            ...variation,
+            specificChildren: variation.specificChildren.map(
+              (child: any) => this._applyLinkedBlocks(child, blockMap, processingIds)
+            )
+          }
+        }
+      }
     }
 
     return structure
@@ -144,6 +168,16 @@ export class LinkedBlocksService {
     if (node.children && Array.isArray(node.children)) {
       for (const child of node.children) {
         this._collectLinkedNodes(child, result)
+      }
+    }
+    // Traverse viewport-specific children (responsive variations)
+    if (node.variations) {
+      for (const variation of Object.values(node.variations) as any[]) {
+        if (variation.specificChildren && Array.isArray(variation.specificChildren)) {
+          for (const child of variation.specificChildren) {
+            this._collectLinkedNodes(child, result)
+          }
+        }
       }
     }
   }
