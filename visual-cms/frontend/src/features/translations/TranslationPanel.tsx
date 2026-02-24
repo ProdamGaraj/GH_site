@@ -20,14 +20,55 @@ import {
   selectDefaultLanguage,
   updateTranslationLocally,
 } from './translationsSlice'
-import { selectRootNode, selectSelectedNode, setActiveRightPanel } from '@/features/editor/editorSlice'
+import { selectRootNode, selectSelectedNode, setActiveRightPanel, updateNode } from '@/features/editor/editorSlice'
 import { Button } from '@/shared/components/Button'
 import { 
   Globe, ChevronDown, Check, Search, Image, Type, Link, 
   FileText, Save, Loader2, X, Languages, ArrowRight,
-  Eye, EyeOff, Settings
+  Eye, EyeOff, Settings, MousePointer, Trash2
 } from 'lucide-react'
 import type { TranslationEntry } from '@/shared/types/translation'
+
+// --- Language Binding types ---
+type LangRole = '' | 'lang-switch' | 'lang-selector' | 'lang-current' | 'lang-active'
+
+const LANG_ROLES: { value: LangRole; label: string; description: string }[] = [
+  { value: '', label: 'Нет роли', description: 'Элемент не участвует в переключении языка' },
+  { value: 'lang-switch', label: 'Кнопка языка', description: 'Клик переключает на выбранный язык' },
+  { value: 'lang-selector', label: 'Выпадающий список', description: 'Становится <select> со всеми языками' },
+  { value: 'lang-current', label: 'Текущий язык', description: 'Показывает название/флаг текущего языка' },
+  { value: 'lang-active', label: 'Индикатор активного', description: 'Виден только когда активен выбранный язык' },
+]
+
+const CURRENT_DISPLAY_OPTIONS = [
+  { value: '', label: 'Название (по умолчанию)' },
+  { value: 'flag', label: 'Флаг эмодзи' },
+  { value: 'code', label: 'Код (en, ru, kz)' },
+  { value: 'native', label: 'Родное название' },
+]
+
+function detectLangRole(attributes: Record<string, string> | undefined): {
+  role: LangRole
+  langCode: string
+  displayFormat: string
+} {
+  if (!attributes) return { role: '', langCode: '', displayFormat: '' }
+  
+  if ('data-lang-switch' in attributes) {
+    return { role: 'lang-switch', langCode: attributes['data-lang-switch'] || '', displayFormat: '' }
+  }
+  if ('data-lang-selector' in attributes) {
+    return { role: 'lang-selector', langCode: '', displayFormat: '' }
+  }
+  if ('data-lang-current' in attributes) {
+    return { role: 'lang-current', langCode: '', displayFormat: attributes['data-lang-current'] || '' }
+  }
+  if ('data-lang-active' in attributes) {
+    return { role: 'lang-active', langCode: attributes['data-lang-active'] || '', displayFormat: '' }
+  }
+  
+  return { role: '', langCode: '', displayFormat: '' }
+}
 
 interface TranslationPanelProps {
   pageId: string
@@ -72,6 +113,210 @@ function getFieldCategory(field: string): FieldCategory {
 function truncate(str: string, maxLen: number): string {
   if (str.length <= maxLen) return str
   return str.slice(0, maxLen) + '…'
+}
+
+// --- Language Binding Section Component ---
+interface LanguageBindingSectionProps {
+  selectedNode: { id: string; tagName?: string; metadata?: { name?: string }; attributes?: Record<string, string> }
+  languages: Array<{ code: string; name: string; nativeName: string; flag?: string }>
+  dispatch: ReturnType<typeof useAppDispatch>
+}
+
+const LanguageBindingSection: React.FC<LanguageBindingSectionProps> = ({
+  selectedNode,
+  languages,
+  dispatch,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(true)
+  
+  // Detect what's currently saved on the node
+  const saved = useMemo(
+    () => detectLangRole(selectedNode.attributes),
+    [selectedNode.attributes]
+  )
+
+  // Local draft state — initialize from saved (key={selectedNode.id} on parent handles reset on node change)
+  const [draftRole, setDraftRole] = useState<LangRole>(saved.role)
+  const [draftLangCode, setDraftLangCode] = useState(saved.langCode)
+  const [draftDisplayFormat, setDraftDisplayFormat] = useState(saved.displayFormat)
+
+  const nodeName = selectedNode.metadata?.name || selectedNode.tagName || selectedNode.id.slice(0, 8)
+
+  // Check if draft differs from saved
+  const hasChanges = draftRole !== saved.role 
+    || draftLangCode !== saved.langCode 
+    || draftDisplayFormat !== saved.displayFormat
+
+  const clearAllLangAttributes = useCallback((attrs: Record<string, string>) => {
+    const cleaned = { ...attrs }
+    delete cleaned['data-lang-switch']
+    delete cleaned['data-lang-selector']
+    delete cleaned['data-lang-current']
+    delete cleaned['data-lang-active']
+    return cleaned
+  }, [])
+
+  // When role changes in the dropdown, update draft + set sensible defaults
+  const handleDraftRoleChange = useCallback((newRole: LangRole) => {
+    setDraftRole(newRole)
+    if (newRole === 'lang-switch' || newRole === 'lang-active') {
+      setDraftLangCode(prev => prev || languages[0]?.code || 'en')
+      setDraftDisplayFormat('')
+    } else if (newRole === 'lang-current') {
+      setDraftLangCode('')
+      setDraftDisplayFormat('')
+    } else {
+      setDraftLangCode('')
+      setDraftDisplayFormat('')
+    }
+  }, [languages])
+
+  // Apply draft to the node
+  const handleApply = useCallback(() => {
+    const baseAttrs = clearAllLangAttributes(selectedNode.attributes || {})
+    
+    let newAttrs: Record<string, string>
+    switch (draftRole) {
+      case 'lang-switch':
+        newAttrs = { ...baseAttrs, 'data-lang-switch': draftLangCode || languages[0]?.code || 'en' }
+        break
+      case 'lang-selector':
+        newAttrs = { ...baseAttrs, 'data-lang-selector': '' }
+        break
+      case 'lang-current':
+        newAttrs = { ...baseAttrs, 'data-lang-current': draftDisplayFormat }
+        break
+      case 'lang-active':
+        newAttrs = { ...baseAttrs, 'data-lang-active': draftLangCode || languages[0]?.code || 'en' }
+        break
+      default:
+        newAttrs = baseAttrs
+    }
+    
+    dispatch(updateNode({ id: selectedNode.id, updates: { attributes: newAttrs } }))
+  }, [dispatch, selectedNode.id, selectedNode.attributes, draftRole, draftLangCode, draftDisplayFormat, languages, clearAllLangAttributes])
+
+  const handleRemoveBinding = useCallback(() => {
+    const baseAttrs = clearAllLangAttributes(selectedNode.attributes || {})
+    dispatch(updateNode({ id: selectedNode.id, updates: { attributes: baseAttrs } }))
+    setDraftRole('')
+    setDraftLangCode('')
+    setDraftDisplayFormat('')
+  }, [dispatch, selectedNode.id, selectedNode.attributes, clearAllLangAttributes])
+
+  return (
+    <div className="border-b border-gray-200">
+      {/* Section header */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center gap-2 p-2 hover:bg-gray-50 transition-colors"
+      >
+        <MousePointer size={12} className="text-purple-500" />
+        <span className="text-[10px] font-semibold text-gray-600 uppercase flex-1 text-left">
+          Привязка языка
+        </span>
+        <span className="text-[10px] text-gray-400 truncate max-w-[100px]">
+          {nodeName}
+        </span>
+        <ChevronDown
+          size={12}
+          className={`text-gray-400 transition-transform ${isExpanded ? '' : '-rotate-90'}`}
+        />
+      </button>
+
+      {isExpanded && (
+        <div className="px-3 pb-3 space-y-2">
+          {/* Current saved assignment indicator */}
+          {saved.role && (
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-purple-50 rounded text-[10px] text-purple-700">
+              <Check size={10} />
+              <span className="flex-1">
+                {LANG_ROLES.find(r => r.value === saved.role)?.label}
+                {saved.langCode && ` → ${saved.langCode}`}
+                {saved.displayFormat && ` (${CURRENT_DISPLAY_OPTIONS.find(o => o.value === saved.displayFormat)?.label || saved.displayFormat})`}
+              </span>
+              <button
+                onClick={handleRemoveBinding}
+                className="p-0.5 rounded hover:bg-purple-100 text-purple-400 hover:text-purple-600 transition-colors"
+                title="Удалить привязку"
+              >
+                <Trash2 size={10} />
+              </button>
+            </div>
+          )}
+
+          {/* Role selector */}
+          <div>
+            <label className="text-[10px] text-gray-500 mb-1 block">Роль элемента</label>
+            <select
+              value={draftRole}
+              onChange={(e) => handleDraftRoleChange(e.target.value as LangRole)}
+              className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:border-blue-400 focus:outline-none bg-white text-gray-900"
+            >
+              {LANG_ROLES.map(r => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+            <p className="text-[9px] text-gray-400 mt-0.5">
+              {LANG_ROLES.find(r => r.value === draftRole)?.description}
+            </p>
+          </div>
+
+          {/* Language code selector — for lang-switch and lang-active */}
+          {(draftRole === 'lang-switch' || draftRole === 'lang-active') && (
+            <div>
+              <label className="text-[10px] text-gray-500 mb-1 block">
+                {draftRole === 'lang-switch' ? 'Переключить на язык' : 'Показывать для языка'}
+              </label>
+              <div className="flex flex-wrap gap-1">
+                {languages.map(lang => (
+                  <button
+                    key={lang.code}
+                    onClick={() => setDraftLangCode(lang.code)}
+                    className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded border transition-colors ${
+                      draftLangCode === lang.code
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-purple-300'
+                    }`}
+                  >
+                    <span>{lang.flag || '🌐'}</span>
+                    <span>{lang.code}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Display format — for lang-current */}
+          {draftRole === 'lang-current' && (
+            <div>
+              <label className="text-[10px] text-gray-500 mb-1 block">Формат отображения</label>
+              <select
+                value={draftDisplayFormat}
+                onChange={(e) => setDraftDisplayFormat(e.target.value)}
+                className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:border-blue-400 focus:outline-none bg-white text-gray-900"
+              >
+                {CURRENT_DISPLAY_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Apply button — visible when draft differs from saved */}
+          {hasChanges && (
+            <button
+              onClick={handleApply}
+              className="w-full flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-2 rounded bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+            >
+              <Check size={14} />
+              Применить
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) => {
@@ -376,6 +621,30 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
             <span className="ml-1">Выбранный</span>
           </button>
         </div>
+      </div>
+
+      {/* Language Binding Section — assign data-lang-* attributes to selected element */}
+      <div className="border-b border-gray-200">
+        {selectedNode ? (
+          <LanguageBindingSection
+            key={selectedNode.id}
+            selectedNode={selectedNode}
+            languages={languages}
+            dispatch={dispatch}
+          />
+        ) : (
+          <div className="p-2">
+            <div className="flex items-center gap-2 mb-1">
+              <MousePointer size={12} className="text-purple-500" />
+              <span className="text-[10px] font-semibold text-gray-600 uppercase">
+                Привязка языка
+              </span>
+            </div>
+            <p className="text-[10px] text-gray-400 pl-5">
+              Выберите элемент на странице, чтобы назначить ему роль переключателя языка
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Content: Translation entries */}

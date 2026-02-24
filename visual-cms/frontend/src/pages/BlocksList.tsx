@@ -42,7 +42,11 @@ export const BlocksList: React.FC = () => {
         const map: Record<string, BlockUsage[]> = {}
         for (const block of data) {
           if (block.usages && block.usages.length > 0) {
-            map[block.id] = block.usages
+            map[block.id] = block.usages.map((u: any) => ({
+              type: (u.type || 'page') as 'page' | 'block',
+              id: u.id || u.pageId || '',
+              name: u.name || u.pageName || '',
+            }))
           }
         }
         setUsagesMap(map)
@@ -174,11 +178,11 @@ export const BlocksList: React.FC = () => {
                       <div className="flex flex-wrap gap-1">
                         {usagesMap[block.id].map((u, idx) => (
                           <span
-                            key={`${u.id}-${idx}`}
+                            key={`${u.id || idx}-${idx}`}
                             className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded truncate max-w-[120px]"
                             title={u.name}
                           >
-                            {u.name || u.id.slice(0, 8)}
+                            {u.name || u.id?.slice(0, 8) || '?'}
                           </span>
                         ))}
                       </div>

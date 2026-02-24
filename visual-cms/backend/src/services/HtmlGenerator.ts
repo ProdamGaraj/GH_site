@@ -21,6 +21,14 @@ interface StateTransition {
   properties: string[]
 }
 
+export interface AvailableLanguage {
+  code: string
+  name: string
+  flag: string
+  isDefault: boolean
+  direction: string
+}
+
 interface Animation {
   id: string
   preset?: string
@@ -82,7 +90,7 @@ export class HtmlGenerator {
   /**
    * Р“РµРЅРµСЂРёСЂСѓРµС‚ РїРѕР»РЅС‹Р№ HTML РґРѕРєСѓРјРµРЅС‚ РёР· СЃС‚СЂСѓРєС‚СѓСЂС‹ СЃС‚СЂР°РЅРёС†С‹
    */
-  generatePage(structure: BlockNode, metadata: PageMetadata, slug: string, dataConfig?: PageDataConfig, lang?: string, direction?: string): string {
+  generatePage(structure: BlockNode, metadata: PageMetadata, slug: string, dataConfig?: PageDataConfig, lang?: string, direction?: string, availableLanguages?: AvailableLanguage[]): string {
     // Собираем ID specificChildren для базового скрытия
     const specificChildrenIds = styleGenerator.collectSpecificChildrenIds(structure as any)
     
@@ -201,6 +209,7 @@ ${specificHideCSS}${responsiveCSS}
 ${customHeadHtml ? '  ' + customHeadHtml.split('\n').join('\n  ') + '\n' : ''}</head>
 <body>
 ${bodyContent}
+${this.generateLanguageSwitcher(slug, lang, availableLanguages)}
 ${dataConfig ? generateDataBindingRuntime(dataConfig) : ''}
 ${scripts ? `<script>\n${scripts}\n</script>` : ''}
 ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
@@ -208,7 +217,117 @@ ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
   }
 
   /**
-   * РќРµРєСѓСЂСЃРёРІРЅРѕ СЂРµРЅРґРµСЂРёС‚ СѓР·РµР» РІ HTML
+   * Генерирует JS-рантайм для переключения языков.
+   * Не рисует никакого UI — пользователь сам создаёт элементы в редакторе
+   * и привязывает их через data-атрибуты:
+   *
+   *   data-lang-switch="en"       — клик переключает на язык en
+   *   data-lang-switch="kz"       — клик переключает на язык kz
+   *   data-lang-selector           — <select> с <option value="en"> автоматически работает
+   *   data-lang-current            — textContent заполняется названием текущего языка
+   *   data-lang-current="code"     — textContent заполняется кодом языка
+   *   data-lang-current="flag"     — textContent заполняется флагом
+   *   data-lang-current="name"     — textContent заполняется нативным названием
+   *   data-lang-active="en"        — элемент получает класс 'active' если текущий язык en
+   *
+   * JS API (глобальный):
+   *   window.__gh.languages       — массив доступных языков
+   *   window.__gh.currentLang     — текущий код языка
+   *   window.__gh.switchLang(code) — переход на другой язык
+   *   window.__gh.getLangUrl(code) — получить URL для языка
+   */
+  private generateLanguageSwitcher(slug: string, currentLang?: string, languages?: AvailableLanguage[]): string {
+    if (!languages || languages.length < 2) return ''
+
+    const currentCode = currentLang || languages.find(l => l.isDefault)?.code || 'ru'
+    const fileName = slug === 'index' || slug === 'home' ? 'index.html' : `${slug}.html`
+
+    return `
+  <!-- Language Runtime -->
+  <script>
+  (function(){
+    var langs = ${JSON.stringify(languages)};
+    var current = ${JSON.stringify(currentCode)};
+    var file = ${JSON.stringify(fileName)};
+
+    function getLangUrl(code) {
+      var lang = langs.find(function(l){ return l.code === code; });
+      if (!lang) return null;
+      return lang.isDefault ? '/' + file : '/' + code + '/' + file;
+    }
+
+    function switchLang(code) {
+      var url = getLangUrl(code);
+      if (url) window.location.href = url;
+    }
+
+    // Global API
+    window.__gh = window.__gh || {};
+    window.__gh.languages = langs;
+    window.__gh.currentLang = current;
+    window.__gh.switchLang = switchLang;
+    window.__gh.getLangUrl = getLangUrl;
+
+    // Auto-bind data attributes on DOM ready
+    function init() {
+      // data-lang-switch="code" — click to switch
+      document.querySelectorAll('[data-lang-switch]').forEach(function(el){
+        el.addEventListener('click', function(e){
+          e.preventDefault();
+          switchLang(el.getAttribute('data-lang-switch'));
+        });
+      });
+
+      // data-lang-selector — <select> with language options
+      document.querySelectorAll('[data-lang-selector]').forEach(function(sel){
+        // Auto-populate if empty
+        if (sel.tagName === 'SELECT' && sel.options.length === 0) {
+          langs.forEach(function(l){
+            var opt = document.createElement('option');
+            opt.value = l.code;
+            opt.textContent = l.flag + ' ' + l.name;
+            if (l.code === current) opt.selected = true;
+            sel.appendChild(opt);
+          });
+        }
+        // Set current value
+        if (sel.tagName === 'SELECT') sel.value = current;
+        sel.addEventListener('change', function(){
+          switchLang(sel.value);
+        });
+      });
+
+      // data-lang-current — show current language info
+      var currentLangObj = langs.find(function(l){ return l.code === current; });
+      if (currentLangObj) {
+        document.querySelectorAll('[data-lang-current]').forEach(function(el){
+          var attr = el.getAttribute('data-lang-current');
+          if (attr === 'code') el.textContent = currentLangObj.code;
+          else if (attr === 'flag') el.textContent = currentLangObj.flag;
+          else if (attr === 'name') el.textContent = currentLangObj.name;
+          else el.textContent = currentLangObj.flag + ' ' + currentLangObj.name;
+        });
+      }
+
+      // data-lang-active="code" — add 'active' class if current
+      document.querySelectorAll('[data-lang-active]').forEach(function(el){
+        if (el.getAttribute('data-lang-active') === current) {
+          el.classList.add('active');
+        }
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  })();
+  </script>`
+  }
+
+  /**
+   * Некурсивно рендерит узел в HTML
    */
   private renderNode(node: BlockNode, indent: string = '  '): string {
     if (!node) return ''

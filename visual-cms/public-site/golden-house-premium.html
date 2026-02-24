@@ -97,6 +97,8 @@
 [data-element-id="gh-1771847860006-5"]:hover { color: #D29F66 !important }
 [data-element-id="gh-1771847860006-6"] { transition: color 200ms ease; }
 [data-element-id="gh-1771847860006-6"]:hover { color: #D29F66 !important }
+[data-element-id="gh-lang-selector"] { transition: border-color 200ms ease; }
+[data-element-id="gh-lang-selector"]:hover { border-color: #D29F66 !important }
 [data-element-id="gh-1771847860006-7"] { transition: background-color 200ms ease; }
 [data-element-id="gh-1771847860006-7"]:hover { background-color: #B8864D !important }
 [data-element-id="gh-1771847860006-8"] { transition: color 200ms ease; }
@@ -273,7 +275,7 @@ label {
 </head>
 <body>
   <div style="color: #1A1A1A; display: flex; font-family: 'Muller', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; flex-direction: column" data-element-id="gh-premium-1771840286938-155" data-element-name="Golden House Premium Page">
-    <header style="top: 0; height: 80px; z-index: 1000; display: flex; padding: 0 40px; position: sticky; align-items: center; backdrop-filter: blur(20px); justify-content: space-between; background-color: rgba(64, 62, 61, 0.5); -webkit-backdrop-filter: blur(20px)" data-element-id="gh-header-root" data-element-name="Header">
+    <header style="top: 0; height: 80px; z-index: 1000; display: flex; padding: 0 40px; position: sticky; align-items: center; justify-content: space-between; background-color: rgba(64, 62, 61, 0.3)" data-element-id="gh-header-root" data-element-name="Header">
       <a style="color: #D29F66; font-size: 24px; font-family: Muller, sans-serif; font-weight: 700; letter-spacing: 2px; text-decoration: none" data-element-id="gh-header-logo" data-element-name="Logo" href="/">GOLDEN HOUSE</a>
       <nav style="gap: 32px; display: flex" data-element-id="gh-header-nav" data-element-name="Navigation">
         <a style="color: rgba(255,255,255,0.9); font-size: 14px; font-family: Muller, sans-serif; letter-spacing: 1px; text-transform: uppercase; text-decoration: none" data-element-id="gh-1771847860006-1" data-element-name="Nav - Квартиры" href="#">Квартиры</a>
@@ -284,6 +286,11 @@ label {
       </nav>
       <div style="gap: 24px; display: flex; align-items: center" data-element-id="gh-header-right" data-element-name="Header Right">
         <a style="color: #FFFFFF; font-size: 16px; font-family: Muller, sans-serif; font-weight: 500; text-decoration: none" data-element-id="gh-1771847860006-6" data-element-name="Phone" href="tel:+998781501111">+998 78 150-11-11</a>
+        <select style="color: #FFFFFF; border: 1px solid rgba(255,255,255,0.3); cursor: pointer; outline: none; padding: 8px 12px; font-size: 14px; appearance: none; font-family: Muller, sans-serif; font-weight: 500; border-radius: 4px; padding-right: 28px; background-color: transparent; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); -webkit-appearance: none; background-repeat: no-repeat; background-position: right 8px center" data-element-id="gh-lang-selector" data-element-name="Language Selector" data-lang-selector="">
+          <option data-element-id="gh-lang-opt-ru" data-element-name="RU option" value="ru" selected="true">RU</option>
+          <option data-element-id="gh-lang-opt-en" data-element-name="EN option" value="en">EN</option>
+          <option data-element-id="gh-lang-opt-uz" data-element-name="UZ option" value="uz">UZ</option>
+        </select>
         <button style="color: #FFFFFF; border: none; cursor: pointer; padding: 12px 24px; font-size: 14px; font-family: Muller, sans-serif; font-weight: 500; border-radius: 4px; letter-spacing: 1px; text-transform: uppercase; background-color: #D29F66" data-element-id="gh-1771847860006-7" data-element-name="CTA Button">Перезвоните мне</button>
       </div>
       <button style="gap: 5px; width: 40px; border: none; cursor: pointer; height: 40px; z-index: 1002; display: none; padding: 8px; position: relative; align-items: center; flex-direction: column; justify-content: center; background-color: transparent" data-element-id="gh-header-burger" data-element-name="Burger Button" aria-label="Меню" aria-expanded="false">
@@ -510,6 +517,7 @@ label {
       </div>
     </footer>
   </div>
+
 
 
 <script>

@@ -72,12 +72,26 @@ export class DeployService {
       
       console.log('📋 DataConfig for deploy:', JSON.stringify(dataConfig, null, 2))
 
+      // Проверяем наличие переводов для переключателя языков на основной странице
+      const activeLanguages = await languageService.getActive()
+      const translationLocales = await translationService.getPageLocales(page.id)
+      const defaultLang = activeLanguages.find(l => l.isDefault)
+      let availableLangsForSwitcher: { code: string; name: string; flag: string; isDefault: boolean; direction: string }[] | undefined
+      if (translationLocales.length > 0) {
+        availableLangsForSwitcher = activeLanguages
+          .filter(l => l.isActive && (l.isDefault || translationLocales.includes(l.code)))
+          .map(l => ({ code: l.code, name: l.nativeName, flag: l.flag || '🌐', isDefault: l.isDefault, direction: l.direction }))
+      }
+
       // Генерируем HTML
       const html = htmlGenerator.generatePage(
         updatedStructure,
         page.metadata || { title: page.name, description: '', keywords: [] },
         page.slug,
-        dataConfig
+        dataConfig,
+        defaultLang?.code,
+        defaultLang?.direction,
+        availableLangsForSwitcher
       )
 
       // Определяем путь файла
@@ -156,12 +170,26 @@ export class DeployService {
           
           // Загружаем data bindings для страницы
           const dataConfig = await this.preparePageDataConfig(page.id)
+
+          // Проверяем переводы для переключателя
+          const pageLangs = await translationService.getPageLocales(page.id)
+          const allActiveLangs = await languageService.getActive()
+          const defLang = allActiveLangs.find(l => l.isDefault)
+          let pageLangSwitcher: { code: string; name: string; flag: string; isDefault: boolean; direction: string }[] | undefined
+          if (pageLangs.length > 0) {
+            pageLangSwitcher = allActiveLangs
+              .filter(l => l.isActive && (l.isDefault || pageLangs.includes(l.code)))
+              .map(l => ({ code: l.code, name: l.nativeName, flag: l.flag || '🌐', isDefault: l.isDefault, direction: l.direction }))
+          }
           
           const html = htmlGenerator.generatePage(
             updatedStructure,
             page.metadata || { title: page.name, description: '', keywords: [] },
             page.slug,
-            dataConfig
+            dataConfig,
+            defLang?.code,
+            defLang?.direction,
+            pageLangSwitcher
           )
 
           const fileName = page.slug === 'index' || page.slug === 'home' 
@@ -496,6 +524,17 @@ export class DeployService {
 
       if (translationLocales.length === 0) return
 
+      // Build available languages list for the switcher widget
+      const availableLanguages = languages
+        .filter(l => l.isActive && (l.isDefault || translationLocales.includes(l.code)))
+        .map(l => ({
+          code: l.code,
+          name: l.nativeName,
+          flag: l.flag || '🌐',
+          isDefault: l.isDefault,
+          direction: l.direction,
+        }))
+
       for (const lang of languages) {
         // Skip default language — already deployed as the main file
         if (lang.isDefault) continue
@@ -511,14 +550,15 @@ export class DeployService {
               page.metadata || { title: page.name, description: '', keywords: [] }
             )
 
-          // Generate localized HTML with lang attribute
+          // Generate localized HTML with lang attribute and language switcher
           const localizedHtml = htmlGenerator.generatePage(
             translatedStructure,
             translatedMetadata,
             page.slug,
             dataConfig,
             lang.code,
-            lang.direction
+            lang.direction,
+            availableLanguages
           )
 
           // Create language directory: /en/, /kz/, etc.
