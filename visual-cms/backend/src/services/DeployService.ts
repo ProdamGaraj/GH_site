@@ -12,6 +12,8 @@ import { linkedBlocksService } from './LinkedBlocksService'
 import { DataBinding } from '../models/DataBinding'
 import { DataSource as DataSourceEntity } from '../models/DataSource'
 import { PageDataConfig } from './DataBindingGenerator'
+import { translationService } from './TranslationService'
+import { languageService } from './LanguageService'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
@@ -87,6 +89,9 @@ export class DeployService {
       // Записываем файл
       fs.writeFileSync(filePath, html, 'utf-8')
       deployedPages.push(fileName)
+
+      // === Генерация мультиязычных версий ===
+      await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors)
 
       // Обновляем статус страницы
       page.status = 'published'
@@ -166,6 +171,10 @@ export class DeployService {
 
           fs.writeFileSync(filePath, html, 'utf-8')
           deployedPages.push(fileName)
+          
+          // Deploy translations for this page
+          await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors)
+          
           console.log(`✅ Deployed: ${fileName}`)
         } catch (err: any) {
           errors.push(`Ошибка при генерации "${page.name}": ${err.message}`)
@@ -468,6 +477,85 @@ export class DeployService {
     }
 
     return injectTemplates(structure)
+  }
+
+  /**
+   * Генерирует HTML-страницы для всех языковых версий
+   */
+  private async deployPageTranslations(
+    page: Page, 
+    structure: any, 
+    dataConfig: PageDataConfig | undefined,
+    deployedPages: string[],
+    errors: string[]
+  ): Promise<void> {
+    try {
+      const languages = await languageService.getActive()
+      const defaultLang = languages.find(l => l.isDefault)
+      const translationLocales = await translationService.getPageLocales(page.id)
+
+      if (translationLocales.length === 0) return
+
+      for (const lang of languages) {
+        // Skip default language — already deployed as the main file
+        if (lang.isDefault) continue
+        // Only deploy if we have translations for this locale
+        if (!translationLocales.includes(lang.code)) continue
+
+        try {
+          const translationMap = await translationService.getTranslationMap(page.id, lang.code)
+          const { structure: translatedStructure, metadata: translatedMetadata } = 
+            translationService.applyTranslations(
+              structure, 
+              translationMap, 
+              page.metadata || { title: page.name, description: '', keywords: [] }
+            )
+
+          // Generate localized HTML with lang attribute
+          const localizedHtml = htmlGenerator.generatePage(
+            translatedStructure,
+            translatedMetadata,
+            page.slug,
+            dataConfig,
+            lang.code,
+            lang.direction
+          )
+
+          // Create language directory: /en/, /kz/, etc.
+          const langDir = path.join(PUBLIC_DIR, lang.code)
+          this.ensureDirectoryExists(langDir)
+
+          const fileName = page.slug === 'index' || page.slug === 'home'
+            ? 'index.html'
+            : `${page.slug}.html`
+          const filePath = path.join(langDir, fileName)
+
+          fs.writeFileSync(filePath, localizedHtml, 'utf-8')
+          deployedPages.push(`${lang.code}/${fileName}`)
+          console.log(`✅ Deployed [${lang.code}]: ${lang.code}/${fileName}`)
+        } catch (err: any) {
+          errors.push(`Ошибка при генерации "${page.name}" [${lang.code}]: ${err.message}`)
+        }
+      }
+
+      // Generate language switcher data JSON for client-side switching
+      if (translationLocales.length > 0) {
+        const langData = languages
+          .filter(l => l.isActive && (l.isDefault || translationLocales.includes(l.code)))
+          .map(l => ({
+            code: l.code,
+            name: l.nativeName,
+            flag: l.flag,
+            isDefault: l.isDefault,
+            direction: l.direction,
+          }))
+        
+        const langJsonPath = path.join(PUBLIC_DIR, 'languages.json')
+        fs.writeFileSync(langJsonPath, JSON.stringify(langData, null, 2), 'utf-8')
+      }
+    } catch (err: any) {
+      errors.push(`Ошибка при генерации переводов для "${page.name}": ${err.message}`)
+    }
   }
 
   /**

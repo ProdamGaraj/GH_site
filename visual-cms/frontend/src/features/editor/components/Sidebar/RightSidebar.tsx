@@ -1,5 +1,5 @@
 import React from 'react'
-import { FileText, Move, Palette, Type, MousePointer, Zap, Code2, Database, Info } from 'lucide-react'
+import { FileText, Move, Palette, Type, MousePointer, Zap, Code2, Database, Info, Languages } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { setActiveRightPanel, selectActiveRightPanel } from '@/features/editor/editorSlice'
 
@@ -134,6 +134,20 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ mode = 'block' }) =>
       >
         <Database size={20} />
       </button>
+      
+      {mode === 'page' && (
+        <button
+          onClick={() => handlePanelClick('translations')}
+          className={`w-10 h-10 flex items-center justify-center rounded transition-colors ${
+            activePanel === 'translations'
+              ? 'bg-white shadow-sm text-blue-600 border border-blue-300' 
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+          }`}
+          title="Переводы"
+        >
+          <Languages size={20} />
+        </button>
+      )}
       
       <button
         onClick={() => handlePanelClick('css')}

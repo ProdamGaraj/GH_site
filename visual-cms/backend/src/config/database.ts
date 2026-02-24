@@ -12,13 +12,15 @@ import { FormDestination } from '../models/FormDestination'
 import { FormSubmissionLog } from '../models/FormSubmissionLog'
 import { AnalyticsEvent } from '../models/AnalyticsEvent'
 import { AnalyticsSession } from '../models/AnalyticsSession'
+import { Language } from '../models/Language'
+import { Translation } from '../models/Translation'
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   synchronize: process.env.NODE_ENV === 'development',
   logging: process.env.NODE_ENV === 'development',
-  entities: [Page, Block, Group, DataSourceEntity, DataBinding, Template, DataSubmission, PageVariable, Form, FormDestination, FormSubmissionLog, AnalyticsEvent, AnalyticsSession],
+  entities: [Page, Block, Group, DataSourceEntity, DataBinding, Template, DataSubmission, PageVariable, Form, FormDestination, FormSubmissionLog, AnalyticsEvent, AnalyticsSession, Language, Translation],
   migrations: ['src/migrations/**/*.ts'],
   subscribers: [],
 })

@@ -60,6 +60,8 @@ import { useAutoSave } from '@/features/editor/hooks/useAutoSave'
 import { validateDrop } from '@/features/editor/utils/dropValidation'
 import type { DragItem, BlockNode, EditorPageSettings } from '@/shared/types'
 import { DataBindingProvider } from '@/features/dataBindings'
+import { TranslationPanel } from '@/features/translations/TranslationPanel'
+import { LanguageSettingsPanel } from '@/features/translations/LanguageSettingsPanel'
 
 import { 
   DropIndicator, 
@@ -995,6 +997,16 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                 {/* CSS Panel */}
                 {activeRightPanel === 'css' && (
                   <CSSPanel />
+                )}
+                
+                {/* Translations Panel */}
+                {type === 'page' && activeRightPanel === 'translations' && id && (
+                  <TranslationPanel pageId={id} />
+                )}
+                
+                {/* Language Settings Panel */}
+                {type === 'page' && activeRightPanel === 'languageSettings' && (
+                  <LanguageSettingsPanel onClose={() => dispatch(setActiveRightPanel('translations'))} />
                 )}
                 
                 {/* Показываем панель свойств элемента (old properties with tabs - deprecated) */}

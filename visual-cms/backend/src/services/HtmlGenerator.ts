@@ -82,7 +82,7 @@ export class HtmlGenerator {
   /**
    * Р“РµРЅРµСЂРёСЂСѓРµС‚ РїРѕР»РЅС‹Р№ HTML РґРѕРєСѓРјРµРЅС‚ РёР· СЃС‚СЂСѓРєС‚СѓСЂС‹ СЃС‚СЂР°РЅРёС†С‹
    */
-  generatePage(structure: BlockNode, metadata: PageMetadata, slug: string, dataConfig?: PageDataConfig): string {
+  generatePage(structure: BlockNode, metadata: PageMetadata, slug: string, dataConfig?: PageDataConfig, lang?: string, direction?: string): string {
     // Собираем ID specificChildren для базового скрытия
     const specificChildrenIds = styleGenerator.collectSpecificChildrenIds(structure as any)
     
@@ -106,7 +106,7 @@ export class HtmlGenerator {
     const customBodyEndHtml = structure.metadata?.customBodyEndHtml || ''
     
     return `<!DOCTYPE html>
-<html lang="ru">
+<html lang="${lang || 'ru'}"${direction === 'rtl' ? ' dir="rtl"' : ''}>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">

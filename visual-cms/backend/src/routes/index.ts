@@ -13,6 +13,8 @@ import templateTestRouter from './template-test'
 import mockRouter from './mock'
 import formsRouter from './forms'
 import analyticsRouter from './analytics'
+import languagesRouter from './languages'
+import translationsRouter from './translations'
 
 const router = Router()
 
@@ -30,5 +32,7 @@ router.use('/variables', variablesRouter)
 router.use('/template-test', templateTestRouter)
 router.use('/mock', mockRouter)
 router.use('/forms', formsRouter)
+router.use('/languages', languagesRouter)
+router.use('/translations', translationsRouter)
 
 export default router

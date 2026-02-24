@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Header } from '@/shared/components/Header'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { 
@@ -14,15 +14,46 @@ import {
   removeBreakpoint,
   updateBreakpoint
 } from '@/features/editor/editorSlice'
+import {
+  fetchLanguages,
+  createLanguage,
+  updateLanguage,
+  deleteLanguage,
+  seedDefaultLanguages,
+  selectLanguages,
+  selectLanguagesLoading,
+} from '@/features/translations/translationsSlice'
 import { Browser, StandardMonitor } from '@/shared/types'
-import { Plus, Trash2, Monitor, Laptop, Tablet, Smartphone, Watch, Check, X } from 'lucide-react'
+import type { Language, CreateLanguageRequest } from '@/shared/types/translation'
+import { Plus, Trash2, Monitor, Laptop, Tablet, Smartphone, Watch, Check, X, Globe, Star, AlertTriangle } from 'lucide-react'
 import { Button } from '@/shared/components/Button'
+
+const COMMON_LANGUAGES: Array<{ code: string; name: string; nativeName: string; flag: string }> = [
+  { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺' },
+  { code: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧' },
+  { code: 'kz', name: 'Kazakh', nativeName: 'Қазақша', flag: '🇰🇿' },
+  { code: 'de', name: 'German', nativeName: 'Deutsch', flag: '🇩🇪' },
+  { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷' },
+  { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸' },
+  { code: 'zh', name: 'Chinese', nativeName: '中文', flag: '🇨🇳' },
+  { code: 'ar', name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦' },
+  { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', flag: '🇹🇷' },
+  { code: 'pt', name: 'Portuguese', nativeName: 'Português', flag: '🇵🇹' },
+  { code: 'it', name: 'Italian', nativeName: 'Italiano', flag: '🇮🇹' },
+  { code: 'ja', name: 'Japanese', nativeName: '日本語', flag: '🇯🇵' },
+  { code: 'ko', name: 'Korean', nativeName: '한국어', flag: '🇰🇷' },
+  { code: 'uk', name: 'Ukrainian', nativeName: 'Українська', flag: '🇺🇦' },
+]
 
 export const Settings: React.FC = () => {
   const dispatch = useAppDispatch()
   const browsers = useAppSelector(selectBrowsers)
   const standardMonitors = useAppSelector(selectStandardMonitors)
   const breakpoints = useAppSelector(selectBreakpoints)
+
+  // Languages
+  const languages = useAppSelector(selectLanguages)
+  const languagesLoading = useAppSelector(selectLanguagesLoading)
 
   // Edit state for browsers
   const [editingBrowser, setEditingBrowser] = useState<string | null>(null)
@@ -39,6 +70,17 @@ export const Settings: React.FC = () => {
     icon: 'monitor' | 'tablet' | 'smartphone' | 'laptop' | 'watch'
     color: string
   }>>({})
+
+  // Language state
+  const [showLangForm, setShowLangForm] = useState(false)
+  const [newLang, setNewLang] = useState<CreateLanguageRequest>({
+    code: '', name: '', nativeName: '', flag: '', direction: 'ltr',
+  })
+  const [deleteLangConfirm, setDeleteLangConfirm] = useState<string | null>(null)
+
+  useEffect(() => {
+    dispatch(fetchLanguages())
+  }, [dispatch])
 
   // Browser form state
   const [newBrowser, setNewBrowser] = useState<Partial<Browser>>({
@@ -145,6 +187,41 @@ export const Settings: React.FC = () => {
     }
   }
 
+  // Language handlers
+  const handleSelectCommonLang = (common: typeof COMMON_LANGUAGES[0]) => {
+    setNewLang({
+      code: common.code,
+      name: common.name,
+      nativeName: common.nativeName,
+      flag: common.flag,
+      direction: common.code === 'ar' ? 'rtl' : 'ltr',
+    })
+  }
+
+  const handleAddLanguage = async () => {
+    if (!newLang.code || !newLang.name || !newLang.nativeName) return
+    await dispatch(createLanguage(newLang))
+    setNewLang({ code: '', name: '', nativeName: '', flag: '', direction: 'ltr' })
+    setShowLangForm(false)
+  }
+
+  const handleToggleLangActive = (lang: Language) => {
+    dispatch(updateLanguage({ id: lang.id, data: { isActive: !lang.isActive } }))
+  }
+
+  const handleSetDefaultLang = (lang: Language) => {
+    if (lang.isDefault) return
+    dispatch(updateLanguage({ id: lang.id, data: { isDefault: true } }))
+  }
+
+  const handleDeleteLang = (id: string) => {
+    dispatch(deleteLanguage(id))
+    setDeleteLangConfirm(null)
+  }
+
+  const existingLangCodes = languages.map(l => l.code)
+  const availableCommonLangs = COMMON_LANGUAGES.filter(cl => !existingLangCodes.includes(cl.code))
+
   const iconOptions = [
     { value: 'monitor' as const, Icon: Monitor, label: 'Monitor' },
     { value: 'laptop' as const, Icon: Laptop, label: 'Laptop' },
@@ -163,11 +240,227 @@ export const Settings: React.FC = () => {
               Настройки
             </h1>
             <p className="text-gray-600">
-              Управление браузерами, мониторами и viewports
+              Управление языками, браузерами, мониторами и viewports
             </p>
           </header>
 
           <div className="space-y-6">
+            {/* Languages Section */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Globe size={20} className="text-blue-600" />
+                Языки сайта
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Настройка языков для переводов контента. Основной язык — это язык, на котором создаётся контент в редакторе. Переводы выполняются на все остальные языки.
+              </p>
+
+              {/* Language List */}
+              {languages.length === 0 && !languagesLoading ? (
+                <div className="text-center py-6 space-y-3">
+                  <Globe size={32} className="mx-auto text-gray-300" />
+                  <p className="text-sm text-gray-500">Языки не настроены</p>
+                  <Button onClick={() => dispatch(seedDefaultLanguages())}>
+                    <Globe size={16} className="mr-2" />
+                    Добавить RU + EN
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2 mb-4">
+                  {languages.map((lang) => (
+                    <div
+                      key={lang.id}
+                      className={`flex items-center gap-3 p-3 rounded border ${
+                        lang.isActive 
+                          ? 'border-gray-200 bg-gray-50' 
+                          : 'border-gray-100 bg-gray-50 opacity-50'
+                      }`}
+                    >
+                      <span className="text-2xl">{lang.flag || '🌐'}</span>
+                      
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">
+                          {lang.nativeName}
+                          <span className="text-gray-400 text-sm ml-2">({lang.code})</span>
+                        </div>
+                        <div className="text-sm text-gray-500 flex items-center gap-2">
+                          {lang.name}
+                          {lang.direction === 'rtl' && (
+                            <span className="text-[10px] text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">RTL</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {lang.isDefault ? (
+                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded flex items-center gap-1">
+                          <Star size={12} fill="currentColor" />
+                          Основной
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleSetDefaultLang(lang)}
+                          className="p-1 hover:bg-amber-50 rounded text-gray-400 hover:text-amber-500"
+                          title="Сделать основным"
+                        >
+                          <Star size={16} />
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => handleToggleLangActive(lang)}
+                        className={`p-1 rounded ${
+                          lang.isActive 
+                            ? 'text-green-600 hover:text-green-700 hover:bg-green-50' 
+                            : 'text-gray-400 hover:text-green-500 hover:bg-green-50'
+                        }`}
+                        title={lang.isActive ? 'Деактивировать' : 'Активировать'}
+                      >
+                        <Check size={16} />
+                      </button>
+
+                      {!lang.isDefault && (
+                        deleteLangConfirm === lang.id ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleDeleteLang(lang.id)}
+                              className="p-1 bg-red-600 text-white rounded hover:bg-red-700"
+                              title="Подтвердить удаление"
+                            >
+                              <Check size={14} />
+                            </button>
+                            <button
+                              onClick={() => setDeleteLangConfirm(null)}
+                              className="p-1 bg-gray-400 text-white rounded hover:bg-gray-500"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setDeleteLangConfirm(lang.id)}
+                            className="p-1 hover:bg-red-50 rounded text-gray-400 hover:text-red-600"
+                            title="Удалить"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add Language Form */}
+              <div className="border-t pt-4 space-y-3">
+                {showLangForm ? (
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-gray-900">Добавить язык</h4>
+                    
+                    {/* Quick select */}
+                    {availableCommonLangs.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Быстрый выбор</label>
+                        <div className="flex flex-wrap gap-2">
+                          {availableCommonLangs.map((cl) => (
+                            <button
+                              key={cl.code}
+                              onClick={() => handleSelectCommonLang(cl)}
+                              className={`text-sm px-3 py-1.5 rounded border transition-colors ${
+                                newLang.code === cl.code
+                                  ? 'bg-blue-600 text-white border-blue-600'
+                                  : 'bg-white text-gray-900 border-gray-200 hover:border-blue-300'
+                              }`}
+                            >
+                              {cl.flag} {cl.nativeName}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-5 gap-3">
+                      <input
+                        type="text"
+                        placeholder="Код (en)"
+                        value={newLang.code}
+                        onChange={(e) => setNewLang({ ...newLang, code: e.target.value })}
+                        className="px-3 py-2 bg-white text-gray-900 placeholder-gray-400 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Название (English)"
+                        value={newLang.name}
+                        onChange={(e) => setNewLang({ ...newLang, name: e.target.value })}
+                        className="px-3 py-2 bg-white text-gray-900 placeholder-gray-400 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Родное название"
+                        value={newLang.nativeName}
+                        onChange={(e) => setNewLang({ ...newLang, nativeName: e.target.value })}
+                        className="px-3 py-2 bg-white text-gray-900 placeholder-gray-400 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Флаг (🇬🇧)"
+                        value={newLang.flag || ''}
+                        onChange={(e) => setNewLang({ ...newLang, flag: e.target.value })}
+                        className="px-3 py-2 bg-white text-gray-900 placeholder-gray-400 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <select
+                        value={newLang.direction}
+                        onChange={(e) => setNewLang({ ...newLang, direction: e.target.value as 'ltr' | 'rtl' })}
+                        className="px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="ltr">LTR (слева направо)</option>
+                        <option value="rtl">RTL (справа налево)</option>
+                      </select>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button onClick={handleAddLanguage} disabled={!newLang.code || !newLang.name || !newLang.nativeName}>
+                        <Plus size={16} className="mr-2" />
+                        Добавить
+                      </Button>
+                      <Button variant="secondary" onClick={() => { setShowLangForm(false); setNewLang({ code: '', name: '', nativeName: '', flag: '', direction: 'ltr' }) }}>
+                        Отмена
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <Button onClick={() => setShowLangForm(true)}>
+                      <Plus size={16} className="mr-2" />
+                      Добавить язык
+                    </Button>
+                    {languages.length === 0 && (
+                      <Button variant="secondary" onClick={() => dispatch(seedDefaultLanguages())}>
+                        <Globe size={16} className="mr-2" />
+                        Добавить RU + EN
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Info about languages */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-medium text-blue-900 mb-2 flex items-center gap-2">
+                <AlertTriangle size={14} />
+                О языках и переводах
+              </h4>
+              <p className="text-sm text-blue-800 mb-1">
+                <strong>Основной язык</strong> (⭐) — язык, на котором создаётся контент в редакторе.
+              </p>
+              <p className="text-sm text-blue-800 mb-1">
+                <strong>Переводы</strong> делаются из основного языка во все остальные через панель «Переводы» в редакторе.
+              </p>
+              <p className="text-sm text-blue-800">
+                При публикации страницы для каждого языка создаётся отдельная HTML-версия (напр. <code className="bg-blue-100 px-1 rounded">/en/page.html</code>).
+              </p>
+            </div>
+
             {/* Browsers Section */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Браузеры и Browser Offset</h3>

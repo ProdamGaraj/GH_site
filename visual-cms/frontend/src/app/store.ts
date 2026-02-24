@@ -10,6 +10,7 @@ import templatesReducer from '@/features/templates/templatesSlice'
 import variablesReducer from '@/features/variables/variablesSlice'
 import formsReducer from '@/features/forms/formsSlice'
 import analyticsReducer from '@/features/analytics/analyticsSlice'
+import translationsReducer from '@/features/translations/translationsSlice'
 
 export const store = configureStore({
   reducer: {
@@ -24,6 +25,7 @@ export const store = configureStore({
     variables: variablesReducer,
     analytics: analyticsReducer,
     forms: formsReducer,
+    translations: translationsReducer,
   },
 })
 
