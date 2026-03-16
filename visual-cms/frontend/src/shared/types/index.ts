@@ -304,6 +304,8 @@ export interface Page {
   id: string
   name: string
   slug: string
+  siteId?: string | null
+  site?: Site | null
   groupId: string | null
   metadata: {
     title: string
@@ -322,6 +324,49 @@ export interface Page {
   updatedAt: string
   status: 'draft' | 'published' | 'archived'
   version: number
+}
+
+// Site
+export interface SiteSettings {
+  defaultTitle?: string
+  defaultDescription?: string
+  defaultKeywords?: string[]
+  ogImage?: string
+  favicon?: string
+  siteName?: string
+  logo?: string
+  googleAnalyticsId?: string
+  googleTagManagerId?: string
+  metaPixelId?: string
+  yandexMetrikaId?: string
+  customHeadHtml?: string
+  customBodyEndHtml?: string
+  companyName?: string
+  phone?: string
+  email?: string
+  address?: string
+  primaryFont?: string
+  secondaryFont?: string
+  primaryColor?: string
+  secondaryColor?: string
+  accentColor?: string
+  defaultLanguage?: string
+}
+
+export interface Site {
+  id: string
+  name: string
+  slug: string
+  description?: string
+  routingMode: 'subdomain' | 'path-prefix' | 'custom-domain'
+  hostname?: string
+  settings: SiteSettings
+  status: 'draft' | 'active' | 'archived'
+  isDefault: boolean
+  homepageId?: string
+  pageCount?: number
+  createdAt: string
+  updatedAt: string
 }
 
 // Block

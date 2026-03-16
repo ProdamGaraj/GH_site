@@ -99,15 +99,30 @@ export const blockApi = {
 
 // Page API
 export const pageApi = {
-  getAll: () => api.get<Page[]>('/pages'),
+  getAll: (siteId?: string) => api.get<Page[]>('/pages', { params: siteId ? { siteId } : undefined }),
   getById: (id: string) => api.get<Page>(`/pages/${id}`),
   create: (data: CreatePageDto) => api.post<Page>('/pages', data),
   update: (id: string, data: UpdatePageDto) => api.put<Page>(`/pages/${id}`, data),
   delete: (id: string) => api.delete<void>(`/pages/${id}`),
 }
 
+// Site API
+export const siteApi = {
+  getAll: () => api.get<Site[]>('/sites'),
+  getById: (id: string) => api.get<Site>(`/sites/${id}`),
+  create: (data: CreateSiteDto) => api.post<Site>('/sites', data),
+  update: (id: string, data: UpdateSiteDto) => api.put<Site>(`/sites/${id}`, data),
+  delete: (id: string) => api.delete<void>(`/sites/${id}`),
+  getPages: (id: string) => api.get<Page[]>(`/sites/${id}/pages`),
+  assignPage: (siteId: string, pageId: string) => api.post<Page>(`/sites/${siteId}/pages/${pageId}`),
+  unassignPage: (siteId: string, pageId: string) => api.delete<Page>(`/sites/${siteId}/pages/${pageId}`),
+  updateSettings: (id: string, settings: Partial<SiteSettings>) => api.put<Site>(`/sites/${id}/settings`, settings),
+  duplicate: (id: string) => api.post<Site>(`/sites/${id}/duplicate`),
+  deploy: (id: string) => api.post<any>(`/deploy/site/${id}`),
+}
+
 // Types
-import type { Block, Page, BlockNode } from '@/shared/types'
+import type { Block, Page, BlockNode, Site, SiteSettings } from '@/shared/types'
 import type { 
   DataSource, 
   DataSourcesListResponse, 
@@ -160,6 +175,28 @@ export interface UpdatePageDto {
     ogImage?: string
   }
   status?: 'draft' | 'published' | 'archived'
+  siteId?: string | null
+}
+
+export interface CreateSiteDto {
+  name: string
+  slug: string
+  description?: string
+  routingMode?: 'subdomain' | 'path-prefix' | 'custom-domain'
+  hostname?: string
+  settings?: Partial<SiteSettings>
+}
+
+export interface UpdateSiteDto {
+  name?: string
+  slug?: string
+  description?: string
+  routingMode?: 'subdomain' | 'path-prefix' | 'custom-domain'
+  hostname?: string
+  settings?: Partial<SiteSettings>
+  status?: 'draft' | 'active' | 'archived'
+  isDefault?: boolean
+  homepageId?: string | null
 }
 
 // Deploy API

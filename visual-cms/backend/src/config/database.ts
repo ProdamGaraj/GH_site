@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm'
+import { Site } from '../models/Site'
 import { Page } from '../models/Page'
 import { Block } from '../models/Block'
 import { Group } from '../models/Group'
@@ -20,7 +21,7 @@ export const AppDataSource = new DataSource({
   url: process.env.DATABASE_URL,
   synchronize: process.env.NODE_ENV === 'development',
   logging: process.env.NODE_ENV === 'development',
-  entities: [Page, Block, Group, DataSourceEntity, DataBinding, Template, DataSubmission, PageVariable, Form, FormDestination, FormSubmissionLog, AnalyticsEvent, AnalyticsSession, Language, Translation],
+  entities: [Site, Page, Block, Group, DataSourceEntity, DataBinding, Template, DataSubmission, PageVariable, Form, FormDestination, FormSubmissionLog, AnalyticsEvent, AnalyticsSession, Language, Translation],
   migrations: ['src/migrations/**/*.ts'],
   subscribers: [],
 })

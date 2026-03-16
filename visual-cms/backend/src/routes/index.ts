@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import sitesRouter from './sites'
 import pagesRouter from './pages'
 import blocksRouter from './blocks'
 import groupsRouter from './groups'
@@ -18,6 +19,7 @@ import translationsRouter from './translations'
 
 const router = Router()
 
+router.use('/sites', sitesRouter)
 router.use('/analytics', analyticsRouter)
 router.use('/pages', pagesRouter)
 router.use('/blocks', blocksRouter)

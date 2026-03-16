@@ -29,6 +29,7 @@ services:
       - S3_SECRET_KEY=minioadmin
       - S3_BUCKET=cms-media
       - PUBLIC_SITE_DIR=/app/public-site
+      - PUBLIC_SITE_URL=https://localhost
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -86,10 +87,12 @@ services:
   public-site:
     image: nginx:alpine
     ports:
-      - "3001:80"
+      - "80:80"
+      - "443:443"
     volumes:
       - ./public-site:/usr/share/nginx/html:ro
       - ./nginx-public.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - backend
 

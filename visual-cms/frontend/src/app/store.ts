@@ -11,11 +11,13 @@ import variablesReducer from '@/features/variables/variablesSlice'
 import formsReducer from '@/features/forms/formsSlice'
 import analyticsReducer from '@/features/analytics/analyticsSlice'
 import translationsReducer from '@/features/translations/translationsSlice'
+import sitesReducer from '@/features/sites/sitesSlice'
 
 export const store = configureStore({
   reducer: {
     editor: editorReducer,
     pages: pagesReducer,
+    sites: sitesReducer,
     blocks: blocksReducer,
     groups: groupsReducer,
     dataSources: dataSourcesReducer,

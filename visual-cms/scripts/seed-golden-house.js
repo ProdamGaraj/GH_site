@@ -35,16 +35,46 @@ const colors = {
 }
 
 // =====================
-// БЛОК 1: HEADER
+// БЛОК 1: HEADER (responsive с бургер-меню)
 // =====================
+
+// Нам нужны стабильные ID для элементов, на которые ссылаются variations и скрипты
+const headerIds = {
+  root: `gh-header-root`,
+  logo: `gh-header-logo`,
+  nav: `gh-header-nav`,
+  headerRight: `gh-header-right`,
+  burger: `gh-header-burger`,
+  burgerLine1: `gh-header-burger-l1`,
+  burgerLine2: `gh-header-burger-l2`,
+  burgerLine3: `gh-header-burger-l3`,
+  overlay: `gh-header-overlay`,
+  overlayContent: `gh-header-overlay-content`,
+}
+
+const navLabels = ['Квартиры', 'Коммерция', 'Ипотека', 'О компании', 'Контакты']
+
 const headerBlock = {
   name: 'GH - Header',
   type: 'static',
   isReusable: true,
-  tags: ['header', 'navigation', 'golden-house'],
-  structure: createNode({
+  tags: ['header', 'navigation', 'golden-house', 'responsive', 'burger-menu'],
+  structure: {
+    id: headerIds.root,
+    elementType: 'container',
     tagName: 'header',
-    metadata: { name: 'Header' },
+    layoutMode: 'flex',
+    children: [],
+    content: '',
+    attributes: {},
+    metadata: {
+      name: 'Header',
+      // Определяем breakpoints для responsive CSS генерации
+      breakpoints: [
+        { id: 'tablet', name: 'Tablet', width: 768 },
+        { id: 'mobile', name: 'Mobile', width: 480 },
+      ],
+    },
     styles: {
       properties: {
         display: 'flex',
@@ -58,105 +88,558 @@ const headerBlock = {
         zIndex: '1000',
       },
     },
-    children: [
-      createNode({
-        elementType: 'text',
-        tagName: 'a',
-        metadata: { name: 'Logo' },
-        content: 'GOLDEN HOUSE',
-        attributes: { href: '/' },
-        styles: {
-          properties: {
-            color: colors.gold,
-            fontSize: '24px',
-            fontWeight: '700',
-            fontFamily: 'Muller, sans-serif',
-            letterSpacing: '2px',
-            textDecoration: 'none',
+    // --- Responsive variations (только стилевые корректировки, show/hide управляется JS) ---
+    variations: {
+      tablet: {
+        inheritedOverrides: {
+          [headerIds.root]: {
+            styles: {
+              padding: '0 20px',
+              height: '64px',
+            },
+          },
+          [headerIds.logo]: {
+            styles: {
+              fontSize: '18px',
+            },
           },
         },
-      }),
-      createNode({
-        tagName: 'nav',
-        metadata: { name: 'Navigation' },
-        styles: {
-          properties: {
-            display: 'flex',
-            gap: '32px',
+      },
+      mobile: {
+        inheritedOverrides: {
+          [headerIds.root]: {
+            styles: {
+              padding: '0 16px',
+              height: '56px',
+            },
+          },
+          [headerIds.logo]: {
+            styles: {
+              fontSize: '16px',
+              letterSpacing: '1px',
+            },
           },
         },
-        children: ['Квартиры', 'Коммерция', 'Ипотека', 'О компании', 'Контакты'].map(label =>
+      },
+    },
+    // Скрипт адаптивного бургера — показывает/скрывает навигацию по месту
+    scripts: [
+      {
+        id: 'adaptive-burger-script',
+        name: 'Adaptive Burger (content-aware)',
+        code: `
+          var nav = document.querySelector('[data-element-id="${headerIds.nav}"]');
+          var headerRight = document.querySelector('[data-element-id="${headerIds.headerRight}"]');
+          var burger = document.querySelector('[data-element-id="${headerIds.burger}"]');
+          var overlay = document.querySelector('[data-element-id="${headerIds.overlay}"]');
+          var logo = document.querySelector('[data-element-id="${headerIds.logo}"]');
+          var line1 = document.querySelector('[data-element-id="${headerIds.burgerLine1}"]');
+          var line2 = document.querySelector('[data-element-id="${headerIds.burgerLine2}"]');
+          var line3 = document.querySelector('[data-element-id="${headerIds.burgerLine3}"]');
+
+          if (!nav || !headerRight || !burger || !logo) return;
+
+          // Измеряем минимальную ширину контента при первой загрузке
+          // (пока nav ещё видима — display не none)
+          var minGap = 40; // минимальный зазор между элементами
+          var navWidth = nav.scrollWidth;
+          var rightWidth = headerRight.scrollWidth;
+          var logoWidth = logo.scrollWidth;
+          var neededWidth = logoWidth + navWidth + rightWidth + minGap * 2;
+
+          var burgerMode = false;
+
+          function checkFit() {
+            var available = element.clientWidth;
+
+            if (available < neededWidth && !burgerMode) {
+              // Не хватает места — включаем бургер
+              burgerMode = true;
+              nav.style.display = 'none';
+              headerRight.style.display = 'none';
+              burger.style.display = 'flex';
+            } else if (available >= neededWidth && burgerMode) {
+              // Места хватает — возвращаем навигацию
+              burgerMode = false;
+              nav.style.display = 'flex';
+              headerRight.style.display = 'flex';
+              burger.style.display = 'none';
+
+              // Закрываем оверлей если был открыт
+              if (overlay && overlay.style.visibility === 'visible') {
+                overlay.style.opacity = '0';
+                setTimeout(function() { overlay.style.visibility = 'hidden'; }, 300);
+                document.body.style.overflow = '';
+                if (line1) line1.style.transform = 'none';
+                if (line2) line2.style.opacity = '1';
+                if (line3) line3.style.transform = 'none';
+                burger.setAttribute('aria-expanded', 'false');
+              }
+            }
+          }
+
+          checkFit();
+          window.addEventListener('resize', checkFit);
+        `,
+        trigger: 'load',
+        enabled: true,
+      },
+    ],
+  },
+}
+
+// --- Children ---
+// 1) Logo
+headerBlock.structure.children.push({
+  id: headerIds.logo,
+  elementType: 'text',
+  tagName: 'a',
+  layoutMode: 'flex',
+  children: [],
+  attributes: { href: '/' },
+  content: 'GOLDEN HOUSE',
+  metadata: { name: 'Logo' },
+  styles: {
+    properties: {
+      color: colors.gold,
+      fontSize: '24px',
+      fontWeight: '700',
+      fontFamily: 'Muller, sans-serif',
+      letterSpacing: '2px',
+      textDecoration: 'none',
+    },
+  },
+})
+
+// 2) Desktop Navigation
+headerBlock.structure.children.push({
+  id: headerIds.nav,
+  elementType: 'container',
+  tagName: 'nav',
+  layoutMode: 'flex',
+  children: navLabels.map(label =>
+    createNode({
+      elementType: 'link',
+      tagName: 'a',
+      metadata: { name: `Nav - ${label}` },
+      content: label,
+      attributes: { href: '#' },
+      styles: {
+        properties: {
+          color: 'rgba(255,255,255,0.9)',
+          fontSize: '14px',
+          fontFamily: 'Muller, sans-serif',
+          textTransform: 'uppercase',
+          letterSpacing: '1px',
+          textDecoration: 'none',
+        },
+        states: {
+          hover: { color: colors.gold },
+        },
+        stateTransition: {
+          duration: 200,
+          easing: 'ease',
+          properties: ['color'],
+        },
+      },
+    })
+  ),
+  content: '',
+  attributes: {},
+  metadata: { name: 'Navigation' },
+  styles: {
+    properties: {
+      display: 'flex',
+      gap: '32px',
+    },
+  },
+})
+
+// 3) Header Right (phone + CTA) — скрывается на мобильном
+headerBlock.structure.children.push({
+  id: headerIds.headerRight,
+  elementType: 'container',
+  tagName: 'div',
+  layoutMode: 'flex',
+  children: [
+    createNode({
+      elementType: 'text',
+      tagName: 'a',
+      metadata: { name: 'Phone' },
+      content: '+998 78 150-11-11',
+      attributes: { href: 'tel:+998781501111' },
+      styles: {
+        properties: {
+          color: colors.white,
+          fontSize: '16px',
+          fontFamily: 'Muller, sans-serif',
+          fontWeight: '500',
+          textDecoration: 'none',
+        },
+        states: {
+          hover: { color: colors.gold },
+        },
+        stateTransition: {
+          duration: 200,
+          easing: 'ease',
+          properties: ['color'],
+        },
+      },
+    }),
+    createNode({
+      elementType: 'button',
+      tagName: 'button',
+      metadata: { name: 'CTA Button' },
+      content: 'Перезвоните мне',
+      styles: {
+        properties: {
+          backgroundColor: colors.gold,
+          color: colors.white,
+          padding: '12px 24px',
+          borderRadius: '4px',
+          border: 'none',
+          fontSize: '14px',
+          fontFamily: 'Muller, sans-serif',
+          fontWeight: '500',
+          textTransform: 'uppercase',
+          letterSpacing: '1px',
+          cursor: 'pointer',
+        },
+        states: {
+          hover: { backgroundColor: colors.goldDark },
+        },
+        stateTransition: {
+          duration: 200,
+          easing: 'ease',
+          properties: ['background-color'],
+        },
+      },
+    }),
+  ],
+  content: '',
+  attributes: {},
+  metadata: { name: 'Header Right' },
+  styles: {
+    properties: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '24px',
+    },
+  },
+})
+
+// 4) Burger Button — скрыт по умолчанию (display: none), показывается через responsive CSS
+headerBlock.structure.children.push({
+  id: headerIds.burger,
+  elementType: 'button',
+  tagName: 'button',
+  layoutMode: 'flex',
+  children: [
+    // Три линии бургера
+    {
+      id: headerIds.burgerLine1,
+      elementType: 'container',
+      tagName: 'span',
+      layoutMode: 'flex',
+      children: [],
+      content: '',
+      attributes: {},
+      metadata: { name: 'Burger Line 1' },
+      styles: {
+        properties: {
+          display: 'block',
+          width: '24px',
+          height: '2px',
+          backgroundColor: colors.white,
+          borderRadius: '1px',
+          transition: 'transform 0.3s ease, opacity 0.3s ease',
+        },
+      },
+    },
+    {
+      id: headerIds.burgerLine2,
+      elementType: 'container',
+      tagName: 'span',
+      layoutMode: 'flex',
+      children: [],
+      content: '',
+      attributes: {},
+      metadata: { name: 'Burger Line 2' },
+      styles: {
+        properties: {
+          display: 'block',
+          width: '24px',
+          height: '2px',
+          backgroundColor: colors.white,
+          borderRadius: '1px',
+          transition: 'transform 0.3s ease, opacity 0.3s ease',
+        },
+      },
+    },
+    {
+      id: headerIds.burgerLine3,
+      elementType: 'container',
+      tagName: 'span',
+      layoutMode: 'flex',
+      children: [],
+      content: '',
+      attributes: {},
+      metadata: { name: 'Burger Line 3' },
+      styles: {
+        properties: {
+          display: 'block',
+          width: '24px',
+          height: '2px',
+          backgroundColor: colors.white,
+          borderRadius: '1px',
+          transition: 'transform 0.3s ease, opacity 0.3s ease',
+        },
+      },
+    },
+  ],
+  content: '',
+  attributes: { 'aria-label': 'Меню', 'aria-expanded': 'false' },
+  metadata: { name: 'Burger Button' },
+  styles: {
+    properties: {
+      display: 'none', // Скрыт на desktop
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: '5px',
+      width: '40px',
+      height: '40px',
+      backgroundColor: 'transparent',
+      border: 'none',
+      cursor: 'pointer',
+      padding: '8px',
+      zIndex: '1002',
+      position: 'relative',
+    },
+  },
+  // Скрипт для toggle бургер-меню
+  scripts: [
+    {
+      id: 'burger-toggle-script',
+      name: 'Burger Menu Toggle',
+      code: `
+        var overlay = document.querySelector('[data-element-id="${headerIds.overlay}"]');
+        var line1 = document.querySelector('[data-element-id="${headerIds.burgerLine1}"]');
+        var line2 = document.querySelector('[data-element-id="${headerIds.burgerLine2}"]');
+        var line3 = document.querySelector('[data-element-id="${headerIds.burgerLine3}"]');
+        var isOpen = false;
+
+        element.addEventListener('click', function(e) {
+          e.stopPropagation();
+          isOpen = !isOpen;
+          element.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+
+          if (isOpen) {
+            // Анимация бургера → крестик
+            line1.style.transform = 'translateY(7px) rotate(45deg)';
+            line2.style.opacity = '0';
+            line3.style.transform = 'translateY(-7px) rotate(-45deg)';
+            // Показать оверлей
+            overlay.style.visibility = 'visible';
+            overlay.style.opacity = '1';
+            // Заблокировать скролл
+            document.body.style.overflow = 'hidden';
+          } else {
+            // Анимация крестик → бургер
+            line1.style.transform = 'none';
+            line2.style.opacity = '1';
+            line3.style.transform = 'none';
+            // Скрыть оверлей
+            overlay.style.opacity = '0';
+            setTimeout(function() { overlay.style.visibility = 'hidden'; }, 300);
+            // Вернуть скролл
+            document.body.style.overflow = '';
+          }
+        });
+
+        // Закрытие при клике на ссылку в оверлее
+        if (overlay) {
+          overlay.querySelectorAll('a').forEach(function(link) {
+            link.addEventListener('click', function() {
+              isOpen = false;
+              element.setAttribute('aria-expanded', 'false');
+              line1.style.transform = 'none';
+              line2.style.opacity = '1';
+              line3.style.transform = 'none';
+              overlay.style.opacity = '0';
+              setTimeout(function() { overlay.style.visibility = 'hidden'; }, 300);
+              document.body.style.overflow = '';
+            });
+          });
+        }
+      `,
+      trigger: 'load',
+      enabled: true,
+    },
+  ],
+})
+
+// 5) Mobile Overlay — скрыт по умолчанию, переключается JS-скриптом бургера
+headerBlock.structure.children.push({
+  id: headerIds.overlay,
+  elementType: 'container',
+  tagName: 'div',
+  layoutMode: 'flex',
+  children: [
+    // Overlay Content wrapper
+    {
+      id: headerIds.overlayContent,
+      elementType: 'container',
+      tagName: 'nav',
+      layoutMode: 'flex',
+      children: [
+        // Мобильные навигационные ссылки
+        ...navLabels.map(label =>
           createNode({
             elementType: 'link',
             tagName: 'a',
-            metadata: { name: `Nav - ${label}` },
+            metadata: { name: `Mobile Nav - ${label}` },
             content: label,
             attributes: { href: '#' },
             styles: {
               properties: {
-                color: 'rgba(255,255,255,0.9)',
-                fontSize: '14px',
+                color: colors.white,
+                fontSize: '20px',
                 fontFamily: 'Muller, sans-serif',
+                fontWeight: '500',
                 textTransform: 'uppercase',
-                letterSpacing: '1px',
+                letterSpacing: '2px',
                 textDecoration: 'none',
+                padding: '12px 0',
+                borderBottom: `1px solid rgba(255,255,255,0.1)`,
+                width: '100%',
+                textAlign: 'center',
+              },
+              states: {
+                hover: { color: colors.gold },
+              },
+              stateTransition: {
+                duration: 200,
+                easing: 'ease',
+                properties: ['color'],
               },
             },
           })
         ),
-      }),
-      createNode({
-        metadata: { name: 'Header Right' },
-        styles: {
-          properties: {
-            display: 'flex',
-            alignItems: 'center',
-            gap: '24px',
+        // Разделитель
+        createNode({
+          elementType: 'container',
+          tagName: 'div',
+          metadata: { name: 'Divider' },
+          styles: {
+            properties: {
+              width: '60px',
+              height: '2px',
+              backgroundColor: colors.gold,
+              margin: '16px auto',
+              borderRadius: '1px',
+            },
           },
+        }),
+        // Телефон
+        createNode({
+          elementType: 'text',
+          tagName: 'a',
+          metadata: { name: 'Mobile Phone' },
+          content: '+998 78 150-11-11',
+          attributes: { href: 'tel:+998781501111' },
+          styles: {
+            properties: {
+              color: colors.white,
+              fontSize: '20px',
+              fontFamily: 'Muller, sans-serif',
+              fontWeight: '500',
+              textDecoration: 'none',
+              marginBottom: '24px',
+            },
+            states: {
+              hover: { color: colors.gold },
+            },
+            stateTransition: {
+              duration: 200,
+              easing: 'ease',
+              properties: ['color'],
+            },
+          },
+        }),
+        // CTA кнопка
+        createNode({
+          elementType: 'button',
+          tagName: 'a',
+          metadata: { name: 'Mobile CTA' },
+          content: 'Перезвоните мне',
+          attributes: { href: '#callback' },
+          styles: {
+            properties: {
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: colors.gold,
+              color: colors.white,
+              padding: '16px 40px',
+              borderRadius: '4px',
+              fontSize: '14px',
+              fontFamily: 'Muller, sans-serif',
+              fontWeight: '500',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              textDecoration: 'none',
+              cursor: 'pointer',
+            },
+            states: {
+              hover: { backgroundColor: colors.goldDark },
+            },
+            stateTransition: {
+              duration: 200,
+              easing: 'ease',
+              properties: ['background-color'],
+            },
+          },
+        }),
+      ],
+      content: '',
+      attributes: {},
+      metadata: { name: 'Overlay Content' },
+      styles: {
+        properties: {
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '4px',
+          width: '100%',
+          maxWidth: '400px',
+          padding: '0 24px',
         },
-        children: [
-          createNode({
-            elementType: 'text',
-            tagName: 'a',
-            metadata: { name: 'Phone' },
-            content: '+998 78 150-11-11',
-            attributes: { href: 'tel:+998781501111' },
-            styles: {
-              properties: {
-                color: colors.white,
-                fontSize: '16px',
-                fontFamily: 'Muller, sans-serif',
-                fontWeight: '500',
-                textDecoration: 'none',
-              },
-            },
-          }),
-          createNode({
-            elementType: 'button',
-            tagName: 'button',
-            metadata: { name: 'CTA Button' },
-            content: 'Перезвоните мне',
-            styles: {
-              properties: {
-                backgroundColor: colors.gold,
-                color: colors.white,
-                padding: '12px 24px',
-                borderRadius: '4px',
-                border: 'none',
-                fontSize: '14px',
-                fontFamily: 'Muller, sans-serif',
-                fontWeight: '500',
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-                cursor: 'pointer',
-              },
-            },
-          }),
-        ],
-      }),
-    ],
-  }),
-}
+      },
+    },
+  ],
+  content: '',
+  attributes: {},
+  metadata: { name: 'Mobile Overlay' },
+  styles: {
+    properties: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '100%',
+      height: '100vh',
+      backgroundColor: 'rgba(64, 62, 61, 0.97)',
+      zIndex: '1001',
+      visibility: 'hidden',
+      opacity: '0',
+      transition: 'opacity 0.3s ease, visibility 0.3s ease',
+    },
+  },
+})
 
 // =====================
 // БЛОК 2: HERO

@@ -12,6 +12,9 @@ import { DataBindingDemo } from '@/pages/DataBindingDemo'
 import TemplatesPage from '@/pages/TemplatesPage'
 import TemplateBlocksPage from '@/pages/TemplateBlocksPage'
 import AnalyticsPage from '@/pages/AnalyticsPage'
+import { SitesList } from '@/pages/SitesList'
+import { SiteSettingsPage } from '@/pages/SiteSettingsPage'
+import { SitePagesPage } from '@/pages/SitePagesPage'
 
 
 export const router = createBrowserRouter([

@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm'
 import { Group } from './Group'
+import { Site } from './Site'
 
 @Entity('pages')
 export class Page {
@@ -11,6 +12,12 @@ export class Page {
 
   @Column({ unique: true })
   slug!: string
+
+  @ManyToOne(() => Site, site => site.pages, { nullable: true, onDelete: 'SET NULL' })
+  site?: Site
+
+  @Column({ type: 'uuid', nullable: true })
+  siteId?: string
 
   @ManyToOne(() => Group, { nullable: true, onDelete: 'SET NULL' })
   group?: Group

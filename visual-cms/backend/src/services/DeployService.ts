@@ -8,6 +8,7 @@ import { htmlGenerator } from './HtmlGenerator'
 import { AppDataSource } from '../config/database'
 import { Page } from '../models/Page'
 import { Block } from '../models/Block'
+import { Site } from '../models/Site'
 import { linkedBlocksService } from './LinkedBlocksService'
 import { DataBinding } from '../models/DataBinding'
 import { DataSource as DataSourceEntity } from '../models/DataSource'
@@ -17,6 +18,7 @@ import { languageService } from './LanguageService'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
+const PUBLIC_SITE_URL = process.env.PUBLIC_SITE_URL || 'https://localhost'
 
 export interface DeployResult {
   success: boolean
@@ -29,6 +31,7 @@ export interface DeployResult {
 export class DeployService {
   private pageRepository = AppDataSource.getRepository(Page)
   private blockRepository = AppDataSource.getRepository(Block)
+  private siteRepository = AppDataSource.getRepository(Site)
   private dataBindingRepository = AppDataSource.getRepository(DataBinding)
   private dataSourceRepository = AppDataSource.getRepository(DataSourceEntity)
 
@@ -40,7 +43,7 @@ export class DeployService {
     const deployedPages: string[] = []
 
     try {
-      const page = await this.pageRepository.findOne({ where: { id: pageId } })
+      const page = await this.pageRepository.findOne({ where: { id: pageId }, relations: ['site'] })
       
       if (!page) {
         return {
@@ -60,8 +63,9 @@ export class DeployService {
         }
       }
 
-      // Создаём папку public-site если не существует
-      this.ensureDirectoryExists(PUBLIC_DIR)
+      // Resolve deploy directory based on site
+      const siteDir = this.resolveSiteDir(page.site)
+      this.ensureDirectoryExists(siteDir)
 
       // Сначала инжектируем library templates (нужно до preparePageDataConfig)
       let updatedStructure = await linkedBlocksService.updateLinkedBlocks(page.structure)
@@ -98,27 +102,34 @@ export class DeployService {
       const fileName = page.slug === 'index' || page.slug === 'home' 
         ? 'index.html' 
         : `${page.slug}.html`
-      const filePath = path.join(PUBLIC_DIR, fileName)
+      const siteDir = this.resolveSiteDir(page.site)
+      const filePath = path.join(siteDir, fileName)
 
       // Записываем файл
       fs.writeFileSync(filePath, html, 'utf-8')
       deployedPages.push(fileName)
 
       // === Генерация мультиязычных версий ===
-      await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors)
+      await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir)
 
       // Обновляем статус страницы
       page.status = 'published'
       await this.pageRepository.save(page)
 
-      console.log(`✅ Deployed: ${fileName}`)
+      // Regenerate sitemap for the site
+      if (page.site) {
+        await this.generateSitemap(page.site)
+        this.generateRobotsTxt(page.site)
+      }
+
+      console.log(`✅ Deployed: ${fileName} (site: ${page.site?.slug || 'default'})`)
 
       return {
         success: true,
         message: `Страница "${page.name}" успешно опубликована`,
         deployedPages,
         errors,
-        publicUrl: `http://localhost:3001/${fileName}`
+        publicUrl: `${PUBLIC_SITE_URL}/${page.slug === 'index' || page.slug === 'home' ? '' : page.slug}`
       }
     } catch (error: any) {
       console.error('Deploy error:', error)
@@ -140,7 +151,8 @@ export class DeployService {
 
     try {
       const pages = await this.pageRepository.find({
-        where: { status: 'published' }
+        where: { status: 'published' },
+        relations: ['site'],
       })
 
       if (pages.length === 0) {
@@ -152,11 +164,21 @@ export class DeployService {
         }
       }
 
-      // Создаём папку public-site
+      // Создаём корневую папку
       this.ensureDirectoryExists(PUBLIC_DIR)
 
       // Копируем assets (шрифты, изображения)
       this.copyAssets()
+
+      // Group pages by site
+      const sitePages = new Map<string, Page[]>()
+      const sitesMap = new Map<string, Site>()
+      for (const page of pages) {
+        const siteKey = page.siteId || '__default__'
+        if (!sitePages.has(siteKey)) sitePages.set(siteKey, [])
+        sitePages.get(siteKey)!.push(page)
+        if (page.site) sitesMap.set(siteKey, page.site)
+      }
 
       for (const page of pages) {
         if (!page.structure) {
@@ -165,6 +187,9 @@ export class DeployService {
         }
 
         try {
+          const siteDir = this.resolveSiteDir(page.site)
+          this.ensureDirectoryExists(siteDir)
+
           // Обновляем структуру, подставляя актуальные блоки из библиотеки
           const updatedStructure = await linkedBlocksService.updateLinkedBlocks(page.structure)
           
@@ -195,18 +220,24 @@ export class DeployService {
           const fileName = page.slug === 'index' || page.slug === 'home' 
             ? 'index.html' 
             : `${page.slug}.html`
-          const filePath = path.join(PUBLIC_DIR, fileName)
+          const filePath = path.join(siteDir, fileName)
 
           fs.writeFileSync(filePath, html, 'utf-8')
-          deployedPages.push(fileName)
+          deployedPages.push(`${page.site?.slug || ''}/${fileName}`.replace(/^\//, ''))
           
           // Deploy translations for this page
-          await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors)
+          await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir)
           
-          console.log(`✅ Deployed: ${fileName}`)
+          console.log(`✅ Deployed: ${fileName} (site: ${page.site?.slug || 'default'})`)
         } catch (err: any) {
           errors.push(`Ошибка при генерации "${page.name}": ${err.message}`)
         }
+      }
+
+      // Generate sitemap.xml and robots.txt per site
+      for (const [siteKey, site] of sitesMap.entries()) {
+        await this.generateSitemap(site)
+        this.generateRobotsTxt(site)
       }
 
       return {
@@ -214,7 +245,7 @@ export class DeployService {
         message: `Опубликовано ${deployedPages.length} страниц`,
         deployedPages,
         errors,
-        publicUrl: 'http://localhost:3001/'
+        publicUrl: `${PUBLIC_SITE_URL}/`
       }
     } catch (error: any) {
       return {
@@ -223,6 +254,91 @@ export class DeployService {
         deployedPages,
         errors: [error.message]
       }
+    }
+  }
+
+  /**
+   * Деплоит все страницы конкретного сайта
+   */
+  async deploySite(siteId: string): Promise<DeployResult> {
+    const errors: string[] = []
+    const deployedPages: string[] = []
+
+    try {
+      const site = await this.siteRepository.findOne({ where: { id: siteId } })
+      if (!site) {
+        return { success: false, message: 'Сайт не найден', deployedPages: [], errors: ['Site not found'] }
+      }
+
+      const pages = await this.pageRepository.find({
+        where: { siteId, status: 'published' },
+      })
+
+      if (pages.length === 0) {
+        return { success: false, message: 'Нет опубликованных страниц', deployedPages: [], errors: [] }
+      }
+
+      const siteDir = this.resolveSiteDir(site)
+      this.ensureDirectoryExists(siteDir)
+      this.copyAssetsToDir(siteDir)
+
+      for (const page of pages) {
+        if (!page.structure) {
+          errors.push(`Страница "${page.name}" не имеет структуры`)
+          continue
+        }
+        try {
+          const updatedStructure = await linkedBlocksService.updateLinkedBlocks(page.structure)
+          const dataConfig = await this.preparePageDataConfig(page.id)
+
+          const pageLangs = await translationService.getPageLocales(page.id)
+          const allActiveLangs = await languageService.getActive()
+          const defLang = allActiveLangs.find(l => l.isDefault)
+          let pageLangSwitcher: { code: string; name: string; flag: string; isDefault: boolean; direction: string }[] | undefined
+          if (pageLangs.length > 0) {
+            pageLangSwitcher = allActiveLangs
+              .filter(l => l.isActive && (l.isDefault || pageLangs.includes(l.code)))
+              .map(l => ({ code: l.code, name: l.nativeName, flag: l.flag || '🌐', isDefault: l.isDefault, direction: l.direction }))
+          }
+
+          const html = htmlGenerator.generatePage(
+            updatedStructure,
+            page.metadata || { title: page.name, description: '', keywords: [] },
+            page.slug,
+            dataConfig,
+            defLang?.code,
+            defLang?.direction,
+            pageLangSwitcher
+          )
+
+          const fileName = page.slug === 'index' || page.slug === 'home' ? 'index.html' : `${page.slug}.html`
+          fs.writeFileSync(path.join(siteDir, fileName), html, 'utf-8')
+          deployedPages.push(fileName)
+
+          await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir)
+          console.log(`✅ Site "${site.slug}" deployed: ${fileName}`)
+        } catch (err: any) {
+          errors.push(`Ошибка "${page.name}": ${err.message}`)
+        }
+      }
+
+      // Generate SEO files
+      await this.generateSitemap(site)
+      this.generateRobotsTxt(site)
+
+      // Update site status
+      site.status = 'active'
+      await this.siteRepository.save(site)
+
+      return {
+        success: errors.length === 0,
+        message: `Сайт "${site.name}": опубликовано ${deployedPages.length} страниц`,
+        deployedPages,
+        errors,
+        publicUrl: this.resolveSiteUrl(site),
+      }
+    } catch (error: any) {
+      return { success: false, message: 'Ошибка при публикации сайта', deployedPages, errors: [error.message] }
     }
   }
 
@@ -239,9 +355,10 @@ export class DeployService {
   /**
    * Удаляет опубликованный файл
    */
-  async undeployPage(slug: string): Promise<boolean> {
+  async undeployPage(slug: string, siteSlug?: string): Promise<boolean> {
+    const dir = siteSlug ? path.join(PUBLIC_DIR, 'sites', siteSlug) : PUBLIC_DIR
     const fileName = slug === 'index' || slug === 'home' ? 'index.html' : `${slug}.html`
-    const filePath = path.join(PUBLIC_DIR, fileName)
+    const filePath = path.join(dir, fileName)
     
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath)
@@ -515,8 +632,10 @@ export class DeployService {
     structure: any, 
     dataConfig: PageDataConfig | undefined,
     deployedPages: string[],
-    errors: string[]
+    errors: string[],
+    siteDir?: string
   ): Promise<void> {
+    const deployDir = siteDir || PUBLIC_DIR
     try {
       const languages = await languageService.getActive()
       const defaultLang = languages.find(l => l.isDefault)
@@ -562,7 +681,7 @@ export class DeployService {
           )
 
           // Create language directory: /en/, /kz/, etc.
-          const langDir = path.join(PUBLIC_DIR, lang.code)
+          const langDir = path.join(deployDir, lang.code)
           this.ensureDirectoryExists(langDir)
 
           const fileName = page.slug === 'index' || page.slug === 'home'
@@ -590,7 +709,7 @@ export class DeployService {
             direction: l.direction,
           }))
         
-        const langJsonPath = path.join(PUBLIC_DIR, 'languages.json')
+        const langJsonPath = path.join(deployDir, 'languages.json')
         fs.writeFileSync(langJsonPath, JSON.stringify(langData, null, 2), 'utf-8')
       }
     } catch (err: any) {
@@ -854,13 +973,157 @@ Golden House - Public Site
 Сгенерировано: ${new Date().toISOString()}
 
 Структура:
-- *.html - страницы сайта
-- /fonts - шрифты Muller
+- /sites/<slug>/ - папки сайтов
+- *.html - страницы
+- /fonts - шрифты
 - /images - изображения
-- /css - стили (если есть)
+- sitemap.xml - карта сайта (генерируется автоматически)
+- robots.txt - индексация (генерируется автоматически)
 
 Для просмотра запустите: npx serve public-site -p 3001
     `.trim(), 'utf-8')
+  }
+
+  /**
+   * Copy assets to a specific site directory
+   */
+  private copyAssetsToDir(dir: string): void {
+    const fontsDir = path.join(dir, 'fonts')
+    const imagesDir = path.join(dir, 'images')
+    const cssDir = path.join(dir, 'css')
+    this.ensureDirectoryExists(fontsDir)
+    this.ensureDirectoryExists(imagesDir)
+    this.ensureDirectoryExists(cssDir)
+
+    // Copy from shared assets if they exist
+    const sharedFonts = path.join(PUBLIC_DIR, 'fonts')
+    const sharedImages = path.join(PUBLIC_DIR, 'images')
+    if (fs.existsSync(sharedFonts)) {
+      this.copyDirContents(sharedFonts, fontsDir)
+    }
+    if (fs.existsSync(sharedImages)) {
+      this.copyDirContents(sharedImages, imagesDir)
+    }
+  }
+
+  private copyDirContents(src: string, dest: string): void {
+    const files = fs.readdirSync(src)
+    for (const file of files) {
+      const srcPath = path.join(src, file)
+      const destPath = path.join(dest, file)
+      if (fs.statSync(srcPath).isFile()) {
+        fs.copyFileSync(srcPath, destPath)
+      }
+    }
+  }
+
+  // ─── Multi-site helpers ───────────────────────────────────────
+
+  /**
+   * Resolve the deploy directory for a site.
+   * Sites go into public-site/sites/<slug>/
+   * Pages without a site go to public-site/ (backward compatible)
+   */
+  private resolveSiteDir(site?: Site | null): string {
+    if (!site) return PUBLIC_DIR
+    return path.join(PUBLIC_DIR, 'sites', site.slug)
+  }
+
+  /**
+   * Resolve public URL for a site
+   */
+  private resolveSiteUrl(site: Site): string {
+    if (site.routingMode === 'custom-domain' && site.hostname) {
+      return `https://${site.hostname}`
+    }
+    if (site.routingMode === 'subdomain') {
+      const baseHost = new URL(PUBLIC_SITE_URL).hostname
+      const subdomain = site.hostname || site.slug
+      return `https://${subdomain}.${baseHost}`
+    }
+    // path-prefix
+    const prefix = site.hostname || `/${site.slug}`
+    return `${PUBLIC_SITE_URL}${prefix}`
+  }
+
+  /**
+   * Generate sitemap.xml for a site
+   */
+  async generateSitemap(site: Site): Promise<void> {
+    const siteDir = this.resolveSiteDir(site)
+    this.ensureDirectoryExists(siteDir)
+
+    const pages = await this.pageRepository.find({
+      where: { siteId: site.id, status: 'published' },
+    })
+
+    const baseUrl = this.resolveSiteUrl(site)
+    const activeLanguages = await languageService.getActive()
+    const defaultLang = activeLanguages.find(l => l.isDefault)
+
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n'
+    xml += '        xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
+
+    for (const page of pages) {
+      const slug = (page.slug === 'index' || page.slug === 'home') ? '' : page.slug
+      const pageUrl = `${baseUrl}/${slug}`.replace(/\/$/, '') || baseUrl
+
+      // Get translation locales for hreflang
+      const translationLocales = await translationService.getPageLocales(page.id)
+
+      xml += '  <url>\n'
+      xml += `    <loc>${this.escapeXml(pageUrl)}</loc>\n`
+      xml += `    <lastmod>${page.updatedAt.toISOString().split('T')[0]}</lastmod>\n`
+
+      // Add hreflang links for multi-language pages
+      if (translationLocales.length > 0 && defaultLang) {
+        // Default language version
+        xml += `    <xhtml:link rel="alternate" hreflang="${defaultLang.code}" href="${this.escapeXml(pageUrl)}" />\n`
+
+        for (const locale of translationLocales) {
+          const localizedUrl = `${baseUrl}/${locale}/${slug}`.replace(/\/$/, '')
+          xml += `    <xhtml:link rel="alternate" hreflang="${locale}" href="${this.escapeXml(localizedUrl)}" />\n`
+        }
+
+        // x-default (for language pickers)
+        xml += `    <xhtml:link rel="alternate" hreflang="x-default" href="${this.escapeXml(pageUrl)}" />\n`
+      }
+
+      xml += '  </url>\n'
+    }
+
+    xml += '</urlset>\n'
+
+    fs.writeFileSync(path.join(siteDir, 'sitemap.xml'), xml, 'utf-8')
+    console.log(`✅ Generated sitemap.xml for site "${site.slug}" (${pages.length} pages)`)
+  }
+
+  /**
+   * Generate robots.txt for a site
+   */
+  generateRobotsTxt(site: Site): void {
+    const siteDir = this.resolveSiteDir(site)
+    this.ensureDirectoryExists(siteDir)
+
+    const baseUrl = this.resolveSiteUrl(site)
+
+    let robots = 'User-agent: *\n'
+    robots += 'Allow: /\n'
+    robots += '\n'
+    robots += `Sitemap: ${baseUrl}/sitemap.xml\n`
+
+    fs.writeFileSync(path.join(siteDir, 'robots.txt'), robots, 'utf-8')
+    console.log(`✅ Generated robots.txt for site "${site.slug}"`)
+  }
+
+  private escapeXml(str: string): string {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;')
   }
 }
 

@@ -1,10 +1,11 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
-import { Home, FileText, Box, Settings } from 'lucide-react'
+import { Home, FileText, Box, Settings, Globe } from 'lucide-react'
 import { cn } from '@/shared/utils'
 
 const menuItems = [
   { path: '/', label: 'Главная', icon: Home },
+  { path: '/sites', label: 'Сайты', icon: Globe },
   { path: '/pages', label: 'Страницы', icon: FileText },
   { path: '/blocks', label: 'Блоки', icon: Box },
   { path: '/settings', label: 'Настройки', icon: Settings },

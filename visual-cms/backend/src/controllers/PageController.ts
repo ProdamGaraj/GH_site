@@ -9,8 +9,13 @@ const pageRepository = AppDataSource.getRepository(Page)
 
 export class PageController {
   getAll = asyncHandler(async (req: Request, res: Response) => {
+    const { siteId } = req.query
+    const where: any = {}
+    if (siteId) where.siteId = siteId
+
     const pages = await pageRepository.find({
-      relations: ['group'],
+      where,
+      relations: ['group', 'site'],
       order: { updatedAt: 'DESC' },
     })
     res.json(pages)
@@ -21,7 +26,7 @@ export class PageController {
 
     const page = await pageRepository.findOne({
       where: { id },
-      relations: ['group'],
+      relations: ['group', 'site'],
     })
 
     if (!page) {

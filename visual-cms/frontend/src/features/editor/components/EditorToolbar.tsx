@@ -984,12 +984,18 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         />
       )}
 
+    </>
+  )
+
+  // Floating notifications (positioned absolutely, not in toolbar flow)
+  const notificationsContent = (
+    <>
       {/* Deploy result notification */}
       {deployResult && (
-        <div className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
+        <div className={`fixed top-1 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm whitespace-nowrap ${
           deployResult.success 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
+            ? 'bg-green-100 text-green-800 border border-green-200' 
+            : 'bg-red-100 text-red-800 border border-red-200'
         }`}>
           {deployResult.success ? <Check size={16} /> : <X size={16} />}
           <span>{deployResult.message}</span>
@@ -998,7 +1004,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               href={deployResult.url} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="flex items-center gap-1 underline hover:no-underline"
+              className="flex items-center gap-1 underline hover:no-underline font-medium"
             >
               Открыть <ExternalLink size={14} />
             </a>
@@ -1008,10 +1014,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
       {/* Block save result notification */}
       {blockSaveResult && (
-        <div className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm ${
+        <div className={`fixed top-1 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm whitespace-nowrap ${
           blockSaveResult.success 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
+            ? 'bg-green-100 text-green-800 border border-green-200' 
+            : 'bg-red-100 text-red-800 border border-red-200'
         }`}>
           {blockSaveResult.success ? <Check size={16} /> : <X size={16} />}
           <span>{blockSaveResult.message}</span>
@@ -1126,6 +1132,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         <PreviewModal 
           rootNode={rootNode}
           breakpoints={breakpoints}
+          pageId={id}
           onClose={handleClosePreview} 
         />
       )}
@@ -1141,6 +1148,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     return (
       <>
         {children({ centerContent, rightContent })}
+        {notificationsContent}
         {modalsContent}
       </>
     )
@@ -1151,6 +1159,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     <>
       {centerContent}
       {rightContent}
+      {notificationsContent}
       {modalsContent}
     </>
   )
@@ -1160,10 +1169,11 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 interface PreviewModalProps {
   rootNode: import('@/shared/types').BlockNode
   breakpoints: import('@/shared/types').CustomBreakpoint[]
+  pageId?: string
   onClose: () => void
 }
 
-const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onClose }) => {
+const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, pageId, onClose }) => {
   const [selectedBreakpoint, setSelectedBreakpoint] = useState(breakpoints[0]?.id || 'desktop')
   const [isManualMode, setIsManualMode] = useState(false)
   const [manualWidth, setManualWidth] = useState(1440)
@@ -1323,6 +1333,37 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onCl
     }
   }, [rootNode, breakpoints])
 
+  const buildFullDocument = () => {
+    return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: system-ui, -apple-system, sans-serif; }
+      ${keyframes}
+      ${stateAnimCSS}
+      ${specificHideCSS}
+      ${responsiveCSS}
+    </style>
+  </head>
+  <body>
+    ${previewHTML}
+    ${animScripts ? `<script>${animScripts}<\/script>` : ''}
+  </body>
+</html>`
+  }
+
+  const handleOpenInNewTab = () => {
+    const html = buildFullDocument()
+    const blob = new Blob([html], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+    // Clean up blob URL after a short delay
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+  }
+
   return (
     <div 
       className="fixed inset-0 bg-black/80 flex flex-col z-[100]"
@@ -1466,12 +1507,21 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onCl
           </div>
         </div>
         
-        <button 
-          onClick={onClose}
-          className="p-2 hover:bg-gray-800 rounded transition-colors"
-        >
-          <X size={20} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleOpenInNewTab}
+            className="p-2 hover:bg-gray-800 rounded transition-colors"
+            title="Открыть в новой вкладке"
+          >
+            <ExternalLink size={18} />
+          </button>
+          <button 
+            onClick={onClose}
+            className="p-2 hover:bg-gray-800 rounded transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
       </div>
       
       {/* Preview Content */}
@@ -1497,29 +1547,7 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onCl
             }}
           >
             <iframe
-              srcDoc={`
-                <!DOCTYPE html>
-                <html>
-                  <head>
-                    <meta charset="utf-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1">
-                    <style>
-                      * { margin: 0; padding: 0; box-sizing: border-box; }
-                      body { font-family: system-ui, -apple-system, sans-serif; }
-                      ${keyframes}
-                      ${stateAnimCSS}
-                      /* Hide viewport-specific elements by default */
-                      ${specificHideCSS}
-                      /* Responsive @media queries */
-                      ${responsiveCSS}
-                    </style>
-                  </head>
-                  <body>
-                    ${previewHTML}
-                    ${animScripts ? `<script>${animScripts}</script>` : ''}
-                  </body>
-                </html>
-              `}
+              srcDoc={buildFullDocument()}
               className="w-full h-full border-0"
               title="Preview"
               style={{ pointerEvents: (isResizing || ctrlPressed) ? 'none' : 'auto' }}

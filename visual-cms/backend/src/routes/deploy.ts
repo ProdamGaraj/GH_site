@@ -9,6 +9,20 @@ import { deployService } from '../services/DeployService'
 const router = Router()
 
 /**
+ * POST /api/deploy/site/:siteId - Деплой всех страниц сайта
+ */
+router.post('/site/:siteId', asyncHandler(async (req: Request, res: Response) => {
+    const { siteId } = req.params
+    const result = await deployService.deploySite(siteId)
+    
+    if (result.success) {
+      res.json(result)
+    } else {
+      res.status(400).json(result)
+    }
+}))
+
+/**
  * POST /api/deploy/:pageId - Деплой одной страницы
  */
 router.post('/:pageId', asyncHandler(async (req: Request, res: Response) => {
@@ -42,7 +56,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     const files = deployService.getDeployedFiles()
     res.json({
       files,
-      publicUrl: 'http://localhost:3001/'
+      publicUrl: `${process.env.PUBLIC_SITE_URL || 'https://localhost'}/`
     })
 }))
 
@@ -51,7 +65,8 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
  */
 router.delete('/:slug', asyncHandler(async (req: Request, res: Response) => {
     const { slug } = req.params
-    const success = await deployService.undeployPage(slug)
+    const siteSlug = req.query.site as string | undefined
+    const success = await deployService.undeployPage(slug, siteSlug)
     
     if (success) {
       res.json({ message: `Страница ${slug} удалена из публикации` })
