@@ -102,7 +102,6 @@ export class DeployService {
       const fileName = page.slug === 'index' || page.slug === 'home' 
         ? 'index.html' 
         : `${page.slug}.html`
-      const siteDir = this.resolveSiteDir(page.site)
       const filePath = path.join(siteDir, fileName)
 
       // Записываем файл

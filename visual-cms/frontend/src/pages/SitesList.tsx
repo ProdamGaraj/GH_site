@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Header } from '@/shared/components/Header'
-import { Plus, Trash2, Globe, Copy, Rocket, Settings, FileText } from 'lucide-react'
+import { Plus, Trash2, Globe, Copy, Rocket, Settings, FileText, ExternalLink } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import {
   fetchSites,
@@ -15,6 +15,7 @@ import {
   selectSitesSaving,
 } from '@/features/sites/sitesSlice'
 import type { Site } from '@/shared/types'
+import { getSitePublicUrl } from '@/shared/utils'
 
 export const SitesList: React.FC = () => {
   const dispatch = useAppDispatch()
@@ -109,6 +110,8 @@ export const SitesList: React.FC = () => {
     return labels[mode] || mode
   }
 
+  const getSiteUrl = (site: Site) => getSitePublicUrl(site)
+
   const slugFromName = (name: string) =>
     name.toLowerCase().replace(/[а-яё]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
@@ -176,11 +179,20 @@ export const SitesList: React.FC = () => {
                     )}
                   </div>
                   <div className="flex items-center gap-2 ml-4">
+                    <a
+                      href={getSiteUrl(site)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Открыть сайт"
+                    >
+                      <ExternalLink size={18} />
+                    </a>
                     <button
                       onClick={() => handleDeploy(site.id)}
                       disabled={deployingId === site.id}
                       className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
-                      title="Опубликовать"
+                      title="Опубликовать все страницы"
                     >
                       <Rocket size={18} />
                     </button>
@@ -224,7 +236,7 @@ export const SitesList: React.FC = () => {
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCreateModal(false)}>
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md text-gray-900" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-semibold mb-4">Новый сайт</h2>
             <div className="space-y-4">
               <div>
@@ -238,7 +250,7 @@ export const SitesList: React.FC = () => {
                       setNewSiteSlug(slugFromName(e.target.value))
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                   placeholder="Golden House Premium"
                   autoFocus
                 />
@@ -249,7 +261,7 @@ export const SitesList: React.FC = () => {
                   type="text"
                   value={newSiteSlug}
                   onChange={(e) => setNewSiteSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-gray-900 bg-white"
                   placeholder="premium"
                 />
               </div>
@@ -258,7 +270,7 @@ export const SitesList: React.FC = () => {
                 <select
                   value={newSiteRouting}
                   onChange={(e) => setNewSiteRouting(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
                 >
                   <option value="subdomain">Поддомен (premium.site.com) — лучше для SEO</option>
                   <option value="path-prefix">Путь (site.com/premium/)</option>

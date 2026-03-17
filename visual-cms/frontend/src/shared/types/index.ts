@@ -399,6 +399,26 @@ export interface Group {
   updatedAt: string
 }
 
+// Page Version
+export interface PageVersion {
+  id: string
+  pageId: string
+  version: number
+  structure?: any
+  metadata?: {
+    title: string
+    description: string
+    keywords: string[]
+    ogImage?: string
+  }
+  name?: string
+  slug?: string
+  status: 'draft' | 'published' | 'archived'
+  source: 'manual' | 'auto' | 'deploy'
+  label?: string
+  createdAt: string
+}
+
 // Library Items
 export interface LibraryItem {
   type: ElementType

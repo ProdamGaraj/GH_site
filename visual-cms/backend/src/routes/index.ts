@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import sitesRouter from './sites'
 import pagesRouter from './pages'
+import versionsRouter from './versions'
 import blocksRouter from './blocks'
 import groupsRouter from './groups'
 import deployRouter from './deploy'
@@ -22,6 +23,7 @@ const router = Router()
 router.use('/sites', sitesRouter)
 router.use('/analytics', analyticsRouter)
 router.use('/pages', pagesRouter)
+router.use('/pages/:pageId/versions', versionsRouter)
 router.use('/blocks', blocksRouter)
 router.use('/groups', groupsRouter)
 router.use('/deploy', deployRouter)

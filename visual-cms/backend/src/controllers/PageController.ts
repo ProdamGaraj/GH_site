@@ -1,11 +1,13 @@
 import { Request, Response } from 'express'
 import { AppDataSource } from '../config/database'
 import { Page } from '../models/Page'
+import { PageVersion } from '../models/PageVersion'
 import { linkedBlocksService } from '../services/LinkedBlocksService'
 import { asyncHandler, NotFoundError, AppError } from '../middleware'
 import { cacheService } from '../services/CacheService'
 
 const pageRepository = AppDataSource.getRepository(Page)
+const versionRepository = AppDataSource.getRepository(PageVersion)
 
 export class PageController {
   getAll = asyncHandler(async (req: Request, res: Response) => {
@@ -60,6 +62,22 @@ export class PageController {
       await linkedBlocksService.syncLinkedBlocksToLibrary(req.body.structure)
     }
 
+    // Auto-save version snapshot before overwriting
+    if (page.structure) {
+      const snapshot = versionRepository.create({
+        pageId: page.id,
+        version: page.version,
+        structure: page.structure,
+        metadata: page.metadata,
+        name: page.name,
+        slug: page.slug,
+        status: page.status,
+        source: 'auto',
+        label: `v${page.version}`,
+      })
+      await versionRepository.save(snapshot)
+    }
+
     Object.assign(page, req.body)
     page.version += 1
     await pageRepository.save(page)
@@ -86,6 +104,22 @@ export class PageController {
 
     if (!page) {
       throw new NotFoundError('Page', id)
+    }
+
+    // Save deploy snapshot
+    if (page.structure) {
+      const snapshot = versionRepository.create({
+        pageId: page.id,
+        version: page.version,
+        structure: page.structure,
+        metadata: page.metadata,
+        name: page.name,
+        slug: page.slug,
+        status: page.status,
+        source: 'deploy',
+        label: `Деплой v${page.version}`,
+      })
+      await versionRepository.save(snapshot)
     }
 
     const { deployService } = await import('../services/DeployService')

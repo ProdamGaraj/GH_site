@@ -122,7 +122,7 @@ export const siteApi = {
 }
 
 // Types
-import type { Block, Page, BlockNode, Site, SiteSettings } from '@/shared/types'
+import type { Block, Page, BlockNode, Site, SiteSettings, PageVersion } from '@/shared/types'
 import type { 
   DataSource, 
   DataSourcesListResponse, 
@@ -131,6 +131,24 @@ import type {
   UpdateDataSourceRequest,
   TestConnectionResult 
 } from '@/shared/types/dataSource'
+
+export interface DeployLogEntry {
+  id: string
+  siteId?: string
+  pageId?: string
+  pageName?: string
+  pageSlug?: string
+  action: 'deploy' | 'rollback' | 'undeploy' | 'deploy-all' | 'deploy-site'
+  status: 'success' | 'failed' | 'partial'
+  message?: string
+  deployedFiles?: string[]
+  errors?: string[]
+  durationMs?: number
+  publicUrl?: string
+  pageVersion?: number
+  versionId?: string
+  createdAt: string
+}
 
 export interface CreateBlockDto {
   name: string
@@ -199,6 +217,16 @@ export interface UpdateSiteDto {
   homepageId?: string | null
 }
 
+// Version API
+export const versionApi = {
+  getAll: (pageId: string) => api.get<PageVersion[]>(`/pages/${pageId}/versions`),
+  getById: (pageId: string, versionId: string) => api.get<PageVersion>(`/pages/${pageId}/versions/${versionId}`),
+  create: (pageId: string, label?: string) => api.post<PageVersion>(`/pages/${pageId}/versions`, { label }),
+  restore: (pageId: string, versionId: string) => api.post<{ success: boolean; page: Page; restoredFrom: string }>(`/pages/${pageId}/versions/${versionId}/restore`),
+  updateLabel: (pageId: string, versionId: string, label: string) => api.put<PageVersion>(`/pages/${pageId}/versions/${versionId}`, { label }),
+  delete: (pageId: string, versionId: string) => api.delete<void>(`/pages/${pageId}/versions/${versionId}`),
+}
+
 // Deploy API
 export interface DeployResult {
   success: boolean
@@ -209,17 +237,14 @@ export interface DeployResult {
 }
 
 export const deployApi = {
-  // Р”РµРїР»РѕР№ РѕРґРЅРѕР№ СЃС‚СЂР°РЅРёС†С‹
   deployPage: (pageId: string) => api.post<DeployResult>(`/deploy/${pageId}`),
-  
-  // Р”РµРїР»РѕР№ РІСЃРµС… РѕРїСѓР±Р»РёРєРѕРІР°РЅРЅС‹С… СЃС‚СЂР°РЅРёС†
   deployAll: () => api.post<DeployResult>('/deploy'),
-  
-  // РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РѕРїСѓР±Р»РёРєРѕРІР°РЅРЅС‹С… С„Р°Р№Р»РѕРІ
   getDeployedFiles: () => api.get<{ files: string[], publicUrl: string }>('/deploy'),
-  
-  // РЈРґР°Р»РёС‚СЊ СЃС‚СЂР°РЅРёС†Сѓ РёР· РїСѓР±Р»РёРєР°С†РёРё
   undeploy: (slug: string) => api.delete<{ message: string }>(`/deploy/${slug}`),
+  getLogs: (params?: { siteId?: string; pageId?: string; limit?: number }) =>
+    api.get<DeployLogEntry[]>('/deploy/logs', { params: params as any }),
+  rollback: (pageId: string, versionId: string) =>
+    api.post<DeployResult & { rolledBackTo: number; newVersion: number }>(`/deploy/${pageId}/rollback/${versionId}`),
 }
 
 // Data Sources API

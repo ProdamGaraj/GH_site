@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Header } from '@/shared/components/Header'
-import { ArrowLeft, Save, Globe, Palette, Code, Building2, BarChart3 } from 'lucide-react'
+import { ArrowLeft, Save, Globe, Palette, Code, Building2, BarChart3, Rocket } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import {
   fetchSiteById,
@@ -12,8 +12,9 @@ import {
   selectSitesSaving,
 } from '@/features/sites/sitesSlice'
 import type { Site, SiteSettings } from '@/shared/types'
+import { DeployHistory } from '@/features/deploy/DeployHistory'
 
-type Tab = 'general' | 'seo' | 'branding' | 'analytics' | 'company' | 'code'
+type Tab = 'general' | 'seo' | 'branding' | 'analytics' | 'company' | 'code' | 'deploy'
 
 export const SiteSettingsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -72,6 +73,7 @@ export const SiteSettingsPage: React.FC = () => {
     { id: 'analytics', label: 'Аналитика', icon: <BarChart3 size={16} /> },
     { id: 'company', label: 'Компания', icon: <Building2 size={16} /> },
     { id: 'code', label: 'Код', icon: <Code size={16} /> },
+    { id: 'deploy', label: 'Деплой', icon: <Rocket size={16} /> },
   ]
 
   if (!site) {
@@ -508,6 +510,14 @@ export const SiteSettingsPage: React.FC = () => {
                   <Save size={16} className="mr-2" />
                   {saving ? 'Сохранение...' : 'Сохранить'}
                 </Button>
+              </div>
+            </div>
+          )}
+          {activeTab === 'deploy' && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">История деплоев</h3>
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <DeployHistory siteId={id} />
               </div>
             </div>
           )}

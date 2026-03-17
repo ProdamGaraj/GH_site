@@ -3,10 +3,11 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Header } from '@/shared/components/Header'
 import { ImportModal } from '@/shared/components/ImportModal'
-import { Plus, Edit, Trash2, ExternalLink, Upload } from 'lucide-react'
+import { Plus, Edit, Trash2, ExternalLink, Upload, Globe } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { fetchPages, deletePage, selectPages, selectPagesLoading } from '@/features/pages/pagesSlice'
 import type { BlockNode } from '@/shared/types'
+import { getPagePublicUrl } from '@/shared/utils'
 
 export const PagesList: React.FC = () => {
   const dispatch = useAppDispatch()
@@ -101,6 +102,9 @@ export const PagesList: React.FC = () => {
                     Статус
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Сайт
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Дата создания
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -123,19 +127,31 @@ export const PagesList: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(page.status || 'draft')}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {page.site ? (
+                        <Link to={`/sites/${page.site.id}/pages`} className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-900">
+                          <Globe size={14} />
+                          {page.site.name}
+                        </Link>
+                      ) : (
+                        <span className="text-sm text-gray-400">—</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(page.createdAt).toLocaleDateString('ru-RU')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end gap-2">
-                        {page.status === 'published' && (
-                          <button
-                            onClick={() => window.open(`/${page.slug}`, '_blank')}
+                        {page.status === 'published' && page.site && (
+                          <a
+                            href={getPagePublicUrl(page.site, page.slug)}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-900"
-                            title="Просмотр"
+                            title="Просмотр на сайте"
                           >
                             <ExternalLink size={18} />
-                          </button>
+                          </a>
                         )}
                         <Link
                           to={`/editor/page/${page.id}`}

@@ -47,6 +47,18 @@ export const router = createBrowserRouter([
         element: <TemplatesPage />,
       },
       {
+        path: 'sites',
+        element: <SitesList />,
+      },
+      {
+        path: 'sites/:id/settings',
+        element: <SiteSettingsPage />,
+      },
+      {
+        path: 'sites/:id/pages',
+        element: <SitePagesPage />,
+      },
+      {
         path: 'settings',
         element: <Settings />,
       },

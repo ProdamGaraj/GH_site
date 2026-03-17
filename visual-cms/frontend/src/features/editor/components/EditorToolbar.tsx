@@ -4,7 +4,7 @@ import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
 import { ColorPicker } from '@/shared/components/ColorPicker'
 import { ExpandableButton } from '@/shared/components/ExpandableButton'
-import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, Rocket, ExternalLink, ChevronDown, Palette, Pencil, FileText, Library, FileDown, Info, Code2, Database, Zap, MousePointer } from 'lucide-react'
+import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, ExternalLink, ChevronDown, Palette, Pencil, FileText, Library, FileDown, Info, Code2, Database, Zap, MousePointer } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor, selectInlineBlockEdit, startInlineBlockEdit, cancelInlineBlockEdit, finishInlineBlockEdit, selectActiveRightPanelTab, setActiveRightPanelTab } from '@/features/editor/editorSlice'
 import { createBlock, updateBlock, selectBlocksSaving } from '@/features/blocks/blocksSlice'
@@ -12,7 +12,7 @@ import { createPage, updatePage, selectPagesSaving } from '@/features/pages/page
 import { BreakpointManager } from './BreakpointManager'
 import { ExportImportModal } from './ExportImportModal'
 import { FullPageHtmlEditor } from './FullPageHtmlEditor'
-import { deployApi, blockApi, pageApi } from '@/shared/api'
+import { blockApi, pageApi } from '@/shared/api'
 import { generateNodeTreeCSS, generateResponsiveCSS, collectSpecificChildrenIds, generateFullHTML } from '../utils/styleGenerator'
 import type { BlockNode } from '@/shared/types'
 
@@ -77,8 +77,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const [blockName, setBlockName] = useState(initialBlockName || '')
   const [isReusable, setIsReusable] = useState(true)
   const [zoomInput, setZoomInput] = useState(String(zoom))
-  const [isDeploying, setIsDeploying] = useState(false)
-  const [deployResult, setDeployResult] = useState<{ success: boolean; message: string; url?: string } | null>(null)
   const [showViewportDropdown, setShowViewportDropdown] = useState(false)
   const [isSavingToLibrary, setIsSavingToLibrary] = useState(false)
   const [blockSaveResult, setBlockSaveResult] = useState<{ success: boolean; message: string } | null>(null)
@@ -381,37 +379,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     setShowPreview(false)
   }
 
-  const handleDeploy = async () => {
-    if (!id || isNewBlock) {
-      setDeployResult({ success: false, message: 'Сначала сохраните страницу' })
-      setTimeout(() => setDeployResult(null), 3000)
-      return
-    }
-
-    setIsDeploying(true)
-    setDeployResult(null)
-
-    try {
-      const result = await deployApi.deployPage(id)
-      setDeployResult({
-        success: result.success,
-        message: result.message,
-        url: result.publicUrl
-      })
-      
-      // Автоматически скрываем сообщение через 5 секунд
-      setTimeout(() => setDeployResult(null), 5000)
-    } catch (error: any) {
-      setDeployResult({
-        success: false,
-        message: error.message || 'Ошибка при публикации'
-      })
-      setTimeout(() => setDeployResult(null), 5000)
-    } finally {
-      setIsDeploying(false)
-    }
-  }
-  
   const handleZoomIn = () => {
     dispatch(setZoom(zoom + 10))
   }
@@ -972,17 +939,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         />
       )}
 
-      {/* Deploy button - only for page editor */}
-      {isPageEditor && !isNewBlock && (
-        <ExpandableButton
-          icon={isDeploying ? <Loader2 size={16} className="animate-spin" /> : <Rocket size={16} />}
-          label="Опубликовать"
-          onClick={handleDeploy}
-          disabled={isDeploying || isDirty}
-          title={isDirty ? 'Сначала сохраните изменения' : 'Опубликовать страницу на сайт'}
-          variant="success"
-        />
-      )}
+
 
     </>
   )
@@ -990,28 +947,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   // Floating notifications (positioned absolutely, not in toolbar flow)
   const notificationsContent = (
     <>
-      {/* Deploy result notification */}
-      {deployResult && (
-        <div className={`fixed top-1 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm whitespace-nowrap ${
-          deployResult.success 
-            ? 'bg-green-100 text-green-800 border border-green-200' 
-            : 'bg-red-100 text-red-800 border border-red-200'
-        }`}>
-          {deployResult.success ? <Check size={16} /> : <X size={16} />}
-          <span>{deployResult.message}</span>
-          {deployResult.url && (
-            <a 
-              href={deployResult.url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 underline hover:no-underline font-medium"
-            >
-              Открыть <ExternalLink size={14} />
-            </a>
-          )}
-        </div>
-      )}
-
       {/* Block save result notification */}
       {blockSaveResult && (
         <div className={`fixed top-1 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm whitespace-nowrap ${

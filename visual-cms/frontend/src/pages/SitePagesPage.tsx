@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Header } from '@/shared/components/Header'
-import { ArrowLeft, Plus, Edit, X, FileText } from 'lucide-react'
+import { ArrowLeft, Plus, Edit, X, FileText, ExternalLink } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { fetchSiteById, selectCurrentSite } from '@/features/sites/sitesSlice'
 import { fetchPages, selectPages } from '@/features/pages/pagesSlice'
 import { siteApi } from '@/shared/api'
 import type { Page } from '@/shared/types'
+import { getSitePublicUrl } from '@/shared/utils'
 
 export const SitePagesPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -77,9 +78,23 @@ export const SitePagesPage: React.FC = () => {
           </Link>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Страницы: {site?.name || '...'}
-              </h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold text-gray-900">
+                  Страницы: {site?.name || '...'}
+                </h1>
+                {site && (
+                  <a
+                    href={getSitePublicUrl(site)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Открыть сайт"
+                  >
+                    <ExternalLink size={16} />
+                    Открыть сайт
+                  </a>
+                )}
+              </div>
               <p className="text-gray-600 mt-1">Управление страницами сайта</p>
             </div>
             <div className="flex gap-3">

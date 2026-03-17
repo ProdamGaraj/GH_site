@@ -62,6 +62,7 @@ import type { DragItem, BlockNode, EditorPageSettings } from '@/shared/types'
 import { DataBindingProvider } from '@/features/dataBindings'
 import { TranslationPanel } from '@/features/translations/TranslationPanel'
 import { LanguageSettingsPanel } from '@/features/translations/LanguageSettingsPanel'
+import { VersionHistoryPanel } from '@/features/editor/components/VersionHistoryPanel'
 
 import { 
   DropIndicator, 
@@ -106,6 +107,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   const [activeNode, setActiveNode] = useState<BlockNode | null>(null)
   const [loading, setLoading] = useState(false)
   const [currentBlockData, setCurrentBlockData] = useState<any>(null) // Данные загруженного блока (для Template)
+  const [pageVersion, setPageVersion] = useState(1)
   const [pageSettings, setPageSettings] = useState<EditorPageSettings>({
     name: '',
     slug: '',
@@ -265,6 +267,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
           // Load the page structure into editor
           const { loadEditor: loadEditorAction } = await import('@/features/editor/editorSlice')
           dispatch(loadEditorAction(result.structure))
+          setPageVersion(result.version || 1)
           
           // Load page settings
           setPageSettings({
@@ -1007,6 +1010,28 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                 {/* Language Settings Panel */}
                 {type === 'page' && activeRightPanel === 'languageSettings' && (
                   <LanguageSettingsPanel onClose={() => dispatch(setActiveRightPanel('translations'))} />
+                )}
+                
+                {/* Version History Panel */}
+                {type === 'page' && activeRightPanel === 'versionHistory' && id && (
+                  <VersionHistoryPanel
+                    pageId={id}
+                    currentVersion={pageVersion}
+                    onRestore={async (restoredPage) => {
+                      const { loadEditor: loadEditorAction } = await import('@/features/editor/editorSlice')
+                      dispatch(loadEditorAction(restoredPage.structure))
+                      setPageVersion(restoredPage.version || pageVersion + 1)
+                      if (restoredPage.metadata) {
+                        setPageSettings(prev => ({
+                          ...prev,
+                          metaTitle: restoredPage.metadata?.title || prev.metaTitle,
+                          metaDescription: restoredPage.metadata?.description || prev.metaDescription,
+                          keywords: restoredPage.metadata?.keywords?.join(', ') || prev.keywords,
+                        }))
+                      }
+                    }}
+                    onClose={() => dispatch(setActiveRightPanel(null))}
+                  />
                 )}
                 
                 {/* Показываем панель свойств элемента (old properties with tabs - deprecated) */}
