@@ -55,7 +55,15 @@ class ApiClient {
     
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Network error' }))
-      throw new Error(error.message || `HTTP error ${response.status}`)
+      let message = error.message || `HTTP error ${response.status}`
+      // Include field-level validation errors in the message
+      if (error.details?.errors) {
+        const fields = Object.entries(error.details.errors)
+          .map(([field, msgs]) => `${field}: ${(msgs as string[]).join(', ')}`)
+          .join('; ')
+        if (fields) message += ` (${fields})`
+      }
+      throw new Error(message)
     }
 
     return response.json()

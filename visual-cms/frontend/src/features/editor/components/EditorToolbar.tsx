@@ -80,6 +80,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const [showViewportDropdown, setShowViewportDropdown] = useState(false)
   const [isSavingToLibrary, setIsSavingToLibrary] = useState(false)
   const [blockSaveResult, setBlockSaveResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [saveResult, setSaveResult] = useState<{ success: boolean; message: string } | null>(null)
   const [showHtmlEditor, setShowHtmlEditor] = useState(false)
 
   // Sync zoomInput with redux zoom when it changes externally
@@ -126,11 +127,21 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   }
 
   const handleSave = async () => {
-    if (!rootNode) return
+    if (!rootNode) {
+      console.warn('handleSave: rootNode is null')
+      setSaveResult({ success: false, message: 'Нет структуры для сохранения' })
+      setTimeout(() => setSaveResult(null), 3000)
+      return
+    }
 
     if (isPageEditor) {
       // Save page
-      if (!pageSettings) return
+      if (!pageSettings) {
+        console.warn('handleSave: pageSettings is null')
+        setSaveResult({ success: false, message: 'Настройки страницы не загружены' })
+        setTimeout(() => setSaveResult(null), 3000)
+        return
+      }
 
       if (isNewBlock) {
         setShowSaveDialog(true)
@@ -148,25 +159,33 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             },
           }
           
-          await dispatch(updatePage({
-            id: id!,
-            data: {
+          const updateData: Record<string, unknown> = {
               structure: structureWithBreakpoints,
-              name: pageSettings.name,
-              slug: pageSettings.slug,
               status: pageSettings.status,
               metadata: {
                 title: pageSettings.metaTitle || undefined,
                 description: pageSettings.metaDescription || undefined,
                 keywords: pageSettings.keywords ? pageSettings.keywords.split(',').map(k => k.trim()) : [],
                 ogImage: pageSettings.ogImage || undefined,
+                scripts: (pageSettings as any).scripts || [],
               }
             }
+          // Only include name/slug when non-empty to avoid validation errors
+          if (pageSettings.name) updateData.name = pageSettings.name
+          if (pageSettings.slug) updateData.slug = pageSettings.slug
+          
+          await dispatch(updatePage({
+            id: id!,
+            data: updateData as any,
           })).unwrap()
           
           dispatch(markAsSaved())
-        } catch (error) {
+          setSaveResult({ success: true, message: 'Страница сохранена' })
+          setTimeout(() => setSaveResult(null), 3000)
+        } catch (error: any) {
           console.error('Failed to save page:', error)
+          setSaveResult({ success: false, message: error?.message || 'Ошибка сохранения' })
+          setTimeout(() => setSaveResult(null), 5000)
         }
       }
     } else {
@@ -956,6 +975,16 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         }`}>
           {blockSaveResult.success ? <Check size={16} /> : <X size={16} />}
           <span>{blockSaveResult.message}</span>
+        </div>
+      )}
+      {saveResult && (
+        <div className={`fixed top-1 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm whitespace-nowrap ${
+          saveResult.success 
+            ? 'bg-green-100 text-green-800 border border-green-200' 
+            : 'bg-red-100 text-red-800 border border-red-200'
+        }`}>
+          {saveResult.success ? <Check size={16} /> : <X size={16} />}
+          <span>{saveResult.message}</span>
         </div>
       )}
     </>

@@ -32,6 +32,7 @@ import {
   setActiveLeftPanel,
   setActiveRightPanel,
   selectInlineBlockEdit,
+  markAsDirty,
 } from '@/features/editor/editorSlice'
 import { Header } from '@/shared/components/Header'
 import { EditorToolbar } from '@/features/editor/components/EditorToolbar'
@@ -278,6 +279,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
             metaDescription: result.metadata?.description || '',
             keywords: result.metadata?.keywords?.join(', ') || '',
             ogImage: result.metadata?.ogImage || '',
+            scripts: result.metadata?.scripts || [],
           })
 
           // Load data bindings for all blocks on this page
@@ -946,7 +948,10 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                 {type === 'page' && activeRightPanel === 'pageSettings' && !inlineBlockEdit.active && (
                   <PageSettingsPanel 
                     settings={pageSettings}
-                    onChange={setPageSettings}
+                    onChange={(newSettings) => {
+                      setPageSettings(newSettings)
+                      dispatch(markAsDirty())
+                    }}
                   />
                 )}
                 

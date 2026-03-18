@@ -4,7 +4,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
-import { htmlGenerator } from './HtmlGenerator'
+import { htmlGenerator, type ResolvedNavItem } from './HtmlGenerator'
 import { AppDataSource } from '../config/database'
 import { Page } from '../models/Page'
 import { Block } from '../models/Block'
@@ -279,7 +279,13 @@ export class DeployService {
 
       const siteDir = this.resolveSiteDir(site)
       this.ensureDirectoryExists(siteDir)
+      // Clean old HTML files before deploying fresh pages
+      this.cleanHtmlFiles(siteDir)
       this.copyAssetsToDir(siteDir)
+
+      // Resolve navigation from site settings
+      const allSitePages = await this.pageRepository.find({ where: { siteId } })
+      const resolvedNav = this.resolveNavigation(site.settings?.navigation, allSitePages)
 
       for (const page of pages) {
         if (!page.structure) {
@@ -307,7 +313,8 @@ export class DeployService {
             dataConfig,
             defLang?.code,
             defLang?.direction,
-            pageLangSwitcher
+            pageLangSwitcher,
+            resolvedNav
           )
 
           const fileName = page.slug === 'index' || page.slug === 'home' ? 'index.html' : `${page.slug}.html`
@@ -367,12 +374,67 @@ export class DeployService {
   }
 
   /**
+   * Удаляет всю директорию развёртывания сайта
+   */
+  cleanupSiteDir(siteSlug: string): boolean {
+    if (!siteSlug) {
+      // Root site — only clean generated HTML files, not static assets
+      const htmlFiles = fs.readdirSync(PUBLIC_DIR).filter(f => f.endsWith('.html') && f !== 'index.html')
+      htmlFiles.forEach(f => fs.unlinkSync(path.join(PUBLIC_DIR, f)))
+      return htmlFiles.length > 0
+    }
+    const dir = path.join(PUBLIC_DIR, 'sites', siteSlug)
+    if (fs.existsSync(dir)) {
+      fs.rmSync(dir, { recursive: true, force: true })
+      return true
+    }
+    return false
+  }
+
+  /**
    * Создаёт директорию если не существует
    */
   private ensureDirectoryExists(dir: string): void {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true })
     }
+  }
+
+  /**
+   * Удаляет все .html файлы из директории (не рекурсивно)
+   */
+  private cleanHtmlFiles(dir: string): void {
+    if (!fs.existsSync(dir)) return
+    const htmlFiles = fs.readdirSync(dir).filter(f => f.endsWith('.html'))
+    htmlFiles.forEach(f => fs.unlinkSync(path.join(dir, f)))
+  }
+
+  /**
+   * Разрешает navigation items: pageId → href URL
+   */
+  private resolveNavigation(navItems: any[] | undefined, pages: Page[]): ResolvedNavItem[] {
+    if (!navItems || navItems.length === 0) return []
+
+    const pageSlugMap = new Map(pages.map(p => [p.id, p.slug]))
+
+    const resolve = (items: any[]): ResolvedNavItem[] =>
+      items.map(item => {
+        let href = item.url || '#'
+        if (item.pageId) {
+          const slug = pageSlugMap.get(item.pageId)
+          if (slug !== undefined) {
+            href = slug === 'home' || slug === 'index' ? '/' : `/${slug}`
+          }
+        }
+        return {
+          label: item.label || '',
+          href,
+          openInNewTab: item.openInNewTab || false,
+          children: item.children ? resolve(item.children) : undefined,
+        }
+      })
+
+    return resolve(navItems)
   }
 
   /**
@@ -1020,11 +1082,11 @@ Golden House - Public Site
 
   /**
    * Resolve the deploy directory for a site.
-   * Sites go into public-site/sites/<slug>/
-   * Pages without a site go to public-site/ (backward compatible)
+   * Sites with slug go into public-site/sites/<slug>/
+   * Sites without slug (root site) or pages without a site go to public-site/
    */
   private resolveSiteDir(site?: Site | null): string {
-    if (!site) return PUBLIC_DIR
+    if (!site || !site.slug) return PUBLIC_DIR
     return path.join(PUBLIC_DIR, 'sites', site.slug)
   }
 

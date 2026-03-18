@@ -327,7 +327,17 @@ export interface Page {
 }
 
 // Site
+export interface NavigationItem {
+  id: string
+  label: string
+  pageId?: string
+  url?: string
+  openInNewTab?: boolean
+  children?: NavigationItem[]
+}
+
 export interface SiteSettings {
+  navigation?: NavigationItem[]
   defaultTitle?: string
   defaultDescription?: string
   defaultKeywords?: string[]

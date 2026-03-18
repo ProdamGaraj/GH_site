@@ -1,11 +1,13 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import Editor from '@monaco-editor/react'
+import { useParams } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { updateNode, updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
 import { ImageUpload } from './ImageUpload'
 import { Link as LinkIcon, Image as ImageIcon, Code as CodeIcon } from 'lucide-react'
-import type { BlockNode } from '@/shared/types'
+import type { BlockNode, Page } from '@/shared/types'
+import { pageApi } from '@/shared/api'
 
 interface ContentTabProps {
   node: BlockNode
@@ -14,6 +16,21 @@ interface ContentTabProps {
 export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
   const dispatch = useAppDispatch()
   const viewport = useAppSelector(selectViewport)
+  const { id: pageId } = useParams<{ id: string }>()
+  const [sitePages, setSitePages] = useState<Page[]>([])
+
+  // Load sibling pages for the page link picker
+  useEffect(() => {
+    if (!pageId) return
+    let cancelled = false
+    pageApi.getById(pageId).then(page => {
+      if (cancelled || !page.siteId) return
+      pageApi.getAll(page.siteId).then(pages => {
+        if (!cancelled) setSitePages(pages)
+      })
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [pageId])
 
   const handleContentChange = (content: string) => {
     dispatch(updateNode({
@@ -137,6 +154,38 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
           <h4 className="text-xs font-medium text-gray-700 flex items-center gap-1">
             <LinkIcon size={14} /> Ссылка
           </h4>
+
+          {/* Page link picker */}
+          {sitePages.length > 0 && (
+            <div>
+              <label className="text-xs text-gray-600 mb-1 block">Страница сайта</label>
+              <select
+                value={node.attributes?.['data-page-id'] || ''}
+                onChange={(e) => {
+                  const selectedPageId = e.target.value
+                  if (selectedPageId) {
+                    const page = sitePages.find(p => p.id === selectedPageId)
+                    if (page) {
+                      const href = page.slug === 'home' || page.slug === 'index' ? '/' : `/${page.slug}`
+                      handleAttributeChange('href', href)
+                      handleAttributeChange('data-page-id', selectedPageId)
+                    }
+                  } else {
+                    handleAttributeChange('data-page-id', '')
+                  }
+                }}
+                className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
+              >
+                <option value="">— Внешняя ссылка —</option>
+                {sitePages.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} (/{p.slug})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <Input
             label="URL (href)"
             value={node.attributes?.href || ''}

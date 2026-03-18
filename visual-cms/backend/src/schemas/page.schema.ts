@@ -5,6 +5,7 @@ const metadataSchema = z.object({
   description: z.string().max(1000).optional().default(''),
   keywords: z.array(z.string()).optional().default([]),
   ogImage: z.union([z.string().url(), z.literal('')]).optional(),
+  scripts: z.array(z.record(z.unknown())).optional().default([]),
 })
 
 // POST /api/pages

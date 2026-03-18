@@ -19,8 +19,8 @@ const initialState: PagesState = {
 
 export const fetchPages = createAsyncThunk(
   'pages/fetchAll',
-  async () => {
-    const pages = await pageApi.getAll()
+  async (siteId?: string) => {
+    const pages = await pageApi.getAll(siteId)
     return pages
   }
 )

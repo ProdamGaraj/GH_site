@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Header } from '@/shared/components/Header'
-import { ArrowLeft, Save, Globe, Palette, Code, Building2, BarChart3, Rocket } from 'lucide-react'
+import { ArrowLeft, Save, Globe, Palette, Code, Building2, BarChart3, Rocket, Menu } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import {
   fetchSiteById,
@@ -11,16 +11,19 @@ import {
   selectCurrentSite,
   selectSitesSaving,
 } from '@/features/sites/sitesSlice'
+import { fetchPages, selectPages } from '@/features/pages/pagesSlice'
 import type { Site, SiteSettings } from '@/shared/types'
 import { DeployHistory } from '@/features/deploy/DeployHistory'
+import { NavigationEditor } from '@/features/sites/components/NavigationEditor'
 
-type Tab = 'general' | 'seo' | 'branding' | 'analytics' | 'company' | 'code' | 'deploy'
+type Tab = 'general' | 'navigation' | 'seo' | 'branding' | 'analytics' | 'company' | 'code' | 'deploy'
 
 export const SiteSettingsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const dispatch = useAppDispatch()
   const site = useAppSelector(selectCurrentSite)
   const saving = useAppSelector(selectSitesSaving)
+  const pages = useAppSelector(selectPages)
 
   const [activeTab, setActiveTab] = useState<Tab>('general')
   const [name, setName] = useState('')
@@ -34,6 +37,7 @@ export const SiteSettingsPage: React.FC = () => {
   useEffect(() => {
     if (id) {
       dispatch(fetchSiteById(id))
+      dispatch(fetchPages(id))
     }
   }, [id, dispatch])
 
@@ -68,6 +72,7 @@ export const SiteSettingsPage: React.FC = () => {
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'general', label: 'Основные', icon: <Globe size={16} /> },
+    { id: 'navigation', label: 'Навигация', icon: <Menu size={16} /> },
     { id: 'seo', label: 'SEO', icon: <Globe size={16} /> },
     { id: 'branding', label: 'Брендинг', icon: <Palette size={16} /> },
     { id: 'analytics', label: 'Аналитика', icon: <BarChart3 size={16} /> },
@@ -136,9 +141,13 @@ export const SiteSettingsPage: React.FC = () => {
                 <input
                   type="text"
                   value={slug}
-                  onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
+                  onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                  placeholder="(пусто = корневой домен)"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Оставьте пустым, чтобы сайт был доступен на корневом домене
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Описание</label>
@@ -178,10 +187,46 @@ export const SiteSettingsPage: React.FC = () => {
                   />
                 </div>
               )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Домашняя страница</label>
+                <select
+                  value={homepageId}
+                  onChange={(e) => setHomepageId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">— Не выбрана —</option>
+                  {pages.map((page) => (
+                    <option key={page.id} value={page.id}>
+                      {page.name} ({page.slug})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Страница, которая будет открываться по умолчанию (index.html)
+                </p>
+              </div>
               <div className="pt-4">
                 <Button onClick={handleSaveGeneral} disabled={saving}>
                   <Save size={16} className="mr-2" />
                   {saving ? 'Сохранение...' : 'Сохранить'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* SEO Tab */}
+          {activeTab === 'navigation' && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900">Меню навигации</h3>
+              <NavigationEditor
+                items={settings.navigation || []}
+                onChange={(nav) => setSettings(prev => ({ ...prev, navigation: nav }))}
+                pages={pages}
+              />
+              <div className="pt-4">
+                <Button onClick={handleSaveSettings} disabled={saving}>
+                  <Save size={16} className="mr-2" />
+                  {saving ? 'Сохранение...' : 'Сохранить навигацию'}
                 </Button>
               </div>
             </div>

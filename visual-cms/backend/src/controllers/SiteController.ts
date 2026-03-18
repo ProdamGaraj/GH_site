@@ -4,6 +4,7 @@ import { Site } from '../models/Site'
 import { Page } from '../models/Page'
 import { asyncHandler, NotFoundError, AppError } from '../middleware'
 import { cacheService } from '../services/CacheService'
+import { deployService } from '../services/DeployService'
 
 const siteRepository = AppDataSource.getRepository(Site)
 const pageRepository = AppDataSource.getRepository(Page)
@@ -77,14 +78,23 @@ export class SiteController {
       throw new NotFoundError('Site', id)
     }
 
-    const { name, slug, description, routingMode, hostname, settings, status, isDefault, homepageId } = req.body
+    const { name, description, routingMode, hostname, settings, status, isDefault, homepageId } = req.body
+    const slug: string | undefined = req.body.slug
 
-    // If slug changed, check uniqueness
-    if (slug && slug !== site.slug) {
+    // If slug changed, check uniqueness (only for non-empty slugs)
+    if (slug !== undefined && slug && slug !== site.slug) {
       const existing = await siteRepository.findOne({ where: { slug } })
       if (existing) {
         throw new AppError(`Site with slug "${slug}" already exists`, 409)
       }
+    }
+
+    // Clean up old deployment if slug, routingMode, or hostname changed
+    const slugChanged = slug !== undefined && slug !== site.slug
+    const routingChanged = routingMode !== undefined && routingMode !== site.routingMode
+    const hostnameChanged = hostname !== undefined && hostname !== site.hostname
+    if (slugChanged || routingChanged || hostnameChanged) {
+      deployService.cleanupSiteDir(site.slug)
     }
 
     // If setting as default, unset others

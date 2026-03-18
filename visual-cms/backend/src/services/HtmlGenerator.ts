@@ -86,11 +86,18 @@ interface PageMetadata {
   ogImage?: string
 }
 
+export interface ResolvedNavItem {
+  label: string
+  href: string
+  openInNewTab?: boolean
+  children?: ResolvedNavItem[]
+}
+
 export class HtmlGenerator {
   /**
-   * Р“РµРЅРµСЂРёСЂСѓРµС‚ РїРѕР»РЅС‹Р№ HTML РґРѕРєСѓРјРµРЅС‚ РёР· СЃС‚СЂСѓРєС‚СѓСЂС‹ СЃС‚СЂР°РЅРёС†С‹
+   * Генерирует полный HTML документ из структуры страницы
    */
-  generatePage(structure: BlockNode, metadata: PageMetadata, slug: string, dataConfig?: PageDataConfig, lang?: string, direction?: string, availableLanguages?: AvailableLanguage[]): string {
+  generatePage(structure: BlockNode, metadata: PageMetadata, slug: string, dataConfig?: PageDataConfig, lang?: string, direction?: string, availableLanguages?: AvailableLanguage[], navigation?: ResolvedNavItem[]): string {
     // Собираем ID specificChildren для базового скрытия
     const specificChildrenIds = styleGenerator.collectSpecificChildrenIds(structure as any)
     
@@ -210,6 +217,7 @@ ${customHeadHtml ? '  ' + customHeadHtml.split('\n').join('\n  ') + '\n' : ''}</
 <body>
 ${bodyContent}
 ${this.generateLanguageSwitcher(slug, lang, availableLanguages)}
+${navigation && navigation.length > 0 ? this.generateNavRuntime(navigation) : ''}
 ${dataConfig ? generateDataBindingRuntime(dataConfig) : ''}
 ${scripts ? `<script>\n${scripts}\n</script>` : ''}
 ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
@@ -433,6 +441,49 @@ ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;')
+  }
+
+  /**
+   * Генерирует JS-рантайм для навигации сайта.
+   * window.__siteNav — массив пунктов меню с resolved href.
+   * Элементы с data-site-nav автоматически заполняются навигацией.
+   */
+  private generateNavRuntime(navigation: ResolvedNavItem[]): string {
+    return `
+  <!-- Site Navigation Runtime -->
+  <script>
+  (function(){
+    var nav = ${JSON.stringify(navigation)};
+    window.__siteNav = nav;
+
+    function buildNavItems(items, ul) {
+      items.forEach(function(item) {
+        var li = document.createElement('li');
+        var a = document.createElement('a');
+        a.href = item.href;
+        a.textContent = item.label;
+        if (item.openInNewTab) { a.target = '_blank'; a.rel = 'noopener'; }
+        li.appendChild(a);
+        if (item.children && item.children.length > 0) {
+          var sub = document.createElement('ul');
+          buildNavItems(item.children, sub);
+          li.appendChild(sub);
+        }
+        ul.appendChild(li);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('[data-site-nav]').forEach(function(el) {
+        var ul = document.createElement('ul');
+        buildNavItems(nav, ul);
+        el.innerHTML = '';
+        el.appendChild(ul);
+      });
+    });
+  })();
+  </script>
+`
   }
 }
 

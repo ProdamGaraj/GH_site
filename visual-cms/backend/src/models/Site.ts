@@ -1,7 +1,19 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm'
 import { Page } from './Page'
 
+export interface NavigationItem {
+  id: string
+  label: string
+  pageId?: string
+  url?: string
+  openInNewTab?: boolean
+  children?: NavigationItem[]
+}
+
 export interface SiteSettings {
+  // Navigation menu
+  navigation?: NavigationItem[]
+
   // SEO defaults
   defaultTitle?: string
   defaultDescription?: string
