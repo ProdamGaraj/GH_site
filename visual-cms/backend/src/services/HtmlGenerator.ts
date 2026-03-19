@@ -473,12 +473,34 @@ ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
       });
     }
 
+    // Build label→href map (including children)
+    function buildHrefMap(items, map) {
+      items.forEach(function(item) {
+        if (item.label && item.href && item.href !== '#') {
+          map[item.label.trim().toLowerCase()] = item.href;
+        }
+        if (item.children) buildHrefMap(item.children, map);
+      });
+      return map;
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
+      // 1. Auto-fill [data-site-nav] containers
       document.querySelectorAll('[data-site-nav]').forEach(function(el) {
         var ul = document.createElement('ul');
         buildNavItems(nav, ul);
         el.innerHTML = '';
         el.appendChild(ul);
+      });
+
+      // 2. Resolve existing header/nav links by matching text content
+      var hrefMap = buildHrefMap(nav, {});
+      var selectors = 'header a[href="#"], nav a[href="#"], [data-element-name="Header"] a[href="#"], [data-element-name="Navigation"] a[href="#"]';
+      document.querySelectorAll(selectors).forEach(function(a) {
+        var text = (a.textContent || '').trim().toLowerCase();
+        if (text && hrefMap[text]) {
+          a.href = hrefMap[text];
+        }
       });
     });
   })();

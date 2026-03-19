@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
 import { ColorPicker } from '@/shared/components/ColorPicker'
@@ -46,6 +46,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 }) => {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const dispatch = useAppDispatch()
   
   const rootNode = useAppSelector(selectRootNode)
@@ -352,6 +353,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         const result = await dispatch(createPage({
           name: pageSettings.name.trim(),
           slug: pageSettings.slug.trim(),
+          siteId: searchParams.get('siteId') || undefined,
           structure: structureWithBreakpoints,
           metadata: {
             title: pageSettings.metaTitle || pageSettings.name,

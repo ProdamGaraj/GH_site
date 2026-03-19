@@ -179,6 +179,7 @@ export interface UpdateBlockDto {
 export interface CreatePageDto {
   name: string
   slug: string
+  siteId?: string
   structure: BlockNode
   groupId?: string
   metadata?: {

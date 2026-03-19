@@ -72,7 +72,7 @@ export class Site {
    * - path-prefix: goldenhouse.com/premium/ (shared domain authority)
    * - custom-domain: separate domain pointing to same IP
    */
-  @Column({ default: 'subdomain' })
+  @Column({ default: 'path-prefix' })
   routingMode!: 'subdomain' | 'path-prefix' | 'custom-domain'
 
   /**

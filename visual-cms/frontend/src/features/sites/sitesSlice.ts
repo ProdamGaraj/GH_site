@@ -150,7 +150,12 @@ const sitesSlice = createSlice({
         }
       })
       // updateSettings
+      .addCase(updateSiteSettings.pending, (state) => {
+        state.saving = true
+        state.error = null
+      })
       .addCase(updateSiteSettings.fulfilled, (state, action: PayloadAction<Site>) => {
+        state.saving = false
         const index = state.items.findIndex(s => s.id === action.payload.id)
         if (index !== -1) {
           state.items[index] = action.payload
@@ -158,6 +163,10 @@ const sitesSlice = createSlice({
         if (state.currentSite?.id === action.payload.id) {
           state.currentSite = action.payload
         }
+      })
+      .addCase(updateSiteSettings.rejected, (state, action) => {
+        state.saving = false
+        state.error = action.error.message || 'Не удалось сохранить настройки'
       })
       // duplicate
       .addCase(duplicateSite.fulfilled, (state, action: PayloadAction<Site>) => {

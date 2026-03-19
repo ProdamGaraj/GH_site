@@ -61,9 +61,20 @@ export const SiteSettingsPage: React.FC = () => {
     })).unwrap()
   }
 
+  const [settingsSaved, setSettingsSaved] = useState(false)
+  const [settingsError, setSettingsError] = useState<string | null>(null)
+
   const handleSaveSettings = async () => {
     if (!id) return
-    await dispatch(updateSiteSettings({ id, settings })).unwrap()
+    setSettingsSaved(false)
+    setSettingsError(null)
+    try {
+      await dispatch(updateSiteSettings({ id, settings })).unwrap()
+      setSettingsSaved(true)
+      setTimeout(() => setSettingsSaved(false), 3000)
+    } catch (err: any) {
+      setSettingsError(err?.message || 'Ошибка сохранения настроек')
+    }
   }
 
   const updateField = (field: keyof SiteSettings, value: string) => {
@@ -223,11 +234,17 @@ export const SiteSettingsPage: React.FC = () => {
                 onChange={(nav) => setSettings(prev => ({ ...prev, navigation: nav }))}
                 pages={pages}
               />
-              <div className="pt-4">
+              <div className="pt-4 flex items-center gap-3">
                 <Button onClick={handleSaveSettings} disabled={saving}>
                   <Save size={16} className="mr-2" />
                   {saving ? 'Сохранение...' : 'Сохранить навигацию'}
                 </Button>
+                {settingsSaved && (
+                  <span className="text-sm text-green-600">Навигация сохранена ✓</span>
+                )}
+                {settingsError && (
+                  <span className="text-sm text-red-600">{settingsError}</span>
+                )}
               </div>
             </div>
           )}

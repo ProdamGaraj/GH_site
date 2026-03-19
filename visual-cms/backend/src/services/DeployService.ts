@@ -6,6 +6,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { htmlGenerator, type ResolvedNavItem } from './HtmlGenerator'
 import { AppDataSource } from '../config/database'
+import { Not } from 'typeorm'
 import { Page } from '../models/Page'
 import { Block } from '../models/Block'
 import { Site } from '../models/Site'
@@ -150,14 +151,14 @@ export class DeployService {
 
     try {
       const pages = await this.pageRepository.find({
-        where: { status: 'published' },
+        where: { status: Not('archived') },
         relations: ['site'],
       })
 
       if (pages.length === 0) {
         return {
           success: false,
-          message: 'Нет опубликованных страниц для деплоя',
+          message: 'Нет страниц для деплоя',
           deployedPages: [],
           errors: []
         }
@@ -223,6 +224,10 @@ export class DeployService {
 
           fs.writeFileSync(filePath, html, 'utf-8')
           deployedPages.push(`${page.site?.slug || ''}/${fileName}`.replace(/^\//, ''))
+
+          // Mark page as published
+          page.status = 'published'
+          await this.pageRepository.save(page)
           
           // Deploy translations for this page
           await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir)
@@ -270,11 +275,11 @@ export class DeployService {
       }
 
       const pages = await this.pageRepository.find({
-        where: { siteId, status: 'published' },
+        where: { siteId, status: Not('archived') },
       })
 
       if (pages.length === 0) {
-        return { success: false, message: 'Нет опубликованных страниц', deployedPages: [], errors: [] }
+        return { success: false, message: 'Нет страниц для публикации', deployedPages: [], errors: [] }
       }
 
       const siteDir = this.resolveSiteDir(site)
@@ -320,6 +325,10 @@ export class DeployService {
           const fileName = page.slug === 'index' || page.slug === 'home' ? 'index.html' : `${page.slug}.html`
           fs.writeFileSync(path.join(siteDir, fileName), html, 'utf-8')
           deployedPages.push(fileName)
+
+          // Mark page as published
+          page.status = 'published'
+          await this.pageRepository.save(page)
 
           await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir)
           console.log(`✅ Site "${site.slug}" deployed: ${fileName}`)

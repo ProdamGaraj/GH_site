@@ -12,6 +12,7 @@ const metadataSchema = z.object({
 export const createPageSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
   slug: z.string().min(1).max(255).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase alphanumeric with hyphens'),
+  siteId: z.string().uuid().nullable().optional(),
   groupId: z.string().uuid().nullable().optional(),
   metadata: metadataSchema,
   rootBlockId: z.string().uuid().nullable().optional(),
@@ -24,6 +25,7 @@ export const createPageSchema = z.object({
 export const updatePageSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   slug: z.string().min(1).max(255).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
+  siteId: z.string().uuid().nullable().optional(),
   groupId: z.string().uuid().nullable().optional(),
   metadata: metadataSchema.partial().optional(),
   rootBlockId: z.string().uuid().nullable().optional(),

@@ -102,7 +102,7 @@ export const SitePagesPage: React.FC = () => {
                 <Plus size={16} className="mr-2" />
                 Добавить страницу
               </Button>
-              <Link to="/editor/page/new">
+              <Link to={`/editor/page/new?siteId=${id}`}>
                 <Button>
                   <Plus size={16} className="mr-2" />
                   Создать новую
