@@ -873,10 +873,18 @@ export class DeployService {
       const config: PageDataConfig = {
         dataSources: Array.from(dataSourcesMap.values()).map(ds => {
           const restConfig = ds.config as any
+          // Конвертируем абсолютный URL бэкенда в относительный путь для nginx proxy
+          let dsEndpoint = restConfig?.url || `/api/data-sources/${ds.id}/data`
+          try {
+            const parsed = new URL(dsEndpoint)
+            if (parsed.hostname === 'localhost' || parsed.hostname === 'backend') {
+              dsEndpoint = parsed.pathname
+            }
+          } catch { /* уже относительный путь */ }
           return {
             alias: ds.name, // Используем name как alias
             dataSourceId: ds.id,
-            endpoint: restConfig?.url || `/api/data-sources/${ds.id}/data`,
+            endpoint: dsEndpoint,
             loadStrategy: 'pageLoad', // По умолчанию загружаем при загрузке страницы
             cacheEnabled: false,
           }

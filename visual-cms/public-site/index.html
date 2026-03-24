@@ -608,10 +608,10 @@ label {
   const _dataStore = {};
   
   // Data sources config
-  const _dataSources = [{"alias":"123","dataSourceId":"fcf4abe2-e393-4b63-8d04-cc344831c6c5","endpoint":"http://localhost:5000/api/mock","loadStrategy":"pageLoad","cacheEnabled":false}];
+  const _dataSources = [{"alias":"123","dataSourceId":"fcf4abe2-e393-4b63-8d04-cc344831c6c5","endpoint":"/api/mock","loadStrategy":"pageLoad","cacheEnabled":false}];
   
   // Bindings config
-  const _bindings = [{"blockId":"gh-premium-1771840286937-100","bindingId":"554014f1-cced-4684-adf9-e0ff1468a04a","type":"repeater","sourceAlias":"123","fieldMappings":[{"sourceField":"image","targetProperty":"item.project-image"},{"sourceField":"element","targetProperty":"item.element"},{"sourceField":"title","targetProperty":"item.project-name"},{"sourceField":"location","targetProperty":"item.project-location"},{"sourceField":"price","targetProperty":"item.project-price"}],"dynamicFilters":[{"id":"transform-1774344037487-dg1hpujr2","sourceBlockId":"gh-premium-1771840286937-48","field":"price","operator":"gte","skipIfEmpty":true},{"id":"transform-1774344051047-hn5ott3bf","sourceBlockId":"gh-premium-1771840286937-50","field":"price","operator":"lte","skipIfEmpty":true},{"id":"transform-1774344059919-4b6hmpkpb","sourceBlockId":"gh-premium-1771840286937-45","field":"location","operator":"eq","skipIfEmpty":true}],"repeaterConfig":{"itemTemplate":"gh-premium-1771840286937-74","containerSelector":"[data-element-id=\"gh-premium-1771840286937-100\"]","arrayPath":"data"}}];
+  const _bindings = [{"blockId":"gh-premium-1771840286937-100","bindingId":"554014f1-cced-4684-adf9-e0ff1468a04a","type":"repeater","sourceAlias":"123","fieldMappings":[{"sourceField":"image","targetProperty":"item.project-image"},{"sourceField":"element","targetProperty":"item.element"},{"sourceField":"title","targetProperty":"item.project-name"},{"sourceField":"location","targetProperty":"item.project-location"},{"sourceField":"price","targetProperty":"item.project-price"}],"dynamicFilters":[{"id":"transform-1774344037487-dg1hpujr2","sourceBlockId":"gh-premium-1771840286937-48","field":"price","operator":"gte","skipIfEmpty":true},{"id":"transform-1774344051047-hn5ott3bf","sourceBlockId":"gh-premium-1771840286937-50","field":"price","operator":"lte","skipIfEmpty":true},{"id":"transform-1774344059919-4b6hmpkpb","sourceBlockId":"gh-premium-1771840286937-45","field":"location","operator":"eq","skipIfEmpty":true}],"repeaterConfig":{"itemTemplate":"gh-premium-1771840286937-74","containerSelector":"[data-element-id=\"gh-premium-1771840286937-100\"]","arrayPath":"data"}},{"blockId":"gh-premium-1771840286938-137","type":"output","sourceAlias":"123","outputConfig":{"trigger":"click","method":"POST","endpoint":"/applications","payloadMappings":[{"sourceField":"name","type":"direct"},{"sourceField":"phone","type":"direct"},{"sourceField":"project","type":"direct"}],"onError":{"action":"message"}}}];
   
   // Variable getter/setter
   window.$var = function(name, value) {
@@ -1320,14 +1320,14 @@ label {
       if (configEndpoint.startsWith('http://') || configEndpoint.startsWith('https://')) {
         // Абсолютный URL — используем как есть
         endpoint = configEndpoint;
-      } else if (configEndpoint.startsWith('/')) {
-        // Абсолютный путь — используем как есть
-        endpoint = configEndpoint;
       } else if (configEndpoint && dsBaseUrl) {
-        // Относительный путь (например "applications") + есть базовый URL источника данных
-        // Склеиваем: http://localhost:5000/api/mock/ + applications
-        var base = dsBaseUrl.endsWith('/') ? dsBaseUrl : dsBaseUrl + '/';
-        endpoint = base + configEndpoint;
+        // Есть путь + базовый URL — склеиваем
+        var base = dsBaseUrl.endsWith('/') ? dsBaseUrl.slice(0, -1) : dsBaseUrl;
+        var sub = configEndpoint.startsWith('/') ? configEndpoint : '/' + configEndpoint;
+        endpoint = base + sub;
+      } else if (configEndpoint.startsWith('/')) {
+        // Абсолютный путь без базового URL — используем как есть
+        endpoint = configEndpoint;
       } else if (configEndpoint) {
         // Относительный путь, но нет источника данных — пробуем /api/ prefix
         endpoint = '/api/' + configEndpoint;

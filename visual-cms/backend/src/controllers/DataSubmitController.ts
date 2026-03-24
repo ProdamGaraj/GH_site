@@ -139,6 +139,16 @@ class DataSubmitController {
         endpoint = (dsConfig.url || dsConfig.endpoint) as string || ''
         headers = (dsConfig.headers as Record<string, string>) || {}
         authConfig = dataSource.authConfig || null
+        
+        // Добавляем path из output binding config
+        if (outputBindingId) {
+          const binding = await dataBindingRepository.findOne({ where: { id: outputBindingId } })
+          if (binding?.config?.outputConfig?.endpoint?.path) {
+            const basePath = endpoint.replace(/\/+$/, '')
+            const subPath = binding.config.outputConfig.endpoint.path.replace(/^\/+/, '')
+            endpoint = `${basePath}/${subPath}`
+          }
+        }
       } else if (directEndpoint) {
         endpoint = directEndpoint
       } else {

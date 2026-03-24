@@ -816,14 +816,14 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       if (configEndpoint.startsWith('http://') || configEndpoint.startsWith('https://')) {
         // Абсолютный URL — используем как есть
         endpoint = configEndpoint;
-      } else if (configEndpoint.startsWith('/')) {
-        // Абсолютный путь — используем как есть
-        endpoint = configEndpoint;
       } else if (configEndpoint && dsBaseUrl) {
-        // Относительный путь (например "applications") + есть базовый URL источника данных
-        // Склеиваем: http://localhost:5000/api/mock/ + applications
-        var base = dsBaseUrl.endsWith('/') ? dsBaseUrl : dsBaseUrl + '/';
-        endpoint = base + configEndpoint;
+        // Есть путь + базовый URL — склеиваем
+        var base = dsBaseUrl.endsWith('/') ? dsBaseUrl.slice(0, -1) : dsBaseUrl;
+        var sub = configEndpoint.startsWith('/') ? configEndpoint : '/' + configEndpoint;
+        endpoint = base + sub;
+      } else if (configEndpoint.startsWith('/')) {
+        // Абсолютный путь без базового URL — используем как есть
+        endpoint = configEndpoint;
       } else if (configEndpoint) {
         // Относительный путь, но нет источника данных — пробуем /api/ prefix
         endpoint = '/api/' + configEndpoint;
