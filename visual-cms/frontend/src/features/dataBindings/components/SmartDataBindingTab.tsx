@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import {
   fetchBindingsForBlock,
@@ -8,7 +8,7 @@ import {
 } from '@/features/dataBindings/dataBindingsSlice'
 import { fetchDataSources, selectDataSources } from '@/features/data-sources/dataSourcesSlice'
 import { fetchBlockById, selectBlocks } from '@/features/blocks/blocksSlice'
-import { markAsDirty } from '@/features/editor/editorSlice'
+import { markAsDirty, selectIsDirty } from '@/features/editor/editorSlice'
 import { BlockTemplateSelector } from '@/features/blocks/components/BlockTemplateSelector'
 import { TransformsEditor } from './TransformsEditor'
 import { Database, Link, Sparkles, CheckCircle, AlertCircle, ArrowRight, Loader2, ChevronDown, ChevronUp, Settings2 } from 'lucide-react'
@@ -47,6 +47,21 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
   const [dynamicFilters, setDynamicFilters] = useState<DynamicFilter[]>([])
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [endpointConfig, setEndpointConfig] = useState<EndpointConfig>(DEFAULT_ENDPOINT_CONFIG)
+  const [hasChanges, setHasChanges] = useState(false)
+  
+  // Отслеживание сохранения страницы для авто-сохранения привязки
+  const isDirty = useAppSelector(selectIsDirty)
+  const prevIsDirtyRef = useRef(isDirty)
+  const hasChangesRef = useRef(false)
+
+  // Синхронизируем ref с state для доступа из эффекта
+  useEffect(() => { hasChangesRef.current = hasChanges }, [hasChanges])
+
+  // Пометить как изменённое — локально + на уровне страницы
+  const markChanged = () => {
+    setHasChanges(true)
+    dispatch(markAsDirty())
+  }
 
   // Найти блок и его Template Fields
   const block = blocks.find(b => b.id === blockId)
@@ -103,6 +118,8 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         setDynamicFilters(existingBinding.config.inputConfig.dynamicFilters)
         setShowAdvanced(true)
       }
+      // Сброс флага изменений после восстановления из существующей привязки
+      setHasChanges(false)
     }
   }, [existingBinding])
 
@@ -114,6 +131,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
   // Автоматическое создание mappings при выборе Data Source
   const handleDataSourceChange = (dataSourceId: string) => {
     setSelectedDataSourceId(dataSourceId)
+    markChanged()
     
     // Автоматически создать mappings на основе template fields
     if (templateFields.length > 0 && dataSourceId) {
@@ -142,6 +160,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
   // Обработчик выбора Template блока (для Repeater режима)
   const handleTemplateBlockChange = (blockId: string | null, block?: Block) => {
     setSelectedTemplateBlockId(blockId || '')
+    markChanged()
     
     // Если выбран Template блок, создать mappings на основе его полей
     if (block && block.detectedFields && block.detectedFields.length > 0) {
@@ -174,18 +193,19 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
     const newMappings = [...mappings]
     newMappings[index] = { ...newMappings[index], ...updates }
     setMappings(newMappings)
+    markChanged()
   }
 
-  // Сохранить привязку
-  const handleSave = async () => {
+  // Сохранить привязку (silent = true при авто-сохранении с страницей)
+  const handleSave = useCallback(async (silent = false) => {
     if (!selectedDataSourceId) {
-      alert('Выберите источник данных')
+      if (!silent) alert('Выберите источник данных')
       return
     }
 
     // Для Repeater режима требуется Template блок
     if (mode === 'repeater' && !selectedTemplateBlockId) {
-      alert('Для режима Repeater необходимо выбрать Template блок')
+      if (!silent) alert('Для режима Repeater необходимо выбрать Template блок')
       return
     }
 
@@ -226,7 +246,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         })).unwrap()
         
         // Помечаем страницу как изменённую
-        dispatch(markAsDirty())
+        if (!silent) dispatch(markAsDirty())
       } else {
         // Создать новую привязку
         const newBinding: CreateDataBindingRequest = {
@@ -242,9 +262,10 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         await dispatch(createBinding(newBinding)).unwrap()
         
         // Помечаем страницу как изменённую
-        dispatch(markAsDirty())
+        if (!silent) dispatch(markAsDirty())
       }
-      alert('✅ Привязка данных сохранена!')
+      setHasChanges(false)
+      if (!silent) alert('✅ Привязка данных сохранена!')
     } catch (error: any) {
       console.error('Failed to save binding:', error)
       console.error('Error details:', {
@@ -267,11 +288,20 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         errorMessage = error
       }
       
-      alert(`❌ Ошибка сохранения привязки: ${errorMessage}`)
+      if (!silent) alert(`❌ Ошибка сохранения привязки: ${errorMessage}`)
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedDataSourceId, mode, selectedTemplateBlockId, endpointConfig, mappings, transforms, dynamicFilters, arrayPath, existingBinding, blockId, pageId, dispatch])
+
+  // Авто-сохранение привязки при сохранении страницы (isDirty: true → false)
+  useEffect(() => {
+    if (prevIsDirtyRef.current && !isDirty && hasChangesRef.current) {
+      console.log('📎 Страница сохранена — авто-сохраняем привязку данных')
+      handleSave(true)
+    }
+    prevIsDirtyRef.current = isDirty
+  }, [isDirty, handleSave])
 
   // Тест привязки с применением трансформаций
   const handleTest = async () => {
@@ -303,9 +333,12 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         const savedTransforms = (savedConfig as any)?.transforms || []
         const savedMode = savedConfig?.mode || 'single'
         
+        const savedDynamicFilters = (savedConfig as any)?.dynamicFilters || []
+        
         const hasUnsavedChanges = 
           arrayPath !== savedArrayPath ||
           JSON.stringify(transforms) !== JSON.stringify(savedTransforms) ||
+          JSON.stringify(dynamicFilters) !== JSON.stringify(savedDynamicFilters) ||
           mode !== savedMode
         
         console.log('🧪 Есть несохранённые изменения:', hasUnsavedChanges)
@@ -518,7 +551,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
           </p>
           <EndpointConfigEditor
             value={endpointConfig}
-            onChange={setEndpointConfig}
+            onChange={(c) => { setEndpointConfig(c); markChanged() }}
             showBody={true}
             baseUrl={(dataSources.find(ds => ds.id === selectedDataSourceId)?.config as any)?.url}
           />
@@ -533,7 +566,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
           </label>
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => setMode('single')}
+              onClick={() => { setMode('single'); markChanged() }}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                 mode === 'single'
                   ? 'bg-blue-600 text-white'
@@ -543,7 +576,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
               Single
             </button>
             <button
-              onClick={() => setMode('repeater')}
+              onClick={() => { setMode('repeater'); markChanged() }}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                 mode === 'repeater'
                   ? 'bg-blue-600 text-white'
@@ -585,7 +618,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
             <input
               type="text"
               value={arrayPath}
-              onChange={(e) => setArrayPath(e.target.value)}
+              onChange={(e) => { setArrayPath(e.target.value); markChanged() }}
               placeholder="data"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
             />
@@ -682,9 +715,9 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
             <div className="p-4 border-t border-gray-200">
               <TransformsEditor
                 transforms={transforms}
-                onChange={setTransforms}
+                onChange={(t) => { setTransforms(t); markChanged() }}
                 dynamicFilters={dynamicFilters}
-                onDynamicFiltersChange={setDynamicFilters}
+                onDynamicFiltersChange={(f) => { setDynamicFilters(f); markChanged() }}
               />
             </div>
           )}
@@ -696,11 +729,13 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         <div className="flex gap-3 pt-4 border-t border-gray-200">
           {selectedDataSourceId && (
             <button
-              onClick={handleSave}
+              onClick={() => handleSave()}
               disabled={loading || mappings.length === 0}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className={`flex-1 px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+                hasChanges ? 'bg-orange-500 hover:bg-orange-600 animate-pulse' : 'bg-blue-600 hover:bg-blue-700'
+              }`}
             >
-              {loading ? 'Сохранение...' : existingBinding ? 'Обновить привязку' : 'Создать привязку'}
+              {loading ? 'Сохранение...' : hasChanges ? '💾 Сохранить изменения' : existingBinding ? 'Обновить привязку' : 'Создать привязку'}
             </button>
           )}
           <button

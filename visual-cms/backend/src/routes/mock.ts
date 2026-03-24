@@ -5,6 +5,8 @@ import { submitApplicationSchema } from '../schemas/mock.schema'
 
 const router = Router()
 
+// Root handler — returns projects by default (for data bindings with no endpoint path)
+router.get('/', mockDataController.getProjects)
 router.get('/projects', mockDataController.getProjects)
 router.get('/projects/:id', mockDataController.getProjectById)
 router.get('/news', mockDataController.getNews)

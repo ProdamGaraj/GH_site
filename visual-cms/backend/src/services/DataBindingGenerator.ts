@@ -479,11 +479,17 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     // Скрываем оригинальный template
     templateElement.style.display = 'none';
     
-    // Удаляем только старые повторяемые элементы (те что имеют data-repeater-item атрибут)
-    // Остальные элементы контейнера (фильтры, заголовки) остаются на месте
+    // Удаляем старые повторяемые элементы (data-repeater-item) И прячем статические 
+    // «братья» шаблона — карточки, которые были в HTML как образцы данных.
+    // Не трогаем элементы с другой структурой (фильтры, заголовки и т.д.)
+    var templateTag = templateElement.tagName;
     Array.from(container.children).forEach(function(child) {
       if (child.hasAttribute('data-repeater-item')) {
         child.remove();
+      } else if (child !== templateElement && child.tagName === templateTag && child.hasAttribute('data-element-id')) {
+        // Статический «брат» шаблона — прячем (это тот же тип карточки, но с другими данными)
+        child.style.display = 'none';
+        child.setAttribute('data-repeater-original', 'true');
       }
     });
     

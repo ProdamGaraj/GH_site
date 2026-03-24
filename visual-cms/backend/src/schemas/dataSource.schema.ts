@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-const dataSourceTypeEnum = z.enum(['rest', 'graphql', 'static', 'websocket', 'mock'])
+const dataSourceTypeEnum = z.enum(['rest-api', 'rest', 'graphql', 'static', 'websocket', 'mock', 'feed', 'database', 'external', 'computed', 'form-data'])
 const dataSourceStatusEnum = z.enum(['draft', 'active', 'error', 'disabled'])
 
 // POST /api/data-sources

@@ -4,7 +4,7 @@ const bindingTypeEnum = z.enum(['input', 'output', 'two-way'])
 
 // POST /api/data-bindings
 export const createDataBindingSchema = z.object({
-  blockId: z.string().uuid('blockId must be a valid UUID'),
+  blockId: z.string().min(1, 'blockId is required'),
   pageId: z.string().uuid().nullable().optional(),
   dataSourceId: z.string().uuid('dataSourceId must be a valid UUID'),
   bindingType: bindingTypeEnum,
@@ -15,7 +15,7 @@ export const createDataBindingSchema = z.object({
 
 // PUT /api/data-bindings/:id
 export const updateDataBindingSchema = z.object({
-  blockId: z.string().uuid().optional(),
+  blockId: z.string().min(1).optional(),
   pageId: z.string().uuid().nullable().optional(),
   dataSourceId: z.string().uuid().optional(),
   bindingType: bindingTypeEnum.optional(),
