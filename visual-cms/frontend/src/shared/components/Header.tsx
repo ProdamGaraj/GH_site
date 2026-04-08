@@ -1,6 +1,6 @@
 ﻿import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Home, FileText, Box, Database, Settings, Menu, BarChart3, Globe } from 'lucide-react'
+import { Home, FileText, Box, Database, Settings, Menu, BarChart3, Globe, Layers } from 'lucide-react'
 
 interface HeaderProps {
   showActions?: React.ReactNode
@@ -15,6 +15,7 @@ export const Header: React.FC<HeaderProps> = ({ showActions, centerActions, righ
   const navItems = [
     { path: '/', icon: Home, label: 'Главная' },
     { path: '/sites', icon: Globe, label: 'Сайты' },
+    { path: '/collections', icon: Layers, label: 'Коллекции' },
     { path: '/pages', icon: FileText, label: 'Страницы' },
     { path: '/blocks', icon: Box, label: 'Блоки' },
     { path: '/data-sources', icon: Database, label: 'Data Sources' },

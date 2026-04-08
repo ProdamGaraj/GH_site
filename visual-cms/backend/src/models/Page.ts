@@ -45,6 +45,9 @@ export class Page {
   @Column({ default: 'draft' })
   status!: 'draft' | 'published' | 'archived'
 
+  @Column({ type: 'boolean', default: false })
+  isTemplate!: boolean
+
   @Column({ default: 1 })
   version!: number
 

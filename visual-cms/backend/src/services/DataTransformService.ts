@@ -119,6 +119,11 @@ class DataTransformService {
       case 'string':
         return { handled: true, result: String(value) }
       default:
+        // template:Шаблон {{value}} текст
+        if (name.startsWith('template:')) {
+          const tpl = name.slice('template:'.length)
+          return { handled: true, result: tpl.replace(/\{\{value\}\}/g, String(value)) }
+        }
         return { handled: false, result: undefined }
     }
   }

@@ -15,6 +15,8 @@ import AnalyticsPage from '@/pages/AnalyticsPage'
 import { SitesList } from '@/pages/SitesList'
 import { SiteSettingsPage } from '@/pages/SiteSettingsPage'
 import { SitePagesPage } from '@/pages/SitePagesPage'
+import { CollectionsPage } from '@/pages/CollectionsPage'
+import { CollectionEditor } from '@/pages/CollectionEditor'
 
 
 export const router = createBrowserRouter([
@@ -57,6 +59,14 @@ export const router = createBrowserRouter([
       {
         path: 'sites/:id/pages',
         element: <SitePagesPage />,
+      },
+      {
+        path: 'collections',
+        element: <CollectionsPage />,
+      },
+      {
+        path: 'collections/:id',
+        element: <CollectionEditor />,
       },
       {
         path: 'settings',

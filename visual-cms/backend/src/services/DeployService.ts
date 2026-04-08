@@ -6,10 +6,12 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { htmlGenerator, type ResolvedNavItem } from './HtmlGenerator'
 import { AppDataSource } from '../config/database'
-import { Not } from 'typeorm'
+import { Not, In } from 'typeorm'
 import { Page } from '../models/Page'
 import { Block } from '../models/Block'
 import { Site } from '../models/Site'
+import { Collection } from '../models/Collection'
+import { CollectionOverride } from '../models/CollectionOverride'
 import { linkedBlocksService } from './LinkedBlocksService'
 import { DataBinding } from '../models/DataBinding'
 import { DataSource as DataSourceEntity } from '../models/DataSource'
@@ -35,6 +37,8 @@ export class DeployService {
   private siteRepository = AppDataSource.getRepository(Site)
   private dataBindingRepository = AppDataSource.getRepository(DataBinding)
   private dataSourceRepository = AppDataSource.getRepository(DataSourceEntity)
+  private collectionRepository = AppDataSource.getRepository(Collection)
+  private collectionOverrideRepository = AppDataSource.getRepository(CollectionOverride)
 
   /**
    * Деплоит одну страницу
@@ -292,6 +296,12 @@ export class DeployService {
       const allSitePages = await this.pageRepository.find({ where: { siteId } })
       const resolvedNav = this.resolveNavigation(site.settings?.navigation, allSitePages)
 
+      // Загружаем коллекции заранее для auto-links в repeater'ах
+      const siteCollections = await this.collectionRepository.find({
+        where: { siteId, isActive: true },
+        relations: ['dataSource'],
+      })
+
       for (const page of pages) {
         if (!page.structure) {
           errors.push(`Страница "${page.name}" не имеет структуры`)
@@ -300,6 +310,11 @@ export class DeployService {
         try {
           const updatedStructure = await linkedBlocksService.updateLinkedBlocks(page.structure)
           const dataConfig = await this.preparePageDataConfig(page.id)
+
+          // Auto-links: для repeater'ов, чей dataSource совпадает с коллекцией, добавляем collectionLink
+          if (dataConfig) {
+            this.injectCollectionLinks(dataConfig, siteCollections)
+          }
 
           const pageLangs = await translationService.getPageLocales(page.id)
           const allActiveLangs = await languageService.getActive()
@@ -341,6 +356,18 @@ export class DeployService {
       await this.generateSitemap(site)
       this.generateRobotsTxt(site)
 
+      // НОВОЕ: деплой коллекций сайта (используем уже загруженные siteCollections)
+      for (const collection of siteCollections) {
+        try {
+          const colResult = await this.deployCollection(collection.id)
+          deployedPages.push(...colResult.deployedPages)
+          errors.push(...colResult.errors)
+          console.log(`📦 Collection "${collection.name}": ${colResult.deployedPages.length} pages`)
+        } catch (colErr: any) {
+          errors.push(`Collection "${collection.name}": ${colErr.message}`)
+        }
+      }
+
       // Update site status
       site.status = 'active'
       await this.siteRepository.save(site)
@@ -355,6 +382,289 @@ export class DeployService {
     } catch (error: any) {
       return { success: false, message: 'Ошибка при публикации сайта', deployedPages, errors: [error.message] }
     }
+  }
+
+  /**
+   * Деплоит все страницы коллекции (Collection)
+   * Для каждого элемента из API генерирует отдельную HTML-страницу
+   */
+  async deployCollection(collectionId: string): Promise<DeployResult> {
+    const errors: string[] = []
+    const deployedPages: string[] = []
+
+    try {
+      // 1. Загрузить коллекцию с overrides (одним запросом — Проблема 10)
+      const collection = await this.collectionRepository.findOne({
+        where: { id: collectionId },
+        relations: ['dataSource', 'templatePage', 'site', 'overrides'],
+      })
+      if (!collection) {
+        return { success: false, message: 'Коллекция не найдена', deployedPages: [], errors: ['Collection not found'] }
+      }
+      if (!collection.site) {
+        return { success: false, message: 'Коллекция не привязана к сайту', deployedPages: [], errors: ['No site'] }
+      }
+
+      // 2. Загрузить элементы из API
+      let items: any[] = []
+      try {
+        items = await this.fetchCollectionApiData(collection)
+        // Обновляем кеш
+        collection.cachedApiData = items
+        collection.lastCachedAt = new Date()
+        await this.collectionRepository.save(collection)
+      } catch (fetchErr: any) {
+        // Проблема 8: fallback на кеш
+        if (collection.useCache && collection.cachedApiData && Array.isArray(collection.cachedApiData)) {
+          items = collection.cachedApiData
+          errors.push(`API fetch failed (${fetchErr.message}), using cached data from ${collection.lastCachedAt?.toISOString()}`)
+          console.warn(`⚠️ Collection ${collection.name}: API failed, using cache`)
+        } else {
+          return {
+            success: false,
+            message: `Не удалось загрузить данные: ${fetchErr.message}`,
+            deployedPages: [],
+            errors: [fetchErr.message],
+          }
+        }
+      }
+
+      if (items.length === 0) {
+        return { success: true, message: 'Коллекция пуста — нет элементов для генерации', deployedPages: [], errors: [] }
+      }
+
+      // 3. Построить Map overrides (Проблема 10 — один запрос вместо N)
+      const overridesMap = new Map<string, CollectionOverride>()
+      if (collection.overrides) {
+        for (const ov of collection.overrides) {
+          overridesMap.set(ov.apiItemId, ov)
+        }
+      }
+
+      // 4. Загрузить все custom pages одним запросом
+      const customPageIds = Array.from(overridesMap.values()).map(ov => ov.customPageId)
+      const customPages = customPageIds.length > 0
+        ? await this.pageRepository.findByIds(customPageIds)
+        : []
+      const customPagesMap = new Map(customPages.map(p => [p.id, p]))
+
+      // 5. Подготовить шаблонную страницу (один раз)
+      const templatePage = collection.templatePage || await this.pageRepository.findOne({ where: { id: collection.templatePageId } })
+      if (!templatePage || !templatePage.structure) {
+        return { success: false, message: 'Шаблонная страница не имеет структуры', deployedPages: [], errors: ['Template page has no structure'] }
+      }
+
+      // Инжектируем library templates в шаблон (один раз)
+      let templateStructure = await linkedBlocksService.updateLinkedBlocks(templatePage.structure)
+      templateStructure = await this.injectLibraryTemplates(templateStructure, templatePage.id)
+
+      // Подготовить data config шаблона (один раз)
+      const templateDataConfig = await this.preparePageDataConfig(templatePage.id, templateStructure)
+
+      // Resolve deploy directory
+      const siteDir = this.resolveSiteDir(collection.site)
+      const collectionDir = path.join(siteDir, collection.basePath.replace(/^\//, ''))
+      this.ensureDirectoryExists(collectionDir)
+
+      // Resolve navigation for the site
+      const allSitePages = await this.pageRepository.find({ where: { siteId: collection.siteId } })
+      const resolvedNav = this.resolveNavigation(collection.site.settings?.navigation, allSitePages)
+
+      // 6. Для каждого элемента — генерировать HTML
+      const usedSlugs = new Set<string>()
+
+      for (const item of items) {
+        const itemId = String(item.id || item._id || '')
+        let itemSlug = this.getNestedValue(item, collection.slugField) || itemId
+        const itemTitle = this.getNestedValue(item, collection.titleField) || collection.name
+
+        // Проверка slug-конфликтов внутри коллекции
+        if (usedSlugs.has(itemSlug)) {
+          let suffix = 2
+          while (usedSlugs.has(`${itemSlug}-${suffix}`)) suffix++
+          itemSlug = `${itemSlug}-${suffix}`
+          errors.push(`Slug conflict: "${itemSlug}" — added suffix`)
+        }
+        usedSlugs.add(itemSlug)
+
+        try {
+          // Определить — override или шаблон
+          const override = overridesMap.get(itemId)
+          let pageStructure: any
+          let pageDataConfig: PageDataConfig | undefined
+          let pageMetadata: { title: string; description: string; keywords: string[] }
+
+          if (override) {
+            // Кастомная страница
+            const customPage = customPagesMap.get(override.customPageId)
+            if (!customPage || !customPage.structure) {
+              errors.push(`Custom page for "${itemTitle}" (${override.customPageId}) has no structure, skipping`)
+              continue
+            }
+            let customStructure = await linkedBlocksService.updateLinkedBlocks(customPage.structure)
+            customStructure = await this.injectLibraryTemplates(customStructure, customPage.id)
+            pageStructure = customStructure
+            pageDataConfig = await this.preparePageDataConfig(customPage.id, customStructure)
+            pageMetadata = customPage.metadata || { title: itemTitle, description: '', keywords: [] }
+          } else {
+            // Авто-шаблон с контекстом элемента
+            pageStructure = templateStructure
+            pageDataConfig = this.injectCollectionContext(templateDataConfig, collection, item, itemId)
+            pageMetadata = {
+              title: itemTitle,
+              description: templatePage.metadata?.description || '',
+              keywords: templatePage.metadata?.keywords || [],
+            }
+          }
+
+          // Генерируем HTML
+          const html = htmlGenerator.generatePage(
+            pageStructure,
+            pageMetadata,
+            itemSlug,
+            pageDataConfig,
+            undefined,
+            undefined,
+            undefined,
+            resolvedNav
+          )
+
+          // Записываем файл
+          const filePath = path.join(collectionDir, `${itemSlug}.html`)
+          fs.writeFileSync(filePath, html, 'utf-8')
+          deployedPages.push(`${collection.basePath.replace(/^\//, '')}/${itemSlug}.html`)
+
+          console.log(`✅ Collection "${collection.name}": deployed ${itemSlug}.html (${override ? 'custom' : 'template'})`)
+        } catch (itemErr: any) {
+          errors.push(`Error deploying "${itemTitle}" (${itemSlug}): ${itemErr.message}`)
+        }
+      }
+
+      return {
+        success: errors.filter(e => !e.includes('using cached data')).length === 0,
+        message: `Коллекция "${collection.name}": опубликовано ${deployedPages.length}/${items.length} страниц`,
+        deployedPages,
+        errors,
+      }
+    } catch (error: any) {
+      console.error('Deploy collection error:', error)
+      return { success: false, message: 'Ошибка при публикации коллекции', deployedPages, errors: [error.message] }
+    }
+  }
+
+  /**
+   * Загружает данные из data source коллекции
+   */
+  private async fetchCollectionApiData(collection: Collection): Promise<any[]> {
+    const ds = collection.dataSource
+    if (!ds) throw new Error('Data source not loaded')
+
+    const config = ds.config as any
+    const url = config.url
+    if (!url) throw new Error('Data source has no URL')
+
+    const response = await fetch(url, {
+      headers: config.headers || {},
+    })
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}: ${response.statusText}`)
+    }
+
+    const json = await response.json()
+    const items = this.getNestedValue(json, collection.arrayPath)
+
+    if (!Array.isArray(items)) {
+      throw new Error(`Expected array at "${collection.arrayPath}", got ${typeof items}`)
+    }
+
+    return items
+  }
+
+  /**
+   * Инжектирует контекст элемента коллекции в DataConfig
+   * Проблема 2: фильтр только к binding'ам с тем же dataSourceId
+   */
+  private injectCollectionContext(
+    templateConfig: PageDataConfig | undefined,
+    collection: Collection,
+    item: any,
+    itemId: string
+  ): PageDataConfig | undefined {
+    if (!templateConfig) return undefined
+
+    // Глубокая копия, чтобы не мутировать шаблонный config
+    const config: PageDataConfig = JSON.parse(JSON.stringify(templateConfig))
+
+    // Добавляем _collectionItem и _collectionFilter в конфиг
+    // Они будут доступны в runtime JS
+    ;(config as any)._collectionItem = item
+    ;(config as any)._collectionFilter = {
+      field: collection.slugField === 'slug' ? 'id' : collection.slugField,
+      operator: 'eq',
+      value: itemId,
+    }
+    // Проблема 4: кеш и polling настройки
+    ;(config as any)._collectionCacheTtl = collection.cacheTtl
+    ;(config as any)._collectionPollInterval = collection.pollInterval
+
+    // Проблема 2: добавить фильтр ТОЛЬКО к binding'ам с тем же dataSourceId
+    for (const binding of config.bindings) {
+      const matchingDs = config.dataSources.find(ds => ds.alias === binding.sourceAlias)
+      if (matchingDs && matchingDs.dataSourceId === collection.dataSourceId) {
+        if (!binding.dynamicFilters) {
+          binding.dynamicFilters = []
+        }
+        // Добавляем static collection filter (не динамический — значение известно при деплое)
+        ;(binding as any)._collectionFilter = {
+          field: collection.slugField === 'slug' ? 'id' : collection.slugField,
+          operator: 'eq',
+          value: itemId,
+        }
+      }
+    }
+
+    return config
+  }
+
+  /**
+   * Auto-links: для repeater-биндингов, чей dataSource совпадает с коллекцией,
+   * добавляем collectionLink (basePath + slugField), чтобы runtime генерировал href.
+   */
+  private injectCollectionLinks(config: PageDataConfig, collections: Collection[]): void {
+    if (!collections.length) return
+
+    // Строим Map dataSourceId -> collection (первая подходящая)
+    const dsToCollection = new Map<string, Collection>()
+    for (const col of collections) {
+      if (!dsToCollection.has(col.dataSourceId)) {
+        dsToCollection.set(col.dataSourceId, col)
+      }
+    }
+
+    for (const binding of config.bindings) {
+      if (binding.type !== 'repeater' || !binding.repeaterConfig) continue
+
+      // Найти dataSource alias -> dataSourceId
+      const ds = config.dataSources.find(d => d.alias === binding.sourceAlias)
+      if (!ds) continue
+
+      const collection = dsToCollection.get(ds.dataSourceId)
+      if (!collection) continue
+
+      // Инжектируем collectionLink
+      ;(binding.repeaterConfig as any).collectionLink = {
+        basePath: collection.basePath,
+        slugField: collection.slugField,
+      }
+    }
+  }
+
+  /**
+   * Получает значение по вложенному пути (dot notation)
+   */
+  private getNestedValue(obj: any, dotPath: string): any {
+    if (!obj || !dotPath) return undefined
+    return dotPath.split('.').reduce((current, key) => current?.[key], obj)
   }
 
   /**

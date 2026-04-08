@@ -17,10 +17,12 @@ import formsRouter from './forms'
 import analyticsRouter from './analytics'
 import languagesRouter from './languages'
 import translationsRouter from './translations'
+import collectionsRouter from './collections'
 
 const router = Router()
 
 router.use('/sites', sitesRouter)
+router.use('/collections', collectionsRouter)
 router.use('/analytics', analyticsRouter)
 router.use('/pages', pagesRouter)
 router.use('/pages/:pageId/versions', versionsRouter)

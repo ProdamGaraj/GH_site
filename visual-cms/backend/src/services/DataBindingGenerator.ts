@@ -23,6 +23,11 @@ export interface DataBindingConfig {
   repeaterConfig?: {
     itemTemplate: string
     containerSelector: string
+    collectionLink?: {
+      basePath: string
+      slugField: string
+      linkSelector?: string
+    }
     pagination?: {
       enabled: boolean
       pageSize: number
@@ -108,6 +113,12 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
   
   // Bindings config
   const _bindings = ${JSON.stringify(config.bindings)};
+  
+  // Collection context (injected by DeployService.deployCollection)
+  const _collectionItem = ${JSON.stringify((config as any)._collectionItem || null)};
+  const _collectionFilter = ${JSON.stringify((config as any)._collectionFilter || null)};
+  const _collectionCacheTtl = ${(config as any)._collectionCacheTtl || 0};
+  const _collectionPollInterval = ${(config as any)._collectionPollInterval || 0};
   
   // Variable getter/setter
   window.$var = function(name, value) {
@@ -329,6 +340,11 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         // Собираем динамические фильтры из DOM
         var filters = binding ? collectDynamicFilters(binding) : [];
         
+        // Добавляем collection filter если этот binding его имеет (Проблема 2)
+        if (binding && binding._collectionFilter) {
+          filters.push(binding._collectionFilter);
+        }
+        
         var requestBody = { 
           bindingId: bindingId,
           filters: filters.length > 0 ? filters : undefined
@@ -345,16 +361,69 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       // Ключ хранилища: bindingId (уникален) или sourceAlias (общий) 
       var storeKey = bindingId || source.alias;
       
+      // Cache logic: check localStorage first (Проблема 4)
+      var cacheKey = '_vcms_cache_' + storeKey;
+      if (_collectionCacheTtl > 0) {
+        try {
+          var cached = localStorage.getItem(cacheKey);
+          if (cached) {
+            var cacheEntry = JSON.parse(cached);
+            var age = (Date.now() - cacheEntry.ts) / 1000;
+            if (age < _collectionCacheTtl) {
+              console.log('[DataBinding] Cache hit for', storeKey, '(age: ' + Math.round(age) + 's)');
+              _dataStore[storeKey] = cacheEntry.data;
+              // Stale-while-revalidate: schedule background fetch
+              if (age > _collectionCacheTtl / 2) {
+                setTimeout(function() { _bgFetch(source, bindingId, binding, storeKey, cacheKey); }, 0);
+              }
+              return cacheEntry.data;
+            }
+          }
+        } catch(e) { /* localStorage unavailable */ }
+      }
+      
       console.log('[DataBinding] Fetching data for source:', source.alias, 'storeKey:', storeKey, 'from:', url);
       var response = await fetch(url, options);
       var data = await response.json();
       console.log('[DataBinding] Data received for', storeKey, ':', data);
       _dataStore[storeKey] = data;
+      
+      // Save to cache
+      if (_collectionCacheTtl > 0) {
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: data }));
+        } catch(e) { /* quota exceeded */ }
+      }
+      
       return data;
     } catch (error) {
       console.error('[DataBinding] Failed to fetch data for', source.alias, error);
       return null;
     }
+  }
+  
+  // Background fetch for stale-while-revalidate
+  async function _bgFetch(source, bindingId, binding, storeKey, cacheKey) {
+    try {
+      var url = source.endpoint || '/api/data/' + source.dataSourceId;
+      var opts = { method: 'GET' };
+      if (bindingId) {
+        var filters = binding ? collectDynamicFilters(binding) : [];
+        if (binding && binding._collectionFilter) filters.push(binding._collectionFilter);
+        url = '/api/data/fetch-with-transforms';
+        opts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bindingId: bindingId, filters: filters.length > 0 ? filters : undefined }) };
+      }
+      var response = await fetch(url, opts);
+      var data = await response.json();
+      var oldJson = JSON.stringify(_dataStore[storeKey]);
+      var newJson = JSON.stringify(data);
+      if (oldJson !== newJson) {
+        console.log('[DataBinding] Background revalidation: data changed for', storeKey);
+        _dataStore[storeKey] = data;
+        try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: data })); } catch(e) {}
+        updateBindings();
+      }
+    } catch(e) { console.warn('[DataBinding] Background fetch failed:', e); }
   }
   
   // Update all bindings
@@ -516,6 +585,19 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         updateElementContent(clone, item);
       }
       
+      // Auto-link: если repeater привязан к коллекции, проставляем href
+      if (config.collectionLink) {
+        var slugValue = getNestedValue(item, config.collectionLink.slugField) || item.id || item._id || index;
+        var href = config.collectionLink.basePath.replace(/\\/$/, '') + '/' + encodeURIComponent(String(slugValue));
+        var linkEl = config.collectionLink.linkSelector
+          ? clone.querySelector(config.collectionLink.linkSelector)
+          : (clone.tagName === 'A' ? clone : clone.querySelector('a'));
+        if (linkEl) {
+          linkEl.setAttribute('href', href);
+          console.log('[Repeater] Auto-link set:', href);
+        }
+      }
+      
       // Вставляем клон в конец контейнера
       // Не используем insertBefore, так как шаблон может быть в другом контейнере
       container.appendChild(clone);
@@ -532,12 +614,19 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     console.log('[FieldMapping] Mappings:', JSON.stringify(mappings).substring(0, 500));
     
     mappings.forEach(function(mapping) {
-      const value = getNestedValue(data, mapping.sourceField);
+      var value = getNestedValue(data, mapping.sourceField);
       console.log('[FieldMapping] Field "' + mapping.sourceField + '" -> value: "' + (value ? String(value).substring(0, 100) : 'undefined') + '"');
       
       if (value === undefined) {
         console.warn('[FieldMapping] ⚠️ No value for field:', mapping.sourceField, 'in data:', data);
         return;
+      }
+      
+      // Apply template: transform (safe string substitution)
+      if (mapping.transform && mapping.transform.indexOf('template:') === 0) {
+        var tpl = mapping.transform.substring('template:'.length);
+        value = tpl.split('{{value}}').join(String(value));
+        console.log('[FieldMapping] Applied template transform:', value);
       }
       
       console.log('[FieldMapping] ✓ Applying', mapping.sourceField, '->', mapping.targetProperty);
@@ -1212,6 +1301,31 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         setupOutputBinding(binding);
       }
     });
+    
+    // Collection polling: periodically refetch data (Проблема 4)
+    if (_collectionPollInterval > 0) {
+      var _pollInFlight = false;
+      var _pollTimer = setInterval(function() {
+        // Don't poll hidden tabs
+        if (document.visibilityState !== 'visible') return;
+        if (_pollInFlight) return;
+        _pollInFlight = true;
+        
+        var promises = [];
+        sourcesToLoad.forEach(function(config, key) {
+          promises.push(fetchData(config.source, config.bindingId, config.binding));
+        });
+        Promise.all(promises).then(function() {
+          updateBindings();
+          _pollInFlight = false;
+        }).catch(function() { _pollInFlight = false; });
+      }, _collectionPollInterval * 1000);
+      
+      // Stop polling when tab is hidden, resume when visible
+      document.addEventListener('visibilitychange', function() {
+        // Timer clears itself via guard, no need to clearInterval
+      });
+    }
   });
 })();
 </script>

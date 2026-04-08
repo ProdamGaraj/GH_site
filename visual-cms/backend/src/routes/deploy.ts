@@ -9,11 +9,13 @@ import { AppDataSource } from '../config/database'
 import { DeployLog } from '../models/DeployLog'
 import { PageVersion } from '../models/PageVersion'
 import { Page } from '../models/Page'
+import { Collection } from '../models/Collection'
 
 const router = Router()
 const deployLogRepository = AppDataSource.getRepository(DeployLog)
 const versionRepository = AppDataSource.getRepository(PageVersion)
 const pageRepository = AppDataSource.getRepository(Page)
+const collectionRepository = AppDataSource.getRepository(Collection)
 
 /**
  * GET /api/deploy/logs - Получить историю деплоев
@@ -52,6 +54,35 @@ router.post('/site/:siteId', asyncHandler(async (req: Request, res: Response) =>
       publicUrl: result.publicUrl,
     }))
     
+    if (result.success) {
+      res.json(result)
+    } else {
+      res.status(400).json(result)
+    }
+}))
+
+/**
+ * POST /api/deploy/collection/:collectionId - Деплой коллекции
+ */
+router.post('/collection/:collectionId', asyncHandler(async (req: Request, res: Response) => {
+    const { collectionId } = req.params
+    const start = Date.now()
+
+    const collection = await collectionRepository.findOne({ where: { id: collectionId } })
+
+    const result = await deployService.deployCollection(collectionId)
+    const durationMs = Date.now() - start
+
+    await deployLogRepository.save(deployLogRepository.create({
+      siteId: collection?.siteId || undefined,
+      action: 'deploy-site',
+      status: result.success ? 'success' : result.deployedPages.length > 0 ? 'partial' : 'failed',
+      message: result.message,
+      deployedFiles: result.deployedPages,
+      errors: result.errors,
+      durationMs,
+    }))
+
     if (result.success) {
       res.json(result)
     } else {

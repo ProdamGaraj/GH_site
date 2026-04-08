@@ -12,12 +12,14 @@ import formsReducer from '@/features/forms/formsSlice'
 import analyticsReducer from '@/features/analytics/analyticsSlice'
 import translationsReducer from '@/features/translations/translationsSlice'
 import sitesReducer from '@/features/sites/sitesSlice'
+import collectionsReducer from '@/features/collections/collectionsSlice'
 
 export const store = configureStore({
   reducer: {
     editor: editorReducer,
     pages: pagesReducer,
     sites: sitesReducer,
+    collections: collectionsReducer,
     blocks: blocksReducer,
     groups: groupsReducer,
     dataSources: dataSourcesReducer,
