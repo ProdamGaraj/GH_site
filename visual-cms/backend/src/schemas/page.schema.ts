@@ -19,6 +19,7 @@ export const createPageSchema = z.object({
   rootBlock: z.record(z.unknown()).nullable().optional(),
   structure: z.record(z.unknown()).nullable().optional(),
   status: z.enum(['draft', 'published', 'archived']).optional().default('draft'),
+  isTemplate: z.boolean().optional().default(false),
 })
 
 // PUT /api/pages/:id
@@ -32,6 +33,7 @@ export const updatePageSchema = z.object({
   rootBlock: z.record(z.unknown()).nullable().optional(),
   structure: z.record(z.unknown()).nullable().optional(),
   status: z.enum(['draft', 'published', 'archived']).optional(),
+  isTemplate: z.boolean().optional(),
 })
 
 // PUT /api/pages/:id/data-sources

@@ -364,11 +364,18 @@ export const CollectionEditor: React.FC = () => {
                     <div className="max-h-64 overflow-y-auto space-y-1">
                       {collectionItems.items.slice(0, 50).map((item: any, i: number) => (
                         <div key={i} className="text-xs border-b border-gray-100 py-1.5 flex items-center justify-between">
-                          <span className="truncate font-medium text-gray-800">
-                            {item[form.titleField] || item.title || item.name || `#${i + 1}`}
-                          </span>
+                          <div className="flex items-center gap-1.5 truncate">
+                            {item.mode === 'custom' && (
+                              <span className="inline-block px-1 py-0.5 text-[10px] font-semibold bg-indigo-100 text-indigo-700 rounded">
+                                custom
+                              </span>
+                            )}
+                            <span className="truncate font-medium text-gray-800">
+                              {item.title || item[form.titleField] || item.name || `#${i + 1}`}
+                            </span>
+                          </div>
                           <span className="text-gray-400 font-mono ml-2 flex-shrink-0">
-                            /{item[form.slugField] || item.slug || item.id}
+                            {item.generatedUrl || `/${item.slug || item[form.slugField] || item.id}`}
                           </span>
                         </div>
                       ))}

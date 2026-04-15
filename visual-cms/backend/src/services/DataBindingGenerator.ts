@@ -471,6 +471,13 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       return acc && acc[key];
     }, obj);
   }
+
+  // Slugify string (transliterate cyrillic + lowercase + dashes)
+  function slugify(str) {
+    var cyr = {'\u0430':'a','\u0431':'b','\u0432':'v','\u0433':'g','\u0434':'d','\u0435':'e','\u0451':'yo','\u0436':'zh','\u0437':'z','\u0438':'i','\u0439':'y','\u043a':'k','\u043b':'l','\u043c':'m','\u043d':'n','\u043e':'o','\u043f':'p','\u0440':'r','\u0441':'s','\u0442':'t','\u0443':'u','\u0444':'f','\u0445':'kh','\u0446':'ts','\u0447':'ch','\u0448':'sh','\u0449':'shch','\u044a':'','\u044b':'y','\u044c':'','\u044d':'e','\u044e':'yu','\u044f':'ya'};
+    return str.toLowerCase().split('').map(function(ch) { return cyr[ch] !== undefined ? cyr[ch] : ch; }).join('')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 100);
+  }
   
   // Apply value to element property
   function applyValue(element, property, value) {
@@ -550,13 +557,12 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     
     // Удаляем старые повторяемые элементы (data-repeater-item) И прячем статические 
     // «братья» шаблона — карточки, которые были в HTML как образцы данных.
-    // Не трогаем элементы с другой структурой (фильтры, заголовки и т.д.)
-    var templateTag = templateElement.tagName;
+    // Прячем любой дочерний элемент с data-element-id (кроме самого шаблона),
+    // т.к. тег карточки может отличаться (div vs a).
     Array.from(container.children).forEach(function(child) {
       if (child.hasAttribute('data-repeater-item')) {
         child.remove();
-      } else if (child !== templateElement && child.tagName === templateTag && child.hasAttribute('data-element-id')) {
-        // Статический «брат» шаблона — прячем (это тот же тип карточки, но с другими данными)
+      } else if (child !== templateElement && child.hasAttribute('data-element-id')) {
         child.style.display = 'none';
         child.setAttribute('data-repeater-original', 'true');
       }
@@ -587,14 +593,26 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       
       // Auto-link: если repeater привязан к коллекции, проставляем href
       if (config.collectionLink) {
-        var slugValue = getNestedValue(item, config.collectionLink.slugField) || item.id || item._id || index;
-        var href = config.collectionLink.basePath.replace(/\\/$/, '') + '/' + encodeURIComponent(String(slugValue));
+        var rawSlug = getNestedValue(item, config.collectionLink.slugField);
+        var titleVal = config.collectionLink.titleField ? getNestedValue(item, config.collectionLink.titleField) : '';
+        var slugValue = rawSlug || (titleVal ? slugify(titleVal) : '') || item.id || item._id || index;
+        var href = config.collectionLink.basePath + '/' + encodeURIComponent(String(slugValue)) + '.html';
         var linkEl = config.collectionLink.linkSelector
           ? clone.querySelector(config.collectionLink.linkSelector)
           : (clone.tagName === 'A' ? clone : clone.querySelector('a'));
         if (linkEl) {
           linkEl.setAttribute('href', href);
-          console.log('[Repeater] Auto-link set:', href);
+        } else {
+          // Fallback: оборачиваем клон в <a> или добавляем onclick
+          clone.style.cursor = 'pointer';
+          clone.setAttribute('role', 'link');
+          clone.addEventListener('click', (function(url) {
+            return function(e) {
+              if (e.target.tagName !== 'A' && e.target.tagName !== 'BUTTON') {
+                window.location.href = url;
+              }
+            };
+          })(href));
         }
       }
       

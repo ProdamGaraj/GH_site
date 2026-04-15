@@ -23,9 +23,9 @@ import { CollectionOverride } from '../models/CollectionOverride'
 export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
-  synchronize: process.env.NODE_ENV === 'development',
+  synchronize: false,
   logging: process.env.NODE_ENV === 'development',
   entities: [Site, Page, Block, Group, DataSourceEntity, DataBinding, Template, DataSubmission, PageVariable, Form, FormDestination, FormSubmissionLog, AnalyticsEvent, AnalyticsSession, Language, Translation, PageVersion, DeployLog, Collection, CollectionOverride],
-  migrations: ['src/migrations/**/*.ts'],
+  migrations: [],
   subscribers: [],
 })

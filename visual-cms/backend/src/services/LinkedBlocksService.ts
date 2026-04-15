@@ -165,7 +165,12 @@ export class LinkedBlocksService {
   private _collectLinkedNodes(node: any, result: Map<string, any>): void {
     if (!node) return
     if (node.metadata?.linkedBlockId) {
-      result.set(node.metadata.linkedBlockId, node)
+      // Не синхронизируем placeholder'ы (ноды без children) обратно в библиотеку —
+      // это пустые заглушки, которые заполняются из библиотеки при деплое
+      const hasContent = Array.isArray(node.children) && node.children.length > 0
+      if (hasContent) {
+        result.set(node.metadata.linkedBlockId, node)
+      }
     }
     if (node.children && Array.isArray(node.children)) {
       for (const child of node.children) {

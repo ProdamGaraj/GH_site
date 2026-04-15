@@ -1,11 +1,16 @@
 import { Request, Response } from 'express'
+import * as fs from 'fs'
+import * as path from 'path'
 import { AppDataSource } from '../config/database'
 import { Collection } from '../models/Collection'
 import { CollectionOverride } from '../models/CollectionOverride'
 import { Page } from '../models/Page'
+import { Site } from '../models/Site'
 import { DataSource as DataSourceEntity } from '../models/DataSource'
 import { asyncHandler, NotFoundError, ValidationError, ConflictError } from '../middleware'
 import { cacheService } from '../services/CacheService'
+
+const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
 
 export class CollectionController {
   private getRepository() {
@@ -85,11 +90,13 @@ export class CollectionController {
     const { id } = req.params
     const data = req.body
 
-    const collection = await repo.findOne({ where: { id } })
+    const collection = await repo.findOne({ where: { id }, relations: ['site'] })
     if (!collection) throw new NotFoundError('Collection', id)
 
+    // При смене basePath — удалить старые сгенерированные файлы
     if (data.basePath && data.basePath !== collection.basePath) {
       await this.checkBasePathConflict(collection.siteId, data.basePath)
+      this.cleanCollectionDir(collection.site ?? null, collection.basePath)
     }
 
     if (data.templatePageId && data.templatePageId !== collection.templatePageId) {
@@ -149,44 +156,50 @@ export class CollectionController {
       }
     }
 
-    // Мёржим с overrides
-    const overridesMap = new Map(
-      (collection.overrides || []).map(o => [o.apiItemId, o])
+    // Мёржим с overrides — match по apiItemId, затем fallback по apiItemSlug
+    const overridesByItemId = new Map(
+      (collection.overrides || []).filter(o => o.apiItemId).map(o => [o.apiItemId, o])
+    )
+    const overridesBySlug = new Map(
+      (collection.overrides || []).filter(o => o.apiItemSlug).map(o => [o.apiItemSlug, o])
     )
 
+    const warnings: string[] = []
     const enrichedItems = items.map((item: any) => {
       const itemId = String(item.id || item._id || '')
-      const itemSlug = this.getNestedValue(item, collection.slugField) || itemId
       const itemTitle = this.getNestedValue(item, collection.titleField) || ''
-      const override = overridesMap.get(itemId)
+      const rawSlug = this.getNestedValue(item, collection.slugField)
+      let itemSlug = rawSlug || this.slugify(itemTitle) || itemId
+
+      // Ищем override: сначала по id, затем fallback по slug
+      const override = overridesByItemId.get(itemId) || overridesBySlug.get(itemSlug)
+
+      // Override может задать кастомный slug
+      if (override?.apiItemSlug) {
+        itemSlug = override.apiItemSlug
+      }
 
       // Проверка рассинхронизации slug (Проблема 6)
-      let slugWarning: string | undefined
       if (override?.apiItemSlug && override.apiItemSlug !== itemSlug) {
-        slugWarning = `Slug changed: "${override.apiItemSlug}" → "${itemSlug}"`
+        warnings.push(`Slug changed for "${itemTitle}": "${override.apiItemSlug}" → "${itemSlug}"`)
       }
 
       return {
         apiItemId: itemId,
         slug: itemSlug,
         title: itemTitle,
-        generatedUrl: `${collection.basePath}/${itemSlug}`,
+        generatedUrl: `${collection.basePath.replace(/\/+$/, '')}/${itemSlug}`,
         mode: override ? 'custom' : 'template',
         customPageId: override?.customPageId,
         customPageName: override?.customPage?.name,
         overrideId: override?.id,
-        slugWarning,
       }
     })
 
     res.json({
-      collection: {
-        id: collection.id,
-        name: collection.name,
-        basePath: collection.basePath,
-      },
       items: enrichedItems,
-      fetchError,
+      total: enrichedItems.length,
+      warnings: [...warnings, ...(fetchError ? [`API error: ${fetchError}`] : [])],
       fromCache: fetchError !== null && items.length > 0,
     })
   })
@@ -294,6 +307,25 @@ export class CollectionController {
   }
 
   /**
+   * Удаляет директорию сгенерированных файлов коллекции
+   */
+  private cleanCollectionDir(site: Site | null, basePath: string): void {
+    const siteDir = site?.slug
+      ? path.join(PUBLIC_DIR, 'sites', site.slug)
+      : PUBLIC_DIR
+    const collectionDir = path.join(siteDir, basePath.replace(/^\//, ''))
+
+    // Защита от удаления корневой директории сайта
+    if (collectionDir === siteDir || collectionDir === PUBLIC_DIR) {
+      return
+    }
+
+    if (fs.existsSync(collectionDir)) {
+      fs.rmSync(collectionDir, { recursive: true, force: true })
+    }
+  }
+
+  /**
    * Проверяет конфликт basePath с существующими страницами (Проблема 3)
    */
   private async checkBasePathConflict(siteId: string, basePath: string): Promise<void> {
@@ -309,6 +341,27 @@ export class CollectionController {
         `Base path "${basePath}" conflicts with existing page "${conflicting.name}" (slug: ${conflicting.slug})`
       )
     }
+  }
+
+  /**
+   * Транслитерация и slugify строки для URL-безопасного имени файла.
+   */
+  private slugify(str: string): string {
+    const cyrillic: Record<string, string> = {
+      а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'yo', ж: 'zh',
+      з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o',
+      п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'kh', ц: 'ts',
+      ч: 'ch', ш: 'sh', щ: 'shch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu',
+      я: 'ya',
+    }
+    return str
+      .toLowerCase()
+      .split('')
+      .map(ch => cyrillic[ch] ?? ch)
+      .join('')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .substring(0, 100)
   }
 }
 

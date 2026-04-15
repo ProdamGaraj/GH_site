@@ -78,8 +78,15 @@ export class DeployService {
 
       // Загружаем data bindings для страницы, используя обновлённую структуру с templates
       const dataConfig = await this.preparePageDataConfig(pageId, updatedStructure)
-      
-      console.log('📋 DataConfig for deploy:', JSON.stringify(dataConfig, null, 2))
+
+      // Auto-links: для repeater'ов, чей dataSource совпадает с коллекцией, добавляем collectionLink
+      if (dataConfig) {
+        const siteCollections = await this.collectionRepository.find({
+          where: { siteId: page.siteId, isActive: true },
+          relations: ['dataSource'],
+        })
+        this.injectCollectionLinks(dataConfig, siteCollections)
+      }
 
       // Проверяем наличие переводов для переключателя языков на основной странице
       const activeLanguages = await languageService.getActive()
@@ -433,16 +440,19 @@ export class DeployService {
         return { success: true, message: 'Коллекция пуста — нет элементов для генерации', deployedPages: [], errors: [] }
       }
 
-      // 3. Построить Map overrides (Проблема 10 — один запрос вместо N)
-      const overridesMap = new Map<string, CollectionOverride>()
+      // 3. Построить Maps для overrides — по apiItemId и по apiItemSlug (fallback)
+      const overridesByItemId = new Map<string, CollectionOverride>()
+      const overridesBySlug = new Map<string, CollectionOverride>()
       if (collection.overrides) {
         for (const ov of collection.overrides) {
-          overridesMap.set(ov.apiItemId, ov)
+          if (ov.apiItemId) overridesByItemId.set(ov.apiItemId, ov)
+          if (ov.apiItemSlug) overridesBySlug.set(ov.apiItemSlug, ov)
         }
       }
 
       // 4. Загрузить все custom pages одним запросом
-      const customPageIds = Array.from(overridesMap.values()).map(ov => ov.customPageId)
+      const allOverrides = collection.overrides || []
+      const customPageIds = allOverrides.map(ov => ov.customPageId)
       const customPages = customPageIds.length > 0
         ? await this.pageRepository.findByIds(customPageIds)
         : []
@@ -461,9 +471,12 @@ export class DeployService {
       // Подготовить data config шаблона (один раз)
       const templateDataConfig = await this.preparePageDataConfig(templatePage.id, templateStructure)
 
-      // Resolve deploy directory
+      // Resolve deploy directory — очищаем перед генерацией, чтобы не оставались stale-файлы
       const siteDir = this.resolveSiteDir(collection.site)
       const collectionDir = path.join(siteDir, collection.basePath.replace(/^\//, ''))
+      if (collectionDir !== siteDir && fs.existsSync(collectionDir)) {
+        fs.rmSync(collectionDir, { recursive: true, force: true })
+      }
       this.ensureDirectoryExists(collectionDir)
 
       // Resolve navigation for the site
@@ -475,8 +488,19 @@ export class DeployService {
 
       for (const item of items) {
         const itemId = String(item.id || item._id || '')
-        let itemSlug = this.getNestedValue(item, collection.slugField) || itemId
+        const rawSlug = this.getNestedValue(item, collection.slugField)
         const itemTitle = this.getNestedValue(item, collection.titleField) || collection.name
+
+        // Slug приоритет: поле из API → slugify(title) → id
+        let itemSlug = rawSlug || this.slugify(itemTitle) || itemId
+
+        // Определить override (match по id, fallback по slug)
+        const override = overridesByItemId.get(itemId) || overridesBySlug.get(itemSlug)
+
+        // Override может задать кастомный slug для файла
+        if (override?.apiItemSlug) {
+          itemSlug = override.apiItemSlug
+        }
 
         // Проверка slug-конфликтов внутри коллекции
         if (usedSlugs.has(itemSlug)) {
@@ -488,8 +512,6 @@ export class DeployService {
         usedSlugs.add(itemSlug)
 
         try {
-          // Определить — override или шаблон
-          const override = overridesMap.get(itemId)
           let pageStructure: any
           let pageDataConfig: PageDataConfig | undefined
           let pageMetadata: { title: string; description: string; keywords: string[] }
@@ -507,12 +529,12 @@ export class DeployService {
             pageDataConfig = await this.preparePageDataConfig(customPage.id, customStructure)
             pageMetadata = customPage.metadata || { title: itemTitle, description: '', keywords: [] }
           } else {
-            // Авто-шаблон с контекстом элемента
-            pageStructure = templateStructure
+            // Авто-шаблон с контекстом элемента — подставляем данные в структуру
+            pageStructure = this.substituteItemData(templateStructure, item)
             pageDataConfig = this.injectCollectionContext(templateDataConfig, collection, item, itemId)
             pageMetadata = {
-              title: itemTitle,
-              description: templatePage.metadata?.description || '',
+              title: this.replaceTemplateVars(templatePage.metadata?.title || itemTitle, item),
+              description: this.replaceTemplateVars(templatePage.metadata?.description || '', item),
               keywords: templatePage.metadata?.keywords || [],
             }
           }
@@ -532,7 +554,7 @@ export class DeployService {
           // Записываем файл
           const filePath = path.join(collectionDir, `${itemSlug}.html`)
           fs.writeFileSync(filePath, html, 'utf-8')
-          deployedPages.push(`${collection.basePath.replace(/^\//, '')}/${itemSlug}.html`)
+          deployedPages.push(`${collection.basePath.replace(/^\/|\/$/g, '')}/${itemSlug}.html`)
 
           console.log(`✅ Collection "${collection.name}": deployed ${itemSlug}.html (${override ? 'custom' : 'template'})`)
         } catch (itemErr: any) {
@@ -627,6 +649,91 @@ export class DeployService {
   }
 
   /**
+   * Рекурсивно подставляет данные элемента коллекции в дерево структуры страницы.
+   * Заменяет маркеры {{item.fieldName}} в content, attributes, styles.
+   * Поддерживает вложенные поля через dot notation: {{item.address.city}}
+   */
+  private substituteItemData(structure: any, item: any): any {
+    const node = JSON.parse(JSON.stringify(structure))
+    this.substituteNode(node, item)
+    return node
+  }
+
+  private substituteNode(node: any, item: any): void {
+    if (!node || typeof node !== 'object') return
+
+    // Подстановка в content
+    if (typeof node.content === 'string') {
+      node.content = this.replaceTemplateVars(node.content, item)
+    }
+
+    // Подстановка в attributes (src, href, alt, title, etc.)
+    if (node.attributes && typeof node.attributes === 'object') {
+      for (const key of Object.keys(node.attributes)) {
+        if (typeof node.attributes[key] === 'string') {
+          node.attributes[key] = this.replaceTemplateVars(node.attributes[key], item)
+        }
+      }
+    }
+
+    // Подстановка в styles.properties (backgroundImage url и т.д.)
+    if (node.styles?.properties && typeof node.styles.properties === 'object') {
+      for (const key of Object.keys(node.styles.properties)) {
+        if (typeof node.styles.properties[key] === 'string') {
+          node.styles.properties[key] = this.replaceTemplateVars(node.styles.properties[key], item)
+        }
+      }
+    }
+
+    // Рекурсия по children
+    if (Array.isArray(node.children)) {
+      for (const child of node.children) {
+        this.substituteNode(child, item)
+      }
+    }
+
+    // Рекурсия по variations.specificChildren
+    if (node.variations && typeof node.variations === 'object') {
+      for (const variation of Object.values(node.variations) as any[]) {
+        if (Array.isArray(variation?.specificChildren)) {
+          for (const child of variation.specificChildren) {
+            this.substituteNode(child, item)
+          }
+        }
+      }
+    }
+  }
+
+  private replaceTemplateVars(str: string, item: any): string {
+    return str.replace(/\{\{item\.([a-zA-Z0-9_.]+)\}\}/g, (_match, fieldPath: string) => {
+      const value = this.getNestedValue(item, fieldPath)
+      return value !== undefined && value !== null ? String(value) : ''
+    })
+  }
+
+  /**
+   * Транслитерация и slugify строки для URL-безопасного имени файла.
+   * Поддерживает кириллицу, латиницу, цифры.
+   */
+  private slugify(str: string): string {
+    const cyrillic: Record<string, string> = {
+      а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'yo', ж: 'zh',
+      з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o',
+      п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'kh', ц: 'ts',
+      ч: 'ch', ш: 'sh', щ: 'shch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu',
+      я: 'ya',
+    }
+    return str
+      .toLowerCase()
+      .split('')
+      .map(ch => cyrillic[ch] ?? ch)
+      .join('')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .substring(0, 100)
+  }
+
+  /**
    * Auto-links: для repeater-биндингов, чей dataSource совпадает с коллекцией,
    * добавляем collectionLink (basePath + slugField), чтобы runtime генерировал href.
    */
@@ -653,8 +760,9 @@ export class DeployService {
 
       // Инжектируем collectionLink
       ;(binding.repeaterConfig as any).collectionLink = {
-        basePath: collection.basePath,
+        basePath: collection.basePath.replace(/\/+$/, ''),
         slugField: collection.slugField,
+        titleField: collection.titleField,
       }
     }
   }
