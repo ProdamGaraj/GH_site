@@ -19,6 +19,7 @@ export type DataSourceType =
   | 'static'
   | 'computed'
   | 'form-data'
+  | 'page-variable'
 
 /**
  * Статус источника данных

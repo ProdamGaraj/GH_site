@@ -19,6 +19,8 @@ router.delete('/:id', DataSourceController.delete)
 // Test new config (must be above /:id/test)
 router.post('/new/test', validate(testNewConnectionSchema), DataSourceController.testNewConnection)
 router.post('/:id/test', DataSourceController.testConnection)
+router.post('/:id/invalidate-cache', DataSourceController.invalidateCache)
+router.get('/:id/credentials', DataSourceController.revealCredentials)
 router.post('/:id/duplicate', DataSourceController.duplicate)
 
 export default router

@@ -4,7 +4,7 @@
  * Тесты для сервиса трансформации данных
  */
 
-import { dataTransformService } from '../services/DataTransformService'
+import { dataTransformService, normalizeToList } from '../services/DataTransformService'
 import type { ComputedFieldConfig, ConditionalFieldConfig } from '../services/DataTransformService'
 import type { FieldMapping } from '../models/DataBinding'
 
@@ -296,4 +296,122 @@ describe('DataTransformService', () => {
       }).not.toThrow()
     })
   })
+
+  describe('normalizeToList', () => {
+    it('returns empty array for null/undefined', () => {
+      expect(normalizeToList(null)).toEqual([])
+      expect(normalizeToList(undefined)).toEqual([])
+    })
+
+    it('passes arrays through unchanged', () => {
+      expect(normalizeToList([1, 2, 3])).toEqual([1, 2, 3])
+      expect(normalizeToList(['a'])).toEqual(['a'])
+    })
+
+    it('parses JSON-array string', () => {
+      expect(normalizeToList('[1, 2, 3]')).toEqual([1, 2, 3])
+      expect(normalizeToList('["a","b"]')).toEqual(['a', 'b'])
+    })
+
+    it('falls back to CSV split when JSON parse fails', () => {
+      expect(normalizeToList('a, b, c')).toEqual(['a', 'b', 'c'])
+      expect(normalizeToList('1; 2; 3')).toEqual(['1', '2', '3'])
+      expect(normalizeToList('x\ny\nz')).toEqual(['x', 'y', 'z'])
+    })
+
+    it('trims and drops empty entries from CSV', () => {
+      expect(normalizeToList('a, , b,  ,c')).toEqual(['a', 'b', 'c'])
+    })
+
+    it('returns empty array for blank string', () => {
+      expect(normalizeToList('')).toEqual([])
+      expect(normalizeToList('   ')).toEqual([])
+    })
+
+    it('wraps single non-string scalars in an array', () => {
+      expect(normalizeToList(42)).toEqual([42])
+      expect(normalizeToList(true)).toEqual([true])
+    })
+
+    it('parses bug-#1 legacy value: numeric ids stored as JSON-array string', () => {
+      const legacy = '[3296403, 3298069, 5081798]'
+      expect(normalizeToList(legacy)).toEqual([3296403, 3298069, 5081798])
+    })
+  })
+
+  describe('matchesFilterCondition: in / notIn', () => {
+    it('exclude with in operator: array of numbers matches numeric id', () => {
+      const items = [{ id: 1 }, { id: 2 }, { id: 3 }]
+      const result = dataTransformService.applyDataTransform(items, {
+        type: 'exclude',
+        filter: { field: 'id', operator: 'in', value: [1, 3] }
+      } as any)
+      expect(result).toEqual([{ id: 2 }])
+    })
+
+    it('exclude with in operator: loose equality (string vs number)', () => {
+      // Reproduces bug #2: API возвращает id:1 (number), пользователь ввёл "1" (string)
+      const items = [{ id: 1 }, { id: 2 }, { id: 3 }]
+      const result = dataTransformService.applyDataTransform(items, {
+        type: 'exclude',
+        filter: { field: 'id', operator: 'in', value: ['1', '3'] }
+      } as any)
+      expect(result).toEqual([{ id: 2 }])
+    })
+
+    it('exclude with in operator: legacy JSON-string value (bug #1)', () => {
+      const items = [{ id: 3296403 }, { id: 9999999 }, { id: 3298069 }]
+      const result = dataTransformService.applyDataTransform(items, {
+        type: 'exclude',
+        filter: { field: 'id', operator: 'in', value: '[3296403, 3298069]' as any }
+      } as any)
+      expect(result).toEqual([{ id: 9999999 }])
+    })
+
+    it('exclude with in operator: CSV-string value', () => {
+      const items = [{ slug: 'a' }, { slug: 'b' }, { slug: 'c' }]
+      const result = dataTransformService.applyDataTransform(items, {
+        type: 'exclude',
+        filter: { field: 'slug', operator: 'in', value: 'a, c' as any }
+      } as any)
+      expect(result).toEqual([{ slug: 'b' }])
+    })
+
+    it('include with in operator: keep only matching ids', () => {
+      const items = [{ id: 1 }, { id: 2 }, { id: 3 }]
+      const result = dataTransformService.applyDataTransform(items, {
+        type: 'include',
+        filter: { field: 'id', operator: 'in', value: [2] }
+      } as any)
+      expect(result).toEqual([{ id: 2 }])
+    })
+
+    it('notIn operator: keep items NOT in list (loose equality)', () => {
+      const items = [{ id: 1 }, { id: 2 }, { id: 3 }]
+      const result = dataTransformService.applyDataTransform(items, {
+        type: 'include',
+        filter: { field: 'id', operator: 'notIn', value: ['2'] }
+      } as any)
+      expect(result).toEqual([{ id: 1 }, { id: 3 }])
+    })
+
+    it('exclude all ids → empty result (canary)', () => {
+      const items = [{ id: 1 }, { id: 2 }]
+      const result = dataTransformService.applyDataTransform(items, {
+        type: 'exclude',
+        filter: { field: 'id', operator: 'in', value: [1, 2] }
+      } as any)
+      expect(result).toEqual([])
+    })
+
+    it('exclude with empty list: nothing is removed', () => {
+      const items = [{ id: 1 }, { id: 2 }]
+      const result = dataTransformService.applyDataTransform(items, {
+        type: 'exclude',
+        filter: { field: 'id', operator: 'in', value: [] }
+      } as any)
+      expect(result).toEqual(items)
+    })
+  })
 })
+

@@ -19,13 +19,14 @@ import { PageVersion } from '../models/PageVersion'
 import { DeployLog } from '../models/DeployLog'
 import { Collection } from '../models/Collection'
 import { CollectionOverride } from '../models/CollectionOverride'
+import { MediaAsset } from '../models/MediaAsset'
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
-  entities: [Site, Page, Block, Group, DataSourceEntity, DataBinding, Template, DataSubmission, PageVariable, Form, FormDestination, FormSubmissionLog, AnalyticsEvent, AnalyticsSession, Language, Translation, PageVersion, DeployLog, Collection, CollectionOverride],
+  entities: [Site, Page, Block, Group, DataSourceEntity, DataBinding, Template, DataSubmission, PageVariable, Form, FormDestination, FormSubmissionLog, AnalyticsEvent, AnalyticsSession, Language, Translation, PageVersion, DeployLog, Collection, CollectionOverride, MediaAsset],
   migrations: [],
   subscribers: [],
 })

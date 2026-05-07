@@ -309,8 +309,14 @@ export const TransformsEditor: React.FC<TransformsEditorProps> = ({
   const getTransformLabel = (t: DataTransform): string => {
     switch (t.type) {
       case 'include':
-      case 'exclude':
-        return `${t.filter.field} ${t.filter.operator} ${t.filter.value}`
+      case 'exclude': {
+        const v = Array.isArray(t.filter.value)
+          ? t.filter.value.length <= 3
+            ? `[${t.filter.value.join(', ')}]`
+            : `[${t.filter.value.length} значений]`
+          : String(t.filter.value ?? '')
+        return `${t.filter.field} ${t.filter.operator} ${v}`
+      }
       case 'sort':
         return `${t.field} ${t.order}`
       case 'limit':
@@ -328,7 +334,15 @@ export const TransformsEditor: React.FC<TransformsEditorProps> = ({
   const renderTransformEditor = (transform: DataTransform) => {
     switch (transform.type) {
       case 'include':
-      case 'exclude':
+      case 'exclude': {
+        const isMultiValue = transform.filter.operator === 'in' || transform.filter.operator === 'notIn'
+        const isUnary = transform.filter.operator === 'exists' || transform.filter.operator === 'isEmpty'
+
+        // Для in/notIn значение хранится как массив. Отображаем как CSV.
+        const displayValue = Array.isArray(transform.filter.value)
+          ? transform.filter.value.join(', ')
+          : String(transform.filter.value ?? '')
+
         return (
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-2">
@@ -343,27 +357,73 @@ export const TransformsEditor: React.FC<TransformsEditorProps> = ({
               />
               <select
                 value={transform.filter.operator}
-                onChange={(e) => updateTransform(transform.id, {
-                  filter: { ...transform.filter, operator: e.target.value as TransformFilterOperator }
-                })}
+                onChange={(e) => {
+                  const newOp = e.target.value as TransformFilterOperator
+                  const wasMulti = transform.filter.operator === 'in' || transform.filter.operator === 'notIn'
+                  const becomesMulti = newOp === 'in' || newOp === 'notIn'
+                  // Конвертируем value при смене типа оператора, чтобы не потерять данные
+                  let nextValue: unknown = transform.filter.value
+                  if (becomesMulti && !wasMulti && typeof nextValue === 'string') {
+                    nextValue = nextValue
+                      .split(',')
+                      .map(v => v.trim())
+                      .filter(v => v.length > 0)
+                  } else if (!becomesMulti && wasMulti && Array.isArray(nextValue)) {
+                    nextValue = nextValue.join(', ')
+                  }
+                  updateTransform(transform.id, {
+                    filter: { ...transform.filter, operator: newOp, value: nextValue }
+                  })
+                }}
                 className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
               >
                 {FILTER_OPERATORS.map(op => (
                   <option key={op.value} value={op.value}>{op.label}</option>
                 ))}
               </select>
-              <input
-                type="text"
-                value={transform.filter.value}
-                onChange={(e) => updateTransform(transform.id, {
-                  filter: { ...transform.filter, value: e.target.value }
-                })}
-                placeholder="Значение"
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
-              />
+              {!isUnary && (
+                isMultiValue ? (
+                  <textarea
+                    value={displayValue}
+                    onChange={(e) => updateTransform(transform.id, {
+                      filter: {
+                        ...transform.filter,
+                        value: e.target.value
+                          .split(/[,\n;]/)
+                          .map(v => v.trim())
+                          .filter(v => v.length > 0)
+                      }
+                    })}
+                    placeholder="value1, value2, value3"
+                    rows={1}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900 font-mono resize-y min-h-[40px]"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    value={displayValue}
+                    onChange={(e) => updateTransform(transform.id, {
+                      filter: { ...transform.filter, value: e.target.value }
+                    })}
+                    placeholder="Значение"
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
+                  />
+                )
+              )}
             </div>
+            {isMultiValue && (
+              <p className="text-xs text-gray-500">
+                Введите несколько значений через запятую, точку с запятой или с новой строки. Сохраняется как массив.
+                {Array.isArray(transform.filter.value) && (
+                  <span className="ml-1 text-gray-700 font-medium">
+                    Сейчас: {transform.filter.value.length} зн.
+                  </span>
+                )}
+              </p>
+            )}
           </div>
         )
+      }
 
       case 'sort':
         return (
@@ -724,6 +784,38 @@ export const TransformsEditor: React.FC<TransformsEditorProps> = ({
                           ))}
                         </select>
                       </div>
+
+                      {/* populateFrom — путь к данным для заполнения select-а */}
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">
+                          Заполнить options из данных (путь к полю API)
+                        </label>
+                        <input
+                          type="text"
+                          value={filter.populateFrom ?? ''}
+                          onChange={(e) => updateDynamicFilter(filter.id, { populateFrom: e.target.value || undefined })}
+                          placeholder="houses[0].address"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Уникальные значения попадут в options select-а (оставьте пустым если не нужно)</p>
+                      </div>
+
+                      {/* valueExtract — JS-выражение для вырезания части значения */}
+                      {filter.populateFrom && (
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">
+                            Вырезать часть значения (JS-выражение)
+                          </label>
+                          <input
+                            type="text"
+                            value={filter.valueExtract ?? ''}
+                            onChange={(e) => updateDynamicFilter(filter.id, { valueExtract: e.target.value || undefined })}
+                            placeholder="value.split(',')[2].trim()"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900 font-mono"
+                          />
+                          <p className="text-xs text-gray-400 mt-1">Переменная <code>value</code> — сырое значение поля. Результат попадёт в option</p>
+                        </div>
+                      )}
 
                       {/* Checkbox */}
                       <label className="flex items-center gap-2 text-xs text-gray-600 mt-2 cursor-pointer">

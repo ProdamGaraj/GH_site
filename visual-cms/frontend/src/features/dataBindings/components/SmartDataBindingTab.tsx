@@ -7,11 +7,12 @@ import {
   selectCurrentBlockBindings,
 } from '@/features/dataBindings/dataBindingsSlice'
 import { fetchDataSources, selectDataSources } from '@/features/data-sources/dataSourcesSlice'
-import { fetchBlockById, selectBlocks } from '@/features/blocks/blocksSlice'
+import { fetchBlockById, updateBlock, selectBlocks } from '@/features/blocks/blocksSlice'
 import { markAsDirty, selectIsDirty } from '@/features/editor/editorSlice'
 import { BlockTemplateSelector } from '@/features/blocks/components/BlockTemplateSelector'
 import { TransformsEditor } from './TransformsEditor'
-import { Database, Link, Sparkles, CheckCircle, AlertCircle, ArrowRight, Loader2, ChevronDown, ChevronUp, Settings2 } from 'lucide-react'
+import { TemplateFieldsEditor } from './TemplateFieldsEditor'
+import { Database, Link, Sparkles, CheckCircle, AlertCircle, ArrowRight, Loader2, ChevronDown, ChevronUp, Settings2, Plus, Trash2, Eye, EyeOff } from 'lucide-react'
 import { EndpointConfigEditor, DEFAULT_ENDPOINT_CONFIG } from './EndpointConfigEditor'
 import type { DetectedField } from '@/shared/types/template'
 import type { CreateDataBindingRequest, FieldMapping, InputMode, EndpointConfig } from '@/shared/types/dataBinding'
@@ -38,7 +39,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
   const [selectedDataSourceId, setSelectedDataSourceId] = useState<string>('')
   const [mode, setMode] = useState<InputMode>('single')
   const [selectedTemplateBlockId, setSelectedTemplateBlockId] = useState<string>('')
-  const [arrayPath, setArrayPath] = useState<string>('data')
+  const [arrayPath, setArrayPath] = useState<string>('')
   const [mappings, setMappings] = useState<FieldMapping[]>([])
   const [loading, setLoading] = useState(false)
   const [testResult, setTestResult] = useState<any>(null)
@@ -48,6 +49,9 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [endpointConfig, setEndpointConfig] = useState<EndpointConfig>(DEFAULT_ENDPOINT_CONFIG)
   const [hasChanges, setHasChanges] = useState(false)
+  const [fieldOverrides, setFieldOverrides] = useState<Record<string, { joinField: string; values: Record<string, string | number>; displayTemplate?: string }>>({})
+  const [overrideOpenFor, setOverrideOpenFor] = useState<string | null>(null) // targetProperty поля с открытой редакцией
+  const [overrideJsonDraft, setOverrideJsonDraft] = useState<string>('') // raw-текст JSON textarea
   
   // Отслеживание сохранения страницы для авто-сохранения привязки
   const isDirty = useAppSelector(selectIsDirty)
@@ -63,10 +67,36 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
     dispatch(markAsDirty())
   }
 
-  // Найти блок и его Template Fields
+  // Найти блок и его Template Fields.
+  // blockId может быть canvas-нодой (DataPanel), а реальный библиотечный блок — в linkedBlockId.
   const block = blocks.find(b => b.id === blockId)
+             || (linkedBlockId ? blocks.find(b => b.id === linkedBlockId) : undefined)
   const templateFields = block?.detectedFields || []
   const isTemplate = block?.isTemplate
+
+  // Нормализуем mapping для editor-состояния:
+  // sourceField = поле API, targetProperty = item.<templateField>
+  const normalizeMappingForEditor = (mapping: FieldMapping): FieldMapping => {
+    const sourceIsTemplate = typeof mapping.sourceField === 'string' && mapping.sourceField.startsWith('item.')
+    const targetIsTemplate = typeof mapping.targetProperty === 'string' && mapping.targetProperty.startsWith('item.')
+
+    // Legacy-перевернутый формат: source=item.xxx, target=apiField
+    if (sourceIsTemplate && !targetIsTemplate) {
+      return {
+        ...mapping,
+        sourceField: mapping.targetProperty,
+        targetProperty: mapping.sourceField
+      }
+    }
+
+    return mapping
+  }
+
+  const inferApiFieldName = (dataBindValue: string): string => {
+    // Убираем только префикс именования template-поля.
+    // Не делаем автозамену name->title, чтобы не подмешивать legacy-поля.
+    return dataBindValue.replace(/^(project|item|element|card|product)-/, '')
+  }
 
   // Существующая привязка (если есть) - ищем по blockId или linkedBlockId
   const existingBinding = bindings.find(b => 
@@ -89,7 +119,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
   // Загрузить существующие mappings
   useEffect(() => {
     if (existingBinding?.config?.inputConfig?.fieldMappings) {
-      setMappings(existingBinding.config.inputConfig.fieldMappings)
+      setMappings(existingBinding.config.inputConfig.fieldMappings.map(normalizeMappingForEditor))
       setSelectedDataSourceId(existingBinding.dataSourceId)
       setMode(existingBinding.config.inputConfig.mode || 'single')
       
@@ -118,6 +148,12 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         setDynamicFilters(existingBinding.config.inputConfig.dynamicFilters)
         setShowAdvanced(true)
       }
+      // Восстанавливаем fieldOverrides
+      if ((existingBinding.config.inputConfig as any).fieldOverrides) {
+        setFieldOverrides((existingBinding.config.inputConfig as any).fieldOverrides)
+      } else {
+        setFieldOverrides({})
+      }
       // Сброс флага изменений после восстановления из существующей привязки
       setHasChanges(false)
     }
@@ -140,12 +176,8 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         const selectorMatch = field.selector?.match(/\[data-bind="([^"]+)"\]/)
         const dataBindValue = selectorMatch ? selectorMatch[1] : field.name
         
-        // Попытка извлечь имя поля API
-        const apiFieldName = dataBindValue.replace(/^(project|item|element|card|product)-/, '')
-          .replace('name', 'title')
-          .replace('location', 'location')
-          .replace('price', 'price')
-          .replace('image', 'image')
+        // Поле API по умолчанию выводим из data-bind без legacy-эвристик
+        const apiFieldName = inferApiFieldName(dataBindValue)
         
         return {
           id: `mapping-field-${dataBindValue}`,
@@ -169,13 +201,8 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         const selectorMatch = field.selector?.match(/\[data-bind="([^"]+)"\]/)
         const dataBindValue = selectorMatch ? selectorMatch[1] : field.name
         
-        // Попытка извлечь имя поля API из data-bind value
-        // Например: "project-image" -> "image", "project-name" -> "title"
-        const apiFieldName = dataBindValue.replace(/^(project|item|element|card|product)-/, '')
-          .replace('name', 'title')  // Частый случай: project-name -> title
-          .replace('location', 'location')
-          .replace('price', 'price')
-          .replace('image', 'image')
+        // Например: "project-image" -> "image", "project-name" -> "name"
+        const apiFieldName = inferApiFieldName(dataBindValue)
         
         return {
           id: `mapping-field-${dataBindValue}`,
@@ -220,6 +247,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         dynamicFilters,
         ...(mode === 'repeater' && selectedTemplateBlockId && { templateId: selectedTemplateBlockId }),
         ...(mode === 'repeater' && arrayPath && { arrayPath }),
+        ...(Object.keys(fieldOverrides).length > 0 && { fieldOverrides }),
       }
 
       console.log('💾 Saving binding with inputConfig:', inputConfig)
@@ -292,7 +320,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
     } finally {
       setLoading(false)
     }
-  }, [selectedDataSourceId, mode, selectedTemplateBlockId, endpointConfig, mappings, transforms, dynamicFilters, arrayPath, existingBinding, blockId, pageId, dispatch])
+  }, [selectedDataSourceId, mode, selectedTemplateBlockId, endpointConfig, mappings, transforms, dynamicFilters, arrayPath, fieldOverrides, existingBinding, blockId, pageId, dispatch])
 
   // Авто-сохранение привязки при сохранении страницы (isDirty: true → false)
   useEffect(() => {
@@ -474,29 +502,17 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         <h3 className="text-lg font-semibold text-gray-900">Привязка данных</h3>
       </div>
 
-      {/* Информация о Template */}
-      {isTemplate && templateFields.length > 0 && (
-        <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-          <div className="flex items-start gap-3">
-            <Sparkles size={18} className="text-purple-600 mt-0.5" />
-            <div>
-              <h4 className="font-medium text-purple-900 mb-1">Template блок</h4>
-              <p className="text-sm text-purple-700 mb-2">
-                Обнаружено {templateFields.length} полей для автоматической привязки данных
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {templateFields.map((field: DetectedField) => (
-                  <span
-                    key={field.id}
-                    className="px-2 py-1 bg-white border border-purple-300 rounded text-xs font-medium text-purple-800"
-                  >
-                    {field.name}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Управление Template Fields */}
+      {isTemplate && (
+        <TemplateFieldsEditor
+          fields={templateFields}
+          blockId={linkedBlockId || blockId}
+          onFieldsChange={(newFields) => {
+            const targetId = linkedBlockId || blockId
+            dispatch(updateBlock({ id: targetId, data: { detectedFields: newFields } }))
+            dispatch(markAsDirty())
+          }}
+        />
       )}
 
       {/* Нет Template Fields */}
@@ -623,7 +639,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
             />
             <p className="text-xs text-gray-500">
-              Путь к массиву в ответе API (например, "data" для {`{success: true, data: [...]}`})
+              Путь к массиву в ответе API (например, "data" для {`{success: true, data: [...]}`}). Оставьте пустым, если ответ сам является массивом.
             </p>
           </div>
         </>
@@ -643,46 +659,230 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
 
           <div className="space-y-2">
             {mappings.map((mapping, index) => (
-              <div
-                key={index}
-                className="p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-300 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  {/* Template Field */}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs text-gray-500 mb-1">Template поле</div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-sm font-medium">
-                        {mapping.sourceField}
-                      </span>
+              (() => {
+                const fieldName = (mapping.targetProperty || '').startsWith('item.')
+                  ? mapping.targetProperty.slice(5)
+                  : (mapping.targetProperty || '')
+                const override = fieldOverrides[fieldName]
+                const isOverrideOpen = overrideOpenFor === mapping.targetProperty
+
+                return (
+                  <div
+                    key={index}
+                    className={`bg-white border rounded-lg transition-colors ${override ? 'border-amber-400' : 'border-gray-200 hover:border-blue-300'}`}
+                  >
+                    <div className="flex items-center gap-3 p-3">
+                      {/* Поле API */}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-gray-500 mb-1">Поле API (из ответа источника)</div>
+                        <input
+                          type="text"
+                          value={mapping.sourceField || ''}
+                          onChange={(e) => handleUpdateMapping(index, { sourceField: e.target.value })}
+                          placeholder="name, houses[0].address, houses[0].files[0].file_url"
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+
+                      <ArrowRight size={16} className="text-gray-400 flex-shrink-0" />
+
+                      {/* Поле Template */}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-gray-500 mb-1">Поле Template (data-bind)</div>
+                        <div className="px-2 py-1 text-sm border border-gray-200 rounded bg-gray-50 text-gray-700 truncate" title={mapping.targetProperty || ''}>
+                          {mapping.targetProperty || 'item.<template-field>'}
+                        </div>
+                      </div>
+
+                      {/* Кнопка override */}
+                      <button
+                        title={override ? 'Ручные значения настроены' : 'Задать вручную'}
+                        onClick={() => {
+                          if (isOverrideOpen) {
+                            setOverrideOpenFor(null)
+                          } else {
+                            // Инициализируем draft при открытии
+                            const currentValues = fieldOverrides[fieldName]?.values ?? {}
+                            setOverrideJsonDraft(JSON.stringify(currentValues, null, 2))
+                            setOverrideOpenFor(mapping.targetProperty)
+                          }
+                        }}
+                        className={`flex-shrink-0 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                          override
+                            ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        }`}
+                      >
+                        {override ? '🔧' : '+ вручную'}
+                      </button>
+
+                      {/* Status */}
+                      <div className="flex-shrink-0">
+                        {mapping.sourceField && mapping.targetProperty ? (
+                          <CheckCircle size={16} className="text-green-600" />
+                        ) : (
+                          <AlertCircle size={16} className="text-amber-600" />
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Arrow */}
-                  <ArrowRight size={16} className="text-gray-400 flex-shrink-0" />
+                    {/* Панель ручных значений */}
+                    {isOverrideOpen && (() => {
+                      const joinField = override?.joinField ?? 'id'
+                      const displayTemplate = override?.displayTemplate ?? ''
+                      // Собираем ID из уже загруженных тестовых данных
+                      const apiItems: any[] = Array.isArray(testResult?.items)
+                        ? testResult.items
+                        : Array.isArray(testResult?.data)
+                          ? testResult.data
+                          : []
+                      const availableIds: string[] = apiItems
+                        .map((it: any) => {
+                          const val = joinField.split('.').reduce((acc: any, k: string) => acc?.[k], it)
+                          return val !== undefined && val !== null ? String(val) : null
+                        })
+                        .filter((v): v is string => v !== null)
 
-                  {/* Data Source Field */}
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs text-gray-500 mb-1">Поле данных</div>
-                    <input
-                      type="text"
-                      value={mapping.targetProperty || ''}
-                      onChange={(e) => handleUpdateMapping(index, { targetProperty: e.target.value })}
-                      placeholder="data.fieldName"
-                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
+                      const addIdToValues = (id: string) => {
+                        const currentValues = override?.values ?? {}
+                        if (id in currentValues) return // уже есть
+                        const newValues = { ...currentValues, [id]: 0 }
+                        const updated = { joinField, displayTemplate: displayTemplate || undefined, values: newValues }
+                        setFieldOverrides({ ...fieldOverrides, [fieldName]: updated })
+                        setOverrideJsonDraft(JSON.stringify(newValues, null, 2))
+                        markChanged()
+                      }
 
-                  {/* Status */}
-                  <div className="flex-shrink-0">
-                    {mapping.targetProperty ? (
-                      <CheckCircle size={16} className="text-green-600" />
-                    ) : (
-                      <AlertCircle size={16} className="text-amber-600" />
-                    )}
+                      const updateOverride = (patch: Partial<{ joinField: string; displayTemplate: string; values: Record<string, string | number> }>) => {
+                        const current = override || { joinField: 'id', displayTemplate: undefined, values: {} }
+                        const merged = { ...current, ...patch }
+                        // Не сохраняем displayTemplate если пустая строка
+                        if (!merged.displayTemplate) delete merged.displayTemplate
+                        setFieldOverrides({ ...fieldOverrides, [fieldName]: merged })
+                        // Синхронизируем draft только если values явно изменились
+                        if (patch.values !== undefined) {
+                          setOverrideJsonDraft(JSON.stringify(patch.values, null, 2))
+                        }
+                        markChanged()
+                      }
+
+                      return (
+                        <div className="border-t border-amber-200 bg-amber-50 p-3 space-y-2 rounded-b-lg">
+                          <div className="text-xs font-medium text-amber-800">Ручные значения — числа для фильтрации</div>
+
+                          {/* Ключевое поле */}
+                          <div className="flex gap-2 items-center">
+                            <label className="text-xs text-amber-700 whitespace-nowrap">Ключевое поле:</label>
+                            <input
+                              type="text"
+                              value={joinField}
+                              onChange={(e) => updateOverride({ joinField: e.target.value })}
+                              placeholder="id"
+                              className="w-24 px-2 py-1 text-xs border border-amber-300 rounded bg-white"
+                            />
+                            <span className="text-xs text-amber-600">— поле API для идентификации</span>
+                          </div>
+
+                          {/* Шаблон отображения */}
+                          <div className="flex gap-2 items-center">
+                            <label className="text-xs text-amber-700 whitespace-nowrap">Шаблон показа:</label>
+                            <input
+                              type="text"
+                              value={displayTemplate}
+                              onChange={(e) => updateOverride({ displayTemplate: e.target.value })}
+                              placeholder="от {value} млн сум"
+                              className="flex-1 px-2 py-1 text-xs border border-amber-300 rounded bg-white"
+                            />
+                          </div>
+                          <div className="text-xs text-amber-600">
+                            Числа → для фильтрации (gte/lte). Шаблон <code className="bg-amber-100 px-1 rounded">{'{value}'}</code> → как показывать на странице.
+                          </div>
+
+                          {/* Список ID из данных API */}
+                          {availableIds.length > 0 && (
+                            <div className="space-y-1">
+                              <div className="text-xs text-amber-700">
+                                Ключи из данных ({availableIds.length}) — нажми чтобы добавить:
+                              </div>
+                              <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                                {availableIds.map((id) => {
+                                  const alreadySet = override?.values && id in override.values
+                                  return (
+                                    <button
+                                      key={id}
+                                      onClick={() => addIdToValues(id)}
+                                      title={alreadySet ? `Уже задано: ${override!.values[id]}` : `Добавить ключ "${id}"`}
+                                      className={`px-2 py-0.5 rounded text-xs font-mono transition-colors ${
+                                        alreadySet
+                                          ? 'bg-green-100 text-green-700 border border-green-300 cursor-default'
+                                          : 'bg-white text-amber-800 border border-amber-300 hover:bg-amber-100 cursor-pointer'
+                                      }`}
+                                    >
+                                      {id}{alreadySet ? ' ✓' : ''}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          {availableIds.length === 0 && (
+                            <div className="text-xs text-amber-600 italic">
+                              Нет данных — сначала нажмите «Протестировать привязку», чтобы увидеть список ключей
+                            </div>
+                          )}
+
+                          {/* JSON редактор — числовые значения или полный конфиг */}
+                          <textarea
+                            value={overrideJsonDraft}
+                            onChange={(e) => {
+                              const raw = e.target.value
+                              setOverrideJsonDraft(raw)
+                              try {
+                                const parsed = JSON.parse(raw)
+                                // Если вставлен полный override-объект (есть ключ "values") — применяем целиком
+                                if (parsed && typeof parsed === 'object' && 'values' in parsed && typeof parsed.values === 'object') {
+                                  const full: { joinField: string; values: Record<string, string | number>; displayTemplate?: string } = {
+                                    joinField: parsed.joinField || joinField,
+                                    values: parsed.values,
+                                  }
+                                  if (parsed.displayTemplate) full.displayTemplate = parsed.displayTemplate
+                                  setFieldOverrides({ ...fieldOverrides, [fieldName]: full })
+                                  markChanged()
+                                } else {
+                                  updateOverride({ values: parsed })
+                                }
+                              } catch { /* невалидный JSON в процессе ввода — игнорируем */ }
+                            }}
+                            rows={4}
+                            placeholder={'{\n  "Business Park": 850,\n  "Greenwich-CC": 950\n}'}
+                            className="w-full px-2 py-1 text-xs font-mono border border-amber-300 rounded bg-white resize-y"
+                          />
+
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-amber-600">
+                              {override ? `${Object.keys(override.values).length} значений` : 'Нет значений'}
+                            </span>
+                            {override && (
+                              <button
+                                onClick={() => {
+                                  const updated = { ...fieldOverrides }
+                                  delete updated[fieldName]
+                                  setFieldOverrides(updated)
+                                  setOverrideOpenFor(null)
+                                  markChanged()
+                                }}
+                                className="text-xs text-red-600 hover:text-red-800"
+                              >
+                                Удалить override
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
-                </div>
-              </div>
+                )
+              })()
             ))}
           </div>
         </div>

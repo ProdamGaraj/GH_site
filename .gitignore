@@ -1,2 +1,20 @@
 visual-cms/docs/data-binding-system-spec.md
 visual-cms/public-site/*
+node_modules/*
+Интеграция с сайтом _ Документация MACRO.html
+lol.html
+.tmp_binding_update.json
+.tmp_residential_structure.json
+api_resp.json
+.vscode/launch.json
+visual-cms/backend/src/migrations/add-stats-to-collections.sql
+visual-cms/backups/visual_cms_20260429-102421.sql
+visual-cms/backups/visual_cms_20260429-102428.dump
+visual-cms/scripts/diagnose-transforms.sql
+visual-cms/backend/scripts/*
+*.sql
+visual-cms/hero.json
+strip-html.js
+inspect-hero.js
+visual-cms/scripts/*
+*.txt

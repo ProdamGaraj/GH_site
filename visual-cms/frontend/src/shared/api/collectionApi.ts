@@ -15,6 +15,7 @@ export interface Collection {
   basePath: string
   slugField: string
   titleField: string
+  apiIdField: string
   linkMode: 'auto' | 'manual'
   isActive: boolean
   itemsOrder: string
@@ -22,6 +23,7 @@ export interface Collection {
   cacheTtl: number
   pollInterval: number
   indexPageId: string | null
+  statsDataSourceId: string | null
   cachedApiData: unknown[] | null
   lastCachedAt: string | null
   overrides: CollectionOverride[]
@@ -48,12 +50,14 @@ export interface CreateCollectionDto {
   basePath: string
   slugField: string
   titleField: string
+  apiIdField?: string
   linkMode?: 'auto' | 'manual'
   isActive?: boolean
   itemsOrder?: string
   useCache?: boolean
   cacheTtl?: number
   pollInterval?: number
+  statsDataSourceId?: string | null
 }
 
 export interface UpdateCollectionDto {
@@ -64,12 +68,14 @@ export interface UpdateCollectionDto {
   basePath?: string
   slugField?: string
   titleField?: string
+  apiIdField?: string
   linkMode?: 'auto' | 'manual'
   isActive?: boolean
   itemsOrder?: string
   useCache?: boolean
   cacheTtl?: number
   pollInterval?: number
+  statsDataSourceId?: string | null
 }
 
 export interface CreateOverrideDto {

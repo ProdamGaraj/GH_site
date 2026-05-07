@@ -999,7 +999,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                 
                 {/* Data Panel */}
                 {activeRightPanel === 'data' && (
-                  <DataPanel pageId={type === 'page' ? id : undefined} />
+                  <DataPanel pageId={type === 'page' ? id : undefined} libraryBlockId={type === 'block' ? id : undefined} />
                 )}
                 
                 {/* CSS Panel */}

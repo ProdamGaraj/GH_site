@@ -24,6 +24,9 @@ export const updateBlockSchema = z.object({
   tags: z.array(z.string().max(100)).optional(),
   isTemplate: z.boolean().optional(),
   templateCategory: z.string().max(100).nullable().optional(),
+  // Ручное управление Template Fields из UI
+  detectedFields: z.array(z.record(z.unknown())).optional(),
+  templateSettings: z.record(z.unknown()).nullable().optional(),
 })
 
 // POST /api/blocks/:id/enable-template

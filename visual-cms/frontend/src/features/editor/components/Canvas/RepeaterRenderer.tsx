@@ -64,6 +64,8 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
   const templateId = inputConfig?.templateId
   const fieldMappings = inputConfig?.fieldMappings || []
   const arrayPath = (inputConfig as any)?.arrayPath // путь к массиву в данных, например "data"
+  const fieldOverrides: Record<string, { joinField: string; values: Record<string, string | number>; displayTemplate?: string }> =
+    (inputConfig as any)?.fieldOverrides || {}
 
   // Находим шаблон блока
   const templateBlock = templateId ? blocks.find(b => b.id === templateId) : null
@@ -165,10 +167,13 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     }
   }
 
-  // Получаем значение из объекта по пути (например, "user.name" -> obj.user.name)
+  // Получаем значение из объекта по пути
+  // Поддерживает: "name", "houses.address", "houses[0].files[0].file_url"
   const getValueByPath = (obj: any, path: string): any => {
     if (!obj || !path) return undefined
-    return path.split('.').reduce((acc, key) => acc?.[key], obj)
+    // Разбиваем путь: "houses[0].files[0].file_url" → ["houses", "0", "files", "0", "file_url"]
+    const keys = path.replace(/\[(\d+)\]/g, '.$1').split('.')
+    return keys.reduce((acc, key) => acc?.[key], obj)
   }
 
   // Нормализуем targetProperty: "item.project.-image" → "project-image"
@@ -180,6 +185,88 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     return result.toLowerCase()
   }
 
+  // Проверяем ручной override для поля (статические значения из конфига)
+  const resolveOverride = (targetProperty: string, dataItem: any): string | undefined => {
+    if (!fieldOverrides || Object.keys(fieldOverrides).length === 0) return undefined
+    const fieldName = targetProperty.startsWith('item.') ? targetProperty.slice(5) : targetProperty
+    const override = fieldOverrides[fieldName] || fieldOverrides[targetProperty]
+    if (!override?.joinField || !override?.values) return undefined
+    const keyValue = String(getValueByPath(dataItem, override.joinField) ?? '')
+    const rawVal = override.values[keyValue]
+    if (rawVal === undefined) return undefined
+    if (override.displayTemplate) {
+      return override.displayTemplate.split('{value}').join(String(rawVal))
+    }
+    return String(rawVal)
+  }
+
+  // Поддерживаем оба формата mapping:
+  // 1) sourceField="name", targetProperty="item.project-name"
+  // 2) sourceField="title", targetProperty="item.name"
+  const getMappingValue = (
+    dataItem: any,
+    mapping: { sourceField: string; targetProperty: string }
+  ): any => {
+    const targetIsDataPath = typeof mapping.targetProperty === 'string' && mapping.targetProperty.startsWith('item.')
+    const sourceIsDataPath = typeof mapping.sourceField === 'string' && mapping.sourceField.startsWith('item.')
+
+    // Каноничный формат: sourceField = путь в API, targetProperty = item.<templateField>
+    if (!sourceIsDataPath && targetIsDataPath) {
+      return getValueByPath(dataItem, mapping.sourceField)
+    }
+
+    // Legacy перевёрнутый формат: sourceField = item.<templateField>, targetProperty = путь в API
+    if (sourceIsDataPath && !targetIsDataPath) {
+      return getValueByPath(dataItem, mapping.targetProperty)
+    }
+
+    // Fallback для смешанных/нестандартных кейсов
+    if (sourceIsDataPath) {
+      return getValueByPath(dataItem, mapping.sourceField.slice(5))
+    }
+
+    const directValue = getValueByPath(dataItem, mapping.sourceField)
+    if (directValue !== undefined) {
+      return directValue
+    }
+
+    // Специальный fallback для изображений MacroCRM:
+    // если путь содержит file_url, ищем первый доступный file_url в объекте элемента
+    if (mapping.sourceField.includes('file_url')) {
+      const firstFileUrl = findFirstFileUrl(dataItem)
+      if (firstFileUrl) {
+        return firstFileUrl
+      }
+    }
+
+    return undefined
+  }
+
+  const findFirstFileUrl = (value: any): string | undefined => {
+    if (!value) return undefined
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = findFirstFileUrl(item)
+        if (found) return found
+      }
+      return undefined
+    }
+
+    if (typeof value === 'object') {
+      if (typeof value.file_url === 'string' && value.file_url.length > 0) {
+        return value.file_url
+      }
+
+      for (const child of Object.values(value)) {
+        const found = findFirstFileUrl(child)
+        if (found) return found
+      }
+    }
+
+    return undefined
+  }
+
   // Применяем маппинги к атрибутам (src для img, alt, href для a)
   const applyAttributeMappings = (
     block: BlockNodeWithViewport,
@@ -189,9 +276,7 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     if (!block.attributes && block.tagName !== 'img') return block.attributes
     
     const attrs = { ...block.attributes }
-    const elementName = (block.metadata?.name || '').toLowerCase()
     
-    // Для <img> элементов — ищем маппинг для image и ставим src
     if (block.tagName === 'img') {
       // 1) По data-field
       const dataField = attrs['data-field']
@@ -201,41 +286,27 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
           m.targetProperty === `item.${dataField}`
         )
         if (mapping) {
-          const value = getValueByPath(dataItem, mapping.sourceField)
+          const value = getMappingValue(dataItem, mapping)
           if (value !== undefined) {
             attrs.src = String(value)
-            console.log(`[applyAttributeMappings] Set img src by data-field "${dataField}":`, value)
             return attrs
           }
         }
       }
       
-      // 2) По имени элемента: "Project Image" содержит "image"
-      if (elementName.includes('image')) {
-        const imageMapping = mappings.find(m => {
-          const norm = normalizeTargetProp(m.targetProperty)
-          return norm.includes('image') || m.sourceField.toLowerCase().includes('image')
-        })
-        if (imageMapping) {
-          const value = getValueByPath(dataItem, imageMapping.sourceField)
-          if (value !== undefined) {
-            attrs.src = String(value)
-            console.log(`[applyAttributeMappings] Set img src by element name "${elementName}":`, value)
-            return attrs
-          }
-        }
-      }
-      
-      // 3) Любой маппинг с "image" в targetProperty или sourceField
+      // 2) По metadata.name или mapping.id содержащему "image"
+      const blockName = (block.metadata?.name || '').toLowerCase().replace(/\s+/g, '-')
       const imageMapping = mappings.find(m => {
         const norm = normalizeTargetProp(m.targetProperty)
-        return norm.includes('image') || m.sourceField.toLowerCase() === 'image'
+        const idSuffix = m.id ? m.id.replace(/^mapping-field-/, '') : ''
+        return norm.includes('image') || idSuffix.includes('image') ||
+               blockName.includes(norm) || norm.includes(blockName)
       })
       if (imageMapping) {
-        const value = getValueByPath(dataItem, imageMapping.sourceField)
+        const value = getMappingValue(dataItem, imageMapping)
         if (value !== undefined) {
           attrs.src = String(value)
-          console.log(`[applyAttributeMappings] Set img src by image mapping fallback:`, value)
+          console.log(`[applyAttributeMappings] Set img src for "${block.metadata?.name}":`, value)
           return attrs
         }
       }
@@ -250,64 +321,62 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     dataItem: any,
     mappings: Array<{ sourceField: string; targetProperty: string; elementId?: string; id?: string }>
   ): string | undefined => {
-    // Проверяем data-field атрибут блока
+    // 1. По data-field атрибуту (приоритет)
     const dataField = block.attributes?.['data-field']
-    
     if (dataField) {
-      // Ищем маппинг для этого data-field
-      // targetProperty формата "item.project-name", data-field="project-name"
       const mapping = mappings.find(m => 
         m.targetProperty.endsWith(dataField) || 
         m.targetProperty === `item.${dataField}`
       )
-      
       if (mapping) {
-        const value = getValueByPath(dataItem, mapping.sourceField)
-        console.log(`[applyFieldMappings] Found mapping for ${dataField}:`, { 
-          sourceField: mapping.sourceField, 
-          value,
-          dataItem 
-        })
-        if (value !== undefined) {
-          return String(value)
-        }
+        const overrideValue = resolveOverride(mapping.targetProperty, dataItem)
+        if (overrideValue !== undefined) return overrideValue
+        const value = getMappingValue(dataItem, mapping)
+        if (value !== undefined) return String(value)
       }
     }
-    
-    // Новый подход: сопоставление по targetProperty содержащему идентификатор
-    // targetProperty: "item.project-name", ищем блок с content "Golden Residence" или по позиции
-    if (!block.content || block.content.trim() === '') {
-      return block.content
-    }
-    
-    // Пробуем найти маппинг по targetProperty
-    // "item.project-name" -> ищем поле с "name" в конце
-    // "item.project-location" -> ищем поле с "location" в конце
-    // "item.project-price" -> ищем поле с "price" в конце
-    const contentLower = block.content.toLowerCase()
-    
-    for (const mapping of mappings) {
-      const targetProp = mapping.targetProperty.toLowerCase()
+
+    // 2. По targetProperty → metadata.name
+    // targetProperty: "item.project-name" → нормализуем и сопоставляем с metadata.name "Project Name"
+    if (block.metadata?.name && block.content && block.content.trim() !== '') {
+      const blockName = block.metadata.name.toLowerCase().replace(/\s+/g, '-')
       
-      // Простая эвристика: если content похож на то, что должно быть по маппингу
-      if (
-        (targetProp.includes('name') && (contentLower.includes('golden') || contentLower.includes('residence'))) ||
-        (targetProp.includes('location') && (contentLower.includes('юнусабад') || contentLower.includes('метро'))) ||
-        (targetProp.includes('price') && contentLower.includes('$'))
-      ) {
-        const value = getValueByPath(dataItem, mapping.sourceField)
-        if (value !== undefined) {
-          console.log(`[applyFieldMappings] Matched by content heuristic:`, {
-            targetProp: mapping.targetProperty,
-            originalContent: block.content,
-            sourceField: mapping.sourceField,
-            value
-          })
-          return String(value)
+      for (const mapping of mappings) {
+        const norm = normalizeTargetProp(mapping.targetProperty)
+        if (norm === blockName || blockName.includes(norm) || norm.includes(blockName)) {
+          const overrideValue = resolveOverride(mapping.targetProperty, dataItem)
+          if (overrideValue !== undefined) return overrideValue
+          const value = getMappingValue(dataItem, mapping)
+          if (value !== undefined) {
+            console.log(`[applyFieldMappings] Matched by name "${block.metadata.name}" → ${mapping.sourceField}:`, value)
+            return String(value)
+          }
         }
       }
     }
-    
+
+    // 3. По id маппинга → metadata.name  
+    // mapping.id: "mapping-field-project-name" → metadata.name: "Project Name"
+    if (block.metadata?.name && block.content && block.content.trim() !== '') {
+      const blockName = block.metadata.name.toLowerCase().replace(/\s+/g, '-')
+      
+      for (const mapping of mappings) {
+        if (mapping.id) {
+          // "mapping-field-project-name" → "project-name"
+          const idSuffix = mapping.id.replace(/^mapping-field-/, '')
+          if (idSuffix === blockName || blockName.includes(idSuffix) || idSuffix.includes(blockName)) {
+            const overrideValue = resolveOverride(mapping.targetProperty, dataItem)
+            if (overrideValue !== undefined) return overrideValue
+            const value = getMappingValue(dataItem, mapping)
+            if (value !== undefined) {
+              console.log(`[applyFieldMappings] Matched by id "${mapping.id}" → name "${block.metadata.name}":`, value)
+              return String(value)
+            }
+          }
+        }
+      }
+    }
+
     return block.content
   }
 
@@ -329,7 +398,7 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
       )
       
       if (mapping && dataField.includes('image')) {
-        const value = getValueByPath(dataItem, mapping.sourceField)
+        const value = getMappingValue(dataItem, mapping)
         if (value !== undefined) {
           const updatedProperties = { ...block.styles.properties } as Record<string, unknown>
           updatedProperties.backgroundImage = `url(${value})`
@@ -349,7 +418,7 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
       )
       
       if (imageMapping) {
-        const value = getValueByPath(dataItem, imageMapping.sourceField)
+        const value = getMappingValue(dataItem, imageMapping)
         if (value !== undefined) {
           const updatedProperties = { ...block.styles.properties } as Record<string, unknown>
           updatedProperties.backgroundImage = `url(${value})`
@@ -377,7 +446,7 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     const updatedProperties = { ...block.styles.properties } as Record<string, unknown>
 
     for (const mapping of styleMappings) {
-      const value = getValueByPath(dataItem, mapping.sourceField)
+      const value = getMappingValue(dataItem, mapping)
       if (value !== undefined) {
         if (mapping.targetProperty === 'src' || mapping.targetProperty === 'style.backgroundImage') {
           // Для изображений применяем как backgroundImage

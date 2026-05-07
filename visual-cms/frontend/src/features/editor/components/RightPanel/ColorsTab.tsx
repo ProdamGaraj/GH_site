@@ -3,7 +3,22 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
 import { ColorPicker } from '@/shared/components/ColorPicker'
+import { ImageUpload } from './ImageUpload'
 import type { BlockNode } from '@/shared/types'
+
+/** Strip CSS `url("...")` wrapper, return bare URL. */
+function unwrapCssUrl(raw: string): string {
+  if (!raw) return ''
+  const m = raw.match(/^\s*url\((['"]?)(.+?)\1\)\s*$/i)
+  return m ? m[2] : raw
+}
+
+/** Wrap bare URL into CSS `url("...")` form. Empty → ''. */
+function wrapCssUrl(url: string): string {
+  if (!url) return ''
+  if (/^\s*url\(/i.test(url)) return url
+  return `url("${url}")`
+}
 
 interface ColorsTabProps {
   node: BlockNode
@@ -36,11 +51,12 @@ export const ColorsTab: React.FC<ColorsTabProps> = ({ node }) => {
               previewProperty="backgroundColor"
             />
           </div>
-          <Input
-            label="Background Image"
-            value={node.styles.properties?.backgroundImage || ''}
-            onChange={(e) => handleStyleChange('backgroundImage', e.target.value)}
-            placeholder="url()"
+          <ImageUpload
+            label="Фоновое изображение"
+            value={unwrapCssUrl(node.styles.properties?.backgroundImage || '')}
+            onChange={(url) => handleStyleChange('backgroundImage', wrapCssUrl(url))}
+            placeholder="https://example.com/image.jpg"
+            kind="image"
           />
         </div>
       </div>

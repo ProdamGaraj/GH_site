@@ -9,6 +9,9 @@ import { Site } from '../models/Site'
 import { DataSource as DataSourceEntity } from '../models/DataSource'
 import { asyncHandler, NotFoundError, ValidationError, ConflictError } from '../middleware'
 import { cacheService } from '../services/CacheService'
+import { cachedDataSourceService } from '../services/CachedDataSourceService'
+import { FetchConfig, AuthConfig } from '../services/SecureDataSourceService'
+import { CredentialsManager } from '../services/CredentialsManager'
 
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
 
@@ -71,6 +74,12 @@ export class CollectionController {
     if (!dataSource) throw new ValidationError('Data source not found')
     if (!templatePage) throw new ValidationError('Template page not found')
 
+    // Опциональный stats data source
+    if (data.statsDataSourceId) {
+      const statsDs = await this.getDataSourceRepository().findOne({ where: { id: data.statsDataSourceId } })
+      if (!statsDs) throw new ValidationError('Stats data source not found')
+    }
+
     // Проверка конфликта basePath с существующими страницами (Проблема 3)
     await this.checkBasePathConflict(data.siteId, data.basePath)
 
@@ -104,6 +113,13 @@ export class CollectionController {
       if (!page) throw new ValidationError('Template page not found')
       page.isTemplate = true
       await this.getPageRepository().save(page)
+    }
+
+    // Опциональный stats data source: пустое значение/null — отвязать; UUID — проверить существование.
+    // Используем 'in' чтобы отличать "не передавали" (не трогаем) от "передали null" (отвязать).
+    if ('statsDataSourceId' in data && data.statsDataSourceId) {
+      const statsDs = await this.getDataSourceRepository().findOne({ where: { id: data.statsDataSourceId } })
+      if (!statsDs) throw new ValidationError('Stats data source not found')
     }
 
     Object.assign(collection, data)
@@ -169,14 +185,15 @@ export class CollectionController {
       const itemId = String(item.id || item._id || '')
       const itemTitle = this.getNestedValue(item, collection.titleField) || ''
       const rawSlug = this.getNestedValue(item, collection.slugField)
-      let itemSlug = rawSlug || this.slugify(itemTitle) || itemId
+      // Всегда нормализуем slug через slugify (транслит, нижний регистр, без спецсимволов)
+      let itemSlug = this.slugify(String(rawSlug || itemTitle || '')) || itemId
 
       // Ищем override: сначала по id, затем fallback по slug
       const override = overridesByItemId.get(itemId) || overridesBySlug.get(itemSlug)
 
-      // Override может задать кастомный slug
+      // Override может задать кастомный slug — тоже нормализуем
       if (override?.apiItemSlug) {
-        itemSlug = override.apiItemSlug
+        itemSlug = this.slugify(override.apiItemSlug) || itemSlug
       }
 
       // Проверка рассинхронизации slug (Проблема 6)
@@ -277,18 +294,21 @@ export class CollectionController {
     if (!ds) throw new Error('Data source not loaded')
 
     const config = ds.config as any
-    const url = config.url
-    if (!url) throw new Error('Data source has no URL configured')
+    if (!config.url) throw new Error('Data source has no URL configured')
 
-    const response = await fetch(url, {
-      headers: config.headers || {},
-    })
-
-    if (!response.ok) {
-      throw new Error(`API returned ${response.status}: ${response.statusText}`)
+    let authConfig: AuthConfig | undefined = undefined
+    if (ds.authConfig) {
+      authConfig = (await CredentialsManager.decryptAuthConfig(ds.authConfig)) as unknown as AuthConfig
     }
 
-    const json = await response.json()
+    const fetchConfig = { type: ds.type, ...config } as unknown as FetchConfig
+    const result = await cachedDataSourceService.fetchData(ds.id, fetchConfig, authConfig)
+
+    if (!result.success) {
+      throw new Error(result.error?.message || 'Failed to fetch collection data')
+    }
+
+    const json = result.data
     const items = this.getNestedValue(json, collection.arrayPath)
 
     if (!Array.isArray(items)) {

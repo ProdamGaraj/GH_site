@@ -57,12 +57,10 @@ const font = "'Muller', 'Inter', Arial, sans-serif"
 // ──────────────────── SHARED COMPONENTS ────────────────────
 
 const navLinks = [
-  { label: 'Главная', href: '/' },
   { label: 'О компании', href: '/about' },
   { label: 'Жилые комплексы', href: '/residential' },
   { label: 'Коммерция', href: '/commercial' },
   { label: 'Новости', href: '/news' },
-  { label: 'Карьера', href: '/career' },
   { label: 'Контакты', href: '/contacts' },
 ]
 
@@ -77,7 +75,7 @@ function createHeader() {
         alignItems: 'center',
         justifyContent: 'space-between',
         height: '80px',
-        padding: '0 80px',
+        padding: '0 60px',
         backgroundColor: colors.darkBrown,
         position: 'sticky',
         top: '0',
@@ -85,24 +83,38 @@ function createHeader() {
       },
     },
     children: [
+      // LEFT: Logo
       createNode({
-        elementType: 'text',
-        tagName: 'a',
-        tag: 'a',
-        metadata: { name: 'Logo' },
-        content: 'GOLDEN HOUSE',
-        attributes: { href: '/' },
-        styles: {
-          properties: {
-            color: colors.gold,
-            fontSize: '22px',
-            fontWeight: '700',
-            fontFamily: font,
-            letterSpacing: '3px',
-            textDecoration: 'none',
-          },
-        },
+        metadata: { name: 'Header Left' },
+        layoutMode: 'flex',
+        styles: { properties: { display: 'flex', alignItems: 'center', minWidth: '200px' } },
+        children: [
+          createNode({
+            elementType: 'text',
+            tagName: 'a',
+            tag: 'a',
+            metadata: { name: 'Logo' },
+            content: 'GOLDEN HOUSE',
+            attributes: { href: '/' },
+            styles: {
+              properties: {
+                color: colors.gold,
+                fontSize: '22px',
+                fontWeight: '700',
+                fontFamily: font,
+                letterSpacing: '3px',
+                textDecoration: 'none',
+              },
+            },
+          }),
+        ],
       }),
+      // Divider left
+      createNode({
+        metadata: { name: 'Header Divider L' },
+        styles: { properties: { width: '1px', height: '32px', backgroundColor: 'rgba(255,255,255,0.15)', margin: '0 24px' } },
+      }),
+      // CENTER: Navigation
       createNode({
         tagName: 'nav',
         tag: 'nav',
@@ -111,7 +123,9 @@ function createHeader() {
         styles: {
           properties: {
             display: 'flex',
-            gap: '32px',
+            gap: '28px',
+            flex: '1',
+            justifyContent: 'center',
           },
         },
         children: navLinks.map(link =>
@@ -131,27 +145,68 @@ function createHeader() {
                 letterSpacing: '1px',
                 textDecoration: 'none',
               },
+              states: {
+                hover: { color: colors.gold },
+              },
+              stateTransition: { duration: 200, easing: 'ease', properties: ['color'] },
             },
           })
         ),
       }),
+      // Divider right
       createNode({
-        elementType: 'text',
-        tagName: 'a',
-        tag: 'a',
-        metadata: { name: 'Phone' },
-        content: '+998 78 150 11 11',
-        attributes: { href: 'tel:+998781501111' },
-        styles: {
-          properties: {
-            color: colors.gold,
-            fontSize: '14px',
-            fontFamily: font,
-            fontWeight: '500',
-            letterSpacing: '1px',
-            textDecoration: 'none',
-          },
-        },
+        metadata: { name: 'Header Divider R' },
+        styles: { properties: { width: '1px', height: '32px', backgroundColor: 'rgba(255,255,255,0.15)', margin: '0 24px' } },
+      }),
+      // RIGHT: Contacts
+      createNode({
+        metadata: { name: 'Header Right' },
+        layoutMode: 'flex',
+        styles: { properties: { display: 'flex', alignItems: 'center', gap: '20px', minWidth: '200px', justifyContent: 'flex-end' } },
+        children: [
+          createNode({
+            elementType: 'text',
+            tagName: 'a',
+            tag: 'a',
+            metadata: { name: 'Phone' },
+            content: '+998 78 150 11 11',
+            attributes: { href: 'tel:+998781501111' },
+            styles: {
+              properties: {
+                color: colors.white,
+                fontSize: '14px',
+                fontFamily: font,
+                fontWeight: '500',
+                letterSpacing: '0.5px',
+                textDecoration: 'none',
+              },
+            },
+          }),
+          createNode({
+            elementType: 'button',
+            tagName: 'button',
+            tag: 'button',
+            metadata: { name: 'Callback Button' },
+            content: 'Перезвоните мне',
+            styles: {
+              properties: {
+                padding: '10px 20px',
+                backgroundColor: colors.gold,
+                color: colors.white,
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '12px',
+                fontWeight: '600',
+                fontFamily: font,
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                cursor: 'pointer',
+              },
+              states: { hover: { backgroundColor: colors.goldDark } },
+              stateTransition: { duration: 200, easing: 'ease', properties: ['background-color'] },
+            },
+          }),
+        ],
       }),
     ],
   })
@@ -453,253 +508,498 @@ function createCTAButton(text, href, variant = 'primary') {
 // ──────────────────────────────────────────────────────────
 
 function createHomePage() {
-  // Hero Section
+
+  // ====== HERO CAROUSEL (п.1, п.2, п.3, п.6) ======
+  // Карусель из 3 слайдов, усиленный overlay, жирный CTA, text-shadow для читаемости
+
+  const heroSlides = [
+    {
+      bg: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1920',
+      label: 'Жилой комплекс премиум-класса',
+      title: 'Golden House Premium',
+      subtitle: 'Квартиры от 45 м² в Юнусабадском районе',
+      cta: 'Выбрать квартиру',
+      ctaHref: '/residential',
+    },
+    {
+      bg: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1920',
+      label: 'Коммерческая недвижимость',
+      title: 'Пространства для бизнеса',
+      subtitle: 'Офисы и торговые помещения с отделкой под ключ',
+      cta: 'Смотреть помещения',
+      ctaHref: '/commercial',
+    },
+    {
+      bg: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=1920',
+      label: 'Новый проект 2026',
+      title: 'Golden House Elite',
+      subtitle: 'Старт продаж — выгодные цены на этапе строительства',
+      cta: 'Узнать подробности',
+      ctaHref: '/residential',
+    },
+  ]
+
   const hero = createNode({
     tagName: 'section',
     tag: 'section',
-    metadata: { name: 'Hero Section' },
+    metadata: { name: 'Hero Carousel' },
     styles: {
       properties: {
-        height: '100vh',
         position: 'relative',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundImage: 'url(https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1920)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        overflow: 'hidden',
       },
     },
     children: [
+      // Slides wrapper
       createNode({
-        metadata: { name: 'Hero Overlay' },
+        metadata: { name: 'Carousel Slides' },
+        layoutMode: 'flex',
+        styles: {
+          properties: {
+            display: 'flex',
+            width: `${heroSlides.length * 100}%`,
+            transition: 'transform 0.6s ease-in-out',
+          },
+        },
+        children: heroSlides.map((slide, i) => createNode({
+          metadata: { name: `Slide ${i + 1}` },
+          styles: {
+            properties: {
+              width: `${100 / heroSlides.length}%`,
+              height: '100vh',
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundImage: `url(${slide.bg})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              flexShrink: '0',
+            },
+          },
+          children: [
+            // Усиленный overlay для читаемости (п.1)
+            createNode({
+              metadata: { name: 'Slide Overlay' },
+              styles: {
+                properties: {
+                  position: 'absolute',
+                  top: '0', left: '0', right: '0', bottom: '0',
+                  background: 'linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.6) 100%)',
+                },
+              },
+            }),
+            // Содержимое слайда
+            createNode({
+              metadata: { name: 'Slide Content' },
+              styles: {
+                properties: {
+                  position: 'relative',
+                  zIndex: '1',
+                  textAlign: 'center',
+                  maxWidth: '750px',
+                  padding: '0 40px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                },
+              },
+              children: [
+                createNode({
+                  elementType: 'text', tagName: 'p', tag: 'p',
+                  metadata: { name: 'Slide Label' },
+                  content: slide.label,
+                  styles: {
+                    properties: {
+                      color: colors.gold,
+                      fontSize: '13px',
+                      letterSpacing: '4px',
+                      textTransform: 'uppercase',
+                      marginBottom: '20px',
+                      fontWeight: '600',
+                    },
+                  },
+                }),
+                createNode({
+                  elementType: 'text', tagName: 'h1', tag: 'h1',
+                  metadata: { name: 'Slide Title' },
+                  content: slide.title,
+                  styles: {
+                    properties: {
+                      color: colors.white,
+                      fontSize: '60px',
+                      fontWeight: '700',
+                      lineHeight: '1.1',
+                      marginBottom: '16px',
+                      letterSpacing: '-1px',
+                      textShadow: '0 2px 20px rgba(0,0,0,0.5)',
+                    },
+                  },
+                }),
+                createNode({
+                  elementType: 'text', tagName: 'p', tag: 'p',
+                  metadata: { name: 'Slide Subtitle' },
+                  content: slide.subtitle,
+                  styles: {
+                    properties: {
+                      color: 'rgba(255,255,255,0.9)',
+                      fontSize: '20px',
+                      fontWeight: '400',
+                      lineHeight: '1.5',
+                      marginBottom: '36px',
+                      textShadow: '0 1px 8px rgba(0,0,0,0.4)',
+                    },
+                  },
+                }),
+                // Усиленный CTA (п.2) — крупная яркая кнопка
+                createNode({
+                  elementType: 'button', tagName: 'a', tag: 'a',
+                  metadata: { name: 'Slide CTA' },
+                  content: slide.cta,
+                  attributes: { href: slide.ctaHref },
+                  styles: {
+                    properties: {
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '20px 56px',
+                      backgroundColor: colors.gold,
+                      color: colors.white,
+                      border: 'none',
+                      borderRadius: '4px',
+                      fontSize: '16px',
+                      fontWeight: '700',
+                      fontFamily: font,
+                      textTransform: 'uppercase',
+                      letterSpacing: '2px',
+                      textDecoration: 'none',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 24px rgba(210,159,102,0.4)',
+                    },
+                    states: {
+                      hover: {
+                        backgroundColor: colors.goldDark,
+                        boxShadow: '0 6px 32px rgba(210,159,102,0.6)',
+                        transform: 'translateY(-2px)',
+                      },
+                    },
+                    stateTransition: { duration: 250, easing: 'ease-out', properties: ['background-color', 'box-shadow', 'transform'] },
+                  },
+                }),
+              ],
+            }),
+          ],
+        })),
+      }),
+      // Carousel dots
+      createNode({
+        metadata: { name: 'Carousel Dots' },
+        layoutMode: 'flex',
         styles: {
           properties: {
             position: 'absolute',
-            top: '0', left: '0', right: '0', bottom: '0',
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.55) 100%)',
+            bottom: '32px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            gap: '12px',
+            zIndex: '2',
           },
+        },
+        children: heroSlides.map((_, i) => createNode({
+          metadata: { name: `Dot ${i + 1}` },
+          styles: {
+            properties: {
+              width: i === 0 ? '32px' : '10px',
+              height: '10px',
+              borderRadius: '5px',
+              backgroundColor: i === 0 ? colors.gold : 'rgba(255,255,255,0.5)',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+            },
+          },
+        })),
+      }),
+      // Left/Right arrows
+      createNode({
+        elementType: 'button', tagName: 'button', tag: 'button',
+        metadata: { name: 'Arrow Left' },
+        content: '‹',
+        styles: {
+          properties: {
+            position: 'absolute',
+            left: '24px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: '48px',
+            height: '48px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(255,255,255,0.15)',
+            color: colors.white,
+            border: '1px solid rgba(255,255,255,0.3)',
+            fontSize: '24px',
+            cursor: 'pointer',
+            zIndex: '2',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
+          states: { hover: { backgroundColor: 'rgba(255,255,255,0.3)' } },
+          stateTransition: { duration: 200, easing: 'ease', properties: ['background-color'] },
         },
       }),
       createNode({
-        metadata: { name: 'Hero Content' },
+        elementType: 'button', tagName: 'button', tag: 'button',
+        metadata: { name: 'Arrow Right' },
+        content: '›',
         styles: {
           properties: {
-            position: 'relative',
-            zIndex: '1',
-            textAlign: 'center',
-            maxWidth: '800px',
-            padding: '0 40px',
+            position: 'absolute',
+            right: '24px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: '48px',
+            height: '48px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(255,255,255,0.15)',
+            color: colors.white,
+            border: '1px solid rgba(255,255,255,0.3)',
+            fontSize: '24px',
+            cursor: 'pointer',
+            zIndex: '2',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
+            justifyContent: 'center',
           },
+          states: { hover: { backgroundColor: 'rgba(255,255,255,0.3)' } },
+          stateTransition: { duration: 200, easing: 'ease', properties: ['background-color'] },
         },
-        children: [
-          createNode({
-            elementType: 'text', tagName: 'p', tag: 'p',
-            metadata: { name: 'Hero Label' },
-            content: 'Девелопер премиальной недвижимости',
-            styles: {
-              properties: {
-                color: colors.gold,
-                fontSize: '13px',
-                letterSpacing: '4px',
-                textTransform: 'uppercase',
-                marginBottom: '24px',
-                fontWeight: '500',
-              },
-            },
-          }),
-          createNode({
-            elementType: 'text', tagName: 'h1', tag: 'h1',
-            metadata: { name: 'Hero Title' },
-            content: 'Создаём пространства для жизни',
-            styles: {
-              properties: {
-                color: colors.white,
-                fontSize: '56px',
-                fontWeight: '300',
-                lineHeight: '1.15',
-                marginBottom: '24px',
-                letterSpacing: '-1px',
-              },
-            },
-          }),
-          createNode({
-            elementType: 'text', tagName: 'p', tag: 'p',
-            metadata: { name: 'Hero Description' },
-            content: '13 лет мы строим дома, в которых хочется жить. Архитектура, продуманная до мелочей.',
-            styles: {
-              properties: {
-                color: 'rgba(255,255,255,0.8)',
-                fontSize: '18px',
-                fontWeight: '300',
-                lineHeight: '1.7',
-                marginBottom: '48px',
-              },
-            },
-          }),
-          createNode({
-            metadata: { name: 'Hero Buttons' },
-            layoutMode: 'flex',
-            styles: { properties: { display: 'flex', gap: '16px' } },
-            children: [
-              createCTAButton('Смотреть проекты', '/residential'),
-              createCTAButton('О компании', '/about', 'ghost'),
-            ],
-          }),
-        ],
       }),
     ],
   })
 
-  // Stats section
+  // ====== STATS SECTION (п.4 — дизайн по фото) ======
+  // «Цифры говорят сами за себя» — золотые цифры, подписи мелким текстом, бежевый фон
   const stats = createNode({
     tagName: 'section',
     tag: 'section',
     metadata: { name: 'Stats Section' },
     styles: {
       properties: {
-        padding: '80px 80px',
-        backgroundColor: colors.white,
-      },
-    },
-    children: [
-      createNode({
-        metadata: { name: 'Stats Grid' },
-        styles: {
-          properties: {
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '48px',
-            maxWidth: '1200px',
-            margin: '0 auto',
-          },
-        },
-        children: [
-          { value: '13+', label: 'лет на рынке' },
-          { value: '2 млн', label: 'м² недвижимости' },
-          { value: '25', label: 'проектов в реализации' },
-          { value: '30 000+', label: 'довольных клиентов' },
-        ].map(s => createNode({
-          metadata: { name: `Stat - ${s.label}` },
-          styles: {
-            properties: {
-              textAlign: 'center',
-              padding: '24px 0',
-            },
-          },
-          children: [
-            createNode({
-              elementType: 'text', tagName: 'span', tag: 'span',
-              metadata: { name: 'Stat Value' },
-              content: s.value,
-              styles: { properties: { fontSize: '48px', fontWeight: '300', color: colors.black, letterSpacing: '-2px', display: 'block', marginBottom: '8px' } },
-            }),
-            createNode({
-              elementType: 'text', tagName: 'span', tag: 'span',
-              metadata: { name: 'Stat Label' },
-              content: s.label,
-              styles: { properties: { fontSize: '14px', color: colors.gray } },
-            }),
-          ],
-        })),
-      }),
-    ],
-  })
-
-  // About preview
-  const aboutPreview = createNode({
-    tagName: 'section',
-    tag: 'section',
-    metadata: { name: 'About Preview' },
-    styles: {
-      properties: {
-        padding: '120px 80px',
+        padding: '60px 60px',
         backgroundColor: colors.cream,
       },
     },
     children: [
       createNode({
-        metadata: { name: 'About Container' },
-        styles: {
-          properties: {
-            maxWidth: '1200px',
-            margin: '0 auto',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '80px',
-            alignItems: 'center',
-          },
-        },
+        metadata: { name: 'Stats Container' },
+        styles: { properties: { maxWidth: '1200px', margin: '0 auto' } },
         children: [
+          // Title
           createNode({
-            metadata: { name: 'About Text Column' },
-            styles: { properties: { display: 'flex', flexDirection: 'column' } },
-            children: [
-              createSectionLabel('О компании'),
-              createSectionTitle('Мы верим, что дом — это больше, чем стены'),
-              createNode({
-                elementType: 'text', tagName: 'p', tag: 'p',
-                metadata: { name: 'About Description' },
-                content: 'Golden House — это команда архитекторов, инженеров и дизайнеров, объединённых общей целью: создавать жилые пространства, которые вдохновляют. Каждый наш проект — результат глубокого анализа потребностей современного человека.',
-                styles: { properties: { fontSize: '16px', color: colors.grayDark, lineHeight: '1.8', marginTop: '24px', marginBottom: '32px' } },
-              }),
-              createNode({
-                elementType: 'button', tagName: 'a', tag: 'a',
-                metadata: { name: 'About CTA' },
-                content: 'Подробнее о компании',
-                attributes: { href: '/about' },
-                styles: {
-                  properties: {
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    color: colors.gold,
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    letterSpacing: '1px',
-                    textDecoration: 'none',
-                    textTransform: 'uppercase',
-                    border: 'none',
-                    backgroundColor: 'transparent',
-                    cursor: 'pointer',
-                    padding: '0',
-                  },
-                },
-              }),
-            ],
-          }),
-          createNode({
-            elementType: 'image', tagName: 'img', tag: 'img',
-            metadata: { name: 'About Image' },
-            attributes: {
-              src: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800',
-              alt: 'Golden House — современная архитектура',
-            },
+            elementType: 'text', tagName: 'h2', tag: 'h2',
+            metadata: { name: 'Stats Title' },
+            content: 'Цифры говорят сами за себя:',
             styles: {
               properties: {
-                width: '100%',
-                height: '500px',
-                objectFit: 'cover',
-                borderRadius: '8px',
+                fontSize: '28px',
+                fontWeight: '600',
+                color: colors.black,
+                marginBottom: '40px',
               },
             },
+          }),
+          // Stats grid 2x2
+          createNode({
+            metadata: { name: 'Stats Grid' },
+            styles: {
+              properties: {
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '32px',
+              },
+            },
+            children: [
+              { prefix: '>', value: '15', unit: '', label: 'лет опыта' },
+              { prefix: '>', value: '1', unit: ' МЛН М²', label: 'построено' },
+              { prefix: '', value: '65', unit: '', label: 'проектов\nв портфолио' },
+              { prefix: '', value: '30', unit: ' тыс.', label: 'семей живут\nв наших домах' },
+            ].map(s => createNode({
+              metadata: { name: `Stat - ${s.label.split('\n')[0]}` },
+              styles: {
+                properties: {
+                  display: 'flex',
+                  flexDirection: 'column',
+                  padding: '20px 0',
+                },
+              },
+              children: [
+                // Number row: prefix + value + unit
+                createNode({
+                  metadata: { name: 'Stat Number Row' },
+                  layoutMode: 'flex',
+                  styles: { properties: { display: 'flex', alignItems: 'baseline', gap: '0px' } },
+                  children: [
+                    ...(s.prefix ? [createNode({
+                      elementType: 'text', tagName: 'span', tag: 'span',
+                      metadata: { name: 'Stat Prefix' },
+                      content: s.prefix,
+                      styles: { properties: { fontSize: '36px', fontWeight: '700', color: colors.gold } },
+                    })] : []),
+                    createNode({
+                      elementType: 'text', tagName: 'span', tag: 'span',
+                      metadata: { name: 'Stat Value' },
+                      content: s.value,
+                      styles: { properties: { fontSize: '56px', fontWeight: '700', color: colors.gold, lineHeight: '1', letterSpacing: '-2px' } },
+                    }),
+                    ...(s.unit ? [createNode({
+                      elementType: 'text', tagName: 'span', tag: 'span',
+                      metadata: { name: 'Stat Unit' },
+                      content: s.unit,
+                      styles: { properties: { fontSize: '20px', fontWeight: '600', color: colors.gold, marginLeft: '4px' } },
+                    })] : []),
+                  ],
+                }),
+                // Label
+                createNode({
+                  elementType: 'text', tagName: 'span', tag: 'span',
+                  metadata: { name: 'Stat Label' },
+                  content: s.label.replace('\n', ' '),
+                  styles: { properties: { fontSize: '14px', color: colors.grayDark, marginTop: '4px', lineHeight: '1.4' } },
+                }),
+              ],
+            })),
           }),
         ],
       }),
     ],
   })
 
-  // Featured projects preview
+  // ====== HISTORY TIMELINE BLOCK (п.11 — О компании - блок ИСТОРИЯ) ======
+  // Вертикальный таймлайн как на фото 2
+  const historyBlock = createNode({
+    tagName: 'section',
+    tag: 'section',
+    metadata: { name: 'History Section' },
+    styles: {
+      properties: {
+        padding: '80px 60px',
+        backgroundColor: colors.white,
+      },
+    },
+    children: [
+      createNode({
+        metadata: { name: 'History Container' },
+        styles: { properties: { maxWidth: '900px', margin: '0 auto' } },
+        children: [
+          // Section header
+          createNode({
+            metadata: { name: 'History Header' },
+            styles: { properties: { textAlign: 'center', marginBottom: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center' } },
+            children: [
+              createSectionLabel('О компании'),
+              createSectionTitle('С уверенностью к будущему'),
+            ],
+          }),
+          // Vertical timeline
+          createNode({
+            metadata: { name: 'Timeline' },
+            styles: {
+              properties: {
+                position: 'relative',
+                paddingLeft: '60px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0px',
+              },
+            },
+            children: [
+              // Timeline vertical line
+              createNode({
+                metadata: { name: 'Timeline Line' },
+                styles: {
+                  properties: {
+                    position: 'absolute',
+                    left: '20px',
+                    top: '0',
+                    bottom: '0',
+                    width: '2px',
+                    backgroundColor: colors.gold,
+                  },
+                },
+              }),
+              // Timeline items
+              ...[
+                { year: '2009', title: 'Основание компании', desc: 'Национальный лидер рынка недвижимости Узбекистана' },
+                { year: '2020', title: 'Создание единственной в стране наноструктурной лаборатории', desc: '29 жилых комплексов. ~50 коммерческих объектов' },
+                { year: '2022', title: 'Производство модулей', desc: 'Запуск собственного производства строительных модулей' },
+                { year: '2024', title: 'Запуск Digital CMS', desc: 'Цифровая платформа для управления проектами и продажами. GH в ТОП-3 застройщиков' },
+              ].map((item, i) => createNode({
+                metadata: { name: `Timeline ${item.year}` },
+                styles: {
+                  properties: {
+                    position: 'relative',
+                    paddingBottom: '48px',
+                    paddingLeft: '32px',
+                  },
+                },
+                children: [
+                  // Dot on timeline
+                  createNode({
+                    metadata: { name: 'Timeline Dot' },
+                    styles: {
+                      properties: {
+                        position: 'absolute',
+                        left: '-52px',
+                        top: '4px',
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        backgroundColor: colors.gold,
+                        border: `3px solid ${colors.white}`,
+                        boxShadow: `0 0 0 2px ${colors.gold}`,
+                      },
+                    },
+                  }),
+                  // Year
+                  createNode({
+                    elementType: 'text', tagName: 'span', tag: 'span',
+                    metadata: { name: 'Timeline Year' },
+                    content: item.year,
+                    styles: { properties: { fontSize: '32px', fontWeight: '700', color: colors.gold, display: 'block', marginBottom: '8px', letterSpacing: '-1px' } },
+                  }),
+                  // Title
+                  createNode({
+                    elementType: 'text', tagName: 'h3', tag: 'h3',
+                    metadata: { name: 'Timeline Title' },
+                    content: item.title,
+                    styles: { properties: { fontSize: '18px', fontWeight: '600', color: colors.black, marginBottom: '6px' } },
+                  }),
+                  // Description
+                  createNode({
+                    elementType: 'text', tagName: 'p', tag: 'p',
+                    metadata: { name: 'Timeline Desc' },
+                    content: item.desc,
+                    styles: { properties: { fontSize: '14px', color: colors.grayDark, lineHeight: '1.6' } },
+                  }),
+                ],
+              })),
+            ],
+          }),
+        ],
+      }),
+    ],
+  })
+
+  // ====== PROJECTS WITH CLASS FILTER (п.8) ======
   const projectsPreview = createNode({
     tagName: 'section',
     tag: 'section',
     metadata: { name: 'Projects Preview' },
     styles: {
       properties: {
-        padding: '120px 80px',
-        backgroundColor: colors.white,
+        padding: '80px 60px',
+        backgroundColor: colors.grayLighter,
       },
     },
     children: [
@@ -710,7 +1010,7 @@ function createHomePage() {
           createNode({
             metadata: { name: 'Projects Header' },
             layoutMode: 'flex',
-            styles: { properties: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '48px' } },
+            styles: { properties: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '32px' } },
             children: [
               createNode({
                 metadata: { name: 'Projects Title Group' },
@@ -729,19 +1029,49 @@ function createHomePage() {
               }),
             ],
           }),
+          // Class filter tabs (п.8)
+          createNode({
+            metadata: { name: 'Class Filter' },
+            layoutMode: 'flex',
+            styles: { properties: { display: 'flex', gap: '8px', marginBottom: '32px' } },
+            children: ['Все', 'Комфорт+', 'Бизнес'].map((t, i) =>
+              createNode({
+                elementType: 'button', tagName: 'button', tag: 'button',
+                metadata: { name: `Filter - ${t}` },
+                content: t,
+                styles: {
+                  properties: {
+                    padding: '8px 24px',
+                    backgroundColor: i === 0 ? colors.gold : 'transparent',
+                    color: i === 0 ? colors.white : colors.grayDark,
+                    border: i === 0 ? 'none' : `1px solid ${colors.grayLight}`,
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  },
+                  states: { hover: { backgroundColor: i === 0 ? colors.goldDark : colors.grayLighter, borderColor: colors.gold } },
+                  stateTransition: { duration: 200, easing: 'ease', properties: ['background-color', 'border-color'] },
+                },
+              })
+            ),
+          }),
+          // Project cards
           createNode({
             metadata: { name: 'Projects Grid' },
             styles: {
               properties: {
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '32px',
+                gap: '24px',
               },
             },
             children: [
-              { name: 'Golden House Premium', area: 'Юнусабадский район', price: 'от $1 200/м²', img: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600' },
-              { name: 'Golden House Elite', area: 'Мирзо Улугбек', price: 'от $950/м²', img: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600' },
-              { name: 'Golden House Modern', area: 'Чиланзарский район', price: 'от $800/м²', img: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=600' },
+              { name: 'Golden House Premium', cls: 'Бизнес', area: 'Юнусабадский район', price: 'от $1 200/м²', img: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600' },
+              { name: 'Golden House Elite', cls: 'Бизнес', area: 'Мирзо Улугбек', price: 'от $950/м²', img: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600' },
+              { name: 'Golden House Modern', cls: 'Комфорт+', area: 'Чиланзарский район', price: 'от $800/м²', img: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=600' },
             ].map(p => createNode({
               metadata: { name: `Project Card - ${p.name}` },
               styles: {
@@ -749,44 +1079,71 @@ function createHomePage() {
                   borderRadius: '8px',
                   overflow: 'hidden',
                   backgroundColor: colors.white,
-                  boxShadow: '0 2px 20px rgba(0,0,0,0.06)',
+                  boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
                 },
                 states: {
                   hover: {
-                    boxShadow: '0 8px 40px rgba(0,0,0,0.12)',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
                     transform: 'translateY(-4px)',
                   },
                 },
                 stateTransition: { duration: 300, easing: 'ease-out', properties: ['box-shadow', 'transform'] },
               },
               children: [
+                // Image + class badge
                 createNode({
-                  elementType: 'image', tagName: 'img', tag: 'img',
-                  metadata: { name: 'Project Image' },
-                  attributes: { src: p.img, alt: p.name },
-                  styles: { properties: { width: '100%', height: '260px', objectFit: 'cover' } },
+                  metadata: { name: 'Card Image Wrap' },
+                  styles: { properties: { position: 'relative' } },
+                  children: [
+                    createNode({
+                      elementType: 'image', tagName: 'img', tag: 'img',
+                      metadata: { name: 'Project Image' },
+                      attributes: { src: p.img, alt: p.name },
+                      styles: { properties: { width: '100%', height: '220px', objectFit: 'cover' } },
+                    }),
+                    // Class badge
+                    createNode({
+                      elementType: 'text', tagName: 'span', tag: 'span',
+                      metadata: { name: 'Class Badge' },
+                      content: p.cls,
+                      styles: {
+                        properties: {
+                          position: 'absolute',
+                          top: '12px', left: '12px',
+                          padding: '4px 12px',
+                          backgroundColor: p.cls === 'Бизнес' ? colors.gold : colors.charcoal,
+                          color: colors.white,
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          borderRadius: '3px',
+                          letterSpacing: '0.5px',
+                          textTransform: 'uppercase',
+                        },
+                      },
+                    }),
+                  ],
                 }),
                 createNode({
                   metadata: { name: 'Project Info' },
-                  styles: { properties: { padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px' } },
+                  styles: { properties: { padding: '20px', display: 'flex', flexDirection: 'column', gap: '6px' } },
                   children: [
                     createNode({
                       elementType: 'text', tagName: 'h3', tag: 'h3',
                       metadata: { name: 'Project Name' },
                       content: p.name,
-                      styles: { properties: { fontSize: '20px', fontWeight: '600', color: colors.black } },
+                      styles: { properties: { fontSize: '18px', fontWeight: '600', color: colors.black } },
                     }),
                     createNode({
                       elementType: 'text', tagName: 'p', tag: 'p',
                       metadata: { name: 'Project Area' },
                       content: p.area,
-                      styles: { properties: { fontSize: '14px', color: colors.gray } },
+                      styles: { properties: { fontSize: '13px', color: colors.gray } },
                     }),
                     createNode({
                       elementType: 'text', tagName: 'span', tag: 'span',
                       metadata: { name: 'Project Price' },
                       content: p.price,
-                      styles: { properties: { fontSize: '18px', fontWeight: '600', color: colors.gold, marginTop: '8px' } },
+                      styles: { properties: { fontSize: '16px', fontWeight: '600', color: colors.gold, marginTop: '4px' } },
                     }),
                   ],
                 }),
@@ -798,15 +1155,15 @@ function createHomePage() {
     ],
   })
 
-  // News preview
+  // ====== NEWS / PROMOTIONS BLOCK (п.9) ======
   const newsPreview = createNode({
     tagName: 'section',
     tag: 'section',
-    metadata: { name: 'News Preview' },
+    metadata: { name: 'News & Promotions' },
     styles: {
       properties: {
-        padding: '120px 80px',
-        backgroundColor: colors.grayLighter,
+        padding: '80px 60px',
+        backgroundColor: colors.white,
       },
     },
     children: [
@@ -817,7 +1174,7 @@ function createHomePage() {
           createNode({
             metadata: { name: 'News Header' },
             layoutMode: 'flex',
-            styles: { properties: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '48px' } },
+            styles: { properties: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '32px' } },
             children: [
               createNode({
                 metadata: { name: 'News Title Group' },
@@ -842,47 +1199,64 @@ function createHomePage() {
               properties: {
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '32px',
+                gap: '24px',
               },
             },
             children: [
-              { title: 'Старт продаж Golden House Premium', date: '15 марта 2026', tag: 'Событие' },
-              { title: 'Скидка 10% на коммерческие помещения', date: '10 марта 2026', tag: 'Акция' },
-              { title: 'Новый жилой комплекс в Юнусабаде', date: '1 марта 2026', tag: 'Новость' },
+              { title: 'Старт продаж Golden House Premium', date: '15 марта 2026', tag: 'Событие', img: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400' },
+              { title: 'Скидка 10% на коммерческие помещения', date: '10 марта 2026', tag: 'Акция', img: 'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=400' },
+              { title: 'Новый жилой комплекс в Юнусабаде', date: '1 марта 2026', tag: 'Новость', img: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=400' },
             ].map(n => createNode({
               metadata: { name: `News Card - ${n.title.slice(0, 25)}` },
               styles: {
                 properties: {
-                  padding: '32px',
-                  backgroundColor: colors.white,
                   borderRadius: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px',
+                  overflow: 'hidden',
+                  backgroundColor: colors.white,
+                  border: `1px solid ${colors.grayLight}`,
                 },
                 states: {
-                  hover: { boxShadow: '0 4px 20px rgba(0,0,0,0.08)' },
+                  hover: { boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderColor: 'transparent' },
                 },
-                stateTransition: { duration: 200, easing: 'ease', properties: ['box-shadow'] },
+                stateTransition: { duration: 200, easing: 'ease', properties: ['box-shadow', 'border-color'] },
               },
               children: [
                 createNode({
-                  elementType: 'text', tagName: 'span', tag: 'span',
-                  metadata: { name: 'News Tag' },
-                  content: n.tag,
-                  styles: { properties: { color: colors.gold, fontSize: '12px', fontWeight: '600', letterSpacing: '2px', textTransform: 'uppercase' } },
+                  elementType: 'image', tagName: 'img', tag: 'img',
+                  metadata: { name: 'News Image' },
+                  attributes: { src: n.img, alt: n.title },
+                  styles: { properties: { width: '100%', height: '180px', objectFit: 'cover' } },
                 }),
                 createNode({
-                  elementType: 'text', tagName: 'h3', tag: 'h3',
-                  metadata: { name: 'News Title' },
-                  content: n.title,
-                  styles: { properties: { fontSize: '20px', fontWeight: '500', color: colors.black, lineHeight: '1.4' } },
-                }),
-                createNode({
-                  elementType: 'text', tagName: 'span', tag: 'span',
-                  metadata: { name: 'News Date' },
-                  content: n.date,
-                  styles: { properties: { fontSize: '13px', color: colors.gray, marginTop: 'auto' } },
+                  metadata: { name: 'News Body' },
+                  styles: { properties: { padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' } },
+                  children: [
+                    createNode({
+                      metadata: { name: 'News Meta' },
+                      layoutMode: 'flex',
+                      styles: { properties: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+                      children: [
+                        createNode({
+                          elementType: 'text', tagName: 'span', tag: 'span',
+                          metadata: { name: 'News Tag' },
+                          content: n.tag,
+                          styles: { properties: { color: colors.gold, fontSize: '11px', fontWeight: '600', letterSpacing: '1.5px', textTransform: 'uppercase' } },
+                        }),
+                        createNode({
+                          elementType: 'text', tagName: 'span', tag: 'span',
+                          metadata: { name: 'News Date' },
+                          content: n.date,
+                          styles: { properties: { fontSize: '12px', color: colors.gray } },
+                        }),
+                      ],
+                    }),
+                    createNode({
+                      elementType: 'text', tagName: 'h3', tag: 'h3',
+                      metadata: { name: 'News Title' },
+                      content: n.title,
+                      styles: { properties: { fontSize: '17px', fontWeight: '600', color: colors.black, lineHeight: '1.4' } },
+                    }),
+                  ],
                 }),
               ],
             })),
@@ -892,15 +1266,150 @@ function createHomePage() {
     ],
   })
 
-  // CTA section
+  // ====== DKS BLOCK (п.10 — Дирекция Клиентского Сервиса) ======
+  const dksBlock = createNode({
+    tagName: 'section',
+    tag: 'section',
+    metadata: { name: 'DKS Section' },
+    styles: {
+      properties: {
+        padding: '80px 60px',
+        backgroundColor: colors.darkBrown,
+      },
+    },
+    children: [
+      createNode({
+        metadata: { name: 'DKS Container' },
+        styles: {
+          properties: {
+            maxWidth: '1200px',
+            margin: '0 auto',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '60px',
+            alignItems: 'center',
+          },
+        },
+        children: [
+          // Left: description
+          createNode({
+            metadata: { name: 'DKS Info' },
+            styles: { properties: { display: 'flex', flexDirection: 'column' } },
+            children: [
+              createNode({
+                elementType: 'text', tagName: 'p', tag: 'p',
+                metadata: { name: 'DKS Label' },
+                content: 'Дирекция Клиентского Сервиса',
+                styles: { properties: { color: colors.gold, fontSize: '12px', letterSpacing: '3px', textTransform: 'uppercase', marginBottom: '16px', fontWeight: '600' } },
+              }),
+              createNode({
+                elementType: 'text', tagName: 'h2', tag: 'h2',
+                metadata: { name: 'DKS Title' },
+                content: 'Мы рядом на каждом этапе',
+                styles: { properties: { fontSize: '36px', fontWeight: '300', color: colors.white, lineHeight: '1.25', marginBottom: '20px' } },
+              }),
+              createNode({
+                elementType: 'text', tagName: 'p', tag: 'p',
+                metadata: { name: 'DKS Desc' },
+                content: 'Дирекция Клиентского Сервиса Golden House — это единое окно для решения всех вопросов владельцев недвижимости. Мы обеспечиваем сопровождение сделки, помощь с заселением, гарантийное обслуживание и связь с управляющей компанией.',
+                styles: { properties: { fontSize: '16px', color: 'rgba(255,255,255,0.75)', lineHeight: '1.7', marginBottom: '24px' } },
+              }),
+              createNode({
+                elementType: 'text', tagName: 'p', tag: 'p',
+                metadata: { name: 'DKS Desc 2' },
+                content: 'Работаем без выходных. Среднее время ответа — 15 минут.',
+                styles: { properties: { fontSize: '14px', color: 'rgba(255,255,255,0.6)' } },
+              }),
+            ],
+          }),
+          // Right: contact cards
+          createNode({
+            metadata: { name: 'DKS Contacts' },
+            styles: { properties: { display: 'flex', flexDirection: 'column', gap: '16px' } },
+            children: [
+              {
+                icon: '📞',
+                title: 'Горячая линия',
+                value: '+998 78 150 11 11',
+                href: 'tel:+998781501111',
+              },
+              {
+                icon: '✉️',
+                title: 'Email',
+                value: 'dks@goldenhouse.uz',
+                href: 'mailto:dks@goldenhouse.uz',
+              },
+              {
+                icon: '💬',
+                title: 'Telegram',
+                value: '@goldenhouse_dks',
+                href: 'https://t.me/goldenhouse_dks',
+              },
+              {
+                icon: '🏢',
+                title: 'Офис ДКС',
+                value: 'ул. Янги Шахар, 12, каб. 105',
+                href: '/contacts',
+              },
+            ].map(c => createNode({
+              metadata: { name: `DKS Contact - ${c.title}` },
+              layoutMode: 'flex',
+              styles: {
+                properties: {
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '16px',
+                  padding: '20px 24px',
+                  backgroundColor: 'rgba(255,255,255,0.06)',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                },
+                states: { hover: { backgroundColor: 'rgba(255,255,255,0.1)', borderColor: 'rgba(210,159,102,0.3)' } },
+                stateTransition: { duration: 200, easing: 'ease', properties: ['background-color', 'border-color'] },
+              },
+              children: [
+                createNode({
+                  elementType: 'text', tagName: 'span', tag: 'span',
+                  metadata: { name: 'DKS Icon' },
+                  content: c.icon,
+                  styles: { properties: { fontSize: '24px' } },
+                }),
+                createNode({
+                  metadata: { name: 'DKS Contact Info' },
+                  styles: { properties: { display: 'flex', flexDirection: 'column', gap: '2px' } },
+                  children: [
+                    createNode({
+                      elementType: 'text', tagName: 'span', tag: 'span',
+                      metadata: { name: 'DKS Contact Title' },
+                      content: c.title,
+                      styles: { properties: { fontSize: '12px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '1px' } },
+                    }),
+                    createNode({
+                      elementType: 'text', tagName: 'a', tag: 'a',
+                      metadata: { name: 'DKS Contact Value' },
+                      content: c.value,
+                      attributes: { href: c.href },
+                      styles: { properties: { fontSize: '16px', color: colors.white, fontWeight: '500', textDecoration: 'none' } },
+                    }),
+                  ],
+                }),
+              ],
+            })),
+          }),
+        ],
+      }),
+    ],
+  })
+
+  // ====== CTA section (reduced padding п.3) ======
   const ctaSection = createNode({
     tagName: 'section',
     tag: 'section',
     metadata: { name: 'CTA Section' },
     styles: {
       properties: {
-        padding: '120px 80px',
-        backgroundColor: colors.darkBrown,
+        padding: '80px 60px',
+        backgroundColor: colors.cream,
         textAlign: 'center',
         display: 'flex',
         flexDirection: 'column',
@@ -912,21 +1421,73 @@ function createHomePage() {
         elementType: 'text', tagName: 'h2', tag: 'h2',
         metadata: { name: 'CTA Title' },
         content: 'Готовы найти свой идеальный дом?',
-        styles: { properties: { fontSize: '42px', fontWeight: '300', color: colors.white, marginBottom: '16px', letterSpacing: '-1px' } },
+        styles: { properties: { fontSize: '36px', fontWeight: '600', color: colors.black, marginBottom: '12px' } },
       }),
       createNode({
         elementType: 'text', tagName: 'p', tag: 'p',
         metadata: { name: 'CTA Subtitle' },
         content: 'Оставьте заявку, и наш менеджер свяжется с вами в ближайшее время',
-        styles: { properties: { fontSize: '18px', color: 'rgba(255,255,255,0.7)', marginBottom: '40px', fontWeight: '300' } },
+        styles: { properties: { fontSize: '16px', color: colors.grayDark, marginBottom: '32px' } },
       }),
       createNode({
         metadata: { name: 'CTA Buttons' },
         layoutMode: 'flex',
         styles: { properties: { display: 'flex', gap: '16px' } },
         children: [
-          createCTAButton('Оставить заявку', '/contacts'),
-          createCTAButton('Позвонить', 'tel:+998781501111', 'ghost'),
+          createNode({
+            elementType: 'button', tagName: 'a', tag: 'a',
+            metadata: { name: 'CTA Primary' },
+            content: 'Оставить заявку',
+            attributes: { href: '/contacts' },
+            styles: {
+              properties: {
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '16px 48px',
+                backgroundColor: colors.gold,
+                color: colors.white,
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '14px',
+                fontWeight: '600',
+                fontFamily: font,
+                textTransform: 'uppercase',
+                letterSpacing: '2px',
+                textDecoration: 'none',
+                cursor: 'pointer',
+              },
+              states: { hover: { backgroundColor: colors.goldDark } },
+              stateTransition: { duration: 200, easing: 'ease', properties: ['background-color'] },
+            },
+          }),
+          createNode({
+            elementType: 'button', tagName: 'a', tag: 'a',
+            metadata: { name: 'CTA Phone' },
+            content: 'Позвонить',
+            attributes: { href: 'tel:+998781501111' },
+            styles: {
+              properties: {
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '16px 48px',
+                backgroundColor: 'transparent',
+                color: colors.black,
+                border: `1px solid ${colors.grayLight}`,
+                borderRadius: '4px',
+                fontSize: '14px',
+                fontWeight: '600',
+                fontFamily: font,
+                textTransform: 'uppercase',
+                letterSpacing: '2px',
+                textDecoration: 'none',
+                cursor: 'pointer',
+              },
+              states: { hover: { borderColor: colors.gold, color: colors.gold } },
+              stateTransition: { duration: 200, easing: 'ease', properties: ['border-color', 'color'] },
+            },
+          }),
         ],
       }),
     ],
@@ -945,9 +1506,10 @@ function createHomePage() {
       createHeader(),
       hero,
       stats,
-      aboutPreview,
+      historyBlock,
       projectsPreview,
       newsPreview,
+      dksBlock,
       ctaSection,
       createFooter(),
     ]),
@@ -2637,17 +3199,43 @@ function createLegalPage() {
 
 // ──────────────────── MAIN ────────────────────
 
-async function createPage(pageData) {
-  const response = await fetch(`${API_URL}/pages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(pageData),
-  })
-  if (!response.ok) {
-    const err = await response.text()
-    throw new Error(`Failed to create "${pageData.name}": ${response.status} ${err}`)
+async function findPageBySlug(slug) {
+  const response = await fetch(`${API_URL}/pages`)
+  if (!response.ok) return null
+  const pages = await response.json()
+  return pages.find(p => p.slug === slug) || null
+}
+
+async function upsertPage(pageData) {
+  const existing = await findPageBySlug(pageData.slug)
+
+  if (existing) {
+    // Update existing page
+    const response = await fetch(`${API_URL}/pages/${existing.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(pageData),
+    })
+    if (!response.ok) {
+      const err = await response.text()
+      throw new Error(`Failed to update "${pageData.name}": ${response.status} ${err}`)
+    }
+    const result = await response.json()
+    return { ...result, _action: 'updated' }
+  } else {
+    // Create new page
+    const response = await fetch(`${API_URL}/pages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(pageData),
+    })
+    if (!response.ok) {
+      const err = await response.text()
+      throw new Error(`Failed to create "${pageData.name}": ${response.status} ${err}`)
+    }
+    const result = await response.json()
+    return { ...result, _action: 'created' }
   }
-  return response.json()
 }
 
 async function main() {
@@ -2662,12 +3250,14 @@ async function main() {
     createLegalPage(),
   ]
 
-  console.log(`\n🏗  Создание ${pages.length} страниц Golden House...\n`)
+  console.log(`\n🏗  Создание/обновление ${pages.length} страниц Golden House...\n`)
 
   for (const page of pages) {
     try {
-      const result = await createPage(page)
-      console.log(`✅  ${page.name} (/${page.slug}) — создана [ID: ${result.id}]`)
+      const result = await upsertPage(page)
+      const icon = result._action === 'updated' ? '🔄' : '✅'
+      const verb = result._action === 'updated' ? 'обновлена' : 'создана'
+      console.log(`${icon}  ${page.name} (/${page.slug}) — ${verb} [ID: ${result.id}]`)
     } catch (err) {
       console.error(`❌  ${page.name} (/${page.slug}) — ошибка: ${err.message}`)
     }

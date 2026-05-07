@@ -179,6 +179,11 @@ export interface DynamicFilter {
   operator: TransformFilterOperator
   // Применять только если значение не пустое
   skipIfEmpty?: boolean
+  // Путь к полю данных API для заполнения select-а (напр. houses[0].address)
+  populateFrom?: string
+  // JS-выражение для извлечения части значения. Переменная: value (строка).
+  // Пример: "value.split(',')[2].trim()" → вырежет третью часть адреса
+  valueExtract?: string
 }
 
 // ============ Вычисляемые значения (для зависимых блоков) ============

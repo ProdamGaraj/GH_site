@@ -60,6 +60,12 @@ export class Collection {
   @Column({ type: 'varchar', length: 255, default: 'title' })
   titleField!: string
 
+  // Поле в API, которое идентифицирует элемент (для фильтрации single-item endpoint'ов).
+  // Обычно 'id', но может быть '_id', 'uuid', 'code' и т.п. Используется при матчинге item на
+  // сгенерированной странице элемента (Single Item Page) — независимо от slugField.
+  @Column({ type: 'varchar', length: 255, default: 'id' })
+  apiIdField!: string
+
   // --- Авто-ссылки ---
   @Column({ type: 'varchar', length: 50, default: 'auto' })
   linkMode!: CollectionLinkMode
@@ -97,6 +103,22 @@ export class Collection {
 
   @Column({ type: 'timestamptz', nullable: true })
   lastCachedAt?: Date
+
+  // --- Stats источник (Macro v2: estateSell/list по houseIds) ---
+  // Опциональный второй data source. Если задан — DeployService подтягивает квартиры
+  // и агрегирует диапазоны площадей/цен/комнатности в item.__stats.
+  @ManyToOne(() => DataSource, { nullable: true, onDelete: 'SET NULL' })
+  statsDataSource?: DataSource
+
+  @Column({ type: 'uuid', nullable: true })
+  statsDataSourceId?: string
+
+  // Кеш агрегированной статистики: { [itemId]: ProjectStats }
+  @Column('jsonb', { nullable: true })
+  cachedStatsData?: Record<string, unknown>
+
+  @Column({ type: 'timestamptz', nullable: true })
+  cachedStatsAt?: Date
 
   // --- Overrides ---
   @OneToMany(() => CollectionOverride, override => override.collection)

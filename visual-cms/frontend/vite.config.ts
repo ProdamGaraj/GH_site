@@ -24,6 +24,11 @@ export default defineConfig({
         target: 'http://backend:5000',
         changeOrigin: true,
       },
+      '/media/': {
+        target: 'http://minio:9000/cms-media',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/media/, ''),
+      },
     },
   },
 })

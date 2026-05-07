@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { CredentialsManager } from './CredentialsManager'
 
 /**
@@ -28,7 +29,7 @@ export interface FetchConfig {
 }
 
 export interface AuthConfig {
-  type: 'none' | 'bearer' | 'api-key' | 'basic' | 'oauth2' | 'custom'
+  type: 'none' | 'bearer' | 'api-key' | 'basic' | 'oauth2' | 'custom' | 'macro-hmac'
   // Bearer
   token?: string
   // API Key
@@ -46,6 +47,9 @@ export interface AuthConfig {
   clientSecret?: string
   // Custom
   headers?: Record<string, string>
+  // Macro HMAC
+  domain?: string
+  appSecret?: string
 }
 
 export interface FetchResult {
@@ -321,6 +325,16 @@ class SecureDataSourceService {
   }
 
   /**
+   * Генерация HMAC токена для MacroCRM: md5(domain + time + appSecret)
+   */
+  private generateMacroHmacToken(domain: string, time: number, appSecret: string): string {
+    return crypto
+      .createHash('md5')
+      .update(domain + time + appSecret)
+      .digest('hex')
+  }
+
+  /**
    * Построить URL с query параметрами
    */
   private buildUrl(
@@ -348,6 +362,15 @@ class SecureDataSourceService {
     // API Key в query
     if (authConfig?.type === 'api-key' && authConfig.placement === 'query') {
       url.searchParams.append(authConfig.keyName || 'api_key', authConfig.key || '')
+    }
+
+    // Macro HMAC: domain + time + md5(domain+time+appSecret)
+    if (authConfig?.type === 'macro-hmac' && authConfig.domain && authConfig.appSecret) {
+      const time = Math.floor(Date.now() / 1000)
+      const token = this.generateMacroHmacToken(authConfig.domain, time, authConfig.appSecret)
+      url.searchParams.append('domain', authConfig.domain)
+      url.searchParams.append('time', String(time))
+      url.searchParams.append('token', token)
     }
 
     const result = url.toString()
@@ -396,6 +419,10 @@ class SecureDataSourceService {
         if (authConfig.headers) {
           Object.assign(headers, authConfig.headers)
         }
+        break
+
+      case 'macro-hmac':
+        // Auth params are added via query string in buildUrl(), not headers
         break
     }
 

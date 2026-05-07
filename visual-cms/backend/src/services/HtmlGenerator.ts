@@ -3,6 +3,7 @@
  */
 import { styleGenerator } from './StyleGenerator'
 import { generateDataBindingRuntime, type PageDataConfig } from './DataBindingGenerator'
+import { generateCarouselRuntime } from './CarouselRuntime'
 
 interface CSSProperties {
   [key: string]: string | undefined
@@ -219,6 +220,7 @@ ${bodyContent}
 ${this.generateLanguageSwitcher(slug, lang, availableLanguages)}
 ${navigation && navigation.length > 0 ? this.generateNavRuntime(navigation) : ''}
 ${dataConfig ? generateDataBindingRuntime(dataConfig) : ''}
+${generateCarouselRuntime()}
 ${scripts ? `<script>\n${scripts}\n</script>` : ''}
 ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
 </html>`

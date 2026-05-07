@@ -18,6 +18,9 @@ import { DataSource as DataSourceEntity } from '../models/DataSource'
 import { PageDataConfig } from './DataBindingGenerator'
 import { translationService } from './TranslationService'
 import { languageService } from './LanguageService'
+import { MacroV2Client } from './MacroV2Client'
+import { mapComplexStats, type ProjectStats } from './ProjectStatsAggregator'
+import { CredentialsManager } from './CredentialsManager'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
@@ -403,7 +406,7 @@ export class DeployService {
       // 1. Загрузить коллекцию с overrides (одним запросом — Проблема 10)
       const collection = await this.collectionRepository.findOne({
         where: { id: collectionId },
-        relations: ['dataSource', 'templatePage', 'site', 'overrides'],
+        relations: ['dataSource', 'statsDataSource', 'templatePage', 'site', 'overrides'],
       })
       if (!collection) {
         return { success: false, message: 'Коллекция не найдена', deployedPages: [], errors: ['Collection not found'] }
@@ -486,20 +489,34 @@ export class DeployService {
       // 6. Для каждого элемента — генерировать HTML
       const usedSlugs = new Set<string>()
 
+      // 5.5. Загрузить агрегированную статистику по проектам (Macro v2 estateSell/list).
+      // Если statsDataSource не задан — statsByItemId пустой, item.__stats будет null.
+      let statsByItemId: Record<string, unknown> = {}
+      try {
+        statsByItemId = await this.fetchProjectStats(collection, items)
+      } catch (statsErr: any) {
+        errors.push(`Stats fetch failed: ${statsErr.message}`)
+        console.warn(`⚠️ Collection ${collection.name}: stats failed —`, statsErr.message)
+      }
+
       for (const item of items) {
         const itemId = String(item.id || item._id || '')
+        // Прокидываем статистику в item; enrichItemForCollections подхватит её и положит в __stats
+        if (statsByItemId[itemId]) {
+          ;(item as any).__stats = statsByItemId[itemId]
+        }
         const rawSlug = this.getNestedValue(item, collection.slugField)
         const itemTitle = this.getNestedValue(item, collection.titleField) || collection.name
 
-        // Slug приоритет: поле из API → slugify(title) → id
-        let itemSlug = rawSlug || this.slugify(itemTitle) || itemId
+        // Slug всегда нормализуется через slugify — единый формат URL независимо от источника
+        let itemSlug = this.slugify(String(rawSlug || itemTitle || '')) || itemId
 
         // Определить override (match по id, fallback по slug)
         const override = overridesByItemId.get(itemId) || overridesBySlug.get(itemSlug)
 
-        // Override может задать кастомный slug для файла
+        // Override может задать кастомный slug для файла — тоже нормализуем
         if (override?.apiItemSlug) {
-          itemSlug = override.apiItemSlug
+          itemSlug = this.slugify(override.apiItemSlug) || itemSlug
         }
 
         // Проверка slug-конфликтов внутри коллекции
@@ -532,9 +549,11 @@ export class DeployService {
             // Авто-шаблон с контекстом элемента — подставляем данные в структуру
             pageStructure = this.substituteItemData(templateStructure, item)
             pageDataConfig = this.injectCollectionContext(templateDataConfig, collection, item, itemId)
+            const enriched = this.enrichItemForCollections(item)
+            const metaCtx = { item: enriched, $: enriched }
             pageMetadata = {
-              title: this.replaceTemplateVars(templatePage.metadata?.title || itemTitle, item),
-              description: this.replaceTemplateVars(templatePage.metadata?.description || '', item),
+              title: this.replaceTemplateVars(templatePage.metadata?.title || itemTitle, metaCtx),
+              description: this.replaceTemplateVars(templatePage.metadata?.description || '', metaCtx),
               keywords: templatePage.metadata?.keywords || [],
             }
           }
@@ -603,6 +622,100 @@ export class DeployService {
   }
 
   /**
+   * Загружает агрегированную статистику по ЖК из Macro v2 (estateComplexes/listStats)
+   * и возвращает map { [itemId]: ProjectStats }.
+   *
+   * Один POST-запрос на всю коллекцию (Macro считает min/max/count сама).
+   *
+   * Поведение:
+   *  - Если у коллекции не задан statsDataSource — возвращает {} (статистика не показывается).
+   *  - Кеш: cachedStatsData в БД, TTL = collection.cacheTtl.
+   *  - complexIds извлекаются из item.id (item коллекции "Проекты" в v1 = ЖК с тем же id, что в v2).
+   *  - currency берётся из dataSource.config.currency (если задан в UI), иначе null.
+   */
+  private async fetchProjectStats(
+    collection: Collection,
+    items: any[]
+  ): Promise<Record<string, ProjectStats>> {
+    if (!collection.statsDataSource || !collection.statsDataSourceId) return {}
+    if (!Array.isArray(items) || items.length === 0) return {}
+
+    // Проверяем кеш: если свежий — отдаём как есть.
+    const ttlMs = (collection.cacheTtl || 600) * 1000
+    const cachedAt = collection.cachedStatsAt ? new Date(collection.cachedStatsAt).getTime() : 0
+    const isFresh = cachedAt > 0 && (Date.now() - cachedAt) < ttlMs
+    if (isFresh && collection.cachedStatsData && typeof collection.cachedStatsData === 'object') {
+      return collection.cachedStatsData as Record<string, ProjectStats>
+    }
+
+    // Готовим клиента
+    const ds = collection.statsDataSource
+    const cfg = (ds.config || {}) as any
+    const baseUrl = cfg.baseUrl || cfg.url
+    if (!baseUrl) throw new Error('statsDataSource has no baseUrl/url in config')
+
+    const authConfig = ds.authConfig
+      ? await CredentialsManager.decryptAuthConfig(ds.authConfig as Record<string, unknown>)
+      : null
+    const token = authConfig && typeof authConfig.token === 'string' ? authConfig.token : ''
+    if (!token) {
+      throw new Error('statsDataSource has no bearer token (auth.type must be "bearer")')
+    }
+
+    const currency = typeof cfg.currency === 'string' && cfg.currency ? cfg.currency : null
+
+    const client = new MacroV2Client({
+      baseUrl,
+      token,
+      timeoutMs: typeof cfg.timeout === 'number' ? cfg.timeout : undefined,
+    })
+
+    const complexIds = this.extractComplexIds(items)
+    if (complexIds.length === 0) return {}
+
+    const rawStats = await client.fetchComplexStats(complexIds)
+
+    // Индексируем ответ по id, чтобы быстро смаппить к items
+    const byComplexId = new Map<number, typeof rawStats[number]>()
+    for (const r of rawStats) byComplexId.set(r.id, r)
+
+    const result: Record<string, ProjectStats> = {}
+    for (const item of items) {
+      const itemId = String(item.id || item._id || '')
+      if (!itemId) continue
+      const complexId = Number(item.id)
+      if (!Number.isFinite(complexId)) continue
+      const raw = byComplexId.get(complexId)
+      if (!raw) continue
+      result[itemId] = mapComplexStats(raw, currency)
+    }
+
+    // Сохраняем в кеш
+    collection.cachedStatsData = result
+    collection.cachedStatsAt = new Date()
+    try {
+      await this.collectionRepository.save(collection)
+    } catch (saveErr: any) {
+      console.warn(`⚠️ failed to persist cachedStatsData: ${saveErr.message}`)
+    }
+
+    return result
+  }
+
+  /**
+   * Извлекает массив complexIds (= item.id) из items коллекции.
+   * Структура коллекции "Проекты": item.id = id ЖК в Macro (v1 и v2 разделяют id).
+   */
+  private extractComplexIds(items: any[]): number[] {
+    const out: number[] = []
+    for (const item of items) {
+      const n = Number(item?.id)
+      if (Number.isFinite(n) && n > 0) out.push(n)
+    }
+    return out
+  }
+
+  /**
    * Инжектирует контекст элемента коллекции в DataConfig
    * Проблема 2: фильтр только к binding'ам с тем же dataSourceId
    */
@@ -617,11 +730,15 @@ export class DeployService {
     // Глубокая копия, чтобы не мутировать шаблонный config
     const config: PageDataConfig = JSON.parse(JSON.stringify(templateConfig))
 
+    // Поле API, по которому идентифицируем элемент. Default 'id' (для legacy записей в БД,
+    // где колонка может быть NULL/undefined).
+    const apiIdField = collection.apiIdField || 'id'
+
     // Добавляем _collectionItem и _collectionFilter в конфиг
     // Они будут доступны в runtime JS
     ;(config as any)._collectionItem = item
     ;(config as any)._collectionFilter = {
-      field: collection.slugField === 'slug' ? 'id' : collection.slugField,
+      field: apiIdField,
       operator: 'eq',
       value: itemId,
     }
@@ -638,7 +755,7 @@ export class DeployService {
         }
         // Добавляем static collection filter (не динамический — значение известно при деплое)
         ;(binding as any)._collectionFilter = {
-          field: collection.slugField === 'slug' ? 'id' : collection.slugField,
+          field: apiIdField,
           operator: 'eq',
           value: itemId,
         }
@@ -651,27 +768,99 @@ export class DeployService {
   /**
    * Рекурсивно подставляет данные элемента коллекции в дерево структуры страницы.
    * Заменяет маркеры {{item.fieldName}} в content, attributes, styles.
-   * Поддерживает вложенные поля через dot notation: {{item.address.city}}
+   * Поддерживает вложенные поля через dot notation: {{item.address.city}}.
+   *
+   * Перед обходом обогащает item производным полем `__allFiles` —
+   * это flatMap всех `houses[].files[]` (если есть). Используется как универсальный
+   * источник медиа-файлов для шаблона (Hero берёт [0], галерея — slice(1)).
+   *
+   * Поддерживает повторители (repeater) через служебное поле node._repeat:
+   *   { source: 'item.__allFiles', offset?: number, limit?: number }
+   * Первый ребёнок такого узла используется как item-template; остальные children
+   * игнорируются. Внутри template-копии доступен плейсхолдер `{{$.field}}` —
+   * текущий элемент массива.
    */
   private substituteItemData(structure: any, item: any): any {
+    const enrichedItem = this.enrichItemForCollections(item)
     const node = JSON.parse(JSON.stringify(structure))
-    this.substituteNode(node, item)
+    this.substituteNode(node, { item: enrichedItem, $: enrichedItem })
     return node
   }
 
-  private substituteNode(node: any, item: any): void {
+  /**
+   * Добавляет к item производные поля для шаблонов: __allFiles.
+   * Не мутирует исходный объект.
+   *
+   * Структура MacroCRM: item.houses[].files[] — это массив папок/категорий
+   * (например "Галерея", "Документы"), и внутри каждой папки лежит свой
+   * .files[] с настоящими файлами (file_url, file_name, is_title и т.д.).
+   * Делаем плоский список реальных файлов со всех домов и всех папок.
+   * Файлы с `is_title === 1` поднимаются в начало (чтобы Hero брал именно их).
+   */
+  private enrichItemForCollections(item: any): any {
+    if (!item || typeof item !== 'object') return item
+    const houses = Array.isArray(item.houses) ? item.houses : []
+    const allFiles: any[] = []
+    for (const h of houses) {
+      if (!h || !Array.isArray(h.files)) continue
+      for (const folder of h.files) {
+        if (folder && Array.isArray(folder.files)) {
+          for (const f of folder.files) {
+            if (f && typeof f === 'object') allFiles.push(f)
+          }
+        } else if (folder && typeof folder === 'object' && (folder.file_url || folder.url)) {
+          // Fallback: если в API окажется плоская структура (h.files = массив файлов)
+          allFiles.push(folder)
+        }
+      }
+    }
+    // Дедупликация: одинаковый файл может быть прикреплён к нескольким домам/папкам,
+    // а в CRM Macro один и тот же файл часто загружается несколько раз — каждая
+    // загрузка получает свой URL и id, но имя файла совпадает.
+    //
+    // Ключ дедупа (внутри одного item): file_name (если есть) → file_url → url.
+    // file_name приоритетнее URL, потому что разные URL для одного файла —
+    // основной кейс мусора. Допускаем риск ложного срабатывания (два разных
+    // файла с одинаковым именем в одном проекте), он крайне маловероятен.
+    //
+    // При коллизии оставляем копию с is_title=1 (она важна для Hero).
+    const seen = new Map<string, number>() // key -> index in deduped
+    const deduped: any[] = []
+    for (const f of allFiles) {
+      const key = f?.file_name || f?.file_url || f?.url
+      if (!key) { deduped.push(f); continue }
+      const idx = seen.get(key)
+      if (idx === undefined) {
+        seen.set(key, deduped.length)
+        deduped.push(f)
+      } else if (f?.is_title === 1 && deduped[idx]?.is_title !== 1) {
+        deduped[idx] = f
+      }
+    }
+    // Сортируем: is_title=1 первыми, остальные сохраняют порядок API (stable sort)
+    deduped.sort((a, b) => (b?.is_title ? 1 : 0) - (a?.is_title ? 1 : 0))
+    return { ...item, __allFiles: deduped }
+  }
+
+  private substituteNode(node: any, ctx: { item: any; $: any }): void {
     if (!node || typeof node !== 'object') return
+
+    // Repeater: разворачиваем children по массиву из source
+    if (node._repeat && typeof node._repeat === 'object' && typeof node._repeat.source === 'string') {
+      this.expandRepeaterNode(node, ctx)
+      return
+    }
 
     // Подстановка в content
     if (typeof node.content === 'string') {
-      node.content = this.replaceTemplateVars(node.content, item)
+      node.content = this.replaceTemplateVars(node.content, ctx)
     }
 
     // Подстановка в attributes (src, href, alt, title, etc.)
     if (node.attributes && typeof node.attributes === 'object') {
       for (const key of Object.keys(node.attributes)) {
         if (typeof node.attributes[key] === 'string') {
-          node.attributes[key] = this.replaceTemplateVars(node.attributes[key], item)
+          node.attributes[key] = this.replaceTemplateVars(node.attributes[key], ctx)
         }
       }
     }
@@ -680,7 +869,7 @@ export class DeployService {
     if (node.styles?.properties && typeof node.styles.properties === 'object') {
       for (const key of Object.keys(node.styles.properties)) {
         if (typeof node.styles.properties[key] === 'string') {
-          node.styles.properties[key] = this.replaceTemplateVars(node.styles.properties[key], item)
+          node.styles.properties[key] = this.replaceTemplateVars(node.styles.properties[key], ctx)
         }
       }
     }
@@ -688,7 +877,7 @@ export class DeployService {
     // Рекурсия по children
     if (Array.isArray(node.children)) {
       for (const child of node.children) {
-        this.substituteNode(child, item)
+        this.substituteNode(child, ctx)
       }
     }
 
@@ -697,16 +886,61 @@ export class DeployService {
       for (const variation of Object.values(node.variations) as any[]) {
         if (Array.isArray(variation?.specificChildren)) {
           for (const child of variation.specificChildren) {
-            this.substituteNode(child, item)
+            this.substituteNode(child, ctx)
           }
         }
       }
     }
   }
 
-  private replaceTemplateVars(str: string, item: any): string {
-    return str.replace(/\{\{item\.([a-zA-Z0-9_.]+)\}\}/g, (_match, fieldPath: string) => {
-      const value = this.getNestedValue(item, fieldPath)
+  /**
+   * Разворачивает _repeat-узел: берёт первого ребёнка как шаблон,
+   * клонирует его N раз по массиву из source с учётом offset/limit,
+   * подставляя в каждой копии {{$.field}}.
+   */
+  private expandRepeaterNode(node: any, ctx: { item: any; $: any }): void {
+    const cfg = node._repeat as { source: string; offset?: number; limit?: number }
+    delete node._repeat
+
+    // source может начинаться с 'item.' или '$.'
+    let arr: any
+    if (cfg.source.startsWith('item.')) {
+      arr = this.getNestedValue(ctx.item, cfg.source.slice(5))
+    } else if (cfg.source.startsWith('$.')) {
+      arr = this.getNestedValue(ctx.$, cfg.source.slice(2))
+    } else {
+      arr = this.getNestedValue(ctx.item, cfg.source)
+    }
+
+    if (!Array.isArray(arr)) {
+      node.children = []
+      return
+    }
+
+    const offset = Math.max(0, cfg.offset ?? 0)
+    const sliced = arr.slice(offset, cfg.limit != null ? offset + cfg.limit : undefined)
+
+    const template = Array.isArray(node.children) && node.children.length > 0 ? node.children[0] : null
+    if (!template || sliced.length === 0) {
+      node.children = []
+      return
+    }
+
+    const newChildren: any[] = []
+    for (const arrItem of sliced) {
+      const clone = JSON.parse(JSON.stringify(template))
+      this.substituteNode(clone, { item: ctx.item, $: arrItem })
+      newChildren.push(clone)
+    }
+    node.children = newChildren
+  }
+
+  private replaceTemplateVars(str: string, ctx: { item: any; $: any }): string {
+    // {{item.field.subfield}} — берёт из item
+    // {{$.field}} — берёт из текущего элемента массива (внутри _repeat)
+    return str.replace(/\{\{(item|\$)\.([a-zA-Z0-9_.]+)\}\}/g, (_match, scope: string, fieldPath: string) => {
+      const root = scope === '$' ? ctx.$ : ctx.item
+      const value = this.getNestedValue(root, fieldPath)
       return value !== undefined && value !== null ? String(value) : ''
     })
   }
@@ -1001,11 +1235,13 @@ export class DeployService {
 
     // Find bindings that use library templates
     const templateIds = new Set<string>()
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     for (const binding of bindings) {
       const config = binding.config as any
-      // Check both libraryTemplateId (old) and templateId (new) for compatibility
+      // Check both libraryTemplateId (old) and templateId (new) for compatibility.
+      // Игнорируем non-UUID значения (in-page block id не является библиотечным блоком).
       const templateId = config.inputConfig?.libraryTemplateId || config.inputConfig?.templateId
-      if (templateId) {
+      if (templateId && UUID_RE.test(String(templateId))) {
         templateIds.add(templateId)
       }
     }
@@ -1290,9 +1526,20 @@ export class DeployService {
       // Формируем конфигурацию
       const config: PageDataConfig = {
         dataSources: Array.from(dataSourcesMap.values()).map(ds => {
-          const restConfig = ds.config as any
+          const dsConfig = ds.config as any
+          // page-variable: данные берутся из page.variables, endpoint не нужен
+          if (ds.type === 'page-variable') {
+            return {
+              alias: ds.name,
+              dataSourceId: ds.id,
+              loadStrategy: 'pageLoad' as const,
+              cacheEnabled: false,
+              type: 'page-variable',
+              variableName: dsConfig?.variableName || ds.name,
+            }
+          }
           // Конвертируем абсолютный URL бэкенда в относительный путь для nginx proxy
-          let dsEndpoint = restConfig?.url || `/api/data-sources/${ds.id}/data`
+          let dsEndpoint = dsConfig?.url || `/api/data-sources/${ds.id}/data`
           try {
             const parsed = new URL(dsEndpoint)
             if (parsed.hostname === 'localhost' || parsed.hostname === 'backend') {
@@ -1303,8 +1550,9 @@ export class DeployService {
             alias: ds.name, // Используем name как alias
             dataSourceId: ds.id,
             endpoint: dsEndpoint,
-            loadStrategy: 'pageLoad', // По умолчанию загружаем при загрузке страницы
+            loadStrategy: 'pageLoad' as const, // По умолчанию загружаем при загрузке страницы
             cacheEnabled: false,
+            type: ds.type,
           }
         }),
         bindings: filteredBindings.map(binding => {
@@ -1357,13 +1605,16 @@ export class DeployService {
                 targetProperty: fm.targetProperty,
                 transform: fm.transform
               })),
+              fieldOverrides: inputConfig.fieldOverrides || undefined,
               // Динамические фильтры для runtime
               dynamicFilters: inputConfig.dynamicFilters?.map((df: any) => ({
                 id: df.id,
                 sourceBlockId: df.sourceBlockId,
                 field: df.field,
                 operator: df.operator,
-                skipIfEmpty: df.skipIfEmpty
+                skipIfEmpty: df.skipIfEmpty,
+                ...(df.populateFrom && { populateFrom: df.populateFrom }),
+                ...(df.valueExtract && { valueExtract: df.valueExtract })
               })),
               repeaterConfig: inputConfig.mode === 'repeater' ? {
                 itemTemplate: templateId,
@@ -1405,7 +1656,11 @@ export class DeployService {
           
           return null
         }).filter(Boolean) as any[],
-        variables: []
+        variables: ((page.variables as any)?.variables || []).map((v: any) => ({
+          name: v.name,
+          type: v.type,
+          defaultValue: v.defaultValue,
+        })),
       }
       
       // Дедупликация repeater-биндингов: если несколько используют один template, оставляем только первый

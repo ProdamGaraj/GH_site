@@ -11,6 +11,10 @@ export const createCollectionSchema = z.object({
   dataSourceId: z.string().uuid('Invalid data source ID'),
   arrayPath: z.string().max(255).optional().default('data'),
 
+  // Опциональный второй DS для агрегированной статистики (Macro v2 estateSell/list).
+  // null допускается чтобы UI мог явно очистить значение.
+  statsDataSourceId: z.string().uuid('Invalid stats data source ID').nullable().optional(),
+
   templatePageId: z.string().uuid('Invalid template page ID'),
 
   basePath: z.string()
@@ -19,6 +23,7 @@ export const createCollectionSchema = z.object({
     .regex(/^\/[a-z0-9\-\/]*$/, 'Base path must start with / and contain only lowercase, numbers, hyphens'),
   slugField: z.string().min(1, 'Slug field is required').max(255),
   titleField: z.string().max(255).optional().default('title'),
+  apiIdField: z.string().min(1).max(255).optional().default('id'),
 
   linkMode: linkModeEnum.optional().default('auto'),
   linkTextField: z.string().max(255).optional(),
@@ -40,6 +45,9 @@ export const updateCollectionSchema = z.object({
   dataSourceId: z.string().uuid().optional(),
   arrayPath: z.string().max(255).optional(),
 
+  // Опциональный второй DS для статистики; null = отвязать.
+  statsDataSourceId: z.string().uuid('Invalid stats data source ID').nullable().optional(),
+
   templatePageId: z.string().uuid().optional(),
 
   basePath: z.string()
@@ -49,6 +57,7 @@ export const updateCollectionSchema = z.object({
     .optional(),
   slugField: z.string().min(1).max(255).optional(),
   titleField: z.string().max(255).optional(),
+  apiIdField: z.string().min(1).max(255).optional(),
 
   linkMode: linkModeEnum.optional(),
   linkTextField: z.string().max(255).optional(),

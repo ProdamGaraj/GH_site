@@ -57,11 +57,14 @@ export class BlockController {
 
     const oldStructure = block.structure
     const oldFields = block.detectedFields || []
+    // Запоминаем, были ли detectedFields явно переданы в запросе
+    const explicitFields = Object.prototype.hasOwnProperty.call(req.body, 'detectedFields')
 
     Object.assign(block, req.body)
 
-    // If block is a Template and structure changed - recalculate fields
-    if (block.isTemplate && JSON.stringify(oldStructure) !== JSON.stringify(block.structure)) {
+    // Если block является Template и структура изменилась — пересчитываем поля,
+    // НО только если поля не были явно переданы в теле запроса (ручное управление).
+    if (block.isTemplate && !explicitFields && JSON.stringify(oldStructure) !== JSON.stringify(block.structure)) {
       const newFields = blockTemplateService.detectFieldsFromStructure(block.structure)
       const diff = blockTemplateService.diffFields(oldFields, newFields)
 

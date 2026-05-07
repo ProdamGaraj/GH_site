@@ -56,11 +56,13 @@ export const CollectionEditor: React.FC = () => {
     siteId: '',
     name: '',
     dataSourceId: '',
+    statsDataSourceId: '',
     arrayPath: '',
     templatePageId: '',
     basePath: '/',
     slugField: 'slug',
     titleField: 'title',
+    apiIdField: 'id',
     linkMode: 'auto' as 'auto' | 'manual',
     isActive: true,
     itemsOrder: 'api',
@@ -95,11 +97,13 @@ export const CollectionEditor: React.FC = () => {
         siteId: collection.siteId,
         name: collection.name,
         dataSourceId: collection.dataSourceId,
+        statsDataSourceId: collection.statsDataSourceId || '',
         arrayPath: collection.arrayPath,
         templatePageId: collection.templatePageId,
         basePath: collection.basePath,
         slugField: collection.slugField,
         titleField: collection.titleField,
+        apiIdField: collection.apiIdField || 'id',
         linkMode: collection.linkMode,
         isActive: collection.isActive,
         itemsOrder: collection.itemsOrder,
@@ -137,11 +141,16 @@ export const CollectionEditor: React.FC = () => {
 
   const handleSave = async () => {
     try {
+      // Пустая строка statsDataSourceId → null (отвязать). Иначе Zod uuid() отклонит "".
+      const payload = {
+        ...form,
+        statsDataSourceId: form.statsDataSourceId ? form.statsDataSourceId : null,
+      }
       if (isNew) {
-        const result = await dispatch(createCollection(form as CreateCollectionDto)).unwrap()
+        const result = await dispatch(createCollection(payload as CreateCollectionDto)).unwrap()
         navigate(`/collections/${result.id}`, { replace: true })
       } else if (id) {
-        const { siteId, ...updateData } = form
+        const { siteId, ...updateData } = payload
         await dispatch(updateCollection({ id, data: updateData as UpdateCollectionDto })).unwrap()
       }
     } catch (err) {
@@ -252,6 +261,14 @@ export const CollectionEditor: React.FC = () => {
                   </select>
                 </div>
                 <div>
+                  <label className={labelClass}>Источник статистики (опционально)</label>
+                  <select className={inputClass} value={form.statsDataSourceId} onChange={e => handleChange('statsDataSourceId', e.target.value)}>
+                    <option value="">Не использовать</option>
+                    {dataSources.map(ds => <option key={ds.id} value={ds.id}>{ds.name}</option>)}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Macro v2 (Bearer-token DS) — для подтягивания квартир и расчёта диапазонов площадей/цен.</p>
+                </div>
+                <div>
                   <label className={labelClass}>Путь к массиву (arrayPath)</label>
                   <input className={inputClass} value={form.arrayPath} onChange={e => handleChange('arrayPath', e.target.value)} placeholder="data.projects" />
                 </div>
@@ -276,10 +293,16 @@ export const CollectionEditor: React.FC = () => {
                 <div>
                   <label className={labelClass}>Поле slug</label>
                   <input className={inputClass} value={form.slugField} onChange={e => handleChange('slugField', e.target.value)} placeholder="slug" />
+                  <p className="text-xs text-gray-500 mt-1">Используется в URL (нормализуется автоматически)</p>
                 </div>
                 <div>
                   <label className={labelClass}>Поле заголовка</label>
                   <input className={inputClass} value={form.titleField} onChange={e => handleChange('titleField', e.target.value)} placeholder="title" />
+                </div>
+                <div className="col-span-2">
+                  <label className={labelClass}>Поле ID в API</label>
+                  <input className={inputClass} value={form.apiIdField} onChange={e => handleChange('apiIdField', e.target.value)} placeholder="id" />
+                  <p className="text-xs text-gray-500 mt-1">Используется для матчинга элемента при рендере страницы. Обычно <code>id</code>, иногда <code>_id</code>, <code>uuid</code>, <code>code</code>.</p>
                 </div>
                 <div>
                   <label className={labelClass}>Режим ссылок</label>

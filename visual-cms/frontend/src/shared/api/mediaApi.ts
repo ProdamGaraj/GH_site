@@ -1,0 +1,147 @@
+/**
+ * Media Library API client.
+ *
+ * Backend endpoints (Phase 1+2):
+ *   GET    /api/media
+ *   GET    /api/media/:id
+ *   POST   /api/media         (multipart: file, optional poster, siteId, title, alt, tags)
+ *   PATCH  /api/media/:id
+ *   DELETE /api/media/:id
+ */
+
+import { api } from './index'
+
+export type MediaKind = 'image' | 'video'
+
+export interface MediaAsset {
+  id: string
+  siteId: string | null
+  kind: MediaKind
+  fileName: string
+  mimeType: string
+  url: string
+  posterUrl: string | null
+  thumbnailUrl: string | null
+  sizeBytes: number
+  width: number | null
+  height: number | null
+  durationSec: number | null
+  title: string | null
+  alt: string | null
+  tags: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface MediaListResponse {
+  items: MediaAsset[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
+export interface MediaListFilter {
+  siteId?: string
+  includeGlobal?: boolean
+  kind?: MediaKind
+  search?: string
+  tag?: string
+  page?: number
+  limit?: number
+}
+
+export interface UploadMediaInput {
+  file: File
+  poster?: File | null
+  siteId?: string | null
+  title?: string | null
+  alt?: string | null
+  tags?: string[]
+}
+
+export interface UpdateMediaInput {
+  title?: string | null
+  alt?: string | null
+  tags?: string[]
+}
+
+const getApiBaseUrl = (): string => {
+  const envUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000'
+  return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`
+}
+const API_BASE = getApiBaseUrl()
+
+function buildQuery(filter: MediaListFilter): string {
+  const params = new URLSearchParams()
+  if (filter.siteId) params.set('siteId', filter.siteId)
+  if (filter.includeGlobal !== undefined) params.set('includeGlobal', String(filter.includeGlobal))
+  if (filter.kind) params.set('kind', filter.kind)
+  if (filter.search) params.set('search', filter.search)
+  if (filter.tag) params.set('tag', filter.tag)
+  if (filter.page) params.set('page', String(filter.page))
+  if (filter.limit) params.set('limit', String(filter.limit))
+  const qs = params.toString()
+  return qs ? `?${qs}` : ''
+}
+
+export const mediaApi = {
+  list: (filter: MediaListFilter = {}): Promise<MediaListResponse> =>
+    api.get<MediaListResponse>(`/media${buildQuery(filter)}`),
+
+  getById: (id: string): Promise<MediaAsset> => api.get<MediaAsset>(`/media/${id}`),
+
+  upload: async (input: UploadMediaInput): Promise<MediaAsset> => {
+    const fd = new FormData()
+    fd.append('file', input.file)
+    if (input.poster) fd.append('poster', input.poster)
+    if (input.siteId) fd.append('siteId', input.siteId)
+    if (input.title) fd.append('title', input.title)
+    if (input.alt) fd.append('alt', input.alt)
+    if (input.tags && input.tags.length > 0) fd.append('tags', input.tags.join(','))
+
+    const resp = await fetch(`${API_BASE}/media`, { method: 'POST', body: fd })
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ message: `HTTP ${resp.status}` }))
+      throw new Error(err.message || `Upload failed (${resp.status})`)
+    }
+    return resp.json()
+  },
+
+  update: (id: string, patch: UpdateMediaInput): Promise<MediaAsset> => {
+    // PATCH not implemented in shared ApiClient — use raw fetch with JSON.
+    return fetch(`${API_BASE}/media/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }).then(async (resp) => {
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ message: `HTTP ${resp.status}` }))
+        throw new Error(err.message || `Update failed (${resp.status})`)
+      }
+      return resp.json()
+    })
+  },
+
+  delete: (id: string): Promise<void> => api.delete<void>(`/media/${id}`),
+}
+
+/**
+ * Resolve a public media URL.
+ * `url` from backend is already absolute path (`/media/<key>`); we leave it as-is
+ * because nginx proxies it to MinIO. For dev (Vite on :3000) we point to backend host.
+ */
+export function resolveMediaUrl(url: string | null | undefined): string {
+  if (!url) return ''
+  if (/^https?:\/\//i.test(url)) return url
+  if (url.startsWith('/media/')) {
+    // In dev (Vite on :3000) media goes through backend nginx (public-site on :443/:80),
+    // not through Vite. We resolve relative to current origin to keep flexibility:
+    // - prod public-site: nginx serves /media/* directly.
+    // - dev admin (localhost:3000): proxied through Vite if configured; otherwise
+    //   user can override via VITE_PUBLIC_MEDIA_URL.
+    const base = ((import.meta as any).env?.VITE_PUBLIC_MEDIA_URL as string | undefined) || ''
+    if (base) return base.replace(/\/+$/, '') + url.replace(/^\/media/, '')
+  }
+  return url
+}

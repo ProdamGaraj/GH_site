@@ -7,7 +7,7 @@ import { ExpandableButton } from '@/shared/components/ExpandableButton'
 import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, ExternalLink, ChevronDown, Palette, Pencil, FileText, Library, FileDown, Info, Code2, Database, Zap, MousePointer } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor, selectInlineBlockEdit, startInlineBlockEdit, cancelInlineBlockEdit, finishInlineBlockEdit, selectActiveRightPanelTab, setActiveRightPanelTab } from '@/features/editor/editorSlice'
-import { createBlock, updateBlock, selectBlocksSaving } from '@/features/blocks/blocksSlice'
+import { createBlock, updateBlock, selectBlocksSaving, selectBlocks } from '@/features/blocks/blocksSlice'
 import { createPage, updatePage, selectPagesSaving } from '@/features/pages/pagesSlice'
 import { BreakpointManager } from './BreakpointManager'
 import { ExportImportModal } from './ExportImportModal'
@@ -52,6 +52,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const rootNode = useAppSelector(selectRootNode)
   const isDirty = useAppSelector(selectIsDirty)
   const isSavingBlocks = useAppSelector(selectBlocksSaving)
+  const allBlocks = useAppSelector(selectBlocks)
   const isSavingPages = useAppSelector(selectPagesSaving)
   const breakpoints = useAppSelector(selectBreakpoints)
   const zoom = useAppSelector(selectZoom)
@@ -196,10 +197,13 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       } else {
         try {
           // 1. Сохраняем блок в библиотеке
+          const currentBlock = allBlocks.find(b => b.id === id)
           await dispatch(updateBlock({
             id: id!,
             data: {
               structure: rootNode,
+              // Передаём detectedFields явно, чтобы бэкенд не перезаписал их авто-детектом
+              ...(currentBlock?.detectedFields ? { detectedFields: currentBlock.detectedFields } : {}),
             }
           })).unwrap()
           

@@ -2,6 +2,8 @@ import { Request, Response } from 'express'
 import { AppDataSource } from '../config/database'
 import { DataSource, DataSourceType, DataSourceStatus } from '../models/DataSource'
 import { CredentialsManager } from '../services/CredentialsManager'
+import { secureDataSourceService, FetchConfig, AuthConfig } from '../services/SecureDataSourceService'
+import { cachedDataSourceService } from '../services/CachedDataSourceService'
 import { Like, In } from 'typeorm'
 import { asyncHandler, NotFoundError, ValidationError } from '../middleware'
 import { cacheService } from '../services/CacheService'
@@ -72,6 +74,24 @@ export class DataSourceController {
     res.json(maskedDataSource)
   })
 
+  /**
+   * Возвращает дешифрованный authConfig для existing DataSource
+   */
+  revealCredentials = asyncHandler(async (req: Request, res: Response) => {
+    const dataSourceRepository = this.getRepository()
+    const { id } = req.params
+
+    const dataSource = await dataSourceRepository.findOne({ where: { id } })
+    if (!dataSource) throw new NotFoundError('DataSource', id)
+
+    if (!dataSource.authConfig) {
+      return res.json({ authConfig: null })
+    }
+
+    const decrypted = await CredentialsManager.decryptAuthConfig(dataSource.authConfig)
+    res.json({ authConfig: decrypted })
+  })
+
   create = asyncHandler(async (req: Request, res: Response) => {
     const dataSourceRepository = this.getRepository()
     const { name, description, type, config, authConfig, groupId, tags, status } = req.body
@@ -124,6 +144,7 @@ export class DataSourceController {
     dataSource.version += 1
     await dataSourceRepository.save(dataSource)
     await cacheService.invalidateByTag('dataSources')
+    await cachedDataSourceService.invalidateCache(id)
 
     const response = {
       ...dataSource,
@@ -140,6 +161,7 @@ export class DataSourceController {
     const { id } = req.params
     const result = await dataSourceRepository.delete(id)
     await cacheService.invalidateByTag('dataSources')
+    await cachedDataSourceService.invalidateCache(id)
     if (result.affected === 0) throw new NotFoundError('DataSource', id)
     res.status(204).send()
   })
@@ -240,6 +262,17 @@ export class DataSourceController {
     res.status(201).json(response)
   })
 
+  invalidateCache = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const dataSourceRepository = this.getRepository()
+
+    const dataSource = await dataSourceRepository.findOne({ where: { id } })
+    if (!dataSource) throw new NotFoundError('DataSource', id)
+
+    const invalidated = await cachedDataSourceService.invalidateCache(id)
+    res.json({ success: true, invalidated, message: `Cache invalidated for DataSource ${id}` })
+  })
+
 
   // ============================================
   // PRIVATE METHODS
@@ -249,7 +282,7 @@ export class DataSourceController {
    * Проверяет, является ли authConfig замаскированным (с frontend)
    */
   private isMaskedAuthConfig(authConfig: Record<string, unknown>): boolean {
-    const sensitiveFields = ['token', 'key', 'password', 'clientSecret', 'accessToken', 'refreshToken']
+    const sensitiveFields = ['token', 'key', 'password', 'clientSecret', 'accessToken', 'refreshToken', 'appSecret']
 
     for (const field of sensitiveFields) {
       const value = authConfig[field]
@@ -328,7 +361,7 @@ export class DataSourceController {
   }
 
   /**
-   * Тест REST API подключения
+   * Тест REST API подключения — делегирует SecureDataSourceService
    */
   private async testRestApi(
     config: Record<string, unknown>,
@@ -339,81 +372,51 @@ export class DataSourceController {
     sampleData?: unknown
     error?: { code: string; message: string; details?: string }
   }> {
-    const url = config.url as string
-    const method = (config.method as string) || 'GET'
-    const headers: Record<string, string> = { ...(config.headers as Record<string, string> || {}) }
-    const timeout = (config.timeout as number) || 30000
-
-    // Добавляем авторизацию
-    if (authConfig) {
-      this.applyAuth(headers, authConfig)
+    const fetchConfig: FetchConfig = {
+      type: (config.type as FetchConfig['type']) || 'rest-api',
+      url: config.url as string,
+      method: (config.method as FetchConfig['method']) || 'GET',
+      headers: config.headers as Record<string, string> | undefined,
+      queryParams: config.queryParams as Record<string, string> | undefined,
+      timeout: (config.timeout as number) || 30000,
     }
 
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), timeout)
+    const result = await secureDataSourceService.fetchData(
+      fetchConfig,
+      authConfig as AuthConfig | undefined
+    )
 
-      const response = await fetch(url, {
-        method,
-        headers,
-        signal: controller.signal
-      })
-
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        return {
-          success: false,
-          message: `HTTP ${response.status}: ${response.statusText}`,
-          error: {
-            code: `HTTP_${response.status}`,
-            message: response.statusText
-          }
-        }
-      }
-
-      const contentType = response.headers.get('content-type')
-      let sampleData: unknown
-
-      if (contentType?.includes('application/json')) {
-        const data = await response.json()
-        // Ограничиваем размер sample data
-        sampleData = this.truncateSampleData(data)
-      } else {
-        const text = await response.text()
-        sampleData = text.substring(0, 1000)
-      }
-
-      return {
-        success: true,
-        message: 'Connection successful',
-        sampleData
-      }
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        return {
-          success: false,
-          message: 'Request timeout',
-          error: {
-            code: 'TIMEOUT',
-            message: `Request timed out after ${timeout}ms`
-          }
-        }
-      }
-
+    if (!result.success) {
       return {
         success: false,
-        message: error.message,
-        error: {
-          code: 'NETWORK_ERROR',
-          message: error.message
-        }
+        message: result.error?.message || 'Connection failed',
+        error: result.error,
       }
+    }
+
+    // Проверяем на false positive: API вернул 200 но body содержит error
+    if (this.isErrorInResponseBody(result.data)) {
+      const errMsg = this.extractErrorMessage(result.data)
+      return {
+        success: false,
+        message: errMsg,
+        sampleData: this.truncateSampleData(result.data),
+        error: {
+          code: 'API_ERROR',
+          message: errMsg,
+        },
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Connection successful',
+      sampleData: this.truncateSampleData(result.data),
     }
   }
 
   /**
-   * Тест GraphQL подключения
+   * Тест GraphQL подключения — делегирует SecureDataSourceService
    */
   private async testGraphQL(
     config: Record<string, unknown>,
@@ -424,55 +427,32 @@ export class DataSourceController {
     sampleData?: unknown
     error?: { code: string; message: string; details?: string }
   }> {
-    const url = config.url as string
-    const query = config.query as string
-    const variables = config.variables as Record<string, unknown> | undefined
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(config.headers as Record<string, string> || {})
+    const fetchConfig: FetchConfig = {
+      type: 'graphql',
+      url: config.url as string,
+      query: config.query as string,
+      variables: config.variables as Record<string, unknown> | undefined,
+      headers: config.headers as Record<string, string> | undefined,
+      timeout: (config.timeout as number) || 30000,
     }
 
-    if (authConfig) {
-      this.applyAuth(headers, authConfig)
-    }
+    const result = await secureDataSourceService.fetchData(
+      fetchConfig,
+      authConfig as AuthConfig | undefined
+    )
 
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          query,
-          variables
-        })
-      })
-
-      const data = await response.json() as { errors?: Array<{ message: string }>; data?: unknown }
-
-      if (data.errors && data.errors.length > 0) {
-        return {
-          success: false,
-          message: 'GraphQL errors',
-          error: {
-            code: 'GRAPHQL_ERROR',
-            message: data.errors.map((e) => e.message).join(', ')
-          }
-        }
-      }
-
-      return {
-        success: true,
-        message: 'Connection successful',
-        sampleData: this.truncateSampleData(data.data)
-      }
-    } catch (error: any) {
+    if (!result.success) {
       return {
         success: false,
-        message: error.message,
-        error: {
-          code: 'GRAPHQL_ERROR',
-          message: error.message
-        }
+        message: result.error?.message || 'GraphQL query failed',
+        error: result.error,
       }
+    }
+
+    return {
+      success: true,
+      message: 'Connection successful',
+      sampleData: this.truncateSampleData(result.data),
     }
   }
 
@@ -528,6 +508,31 @@ export class DataSourceController {
   }
 
   /**
+   * Проверяет, содержит ли body ответа признаки ошибки (false positive detection)
+   */
+  private isErrorInResponseBody(data: unknown): boolean {
+    if (!data || typeof data !== 'object') return false
+    const obj = data as Record<string, unknown>
+    // Паттерн: { error: true, message: "..." }
+    if (obj.error === true) return true
+    // Паттерн: { success: false }
+    if (obj.success === false) return true
+    return false
+  }
+
+  /**
+   * Извлекает сообщение об ошибке из body ответа
+   */
+  private extractErrorMessage(data: unknown): string {
+    if (!data || typeof data !== 'object') return 'Unknown error'
+    const obj = data as Record<string, unknown>
+    if (typeof obj.message === 'string') return obj.message
+    if (typeof obj.error === 'string') return obj.error
+    if (typeof obj.error_message === 'string') return obj.error_message
+    return 'API returned an error response'
+  }
+
+  /**
    * Тест Static Data
    */
   private testStaticData(
@@ -570,58 +575,18 @@ export class DataSourceController {
   }
 
   /**
-   * Применяет авторизацию к headers
-   */
-  private applyAuth(headers: Record<string, string>, authConfig: Record<string, unknown>) {
-    const authType = authConfig.type as string
-
-    switch (authType) {
-      case 'bearer':
-        headers['Authorization'] = `Bearer ${authConfig.token}`
-        break
-
-      case 'api-key':
-        const placement = authConfig.placement as string
-        const keyName = authConfig.keyName as string
-        const key = authConfig.key as string
-
-        if (placement === 'header') {
-          headers[keyName] = key
-        }
-        // Query params обрабатываются отдельно при формировании URL
-        break
-
-      case 'basic':
-        const credentials = Buffer.from(
-          `${authConfig.username}:${authConfig.password}`
-        ).toString('base64')
-        headers['Authorization'] = `Basic ${credentials}`
-        break
-
-      case 'oauth2':
-        if (authConfig.accessToken) {
-          headers['Authorization'] = `Bearer ${authConfig.accessToken}`
-        }
-        break
-
-      case 'custom':
-        const customHeaders = authConfig.headers as Record<string, string>
-        if (customHeaders) {
-          Object.assign(headers, customHeaders)
-        }
-        break
-    }
-  }
-
-  /**
    * Обрезает sample data для preview
    */
-  private truncateSampleData(data: unknown, maxItems = 5, maxDepth = 3): unknown {
+  private truncateSampleData(data: unknown, maxItems = 5, maxDepth = 10): unknown {
     if (maxDepth <= 0) return '[...]'
 
     if (Array.isArray(data)) {
       const truncated = data.slice(0, maxItems).map(
-        item => this.truncateSampleData(item, maxItems, maxDepth - 1)
+        (item, index) => this.truncateSampleData(
+          item,
+          maxItems,
+          index === 0 ? 100 : maxDepth - 1  // первый элемент — полная глубина
+        )
       )
       if (data.length > maxItems) {
         truncated.push(`... and ${data.length - maxItems} more items`)
@@ -633,7 +598,7 @@ export class DataSourceController {
       const result: Record<string, unknown> = {}
       const keys = Object.keys(data)
 
-      for (let i = 0; i < Math.min(keys.length, 20); i++) {
+      for (let i = 0; i < Math.min(keys.length, 50); i++) {
         const key = keys[i]
         result[key] = this.truncateSampleData(
           (data as Record<string, unknown>)[key],
@@ -642,16 +607,16 @@ export class DataSourceController {
         )
       }
 
-      if (keys.length > 20) {
-        result['...'] = `${keys.length - 20} more fields`
+      if (keys.length > 50) {
+        result['...'] = `${keys.length - 50} more fields`
       }
 
       return result
     }
 
     // Обрезаем длинные строки
-    if (typeof data === 'string' && data.length > 500) {
-      return data.substring(0, 500) + '...'
+    if (typeof data === 'string' && data.length > 1000) {
+      return data.substring(0, 1000) + '...'
     }
 
     return data

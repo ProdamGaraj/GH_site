@@ -1,34 +1,40 @@
 import React, { useRef, useState, useCallback } from 'react'
-import { Upload, X, Image as ImageIcon, Link as LinkIcon, Loader2 } from 'lucide-react'
+import { Upload, X, Image as ImageIcon, Link as LinkIcon, Loader2, FolderOpen } from 'lucide-react'
+import { mediaApi, resolveMediaUrl } from '@/shared/api/mediaApi'
+import { MediaPicker } from '@/features/media/MediaPicker'
 
 interface ImageUploadProps {
   value: string
   onChange: (url: string) => void
   label?: string
   placeholder?: string
+  /** Restrict media kind. Default 'image'. */
+  kind?: 'image' | 'video' | 'any'
 }
 
 export const ImageUpload: React.FC<ImageUploadProps> = ({
   value,
   onChange,
   label = 'Изображение',
-  placeholder = 'https://example.com/image.jpg'
+  placeholder = 'https://example.com/image.jpg',
+  kind = 'image',
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUrlMode, setIsUrlMode] = useState(true)
   const [isUploading, setIsUploading] = useState(false)
   const [previewError, setPreviewError] = useState(false)
   const [dragActive, setDragActive] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const handleFileSelect = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) {
+    const expectImage = kind === 'image'
+    const expectVideo = kind === 'video'
+    if (expectImage && !file.type.startsWith('image/')) {
       alert('Пожалуйста, выберите изображение')
       return
     }
-
-    // Max 5MB
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Максимальный размер файла: 5MB')
+    if (expectVideo && !file.type.startsWith('video/')) {
+      alert('Пожалуйста, выберите видео')
       return
     }
 
@@ -36,32 +42,18 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     setPreviewError(false)
 
     try {
-      // For now, convert to base64 data URL
-      // In production, this would upload to MinIO/S3
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string
-        onChange(dataUrl)
-        setIsUploading(false)
-      }
-      reader.onerror = () => {
-        alert('Ошибка чтения файла')
-        setIsUploading(false)
-      }
-      reader.readAsDataURL(file)
-
-      // TODO: Upload to MinIO backend
-      // const formData = new FormData()
-      // formData.append('file', file)
-      // const response = await fetch('/api/upload', { method: 'POST', body: formData })
-      // const { url } = await response.json()
-      // onChange(url)
-    } catch (error) {
+      const asset = await mediaApi.upload({
+        file,
+        title: file.name.replace(/\.[^.]+$/, ''),
+      })
+      onChange(resolveMediaUrl(asset.url))
+    } catch (error: any) {
       console.error('Upload error:', error)
-      alert('Ошибка загрузки файла')
+      alert(`Ошибка загрузки: ${error?.message || ''}`)
+    } finally {
       setIsUploading(false)
     }
-  }, [onChange])
+  }, [onChange, kind])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -127,6 +119,14 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
         </button>
       </div>
 
+      <button
+        type="button"
+        onClick={() => setPickerOpen(true)}
+        className="w-full px-2 py-1.5 text-xs flex items-center justify-center gap-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-50"
+      >
+        <FolderOpen size={12} /> Выбрать из галереи
+      </button>
+
       {isUrlMode ? (
         // URL input mode
         <div className="relative">
@@ -167,7 +167,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept={kind === 'image' ? 'image/*' : kind === 'video' ? 'video/*' : 'image/*,video/*'}
             onChange={handleInputChange}
             className="hidden"
           />
@@ -184,7 +184,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                 Перетащите изображение или кликните для выбора
               </span>
               <span className="text-[10px] text-gray-400">
-                JPG, PNG, GIF, WebP до 5MB
+                {kind === 'video' ? 'MP4, WebM до 200MB' : kind === 'any' ? 'JPG/PNG/WebP/GIF/SVG до 10MB, MP4/WebM до 200MB' : 'JPG, PNG, GIF, WebP, SVG до 10MB'}
               </span>
             </div>
           )}
@@ -216,6 +216,16 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           <span>Не удалось загрузить изображение</span>
         </div>
       )}
+
+      <MediaPicker
+        open={pickerOpen}
+        kind={kind}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(asset) => {
+          onChange(resolveMediaUrl(asset.url))
+          setPreviewError(false)
+        }}
+      />
     </div>
   )
 }

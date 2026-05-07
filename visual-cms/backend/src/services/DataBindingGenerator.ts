@@ -2,6 +2,12 @@
  * Генератор runtime скрипта для Data Binding на опубликованных страницах
  */
 
+export interface FieldOverrideConfig {
+  joinField: string
+  values: Record<string, string | number>
+  displayTemplate?: string // Шаблон отображения: "от {value} млн сум" → числовые значения форматируются при показе
+}
+
 export interface DataBindingConfig {
   blockId: string
   bindingId?: string // ID привязки для использования fetch-with-transforms API
@@ -12,6 +18,7 @@ export interface DataBindingConfig {
     targetProperty: string
     transform?: string
   }>
+  fieldOverrides?: Record<string, FieldOverrideConfig>
   // Динамические фильтры - получают значения из form-элементов
   dynamicFilters?: Array<{
     id: string
@@ -71,6 +78,10 @@ export interface PageDataSourceConfig {
   loadInterval?: number
   cacheEnabled: boolean
   cacheTTL?: number
+  /** Тип источника. Для 'page-variable' данные не фетчатся, а берутся из _variables[variableName]. */
+  type?: string
+  /** Имя page-переменной (только для type='page-variable'). */
+  variableName?: string
 }
 
 export interface PageDataConfig {
@@ -205,6 +216,21 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     return null;
   }
   
+  // Найти override-конфиг по имени поля фильтра.
+  // Матчит точно ("price" == "price") или по суффиксу ("-price" в "project-price").
+  function _findOverrideByField(fieldOverrides, filterField) {
+    if (!fieldOverrides || !filterField) return null;
+    if (fieldOverrides[filterField]) return fieldOverrides[filterField];
+    var keys = Object.keys(fieldOverrides);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (k === filterField) return fieldOverrides[k];
+      if (k.endsWith('-' + filterField) || k.endsWith('.' + filterField)) return fieldOverrides[k];
+      if (filterField.endsWith('-' + k) || filterField.endsWith('.' + k)) return fieldOverrides[k];
+    }
+    return null;
+  }
+  
   // Собрать динамические фильтры из DOM
   function collectDynamicFilters(binding) {
     if (!binding.dynamicFilters || binding.dynamicFilters.length === 0) {
@@ -215,6 +241,11 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     binding.dynamicFilters.forEach(function(df) {
       // Пропускаем фильтры без sourceBlockId или field
       if (!df.sourceBlockId || !df.field) {
+        return;
+      }
+      // Пропускаем поля с override — они фильтруются client-side в renderRepeater
+      // Матчим точно или по суффиксу: "price" совпадёт с ключом "project-price"
+      if (binding.fieldOverrides && _findOverrideByField(binding.fieldOverrides, df.field)) {
         return;
       }
       
@@ -239,8 +270,11 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         }
       }
       
+      // Если задан populateFrom — используем его как реальное поле в API (df.field = "location", populateFrom = "houses[0].address")
+      var apiField = df.populateFrom || df.field;
+      
       filters.push({
-        field: df.field,
+        field: apiField,
         operator: operator,
         value: value
       });
@@ -277,11 +311,26 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
   function populateSelectsFromData(binding, rawData) {
     if (!binding || !binding.dynamicFilters || !rawData) return;
     
-    // Извлекаем массив данных
+    // Нормализуем данные — аналогично renderRepeater.
+    // fetch-with-transforms возвращает { success, data: [...] }, трансформы уже применены.
+    // arrayPath применяем только если data ещё не массив.
     var items = rawData;
-    if (binding.repeaterConfig && binding.repeaterConfig.arrayPath) {
+    
+    // Обёртка { success, data } от fetch-with-transforms
+    if (!Array.isArray(items) && rawData.data !== undefined) {
+      items = rawData.data;
+    }
+    
+    // Если всё ещё не массив — пробуем arrayPath (прямой запрос к API без трансформов)
+    if (!Array.isArray(items) && binding.repeaterConfig && binding.repeaterConfig.arrayPath) {
       items = getNestedValue(rawData, binding.repeaterConfig.arrayPath);
     }
+    
+    // Последний fallback: items-ключ
+    if (!Array.isArray(items) && rawData.items && Array.isArray(rawData.items)) {
+      items = rawData.items;
+    }
+    
     if (!Array.isArray(items) || items.length === 0) return;
     
     binding.dynamicFilters.forEach(function(df) {
@@ -290,14 +339,51 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       var element = document.querySelector('[data-element-id="' + df.sourceBlockId + '"]');
       if (!element || element.tagName !== 'SELECT') return;
       
+      // Резолвим реальный путь к полю в API-данных:
+      // 1. Если задан явный populateFrom — используем его
+      // 2. Иначе пробуем найти через fieldMappings (суффиксный матч)
+      // 3. Fallback: прямое имя поля df.field
+      var dataPath = df.field;
+      if (df.populateFrom) {
+        dataPath = df.populateFrom;
+        console.log('[DynamicFilter] Using explicit populateFrom for field "' + df.field + '": ' + dataPath);
+      } else if (binding.fieldMappings && Array.isArray(binding.fieldMappings)) {
+        var matchedMapping = null;
+        for (var mi = 0; mi < binding.fieldMappings.length; mi++) {
+          var fm = binding.fieldMappings[mi];
+          if (!fm.targetProperty) continue;
+          var tp = fm.targetProperty.replace(/^item\./, '');
+          if (tp === df.field || tp.endsWith('-' + df.field) || tp.endsWith('.' + df.field)) {
+            matchedMapping = fm;
+            break;
+          }
+        }
+        if (matchedMapping && matchedMapping.sourceField) {
+          dataPath = matchedMapping.sourceField;
+          console.log('[DynamicFilter] Resolved data path for field "' + df.field + '": ' + dataPath);
+        }
+      }
+      
+      // Функция извлечения значения (valueExtract — JS-выражение с переменной value)
+      var extractFn = null;
+      if (df.valueExtract) {
+        try {
+          extractFn = new Function('value', 'try { return (' + df.valueExtract + '); } catch(e) { return value; }');
+        } catch(e) {
+          console.warn('[DynamicFilter] Invalid valueExtract expression:', df.valueExtract, e);
+        }
+      }
+      
       // Собираем уникальные значения поля
       var uniqueValues = [];
       var seen = {};
       items.forEach(function(item) {
-        var val = getNestedValue(item, df.field);
-        if (val !== null && val !== undefined && val !== '' && !seen[val]) {
+        var rawVal = getNestedValue(item, dataPath);
+        if (rawVal === null || rawVal === undefined || rawVal === '') return;
+        var val = extractFn ? String(extractFn(String(rawVal))) : String(rawVal);
+        if (val && !seen[val]) {
           seen[val] = true;
-          uniqueValues.push(String(val));
+          uniqueValues.push(val);
         }
       });
       
@@ -460,14 +546,28 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
           return;
         }
         console.log('[DataBinding] Rendering repeater for:', binding.blockId, 'with data:', data);
-        renderRepeater(element, data, binding.repeaterConfig, binding.fieldMappings);
+        // Собираем client-side фильтры для override-полей (числовые gte/lte)
+        var csFilters = [];
+        if (binding.dynamicFilters && binding.fieldOverrides) {
+          binding.dynamicFilters.forEach(function(df) {
+            if (!_findOverrideByField(binding.fieldOverrides, df.field) || !df.sourceBlockId) return;
+            var csVal = getElementValue(df.sourceBlockId);
+            var shouldSkip = df.skipIfEmpty !== false;
+            if (shouldSkip && (csVal === null || csVal === '' || csVal === undefined)) return;
+            csFilters.push({ field: df.field, operator: df.operator, value: csVal });
+          });
+        }
+        renderRepeater(element, data, binding.repeaterConfig, binding.fieldMappings, binding.fieldOverrides, csFilters);
       }
     });
   }
   
   // Get nested value from object
   function getNestedValue(obj, path) {
-    return path.split('.').reduce(function(acc, key) {
+    if (!obj || !path) return undefined;
+    // Support dot and bracket notation: houses[0].files[0].file_url
+    var keys = String(path).replace(/\\[(\\d+)\\]/g, '.$1').split('.');
+    return keys.reduce(function(acc, key) {
       return acc && acc[key];
     }, obj);
   }
@@ -496,7 +596,17 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         break;
       default:
         if (property.startsWith('style.')) {
-          element.style[property.slice(6)] = value;
+          var cssProp = property.slice(6);
+          var cssValue = value;
+          // Для backgroundImage / background — оборачиваем голый URL в url("...")
+          if (typeof cssValue === 'string' && cssValue.length > 0
+              && (cssProp === 'backgroundImage' || cssProp === 'background-image')
+              && !/^\\s*(url|none|linear-gradient|radial-gradient|conic-gradient|var)\\(/i.test(cssValue)) {
+            cssValue = 'url("' + String(cssValue).replace(/"/g, '\\\\"') + '")';
+          }
+          element.style[cssProp] = cssValue;
+        } else if (property.startsWith('attr.')) {
+          element.setAttribute(property.slice(5), value);
         } else if (property.startsWith('data-')) {
           element.setAttribute(property, value);
         }
@@ -504,7 +614,7 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
   }
   
   // Render repeater items
-  function renderRepeater(container, data, config, fieldMappings) {
+  function renderRepeater(container, data, config, fieldMappings, fieldOverrides, clientSideFilters) {
     console.log('[Repeater] Starting render with config:', config);
     console.log('[Repeater] Container:', container);
     console.log('[Repeater] Data received:', data);
@@ -528,6 +638,27 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         console.error('[Repeater] Data is not an array:', data);
         return;
       }
+    }
+
+    // Применяем client-side фильтры для override-полей (числовые gte/lte)
+    if (clientSideFilters && clientSideFilters.length > 0 && fieldOverrides) {
+      items = items.filter(function(item) {
+        return clientSideFilters.every(function(cf) {
+          var overrideCfg = _findOverrideByField(fieldOverrides, cf.field);
+          if (!overrideCfg) return true;
+          var joinVal = String(getNestedValue(item, overrideCfg.joinField) !== undefined ? getNestedValue(item, overrideCfg.joinField) : '');
+          var rawVal = overrideCfg.values[joinVal];
+          if (rawVal === undefined) return true;
+          var numVal = typeof rawVal === 'number' ? rawVal : parseFloat(String(rawVal));
+          if (isNaN(numVal)) return true;
+          var filterNum = parseFloat(String(cf.value));
+          if (isNaN(filterNum)) return true;
+          if (cf.operator === 'gte') return numVal >= filterNum;
+          if (cf.operator === 'lte') return numVal <= filterNum;
+          return true;
+        });
+      });
+      console.log('[Repeater] After client-side filters:', items.length, 'items');
     }
     
     console.log('[Repeater] Items to render:', items.length);
@@ -584,7 +715,7 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       // Применяем field mappings если есть
       if (fieldMappings && fieldMappings.length > 0) {
         console.log('[Repeater] Item #' + index + ' - applying ' + fieldMappings.length + ' field mappings');
-        applyFieldMappingsToElement(clone, item, fieldMappings);
+        applyFieldMappingsToElement(clone, item, fieldMappings, fieldOverrides);
       } else {
         console.log('[Repeater] Item #' + index + ' - NO field mappings, using auto-detection');
         // Иначе пытаемся автоопределить через data-bind и {{template}}
@@ -595,7 +726,8 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       if (config.collectionLink) {
         var rawSlug = getNestedValue(item, config.collectionLink.slugField);
         var titleVal = config.collectionLink.titleField ? getNestedValue(item, config.collectionLink.titleField) : '';
-        var slugValue = rawSlug || (titleVal ? slugify(titleVal) : '') || item.id || item._id || index;
+        // Всегда нормализуем slug — единый формат URL
+        var slugValue = slugify(String(rawSlug || titleVal || '')) || item.id || item._id || index;
         var href = config.collectionLink.basePath + '/' + encodeURIComponent(String(slugValue)) + '.html';
         var linkEl = config.collectionLink.linkSelector
           ? clone.querySelector(config.collectionLink.linkSelector)
@@ -625,7 +757,7 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
   }
   
   // Применить field mappings к элементу
-  function applyFieldMappingsToElement(element, data, mappings) {
+  function applyFieldMappingsToElement(element, data, mappings, fieldOverrides) {
     console.log('[FieldMapping] ===== START =====');
     console.log('[FieldMapping] Applying ' + mappings.length + ' mappings to element');
     console.log('[FieldMapping] Data for this item:', JSON.stringify(data).substring(0, 300));
@@ -634,6 +766,25 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     mappings.forEach(function(mapping) {
       var value = getNestedValue(data, mapping.sourceField);
       console.log('[FieldMapping] Field "' + mapping.sourceField + '" -> value: "' + (value ? String(value).substring(0, 100) : 'undefined') + '"');
+
+      // Проверяем ручные overrides (статические значения по ключу)
+      if (fieldOverrides) {
+        var rawFN = mapping.targetProperty && mapping.targetProperty.indexOf('item.') === 0 ? mapping.targetProperty.slice(5) : (mapping.targetProperty || '');
+        while (rawFN.indexOf('.-') !== -1) rawFN = rawFN.split('.-').join('-');
+        var overrideCfg = fieldOverrides[rawFN] || fieldOverrides[mapping.targetProperty];
+        if (overrideCfg && overrideCfg.joinField && overrideCfg.values) {
+          var joinVal = String(getNestedValue(data, overrideCfg.joinField) !== undefined ? getNestedValue(data, overrideCfg.joinField) : '');
+          var rawOverrideVal = overrideCfg.values[joinVal];
+          if (rawOverrideVal !== undefined) {
+            if (overrideCfg.displayTemplate) {
+              value = overrideCfg.displayTemplate.split('{value}').join(String(rawOverrideVal));
+            } else {
+              value = rawOverrideVal;
+            }
+            console.log('[FieldMapping] Override applied for "' + rawFN + '" (joinVal=' + joinVal + '):', value);
+          }
+        }
+      }
       
       if (value === undefined) {
         console.warn('[FieldMapping] ⚠️ No value for field:', mapping.sourceField, 'in data:', data);
@@ -650,9 +801,31 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       console.log('[FieldMapping] ✓ Applying', mapping.sourceField, '->', mapping.targetProperty);
       
       // targetProperty может быть:
+      // - "self.style.backgroundImage" / "self.attr.href" / "self.textContent" — применяем к корню template
+      // - "[data-bind=image].style.backgroundImage" / "[data-bind=cta].attr.href" — селектор + свойство
       // - "item.project-image" - ищем элемент с data-bind="project-image"
       // - "item.title" - ищем элемент с data-bind="title" 
       // - "children.0.content" - N-й child элемент
+      
+      // self.* — корень template-клона
+      if (mapping.targetProperty.indexOf('self.') === 0) {
+        applyValue(element, mapping.targetProperty.slice(5), value);
+        return;
+      }
+      
+      // [data-bind=X].style.Y / [data-bind=X].attr.Y / [data-bind=X].textContent
+      var selectorMatch = mapping.targetProperty.match(/^\\[data-bind=([^\\]]+)\\]\\.(.+)$/);
+      if (selectorMatch) {
+        var bindKey = selectorMatch[1].replace(/^['"]|['"]$/g, '');
+        var prop = selectorMatch[2];
+        var targetEl = element.querySelector('[data-bind="' + bindKey + '"]');
+        if (targetEl) {
+          applyValue(targetEl, prop, value);
+        } else {
+          console.warn('[FieldMapping] data-bind selector not found:', bindKey);
+        }
+        return;
+      }
       
       const parts = mapping.targetProperty.split('.');
       
@@ -1222,13 +1395,25 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
   // Initialize on page load
   document.addEventListener('DOMContentLoaded', function() {
     console.log('[DataBinding] Initializing with', _bindings.length, 'bindings');
-    
+
+    // Pre-fill _dataStore for page-variable sources — эти данные не фетчатся, берутся из _variables.
+    _dataSources.forEach(function(source) {
+      if (source.type === 'page-variable' && source.variableName) {
+        _dataStore[source.alias] = _variables[source.variableName];
+        console.log('[DataBinding] Initialized page-variable source:', source.alias, '<-', source.variableName);
+      }
+    });
+
     // Собираем уникальные пары (sourceAlias, bindingId, binding)
     const sourcesToLoad = new Map();
     
     _bindings.forEach(function(binding) {
       if (binding.type === 'input' || binding.type === 'repeater') {
         const source = _dataSources.find(s => s.alias === binding.sourceAlias);
+        // page-variable источники не нуждаются в fetch — данные уже в _dataStore.
+        if (source && source.type === 'page-variable') {
+          return;
+        }
         if (source && source.loadStrategy === 'pageLoad') {
           // Используем bindingId если есть, иначе только sourceAlias
           const key = binding.bindingId || binding.sourceAlias;
@@ -1243,6 +1428,13 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     function reloadWithFilters(config) {
       console.log('[DataBinding] Reloading data with filters for:', config.bindingId);
       fetchData(config.source, config.bindingId, config.binding).then(updateBindings);
+    }
+
+    // Если есть page-variable bindings — применяем их немедленно (без fetch)
+    var hasPageVarSources = _dataSources.some(function(s) { return s.type === 'page-variable'; });
+    if (hasPageVarSources) {
+      console.log('[DataBinding] Applying page-variable bindings immediately');
+      updateBindings();
     }
     
     // Загружаем данные для каждого уникального источника с bindingId
@@ -1290,11 +1482,25 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
             : filterElement.querySelector('select, input');
           
           if (input) {
-            input.addEventListener('change', function() {
-              console.log('[DynamicFilter] Filter changed:', df.field, '=', input.value);
-              reloadWithFilters(config);
-            });
-            console.log('[DynamicFilter] Attached change listener to:', df.sourceBlockId);
+            // Для override-полей (client-side фильтр) слушаем 'input' и вызываем updateBindings напрямую.
+            // Для остальных полей — 'change' + reloadWithFilters (API-запрос).
+            var isOverrideField = config.binding.fieldOverrides && _findOverrideByField(config.binding.fieldOverrides, df.field);
+            if (isOverrideField) {
+              input.addEventListener('input', function() {
+                console.log('[DynamicFilter] Override field input:', df.field, '=', input.value);
+                updateBindings();
+              });
+              input.addEventListener('change', function() {
+                updateBindings();
+              });
+              console.log('[DynamicFilter] Attached input+updateBindings to override field:', df.sourceBlockId);
+            } else {
+              input.addEventListener('change', function() {
+                console.log('[DynamicFilter] Filter changed:', df.field, '=', input.value);
+                reloadWithFilters(config);
+              });
+              console.log('[DynamicFilter] Attached change+reload listener to:', df.sourceBlockId);
+            }
           }
         });
       }

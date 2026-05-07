@@ -198,7 +198,7 @@ export class CredentialsManager {
    * Шифрует все sensitive поля в объекте authConfig
    */
   static encryptAuthConfig(authConfig: Record<string, unknown>): Record<string, unknown> {
-    const sensitiveFields = ['token', 'key', 'password', 'clientSecret', 'accessToken', 'refreshToken']
+    const sensitiveFields = ['token', 'key', 'password', 'clientSecret', 'accessToken', 'refreshToken', 'appSecret']
     const result = { ...authConfig }
     
     for (const field of sensitiveFields) {
@@ -233,7 +233,7 @@ export class CredentialsManager {
    * Расшифровывает все sensitive поля в объекте authConfig
    */
   static async decryptAuthConfig(authConfig: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const sensitiveFields = ['token', 'key', 'password', 'clientSecret', 'accessToken', 'refreshToken']
+    const sensitiveFields = ['token', 'key', 'password', 'clientSecret', 'accessToken', 'refreshToken', 'appSecret']
     const result = { ...authConfig }
     
     for (const field of sensitiveFields) {
@@ -264,7 +264,7 @@ export class CredentialsManager {
    * Возвращает объект с замаскированными значениями
    */
   static maskAuthConfig(authConfig: Record<string, unknown>): Record<string, unknown> {
-    const sensitiveFields = ['token', 'key', 'password', 'clientSecret', 'accessToken', 'refreshToken']
+    const sensitiveFields = ['token', 'key', 'password', 'clientSecret', 'accessToken', 'refreshToken', 'appSecret']
     const result = { ...authConfig }
     
     for (const field of sensitiveFields) {
@@ -272,10 +272,22 @@ export class CredentialsManager {
         // Показываем только тип хранения, не само значение
         const fieldValue = result[field]
         if (typeof fieldValue === 'object' && fieldValue !== null && 'storageType' in fieldValue) {
+          // Для зашифрованных значений — дешифруем для preview
+          let preview: string | undefined
+          try {
+            const stored = fieldValue as StoredCredentials
+            if (stored.storageType === 'inline') {
+              const decrypted = this.decrypt(stored as EncryptedData)
+              preview = decrypted.substring(0, 4) + '****'
+            }
+          } catch {
+            // Не удалось дешифровать — preview не будет
+          }
           result[field] = {
             _masked: true,
             storageType: (fieldValue as StoredCredentials).storageType,
-            hasValue: true
+            hasValue: true,
+            ...(preview ? { preview } : {}),
           }
         } else if (typeof fieldValue === 'string') {
           // Если это строка (не зашифровано), маскируем

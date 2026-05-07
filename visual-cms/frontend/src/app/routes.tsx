@@ -17,6 +17,7 @@ import { SiteSettingsPage } from '@/pages/SiteSettingsPage'
 import { SitePagesPage } from '@/pages/SitePagesPage'
 import { CollectionsPage } from '@/pages/CollectionsPage'
 import { CollectionEditor } from '@/pages/CollectionEditor'
+import { MediaLibraryPage } from '@/pages/MediaLibraryPage'
 
 
 export const router = createBrowserRouter([
@@ -67,6 +68,10 @@ export const router = createBrowserRouter([
       {
         path: 'collections/:id',
         element: <CollectionEditor />,
+      },
+      {
+        path: 'media',
+        element: <MediaLibraryPage />,
       },
       {
         path: 'settings',

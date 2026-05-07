@@ -18,6 +18,7 @@ import analyticsRouter from './analytics'
 import languagesRouter from './languages'
 import translationsRouter from './translations'
 import collectionsRouter from './collections'
+import mediaRouter from './media'
 
 const router = Router()
 
@@ -40,5 +41,6 @@ router.use('/mock', mockRouter)
 router.use('/forms', formsRouter)
 router.use('/languages', languagesRouter)
 router.use('/translations', translationsRouter)
+router.use('/media', mediaRouter)
 
 export default router

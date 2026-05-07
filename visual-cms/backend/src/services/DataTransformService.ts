@@ -47,6 +47,48 @@ export interface ConditionalFieldConfig {
   else?: unknown | { field: string }
 }
 
+/**
+ * Нормализовать произвольное значение в массив для операторов in/notIn.
+ *
+ * Поддерживает:
+ * - массив → как есть
+ * - строка JSON-массива "[1,2,3]" или "[\"a\",\"b\"]" → парсим
+ * - строка с разделителями "1, 2, 3" → split по запятой/точке-с-запятой/новой строке + trim
+ * - одиночное значение → [value]
+ * - null/undefined → []
+ *
+ * Backward compatibility: старые сохранённые трансформации с value=строкой
+ * (баг #1) продолжат работать.
+ */
+export function normalizeToList(value: unknown): unknown[] {
+  if (value === null || value === undefined) return []
+  if (Array.isArray(value)) return value
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (trimmed === '') return []
+
+    // JSON массив
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (Array.isArray(parsed)) return parsed
+      } catch {
+        // fallthrough to split
+      }
+    }
+
+    // CSV / новая строка / точка с запятой
+    return trimmed
+      .split(/[,;\n]/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+  }
+
+  // Число, boolean, объект — оборачиваем в [v]
+  return [value]
+}
+
 class DataTransformService {
   private sandboxTimeout = 1000 // 1 секунда на выполнение скрипта
 
@@ -886,7 +928,7 @@ class DataTransformService {
       
       try {
         // 1. Извлекаем массив из ответа
-        let items = this.extractArrayFromPath(rawData, options.dataPath || 'data')
+        let items = this.extractArrayFromPath(rawData, options.dataPath || '')
         const originalCount = items.length
         
         // 2. Нормализуем поля если есть маппинг
@@ -1009,13 +1051,9 @@ class DataTransformService {
      * Применить одну трансформацию
      */
     applyDataTransform(items: unknown[], transform: DataTransformConfig): unknown[] {
-      console.log('⚙️ applyDataTransform:', { type: transform.type, filter: transform.filter, itemsCount: items.length })
-      
       switch (transform.type) {
         case 'exclude':
-          const excludedResult = items.filter(item => !this.matchesFilterCondition(item, transform.filter!))
-          console.log(`⚙️ exclude result: ${items.length} -> ${excludedResult.length} items`)
-          return excludedResult
+          return items.filter(item => !this.matchesFilterCondition(item, transform.filter!))
           
         case 'include':
           return items.filter(item => this.matchesFilterCondition(item, transform.filter!))
@@ -1056,8 +1094,6 @@ class DataTransformService {
       const value = dataFilterService.getValueByPath(item, condition.field)
       const targetValue = condition.value
       
-      console.log('🔍 matchesFilterCondition:', { field: condition.field, value, targetValue, operator: condition.operator })
-      
       // Извлечь число из строки ("от $120,000" → 120000, "2025 Q2" → 2025)
       function extractNumber(val: unknown): number {
         if (typeof val === 'number') return val
@@ -1093,10 +1129,22 @@ class DataTransformService {
           return String(value).toLowerCase().startsWith(String(targetValue).toLowerCase())
         case 'endsWith':
           return String(value).toLowerCase().endsWith(String(targetValue).toLowerCase())
-        case 'in':
-          return Array.isArray(targetValue) && targetValue.includes(value)
-        case 'notIn':
-          return Array.isArray(targetValue) && !targetValue.includes(value)
+        case 'in': {
+          // Нормализуем targetValue в массив:
+          // - массив → как есть
+          // - строка вида "[1,2,3]" → парсим как JSON
+          // - строка вида "1, 2, 3" → split по запятой
+          // - одиночное значение → [value]
+          const list = normalizeToList(targetValue)
+          // Loose equality (1 == "1") — симметрично с case 'eq'
+          // eslint-disable-next-line eqeqeq
+          return list.some(tv => tv == value)
+        }
+        case 'notIn': {
+          const list = normalizeToList(targetValue)
+          // eslint-disable-next-line eqeqeq
+          return !list.some(tv => tv == value)
+        }
         case 'between':
           if (Array.isArray(targetValue) && targetValue.length === 2) {
             const num = Number(value)

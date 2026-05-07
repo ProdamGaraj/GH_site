@@ -174,6 +174,7 @@ export interface UpdateBlockDto {
   isReusable?: boolean
   groupId?: string
   tags?: string[]
+  detectedFields?: any[]
 }
 
 export interface CreatePageDto {
@@ -304,6 +305,11 @@ export const dataSourceApi = {
   testConnection: (id: string) => api.post<TestConnectionResult>(`/data-sources/${id}/test`),
 
   /**
+   * Получить дешифрованный authConfig
+   */
+  revealCredentials: (id: string) => api.get<{ authConfig: Record<string, unknown> | null }>(`/data-sources/${id}/credentials`),
+
+  /**
    * РўРµСЃС‚РёСЂРѕРІР°С‚СЊ РЅРѕРІСѓСЋ РєРѕРЅС„РёРіСѓСЂР°С†РёСЋ (Р±РµР· СЃРѕС…СЂР°РЅРµРЅРёСЏ)
    */
   testNewConnection: (data: { type: string; config: unknown; authConfig?: unknown }) => 
@@ -314,6 +320,12 @@ export const dataSourceApi = {
    */
   duplicate: (id: string, newName?: string) => 
     api.post<DataSource>(`/data-sources/${id}/duplicate`, { name: newName }),
+
+  /**
+   * Сбросить кеш данных для источника
+   */
+  invalidateCache: (id: string) =>
+    api.post<{ success: boolean; invalidated: number; message: string }>(`/data-sources/${id}/invalidate-cache`),
 }
 
 // Re-export types for convenience

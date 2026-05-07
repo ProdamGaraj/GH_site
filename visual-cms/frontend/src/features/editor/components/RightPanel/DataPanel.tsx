@@ -7,9 +7,11 @@ import { OutputBindingSubTab } from '@/features/dataBindings/components/OutputBi
 
 interface DataPanelProps {
   pageId?: string
+  /** ID библиотечного блока (когда редактируем блок напрямую /editor/block/:id) */
+  libraryBlockId?: string
 }
 
-export const DataPanel: React.FC<DataPanelProps> = ({ pageId }) => {
+export const DataPanel: React.FC<DataPanelProps> = ({ pageId, libraryBlockId }) => {
   const selectedNode = useAppSelector(selectSelectedNode)
   const [dataSubTab, setDataSubTab] = useState<'input' | 'output'>('input')
 
@@ -59,7 +61,7 @@ export const DataPanel: React.FC<DataPanelProps> = ({ pageId }) => {
         {dataSubTab === 'input' ? (
           <SmartDataBindingTab 
             blockId={selectedNode.id} 
-            linkedBlockId={linkedBlockId}
+            linkedBlockId={linkedBlockId || libraryBlockId}
             pageId={pageId} 
           />
         ) : (

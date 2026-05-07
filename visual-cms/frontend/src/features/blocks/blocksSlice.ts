@@ -90,6 +90,13 @@ const blocksSlice = createSlice({
       .addCase(fetchBlockById.fulfilled, (state, action) => {
         state.loading = false
         state.currentBlock = action.payload
+        // Также кладём в items, чтобы селекторы по id (SmartDataBindingTab) работали
+        const idx = state.items.findIndex(b => b.id === action.payload.id)
+        if (idx >= 0) {
+          state.items[idx] = action.payload
+        } else {
+          state.items.push(action.payload)
+        }
       })
       .addCase(fetchBlockById.rejected, (state, action) => {
         state.loading = false

@@ -8,7 +8,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { selectRootNode, selectIsDirty, selectBreakpoints, markAsSaved } from '@/features/editor/editorSlice'
 import { updatePage } from '@/features/pages/pagesSlice'
-import { updateBlock } from '@/features/blocks/blocksSlice'
+import { updateBlock, selectBlocks } from '@/features/blocks/blocksSlice'
 import type { BlockNode, EditorPageSettings } from '@/shared/types'
 
 interface UseAutoSaveOptions {
@@ -55,6 +55,10 @@ export function useAutoSave({
   const rootNode = useAppSelector(selectRootNode)
   const isDirty = useAppSelector(selectIsDirty)
   const breakpoints = useAppSelector(selectBreakpoints)
+  const blocks = useAppSelector(selectBlocks)
+  // Ref для чтения актуального массива блоков без захвата значения в closure saveDocument
+  const blocksRef = useRef(blocks)
+  useEffect(() => { blocksRef.current = blocks }, [blocks])
   
   const [state, setState] = useState<AutoSaveState>({
     lastSavedAt: null,
@@ -111,10 +115,13 @@ export function useAutoSave({
           }
         })).unwrap()
       } else if (documentType === 'block') {
+        // Читаем через ref — всегда актуальные данные даже если closure стейлый
+        const currentBlock = blocksRef.current.find(b => b.id === documentId)
         await dispatch(updateBlock({
           id: documentId,
           data: {
             structure: rootNode,
+            ...(currentBlock?.detectedFields ? { detectedFields: currentBlock.detectedFields } : {}),
           }
         })).unwrap()
       }
@@ -144,6 +151,7 @@ export function useAutoSave({
       onSaveError?.(error instanceof Error ? error : new Error(errorMessage))
     }
   }, [documentId, documentType, rootNode, breakpoints, pageSettings, dispatch, serializeNode, onSaveSuccess, onSaveError])
+  // blocksRef намеренно не в deps — мы используем ref именно чтобы не пересоздавать saveDocument при каждом изменении блоков
   
   // Обновляем состояние hasUnsavedChanges
   useEffect(() => {

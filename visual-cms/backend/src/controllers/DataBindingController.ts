@@ -3,6 +3,7 @@ import { AppDataSource } from '../config/database'
 import { DataBinding, DataBindingFullConfig, FilterConfig, SortConfig } from '../models/DataBinding'
 import { DataSource as DataSourceEntity } from '../models/DataSource'
 import { secureDataSourceService, FetchConfig, AuthConfig } from '../services/SecureDataSourceService'
+import { cachedDataSourceService } from '../services/CachedDataSourceService'
 import { dataFilterService } from '../services/DataFilterService'
 import { dataTransformService } from '../services/DataTransformService'
 import { CredentialsManager } from '../services/CredentialsManager'
@@ -121,8 +122,8 @@ class DataBindingController {
       authConfig = await CredentialsManager.decryptAuthConfig(dataSource.authConfig)
     }
 
-    const fetchConfig = (requestConfig || dataSource.config) as unknown as FetchConfig
-    const result = await secureDataSourceService.fetchData(fetchConfig, authConfig as unknown as AuthConfig)
+    const fetchConfig = { type: dataSource.type, ...(requestConfig || dataSource.config) } as unknown as FetchConfig
+    const result = await cachedDataSourceService.fetchData(dataSourceId, fetchConfig, authConfig as unknown as AuthConfig)
 
     if (!result.success) {
       await dataSourceRepository.update(dataSourceId, {
@@ -177,7 +178,8 @@ class DataBindingController {
           filtered: processedResult.filtered,
           page: paginatedResult.page,
           totalPages: paginatedResult.totalPages,
-          responseTime: result.metadata?.responseTime
+          responseTime: result.metadata?.responseTime,
+          headers: result.metadata?.headers
         }
       })
     }
@@ -190,7 +192,8 @@ class DataBindingController {
         filtered: processedResult.filtered,
         page: processedResult.page,
         totalPages: processedResult.totalPages,
-        responseTime: result.metadata?.responseTime
+        responseTime: result.metadata?.responseTime,
+        headers: result.metadata?.headers
       }
     })
   })
@@ -228,8 +231,9 @@ class DataBindingController {
       authConfig = await CredentialsManager.decryptAuthConfig(binding.dataSource.authConfig)
     }
 
-    const result = await secureDataSourceService.fetchData(
-      binding.dataSource.config as unknown as FetchConfig,
+    const result = await cachedDataSourceService.fetchData(
+      binding.dataSource.id,
+      { type: binding.dataSource.type, ...binding.dataSource.config } as unknown as FetchConfig,
       authConfig as unknown as AuthConfig
     )
 
@@ -462,7 +466,7 @@ class DataBindingController {
     }
 
     const dsConfig = binding.dataSource.config as any
-    let finalFetchConfig = { ...dsConfig } as unknown as FetchConfig
+    let finalFetchConfig = { type: binding.dataSource.type, ...dsConfig } as unknown as FetchConfig
 
     if (inputConfig.endpoint) {
       const baseUrl = (dsConfig.url || '').replace(/\/$/, '')
@@ -470,6 +474,7 @@ class DataBindingController {
       const fullUrl = path ? `${baseUrl}/${path}` : baseUrl
 
       finalFetchConfig = {
+        type: binding.dataSource.type,
         ...dsConfig,
         url: fullUrl,
         method: inputConfig.endpoint.method || dsConfig.method || 'GET',
@@ -478,8 +483,8 @@ class DataBindingController {
       } as unknown as FetchConfig
     }
 
-    const fetchResult = await secureDataSourceService.fetchData(
-      finalFetchConfig, authConfig as unknown as AuthConfig
+    const fetchResult = await cachedDataSourceService.fetchData(
+      binding.dataSource.id, finalFetchConfig, authConfig as unknown as AuthConfig
     )
 
     if (!fetchResult.success) {
@@ -492,7 +497,7 @@ class DataBindingController {
     }
 
     const dsResponseConfig = binding.dataSource.config as any
-    const effectiveArrayPath = configOverride?.arrayPath || inputConfig.arrayPath || dsResponseConfig.responseMapping?.dataPath || 'data'
+    const effectiveArrayPath = configOverride?.arrayPath || inputConfig.arrayPath || dsResponseConfig.responseMapping?.dataPath || ''
     const responseMapping = {
       dataPath: effectiveArrayPath,
       fieldMappings: dsResponseConfig.responseMapping?.fieldMappings

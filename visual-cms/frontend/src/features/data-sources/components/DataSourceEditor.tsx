@@ -11,6 +11,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
 import { Header } from '@/shared/components/Header'
+import { dataSourceApi } from '@/shared/api'
 import {
   ArrowLeft,
   Check,
@@ -31,11 +32,13 @@ import {
   ChevronUp,
   Save,
   X,
+  RefreshCw,
 } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import {
   fetchDataSourceById,
   updateDataSource,
+  testDataSourceConnection,
   testNewDataSourceConnection,
   selectDataSourcesSaving,
   selectDataSourcesTesting,
@@ -97,6 +100,9 @@ interface FormData {
   oauth2TokenUrl: string
   oauth2Scope: string
   customHeaders: { key: string; value: string }[]
+  // Macro HMAC
+  macroDomain: string
+  macroAppSecret: string
   status: 'active' | 'draft'
 }
 
@@ -128,6 +134,8 @@ const initialFormData: FormData = {
   oauth2TokenUrl: '',
   oauth2Scope: '',
   customHeaders: [{ key: '', value: '' }],
+  macroDomain: '',
+  macroAppSecret: '',
   status: 'draft',
 }
 
@@ -173,8 +181,12 @@ export const DataSourceEditor: React.FC = () => {
 
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({})
+  const [credentialsRevealed, setCredentialsRevealed] = useState(false)
   const [dataLoaded, setDataLoaded] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [invalidatingCache, setInvalidatingCache] = useState(false)
+  const [cacheInvalidated, setCacheInvalidated] = useState(false)
+  const [authChanged, setAuthChanged] = useState(false)
 
   // ─── Load existing data ─────────────────────────────────────
 
@@ -226,30 +238,49 @@ export const DataSourceEditor: React.FC = () => {
       // Auth
       authType: auth?.type || 'none',
       authStorage: auth?.storage || 'inline',
-      bearerToken: auth?.token || '',
-      apiKey: auth?.key || '',
+      bearerToken: unmask(auth?.token),
+      apiKey: unmask(auth?.key),
       apiKeyName: auth?.keyName || 'X-API-Key',
       apiKeyPlacement: auth?.placement || 'header',
       basicUsername: auth?.username || '',
-      basicPassword: auth?.password || '',
+      basicPassword: unmask(auth?.password),
       oauth2ClientId: auth?.clientId || '',
-      oauth2ClientSecret: auth?.clientSecret || '',
+      oauth2ClientSecret: unmask(auth?.clientSecret),
       oauth2AuthUrl: auth?.authorizationUrl || '',
       oauth2TokenUrl: auth?.tokenUrl || '',
       oauth2Scope: auth?.scope || '',
       customHeaders: customHeadersArr.length > 0 ? customHeadersArr : [{ key: '', value: '' }],
+      macroDomain: auth?.domain || '',
+      macroAppSecret: unmask(auth?.appSecret),
       status: existingDS.status === 'active' ? 'active' : 'draft',
     })
     setDataLoaded(true)
   }, [existingDS, dataLoaded])
 
+  /** Извлекает строку из замаскированного значения (объект { _masked, preview } → строку preview) */
+  const unmask = (val: unknown): string => {
+    if (typeof val === 'string') return val
+    if (val && typeof val === 'object' && '_masked' in val) {
+      return (val as { preview?: string }).preview || '••••••••'
+    }
+    return ''
+  }
+
   // ─── Form helpers ───────────────────────────────────────────
 
+  const AUTH_FIELDS: (keyof FormData)[] = [
+    'authType', 'authStorage', 'bearerToken', 'apiKey', 'apiKeyName', 'apiKeyPlacement',
+    'basicUsername', 'basicPassword', 'oauth2ClientId', 'oauth2ClientSecret',
+    'oauth2AuthUrl', 'oauth2TokenUrl', 'oauth2Scope', 'macroDomain', 'macroAppSecret',
+  ]
+
   const updateForm = (updates: Partial<FormData>) => {
+    if (AUTH_FIELDS.some(f => f in updates)) setAuthChanged(true)
     setFormData(prev => ({ ...prev, ...updates }))
   }
 
   const addKeyValue = (field: 'headers' | 'queryParams' | 'customHeaders') => {
+    if (field === 'customHeaders') setAuthChanged(true)
     setFormData(prev => ({
       ...prev,
       [field]: [...prev[field], { key: '', value: '' }],
@@ -257,6 +288,7 @@ export const DataSourceEditor: React.FC = () => {
   }
 
   const removeKeyValue = (field: 'headers' | 'queryParams' | 'customHeaders', index: number) => {
+    if (field === 'customHeaders') setAuthChanged(true)
     setFormData(prev => ({
       ...prev,
       [field]: prev[field].filter((_, i) => i !== index),
@@ -269,13 +301,34 @@ export const DataSourceEditor: React.FC = () => {
     key: string,
     value: string
   ) => {
+    if (field === 'customHeaders') setAuthChanged(true)
     setFormData(prev => ({
       ...prev,
       [field]: prev[field].map((item, i) => (i === index ? { key, value } : item)),
     }))
   }
 
-  const togglePassword = (field: string) => {
+  const togglePassword = async (field: string) => {
+    const isCurrentlyHidden = !showPasswords[field]
+    // При первом раскрытии любого поля — загружаем реальные credentials
+    if (isCurrentlyHidden && !credentialsRevealed && id) {
+      try {
+        const result = await dataSourceApi.revealCredentials(id)
+        const auth = result.authConfig
+        if (auth) {
+          const updates: Partial<FormData> = {}
+          if (auth.token && typeof auth.token === 'string') updates.bearerToken = auth.token
+          if (auth.key && typeof auth.key === 'string') updates.apiKey = auth.key
+          if (auth.password && typeof auth.password === 'string') updates.basicPassword = auth.password
+          if (auth.clientSecret && typeof auth.clientSecret === 'string') updates.oauth2ClientSecret = auth.clientSecret
+          if (auth.appSecret && typeof auth.appSecret === 'string') updates.macroAppSecret = auth.appSecret
+          updateForm(updates)
+          setCredentialsRevealed(true)
+        }
+      } catch (err) {
+        console.error('Failed to reveal credentials:', err)
+      }
+    }
     setShowPasswords(prev => ({ ...prev, [field]: !prev[field] }))
   }
 
@@ -295,6 +348,7 @@ export const DataSourceEditor: React.FC = () => {
           headers: Object.keys(headersObj).length > 0 ? headersObj : undefined,
           queryParams: Object.keys(queryParamsObj).length > 0 ? queryParamsObj : undefined,
           timeout: formData.timeout,
+          cacheTTL: formData.cacheTTL || 0,
         }
       case 'feed':
         return {
@@ -304,7 +358,7 @@ export const DataSourceEditor: React.FC = () => {
           queryParams: Object.keys(queryParamsObj).length > 0 ? queryParamsObj : undefined,
           pollingEnabled: formData.pollingEnabled,
           pollingInterval: formData.pollingInterval,
-          cacheTTL: formData.cacheTTL,
+          cacheTTL: formData.cacheTTL || 0,
           timeout: formData.timeout,
         }
       case 'graphql':
@@ -315,6 +369,7 @@ export const DataSourceEditor: React.FC = () => {
           query: formData.query,
           variables: formData.variables ? JSON.parse(formData.variables) : undefined,
           timeout: formData.timeout,
+          cacheTTL: formData.cacheTTL || 0,
         }
       case 'static':
         return {
@@ -363,6 +418,13 @@ export const DataSourceEditor: React.FC = () => {
         formData.customHeaders.filter(h => h.key).forEach(h => { obj[h.key] = h.value })
         return { type: 'custom', headers: obj, storage: formData.authStorage }
       }
+      case 'macro-hmac':
+        return {
+          type: 'macro-hmac',
+          domain: formData.macroDomain,
+          appSecret: formData.macroAppSecret,
+          storage: formData.authStorage,
+        }
       default:
         return { type: 'none' }
     }
@@ -373,11 +435,33 @@ export const DataSourceEditor: React.FC = () => {
   const handleTest = async () => {
     dispatch(clearTestResult())
     if (!formData.type) return
-    await dispatch(testNewDataSourceConnection({
-      type: formData.type,
-      config: buildConfig(),
-      authConfig: buildAuthConfig(),
-    }))
+
+    if (id) {
+      // Existing DS — use saved (decrypted) credentials from DB
+      await dispatch(testDataSourceConnection(id))
+    } else {
+      // New DS — send form data directly
+      await dispatch(testNewDataSourceConnection({
+        type: formData.type,
+        config: buildConfig(),
+        authConfig: buildAuthConfig(),
+      }))
+    }
+  }
+
+  const handleInvalidateCache = async () => {
+    if (!id) return
+    setInvalidatingCache(true)
+    setCacheInvalidated(false)
+    try {
+      await dataSourceApi.invalidateCache(id)
+      setCacheInvalidated(true)
+      setTimeout(() => setCacheInvalidated(false), 3000)
+    } catch (error) {
+      console.error('Failed to invalidate cache:', error)
+    } finally {
+      setInvalidatingCache(false)
+    }
   }
 
   const handleSave = async () => {
@@ -389,7 +473,7 @@ export const DataSourceEditor: React.FC = () => {
           name: formData.name,
           description: formData.description || undefined,
           config: buildConfig(),
-          authConfig: buildAuthConfig(),
+          ...(authChanged ? { authConfig: buildAuthConfig() } : {}),
           status: formData.status,
         },
       })).unwrap()
@@ -576,6 +660,20 @@ export const DataSourceEditor: React.FC = () => {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cache TTL (секунды)</label>
+                  <Input
+                    type="number"
+                    value={formData.cacheTTL}
+                    onChange={e => updateForm({ cacheTTL: parseInt(e.target.value) || 0 })}
+                    min={0}
+                    max={86400}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Время жизни кеша ответов от API. 0 = кеш отключён.
+                  </p>
+                </div>
+
                 {/* Feed-specific */}
                 {formData.type === 'feed' && (
                   <>
@@ -607,16 +705,6 @@ export const DataSourceEditor: React.FC = () => {
                         />
                       </div>
                     )}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Cache TTL (секунды)</label>
-                      <Input
-                        type="number"
-                        value={formData.cacheTTL}
-                        onChange={e => updateForm({ cacheTTL: parseInt(e.target.value) || 300 })}
-                        min={0}
-                        max={86400}
-                      />
-                    </div>
                   </>
                 )}
               </div>
@@ -866,6 +954,39 @@ export const DataSourceEditor: React.FC = () => {
                 </div>
               )}
 
+              {formData.authType === 'macro-hmac' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Domain</label>
+                    <Input
+                      value={formData.macroDomain}
+                      onChange={e => updateForm({ macroDomain: e.target.value })}
+                      placeholder="example.com"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Домен сайта для подписи запросов</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">App Secret</label>
+                    <div className="relative">
+                      <Input
+                        type={showPasswords.macroSecret ? 'text' : 'password'}
+                        value={formData.macroAppSecret}
+                        onChange={e => updateForm({ macroAppSecret: e.target.value })}
+                        placeholder="Секретный ключ приложения"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => togglePassword('macroSecret')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPasswords.macroSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
               {/* Storage */}
               {formData.authType !== 'none' && (
                 <div>
@@ -895,6 +1016,20 @@ export const DataSourceEditor: React.FC = () => {
                     <><Globe size={16} className="mr-2" /> Тест подключения</>
                   )}
                 </Button>
+                {id && formData.cacheTTL > 0 && (
+                  <Button variant="secondary" onClick={handleInvalidateCache} disabled={invalidatingCache}>
+                    {invalidatingCache ? (
+                      <><Loader2 size={16} className="mr-2 animate-spin" /> Сброс...</>
+                    ) : (
+                      <><RefreshCw size={16} className="mr-2" /> Сбросить кеш</>
+                    )}
+                  </Button>
+                )}
+                {cacheInvalidated && (
+                  <span className="text-green-600 text-sm flex items-center">
+                    <CheckCircle size={16} className="mr-1" /> Кеш сброшен
+                  </span>
+                )}
                 {testResult && (
                   <div className={`flex items-center ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
                     {testResult.success ? (
@@ -920,7 +1055,7 @@ export const DataSourceEditor: React.FC = () => {
                   {testResult.sampleData !== undefined && (
                     <div>
                       <p className="text-sm font-medium text-gray-700 mb-2">Пример данных:</p>
-                      <pre className="bg-white p-3 rounded border text-xs overflow-auto max-h-64 text-gray-700">
+                      <pre className="bg-white p-3 rounded border text-xs overflow-auto max-h-[600px] text-gray-700">
                         {typeof testResult.sampleData === 'string'
                           ? testResult.sampleData
                           : JSON.stringify(testResult.sampleData, null, 2)}

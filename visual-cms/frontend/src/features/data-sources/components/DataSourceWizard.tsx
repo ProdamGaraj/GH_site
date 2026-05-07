@@ -123,6 +123,9 @@ interface FormData {
   oauth2Scope: string
   // Custom
   customHeaders: { key: string; value: string }[]
+  // Macro HMAC
+  macroDomain: string
+  macroAppSecret: string
   
   // Status
   status: 'active' | 'draft'
@@ -142,7 +145,7 @@ const initialFormData: FormData = {
   timeout: 30000,
   pollingEnabled: false,
   pollingInterval: 60,
-  cacheTTL: 300,
+  cacheTTL: 0,
   query: '',
   variables: '{}',
   staticData: '{}',
@@ -160,6 +163,8 @@ const initialFormData: FormData = {
   oauth2TokenUrl: '',
   oauth2Scope: '',
   customHeaders: [{ key: '', value: '' }],
+  macroDomain: '',
+  macroAppSecret: '',
   status: 'draft',
   tags: []
 }
@@ -276,6 +281,7 @@ export const DataSourceWizard: React.FC = () => {
           url: formData.url,
           headers: Object.keys(headersObj).length > 0 ? headersObj : undefined,
           queryParams: Object.keys(queryParamsObj).length > 0 ? queryParamsObj : undefined,
+          cacheTTL: formData.cacheTTL || 0,
           timeout: formData.timeout
         }
       
@@ -298,6 +304,7 @@ export const DataSourceWizard: React.FC = () => {
           headers: Object.keys(headersObj).length > 0 ? headersObj : undefined,
           query: formData.query,
           variables: formData.variables ? JSON.parse(formData.variables) : undefined,
+          cacheTTL: formData.cacheTTL || 0,
           timeout: formData.timeout
         }
       
@@ -366,6 +373,14 @@ export const DataSourceWizard: React.FC = () => {
           storage: formData.authStorage
         }
       }
+      
+      case 'macro-hmac':
+        return {
+          type: 'macro-hmac',
+          domain: formData.macroDomain,
+          appSecret: formData.macroAppSecret,
+          storage: formData.authStorage
+        }
       
       default:
         return undefined
@@ -633,20 +648,24 @@ export const DataSourceWizard: React.FC = () => {
                 />
               </div>
             )}
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Cache TTL (seconds)
-              </label>
-              <Input
-                type="number"
-                value={formData.cacheTTL}
-                onChange={(e) => updateForm({ cacheTTL: parseInt(e.target.value) || 300 })}
-                min={0}
-                max={86400}
-              />
-            </div>
           </>
+        )}
+
+        {/* Cache TTL — для rest-api, feed, graphql */}
+        {(formData.type === 'rest-api' || formData.type === 'feed' || formData.type === 'graphql') && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Cache TTL (seconds)
+            </label>
+            <Input
+              type="number"
+              value={formData.cacheTTL}
+              onChange={(e) => updateForm({ cacheTTL: parseInt(e.target.value) || 0 })}
+              min={0}
+              max={86400}
+            />
+            <p className="mt-1 text-xs text-gray-500">Время жизни кеша ответов от API. 0 = кеш отключён.</p>
+          </div>
         )}
       </div>
     </div>
@@ -866,6 +885,43 @@ export const DataSourceWizard: React.FC = () => {
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showPasswords.basic ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {formData.authType === 'macro-hmac' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Domain
+              </label>
+              <Input
+                value={formData.macroDomain}
+                onChange={(e) => updateForm({ macroDomain: e.target.value })}
+                placeholder="example.com"
+              />
+              <p className="text-xs text-gray-500 mt-1">Домен сайта для подписи запросов</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                App Secret
+              </label>
+              <div className="relative">
+                <Input
+                  type={showPasswords.macroSecret ? 'text' : 'password'}
+                  value={formData.macroAppSecret}
+                  onChange={(e) => updateForm({ macroAppSecret: e.target.value })}
+                  placeholder="Секретный ключ приложения"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => togglePassword('macroSecret')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPasswords.macroSecret ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>

@@ -54,6 +54,7 @@ export type AuthType =
   | 'basic'         // Basic Auth (username/password)
   | 'oauth2'        // OAuth 2.0 с refresh tokens
   | 'custom'        // Custom headers
+  | 'macro-hmac'    // MacroCRM HMAC (md5 подпись запросов)
 
 /**
  * Способ хранения credentials
@@ -132,6 +133,17 @@ export interface NoAuthConfig {
 }
 
 /**
+ * Конфигурация MacroCRM HMAC авторизации
+ * token = md5(domain + unixtime + appSecret)
+ */
+export interface MacroHmacAuthConfig {
+  type: 'macro-hmac'
+  domain: string
+  appSecret: string
+  storage: CredentialsStorage
+}
+
+/**
  * Объединённый тип конфигурации авторизации
  */
 export type AuthConfig = 
@@ -141,6 +153,7 @@ export type AuthConfig =
   | BasicAuthConfig
   | OAuth2AuthConfig
   | CustomAuthConfig
+  | MacroHmacAuthConfig
 
 // ============================================
 // DATA SOURCE CONFIGURATIONS
@@ -597,6 +610,11 @@ export const AUTH_TYPES: AuthTypeOption[] = [
     value: 'custom',
     label: 'Custom Headers',
     description: 'Custom authentication headers'
+  },
+  {
+    value: 'macro-hmac',
+    label: 'MacroCRM HMAC',
+    description: 'MacroCRM HMAC (md5 подпись запросов)'
   }
 ]
 
