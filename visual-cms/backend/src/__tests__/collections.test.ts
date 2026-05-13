@@ -231,3 +231,75 @@ describe('DataBindingGenerator collectionLink config', () => {
     expect((config.repeaterConfig as any).collectionLink).toBeUndefined()
   })
 })
+
+// ========== DataBindingGenerator runtime: hybrid-static guard ==========
+
+describe('DataBindingGenerator hybrid-static runtime guard', () => {
+  it('renderRepeater должен пропускать children с data-carousel-static', async () => {
+    // Импорт через динамический require чтобы не ломать TS-isolation тестового файла.
+    const { generateDataBindingRuntime } = await import('../services/DataBindingGenerator')
+    const runtime: string = generateDataBindingRuntime({
+      dataSources: [
+        {
+          alias: 'projects',
+          dataSourceId: 'ds-1',
+          endpoint: '/api/projects',
+          loadStrategy: 'pageLoad',
+          cacheEnabled: false,
+        },
+      ],
+      bindings: [
+        {
+          blockId: 'track-1',
+          type: 'repeater',
+          sourceAlias: 'projects',
+          repeaterConfig: {
+            itemTemplate: 'tpl-1',
+            containerSelector: '[data-element-id="track-1"]',
+          },
+          fieldMappings: [],
+        },
+      ],
+      variables: [],
+    })
+    // Гард: внутри обхода container.children проверяем атрибут data-carousel-static
+    // и НЕ скрываем такого ребёнка. Если этот substring потерян — hybrid сломан.
+    expect(runtime).toContain("hasAttribute('data-carousel-static')")
+    // И сам комментарий-инвариант обязан остаться
+    expect(runtime).toContain('hybrid-static')
+  })
+
+  it('renderRepeater должен вставлять clones через insertBefore(template.nextSibling)', async () => {
+    const { generateDataBindingRuntime } = await import('../services/DataBindingGenerator')
+    const runtime: string = generateDataBindingRuntime({
+      dataSources: [
+        {
+          alias: 'projects',
+          dataSourceId: 'ds-1',
+          endpoint: '/api/projects',
+          loadStrategy: 'pageLoad',
+          cacheEnabled: false,
+        },
+      ],
+      bindings: [
+        {
+          blockId: 'track-1',
+          type: 'repeater',
+          sourceAlias: 'projects',
+          repeaterConfig: {
+            itemTemplate: 'tpl-1',
+            containerSelector: '[data-element-id="track-1"]',
+          },
+          fieldMappings: [],
+        },
+      ],
+      variables: [],
+    })
+    // Hybrid-MVP: clones размещаются СРАЗУ ПОСЛЕ template'а через
+    // insertBefore(clone, templateElement.nextSibling). anchor=null → как appendChild.
+    expect(runtime).toContain('templateElement.nextSibling')
+    expect(runtime).toContain('container.insertBefore(clone, insertAnchor)')
+    // Старая реализация appendChild больше не используется для clones
+    expect(runtime).not.toContain('container.appendChild(clone)')
+  })
+})

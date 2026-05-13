@@ -119,9 +119,14 @@ function findNodeById(root: any, id: string): { parent: any; index: number; node
   return walk(root, null, -1)
 }
 
-async function main(): Promise<void> {
-  await AppDataSource.initialize()
-  console.log('[migrate-hero] DB connected')
+export async function migrateHeroToRepeater(
+  options: { initDb?: boolean } = {}
+): Promise<{ status: 'migrated' | 'already-migrated' }> {
+  const initDb = options.initDb ?? true
+  if (initDb) {
+    await AppDataSource.initialize()
+    console.log('[migrate-hero] DB connected')
+  }
 
   const pageRepo = AppDataSource.getRepository(Page)
   const dsRepo = AppDataSource.getRepository(DataSourceEntity)
@@ -133,8 +138,27 @@ async function main(): Promise<void> {
 
   const existingVars = page.variables?.variables || []
   if (existingVars.some(v => v.name === VARIABLE_NAME)) {
-    console.log(`[migrate-hero] Variable "${VARIABLE_NAME}" already exists — page already migrated. Exiting.`)
-    process.exit(0)
+    console.log(`[migrate-hero] Variable "${VARIABLE_NAME}" already exists — page already migrated.`)
+    // Backfill: даже на уже мигрированной странице гарантируем data-carousel-variable
+    // и data-carousel-mode (в первой версии миграции их не ставили).
+    const heroRoot = findNodeById(page.structure, HERO_ROOT_ID)
+    if (heroRoot) {
+      let changed = false
+      if (heroRoot.node.attributes?.['data-carousel-variable'] !== VARIABLE_NAME) {
+        setAttr(heroRoot.node, 'data-carousel-variable', VARIABLE_NAME)
+        changed = true
+      }
+      if (heroRoot.node.attributes?.['data-carousel-mode'] !== 'repeat') {
+        setAttr(heroRoot.node, 'data-carousel-mode', 'repeat')
+        changed = true
+      }
+      if (changed) {
+        await pageRepo.save(page)
+        console.log(`[migrate-hero] Backfilled data-carousel-variable="${VARIABLE_NAME}" + data-carousel-mode="repeat" on hero root`)
+      }
+    }
+    if (initDb) await AppDataSource.destroy()
+    return { status: 'already-migrated' }
   }
 
   // 1. Find track + slides
@@ -194,6 +218,11 @@ async function main(): Promise<void> {
     setAttr(heroRootFound.node, 'data-carousel', 'true')
     setAttr(heroRootFound.node, 'data-carousel-autoplay', '5000')
     setAttr(heroRootFound.node, 'data-carousel-loop', 'true')
+    // Декларируем имя page-variable, в которой лежат слайды.
+    // SlidesTab в редакторе ищет именно этот атрибут, чтобы знать какую переменную править.
+    setAttr(heroRootFound.node, 'data-carousel-variable', VARIABLE_NAME)
+    // Декларативный режим карусели — высший приоритет для getCarouselMode().
+    setAttr(heroRootFound.node, 'data-carousel-mode', 'repeat')
   } else {
     console.warn(`[migrate-hero] WARN: hero root ${HERO_ROOT_ID} not found`)
   }
@@ -295,10 +324,13 @@ async function main(): Promise<void> {
   console.log('[migrate-hero] Page saved')
   console.log('[migrate-hero] DONE. NB: deploy not triggered. Inspect DB / publish manually.')
 
-  await AppDataSource.destroy()
+  if (initDb) await AppDataSource.destroy()
+  return { status: 'migrated' }
 }
 
-main().catch(err => {
-  console.error('[migrate-hero] FAILED:', err)
-  process.exit(1)
-})
+if (require.main === module) {
+  migrateHeroToRepeater().catch(err => {
+    console.error('[migrate-hero] FAILED:', err)
+    process.exit(1)
+  })
+}

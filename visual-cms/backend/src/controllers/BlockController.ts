@@ -85,6 +85,8 @@ export class BlockController {
         const syncResult = await linkedBlocksService.syncBlockToAllPages(id, block.structure)
         if (syncResult.updatedPages.length > 0) {
           console.log(`[BlockSync] Блок ${block.name} синхронизирован на страницы: ${syncResult.updatedPages.join(', ')}`)
+          // Затронутые страницы изменились — кеш страниц устарел
+          await cacheService.invalidateByTag('pages')
         }
         if (syncResult.errors.length > 0) {
           console.error(`[BlockSync] Ошибки: ${syncResult.errors.join('; ')}`)

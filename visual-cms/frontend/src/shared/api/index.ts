@@ -97,6 +97,7 @@ export const api = new ApiClient(API_BASE_URL)
 // Block API
 export const blockApi = {
   getAll: () => api.get<Block[]>('/blocks'),
+  getReusable: () => api.get<Block[]>('/blocks/reusable'),
   getById: (id: string) => api.get<Block>(`/blocks/${id}`),
   getUsages: (id: string) => api.get<Array<{ type: 'page' | 'block'; id: string; name: string; nodePath?: string }>>(`/blocks/${id}/usages`),
   getAllWithUsages: () => api.get<Array<Block & { usages: Array<{ type: 'page' | 'block'; id: string; name: string }> }>>('/blocks/with-usages'),
@@ -112,6 +113,21 @@ export const pageApi = {
   create: (data: CreatePageDto) => api.post<Page>('/pages', data),
   update: (id: string, data: UpdatePageDto) => api.put<Page>(`/pages/${id}`, data),
   delete: (id: string) => api.delete<void>(`/pages/${id}`),
+  // Page-level data settings (variables + dataSources). Используется SlidesTab,
+  // чтобы не таскать огромный page.structure при сохранении hero-слайдов.
+  getDataSettings: (id: string) =>
+    api.get<{ dataSources: unknown; variables: PageVariablesEnvelope }>(`/pages/${id}/data-settings`),
+  updateVariables: (id: string, variables: PageVariablesEnvelope) =>
+    api.put<{ success: true; variables: PageVariablesEnvelope }>(`/pages/${id}/variables`, { variables }),
+}
+
+/**
+ * Конверт page.variables в БД: { variables: PageVariable[] }.
+ * Бэкенд хранит ровно так (см. PageController.updateVariables).
+ * PageVariable объявлен ниже в этом же файле (используется PageDataSettings).
+ */
+export interface PageVariablesEnvelope {
+  variables: PageVariable[]
 }
 
 // Site API

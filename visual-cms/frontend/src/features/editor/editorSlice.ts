@@ -383,6 +383,46 @@ const editorSlice = createSlice({
       state.selectedNodeId = newNode.id
     },
     
+    /**
+     * Вставить уже подготовленный BlockNode (id, styles, children — всё своё)
+     * в children указанного родителя без применения каких-либо defaults.
+     *
+     * Используется когда нода создаётся внешним хелпером (напр. createBlockReferenceNode
+     * из библиотеки) и её структура не должна модифицироваться editor-defaults.
+     *
+     * Не поддерживает responsive-вставку (specificChildren вариаций) — для этого
+     * используйте addNode.
+     */
+    insertPreparedNode: (
+      state,
+      action: PayloadAction<{ parentId: string; node: BlockNode; position?: number; select?: boolean }>
+    ) => {
+      if (!state.rootNode) return
+      const { parentId, node, position, select = true } = action.payload
+      if (state.editMode === 'responsive') {
+        console.warn('insertPreparedNode не поддерживает responsive-режим, переключитесь в base')
+        return
+      }
+
+      const insertInto = (current: BlockNode): BlockNode => {
+        if (current.id === parentId) {
+          const newChildren = [...(current.children || [])]
+          if (position !== undefined && position >= 0 && position <= newChildren.length) {
+            newChildren.splice(position, 0, node)
+          } else {
+            newChildren.push(node)
+          }
+          return { ...current, children: newChildren }
+        }
+        return { ...current, children: (current.children || []).map(insertInto) }
+      }
+
+      state.rootNode = insertInto(state.rootNode)
+      pushToHistory(state)
+      state.isDirty = true
+      if (select) state.selectedNodeId = node.id
+    },
+
     updateNode: (state, action: PayloadAction<{
       id: string
       updates: Partial<BlockNode>
@@ -1209,6 +1249,45 @@ const editorSlice = createSlice({
     setCanvasColor: (state, action: PayloadAction<string>) => {
       state.canvasColor = action.payload
     },
+
+    /**
+     * Атомарно заменить ВЕСЬ массив children указанного родителя.
+     *
+     * Используется когда нужно заменить дочерние ноды одним history-step'ом —
+     * напр. swap template'а карусели в repeat-режиме (один child — единый шаблон).
+     *
+     * NB: пушит history ОДИН раз. Не выполняет валидацию children — caller
+     * сам отвечает за уникальность id (используйте deepCloneNode/remapIds).
+     * В responsive-режиме игнорируется (warning), как и insertPreparedNode.
+     */
+    replaceChildren: (
+      state,
+      action: PayloadAction<{ parentId: string; children: BlockNode[]; selectFirst?: boolean }>
+    ) => {
+      if (!state.rootNode) return
+      const { parentId, children, selectFirst = false } = action.payload
+      if (state.editMode === 'responsive') {
+        console.warn('replaceChildren не поддерживает responsive-режим, переключитесь в base')
+        return
+      }
+
+      let found = false
+      const apply = (current: BlockNode): BlockNode => {
+        if (current.id === parentId) {
+          found = true
+          return { ...current, children: [...children] }
+        }
+        return { ...current, children: (current.children || []).map(apply) }
+      }
+      state.rootNode = apply(state.rootNode)
+      if (!found) return
+
+      pushToHistory(state)
+      state.isDirty = true
+      if (selectFirst && children.length > 0) {
+        state.selectedNodeId = children[0].id
+      }
+    },
   },
 })
 
@@ -1218,6 +1297,7 @@ export const {
   selectNode,
   hoverNode,
   addNode,
+  insertPreparedNode,
   updateNode,
   updateNodeStyles,
   updateLayoutMode,
@@ -1260,6 +1340,7 @@ export const {
   redo,
   saveToHistory,
   setCanvasColor,
+  replaceChildren,
 } = editorSlice.actions
 
 // Selectors

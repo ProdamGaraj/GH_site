@@ -97,6 +97,7 @@
 [data-element-id="gh-1776249962432-187"]:hover { color: #D29F66 !important }
 [data-element-id="gh-1776249962432-191"] { transition: background-color 200ms ease; }
 [data-element-id="gh-1776249962432-191"]:hover { background-color: #B8864D !important }
+[data-element-id="1778571485561-lqe825zyn"]:hover { border-color: #d29f66 !important }
 [data-element-id="gh-1776249962431-5"] { transition: background-color, box-shadow, transform 250ms ease-out; }
 [data-element-id="gh-1776249962431-5"]:hover { box-shadow: 0 6px 32px rgba(210,159,102,0.6) !important; transform: translateY(-2px) !important; background-color: #B8864D !important }
 [data-element-id="gh-1776249962431-27"] { transition: background-color 200ms ease; }
@@ -274,7 +275,7 @@ label {
 </head>
 <body>
   <div style="color: #1A1A1A; width: 100%; display: flex; min-height: 100vh; font-family: 'Muller', 'Inter', Arial, sans-serif; flex-direction: column" data-element-id="gh-1776249962433-222" data-element-name="Home Page">
-    <header style="top: 0; height: 80px; z-index: 1000; display: flex; padding: 0 60px; position: sticky; align-items: center; justify-content: space-between; background-color: #403E3D" data-element-id="gh-1776249962432-193" data-element-name="Header">
+    <header style="top: 0; height: 80px; z-index: 1000; display: flex; padding: 0 60px; position: sticky; align-items: center; background: rgba(0, 0, 0, 0.27); backdrop-filter: blur(35px); justify-content: space-between" data-element-id="gh-1776249962432-193" data-element-name="Header">
       <div style="display: flex; min-width: 200px; align-items: center" data-element-id="gh-1776249962432-181" data-element-name="Header Left">
         <a style="color: #D29F66; font-size: 22px; font-family: 'Muller', 'Inter', Arial, sans-serif; font-weight: 700; letter-spacing: 3px; text-decoration: none" data-element-id="gh-1776249962432-180" data-element-name="Logo" href="/">GOLDEN HOUSE</a>
       </div>
@@ -292,8 +293,17 @@ label {
         <button style="color: #FFFFFF; border: none; cursor: pointer; padding: 10px 20px; font-size: 12px; font-family: 'Muller', 'Inter', Arial, sans-serif; font-weight: 600; border-radius: 4px; letter-spacing: 1px; text-transform: uppercase; background-color: #D29F66" data-element-id="gh-1776249962432-191" data-element-name="Callback Button">Перезвоните мне</button>
       </div>
     </header>
-    <section style="overflow: hidden; position: relative" data-element-id="gh-1776249962431-29" data-element-name="Hero Carousel" data-carousel="true" data-carousel-loop="true" data-carousel-autoplay="5000">
+    <section style="top: -80px; overflow: hidden; position: relative; margin-top: 0; margin-left: 0; padding-top: 0; margin-right: 0; padding-left: 0; margin-bottom: 0; padding-right: 0; padding-bottom: 0" data-element-id="gh-1776249962431-29" data-element-name="Hero Carousel" data-carousel="true" data-carousel-loop="true" data-carousel-mode="repeat" data-carousel-autoplay="5000" data-carousel-variable="heroSlides">
       <div style="width: 100%; display: flex" data-element-id="gh-1776249962431-22" data-element-name="Carousel Slides" data-carousel-track="true">
+        <section style="top: 0px; width: 100%; bottom: 0px; height: 100vh; display: flex; min-width: 100%; position: relative; align-items: center; flex-shrink: 0; background-size: cover; justify-content: center; background-image: url(https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1920); background-position: center" data-element-id="1778571485561-xueoo9qpo" data-element-name="Hero Section" data-carousel-slide="true" data-carousel-static="true">
+          <div style="top: 0; left: 0; right: 0; bottom: 0; position: absolute; background: linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.5) 100%)" data-element-id="1778571485561-foa9m6i4q" data-element-name="Hero Overlay"></div>
+          <div style="z-index: 1; display: flex; padding: 0 40px; max-width: 800px; position: relative; text-align: center; align-items: center; flex-direction: column" data-element-id="1778571485561-feyqf403g" data-element-name="Hero Content">
+            <p style="color: #D29F66; font-size: 13px; font-weight: 500; margin-bottom: 24px; letter-spacing: 4px; text-transform: uppercase" data-element-id="1778571485561-by6chnyse" data-element-name="Hero Subtitle">Девелопер премиальной недвижимости</p>
+            <h1 style="color: #FFFFFF; font-size: 56px; font-weight: 300; line-height: 1.2; margin-bottom: 32px; letter-spacing: -1px" data-element-id="1778571485561-nbkzdhbei" data-element-name="Hero Title">Создаём пространства для жизни</h1>
+            <p style="color: rgba(255,255,255,0.8); font-size: 18px; font-weight: 300; line-height: 1.7; margin-bottom: 48px" data-element-id="1778571485561-ah3n0vtob" data-element-name="Hero Description">13 лет мы строим дома, в которых хочется жить. Архитектура, продуманная до мелочей.</p>
+            <button style="color: #FFFFFF; border: 1px solid rgba(255,255,255,0.4); cursor: pointer; padding: 16px 48px; font-size: 14px; border-color: #c7c7c7; letter-spacing: 2px; text-transform: uppercase; background-color: transparent" data-element-id="1778571485561-lqe825zyn" data-element-name="Hero CTA">Смотреть проекты</button>
+          </div>
+        </section>
         <div style="width: 100%; height: 100vh; display: flex; position: relative; align-items: center; flex-shrink: 0; background-size: cover; justify-content: center; background-image: url("/media/89e6ae34-885e-4345-b946-bcc58b9526cc.png"); background-position: center" data-element-id="gh-1776249962431-7" data-element-name="Slide 1" data-carousel-slide="true">
           <div style="top: 0; left: 0; right: 0; bottom: 0; position: absolute; background: linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.45) 50%, rgba(0,0,0,0.6) 100%)" data-element-id="gh-1776249962431-1" data-element-name="Slide Overlay"></div>
           <div style="z-index: 1; display: flex; padding: 0 40px; max-width: 750px; position: relative; text-align: center; align-items: center; flex-direction: column" data-element-id="gh-1776249962431-6" data-element-name="Slide Content">
@@ -389,19 +399,6 @@ label {
           <button style="color: #4A4A4A; border: 1px solid #E8E8E8; cursor: pointer; padding: 8px 24px; font-size: 13px; font-family: 'Muller', 'Inter', Arial, sans-serif; font-weight: 500; border-radius: 4px; letter-spacing: 0.5px; text-transform: uppercase; background-color: transparent" data-element-id="gh-restore-1776337007476-890" data-element-name="Class Filter - Бизнес">Бизнес</button>
         </div>
         <div style="gap: 32px; display: grid; grid-template-columns: repeat(2, 1fr)" data-element-id="gh-premium-1771840286937-100" data-element-name="Projects Grid">
-          <div style="width: fit-content; border: 1px solid #E8E8E8; cursor: pointer; display: flex; min-width: 100%; overflow: hidden; min-height: 100px; flex-direction: column; background-color: #FFFFFF" data-element-id="gh-premium-1769148718508-74" data-element-name="Project Card">
-            <div style="height: 300px; overflow: hidden; position: relative" data-element-id="gh-premium-1769148718508-69" data-element-name="Project Image Container">
-              <img style="width: 100%; height: 100%; object-fit: cover" data-element-id="gh-premium-1769148718508-66" data-element-name="Project Image" alt="Golden Residence" src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600" />
-              <div style="top: 20px; left: 20px; color: #FFFFFF; padding: 8px 16px; font-size: 12px; position: absolute; font-weight: 500; background-color: #D29F66" data-element-id="gh-premium-1769148718508-68" data-element-name="Project Badge">
-                <span style="color: #FFFFFF" data-element-id="gh-premium-1769148718508-67" data-element-name="Element">Новый проект</span>
-              </div>
-            </div>
-            <div style="display: flex; padding: 28px; flex-direction: column" data-element-id="gh-premium-1769148718508-73" data-element-name="Project Info">
-              <h3 style="color: #1A1A1A; font-size: 22px; font-weight: 500; margin-bottom: 12px" data-element-id="gh-premium-1769148718508-70" data-element-name="Project Name">Golden Residence</h3>
-              <p style="color: #8A8A8A; font-size: 14px; margin-bottom: 20px" data-element-id="gh-premium-1769148718508-71" data-element-name="Project Location">Юнусабад · до метро 5 мин</p>
-              <p style="color: #1A1A1A; font-size: 20px; font-weight: 500" data-element-id="gh-premium-1769148718508-72" data-element-name="Project Price">от $85 000</p>
-            </div>
-          </div>
           <a style="color: inherit; border: 1px solid #E8E8E8; cursor: pointer; display: flex; overflow: hidden; flex-direction: column; text-decoration: none; background-color: #FFFFFF" data-element-id="gh-premium-1771840286937-74" data-element-name="Project Golden Residence" href="#">
             <div style="height: 300px; overflow: hidden; position: relative" data-element-id="gh-premium-1771840286937-69" data-element-name="Project Image Container">
               <img style="width: 100%; height: 100%; object-fit: cover" data-element-id="gh-premium-1771840286937-66" data-element-name="Project Image" alt="Golden Residence" src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600" />
@@ -620,6 +617,62 @@ label {
 
 
 
+  <!-- Site Navigation Runtime -->
+  <script>
+  (function(){
+    var nav = [{"label":"О компании","href":"/about","openInNewTab":true},{"label":"Квартиры","href":"/residential","openInNewTab":true},{"label":"Коммерция","href":"/commercial","openInNewTab":true},{"label":"Новости","href":"/news","openInNewTab":true},{"label":"Карьера","href":"/career","openInNewTab":true},{"label":"Контакты","href":"/contacts","openInNewTab":true},{"label":"Публичная оферта","href":"/legal","openInNewTab":true}];
+    window.__siteNav = nav;
+
+    function buildNavItems(items, ul) {
+      items.forEach(function(item) {
+        var li = document.createElement('li');
+        var a = document.createElement('a');
+        a.href = item.href;
+        a.textContent = item.label;
+        if (item.openInNewTab) { a.target = '_blank'; a.rel = 'noopener'; }
+        li.appendChild(a);
+        if (item.children && item.children.length > 0) {
+          var sub = document.createElement('ul');
+          buildNavItems(item.children, sub);
+          li.appendChild(sub);
+        }
+        ul.appendChild(li);
+      });
+    }
+
+    // Build label→href map (including children)
+    function buildHrefMap(items, map) {
+      items.forEach(function(item) {
+        if (item.label && item.href && item.href !== '#') {
+          map[item.label.trim().toLowerCase()] = item.href;
+        }
+        if (item.children) buildHrefMap(item.children, map);
+      });
+      return map;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      // 1. Auto-fill [data-site-nav] containers
+      document.querySelectorAll('[data-site-nav]').forEach(function(el) {
+        var ul = document.createElement('ul');
+        buildNavItems(nav, ul);
+        el.innerHTML = '';
+        el.appendChild(ul);
+      });
+
+      // 2. Resolve existing header/nav links by matching text content
+      var hrefMap = buildHrefMap(nav, {});
+      var selectors = 'header a[href="#"], nav a[href="#"], [data-element-name="Header"] a[href="#"], [data-element-name="Navigation"] a[href="#"]';
+      document.querySelectorAll(selectors).forEach(function(a) {
+        var text = (a.textContent || '').trim().toLowerCase();
+        if (text && hrefMap[text]) {
+          a.href = hrefMap[text];
+        }
+      });
+    });
+  })();
+  </script>
+
 
 <!-- Visual CMS Data Binding Runtime -->
 <script>
@@ -627,16 +680,16 @@ label {
   'use strict';
   
   // Variables store
-  const _variables = {"heroSlides":[{"id":"41df6640-eed3-467d-9a57-119548b7c26a","kind":"image","image":"/media/89e6ae34-885e-4345-b946-bcc58b9526cc.png","title":"Golden House Premium","ctaHref":"/residential","ctaText":"Выбрать квартиру","subtitle":"Жилой комплекс премиум-класса","alignment":"center","description":"Квартиры от 45 м² в Юнусабадском районе","mediaAssetId":null},{"id":"3527a16d-b24c-487f-a8b2-9a2536aad5cb","kind":"image","image":"/media/89e6ae34-885e-4345-b946-bcc58b9526cc.png","title":"Пространства для бизнеса","ctaHref":"/commercial","ctaText":"Смотреть помещения","subtitle":"Коммерческая недвижимость","alignment":"center","description":"Офисы и торговые помещения с отделкой под ключ","mediaAssetId":null},{"id":"b9ce6af7-7f04-463b-a49b-6ea83f031c1e","kind":"image","image":"/media/60829167-08e3-4a23-8fcd-59d140749ab3.png","title":"Golden House Elite","ctaHref":"/residential","ctaText":"Узнать подробности","subtitle":"Новый проект 2026","alignment":"center","description":"Старт продаж — выгодные цены на этапе строительства","mediaAssetId":null}]};
+  const _variables = {"heroSlides":[{"id":"41df6640-eed3-467d-9a57-119548b7c26a","_id":"1f38f6f7-f10e-439e-9a96-e4e51f07272a","kind":"image","image":"/media/89e6ae34-885e-4345-b946-bcc58b9526cc.png","title":"Golden House Premium","ctaHref":"/residential","ctaText":"Выбрать квартиру","subtitle":"Жилой комплекс премиум-класса","alignment":"center","description":"Квартиры от 45 м² в Юнусабадском районе","mediaAssetId":null},{"id":"3527a16d-b24c-487f-a8b2-9a2536aad5cb","_id":"af877933-e7fc-4ebb-a36f-6101931f3154","kind":"image","image":"/media/89e6ae34-885e-4345-b946-bcc58b9526cc.png","title":"Пространства для бизнеса","ctaHref":"/commercial","ctaText":"Смотреть помещения","subtitle":"Коммерческая недвижимость","alignment":"center","description":"Офисы и торговые помещения с отделкой под ключ","mediaAssetId":null},{"id":"b9ce6af7-7f04-463b-a49b-6ea83f031c1e","_id":"9a7dd3e4-0e4a-4316-b873-bc675358c111","kind":"image","image":"/media/60829167-08e3-4a23-8fcd-59d140749ab3.png","title":"Golden House Elite","ctaHref":"/residential","ctaText":"Узнать подробности","subtitle":"Новый проект 2026","alignment":"center","description":"Старт продаж — выгодные цены на этапе строительства","mediaAssetId":null},{"_id":"504cfbd2-dd86-4515-b3d6-cfcc631dcf63","image":"/media/3331cc21-c55d-4ad1-9f2a-ea6cde709239.png","title":"Отличный тест слайдов","ctaHref":"https://localhost/commercial","ctaText":"CLICKME","subtitle":"Тест","alignment":"center","description":"Просто замечательный тест слайдов для подтверждения работы","_imageAssetId":"9a517ef8-c357-4c54-981f-124a49f57543"}]};
   
   // Data store
   const _dataStore = {};
   
   // Data sources config
-  const _dataSources = [{"alias":"MacroCRM — Жилые комплексы","dataSourceId":"ba7a048c-e742-4829-914d-d3ce1d6773b2","endpoint":"http://api.macrocrm.gh.uz/estate/group/getComplexes","loadStrategy":"pageLoad","cacheEnabled":false,"type":"rest-api"},{"alias":"Golden House — home — heroSlides","dataSourceId":"13a4fa0e-0759-45ff-8cad-bc7f634be071","loadStrategy":"pageLoad","cacheEnabled":false,"type":"page-variable","variableName":"heroSlides"}];
+  const _dataSources = [{"alias":"Golden House — home — heroSlides","dataSourceId":"13a4fa0e-0759-45ff-8cad-bc7f634be071","loadStrategy":"pageLoad","cacheEnabled":false,"type":"page-variable","variableName":"heroSlides"},{"alias":"MacroCRM — Жилые комплексы","dataSourceId":"ba7a048c-e742-4829-914d-d3ce1d6773b2","endpoint":"http://api.macrocrm.gh.uz/estate/group/getComplexes","loadStrategy":"pageLoad","cacheEnabled":false,"type":"rest-api"}];
   
   // Bindings config
-  const _bindings = [{"blockId":"gh-premium-1771840286937-100","bindingId":"8ef6c2d4-9e9f-4e1e-a9b0-6b892b9135ea","type":"repeater","sourceAlias":"MacroCRM — Жилые комплексы","fieldMappings":[{"sourceField":"image","targetProperty":"item.project-image"},{"sourceField":"element","targetProperty":"item.element"},{"sourceField":"name","targetProperty":"item.project-name"},{"sourceField":"location","targetProperty":"item.project-location"},{"sourceField":"price","targetProperty":"item.project-price"},{"sourceField":"year","targetProperty":"item.project-year"},{"sourceField":"class","targetProperty":"item.project-class"}],"fieldOverrides":{"project-class":{"values":{},"joinField":"name"},"project-price":{"values":{"??????":290,"Harizma":560,"Dynasty-1":680,"Dynasty-2":720,"O`Z Zamin":320,"O'zMahal-D":410,"O'zMakon-1":340,"O'zMakon-2":355,"O`zMakon-3":370,"??????????-2":310,"Greenwich-BC":780,"Greenwich-CC":950,"Infinity 3-7":1100,"Assalom Jomiy":360,"Business Park":850,"Assalom Havo-1":430,"Assalom Havo-2":445,"Assalom Havo-3":460,"PARK RESIDENCE":1200,"??????? ???????":420,"Assalom Bog'lar":380,"Assalom Sohil-2":375,"Assalom Sohil-3":390,"Assalom Sohil-4":405,"Novomoskovskaya":480,"Assalom Sohil-5 (1)":415,"Assalom Sohil-5 (2)":420},"joinField":"name","displayTemplate":"от {value} $/кв. м."}},"dynamicFilters":[{"id":"transform-1774344037487-dg1hpujr2","sourceBlockId":"gh-premium-1771840286937-48","field":"project-price","operator":"gte","skipIfEmpty":true},{"id":"transform-1774344051047-hn5ott3bf","sourceBlockId":"gh-premium-1771840286937-50","field":"project-price","operator":"lte","skipIfEmpty":true},{"id":"transform-1774344059919-4b6hmpkpb","sourceBlockId":"gh-premium-1771840286937-45","field":"location","operator":"eq","skipIfEmpty":true,"populateFrom":"houses[0].address","valueExtract":"value.split(',')[2].trim()"},{"id":"transform-1777015667852-ms8e4mxww","sourceBlockId":"gh-premium-1771840286937-54","field":"project-year","operator":"contains","skipIfEmpty":true},{"id":"transform-1777015966381-f4qavcgtd","sourceBlockId":"gh-premium-1771840286937-55","field":"project-year","operator":"contains","skipIfEmpty":true},{"id":"transform-1777015992059-l2k1ypty5","sourceBlockId":"gh-premium-1771840286937-56","field":"project-year","operator":"contains","skipIfEmpty":true}],"repeaterConfig":{"itemTemplate":"gh-premium-1769148718508-74","containerSelector":"[data-element-id=\"gh-premium-1771840286937-100\"]","arrayPath":"complexes","collectionLink":{"basePath":"/projects","slugField":"name","titleField":"title"}}},{"blockId":"gh-1776249962431-22","bindingId":"ed1d8fc0-a6c7-42ee-b9d6-00fbfe10d21d","type":"repeater","sourceAlias":"Golden House — home — heroSlides","fieldMappings":[{"sourceField":"image","targetProperty":"self.style.backgroundImage"},{"sourceField":"subtitle","targetProperty":"[data-bind=subtitle].textContent"},{"sourceField":"title","targetProperty":"[data-bind=title].textContent"},{"sourceField":"description","targetProperty":"[data-bind=description].textContent"},{"sourceField":"ctaText","targetProperty":"[data-bind=cta].textContent"},{"sourceField":"ctaHref","targetProperty":"[data-bind=cta].attr.href"}],"repeaterConfig":{"itemTemplate":"gh-1776249962431-7","containerSelector":"[data-element-id=\"gh-1776249962431-22\"]"}}];
+  const _bindings = [{"blockId":"gh-1776249962431-22","bindingId":"ed1d8fc0-a6c7-42ee-b9d6-00fbfe10d21d","type":"repeater","sourceAlias":"Golden House — home — heroSlides","fieldMappings":[{"sourceField":"image","targetProperty":"self.style.backgroundImage"},{"sourceField":"subtitle","targetProperty":"[data-bind=subtitle].textContent"},{"sourceField":"title","targetProperty":"[data-bind=title].textContent"},{"sourceField":"description","targetProperty":"[data-bind=description].textContent"},{"sourceField":"ctaText","targetProperty":"[data-bind=cta].textContent"},{"sourceField":"ctaHref","targetProperty":"[data-bind=cta].attr.href"}],"repeaterConfig":{"itemTemplate":"gh-1776249962431-7","containerSelector":"[data-element-id=\"gh-1776249962431-22\"]"}},{"blockId":"gh-premium-1771840286937-100","bindingId":"8ef6c2d4-9e9f-4e1e-a9b0-6b892b9135ea","type":"repeater","sourceAlias":"MacroCRM — Жилые комплексы","fieldMappings":[{"sourceField":"image","targetProperty":"item.project-image"},{"sourceField":"element","targetProperty":"item.element"},{"sourceField":"name","targetProperty":"item.project-name"},{"sourceField":"location","targetProperty":"item.project-location"},{"sourceField":"price","targetProperty":"item.project-price"},{"sourceField":"year","targetProperty":"item.project-year"},{"sourceField":"class","targetProperty":"item.project-class"}],"fieldOverrides":{"project-class":{"values":{},"joinField":"name"},"project-price":{"values":{"??????":290,"Harizma":560,"Dynasty-1":680,"Dynasty-2":720,"O`Z Zamin":320,"O'zMahal-D":410,"O'zMakon-1":340,"O'zMakon-2":355,"O`zMakon-3":370,"??????????-2":310,"Greenwich-BC":780,"Greenwich-CC":950,"Infinity 3-7":1100,"Assalom Jomiy":360,"Business Park":850,"Assalom Havo-1":430,"Assalom Havo-2":445,"Assalom Havo-3":460,"PARK RESIDENCE":1200,"??????? ???????":420,"Assalom Bog'lar":380,"Assalom Sohil-2":375,"Assalom Sohil-3":390,"Assalom Sohil-4":405,"Novomoskovskaya":480,"Assalom Sohil-5 (1)":415,"Assalom Sohil-5 (2)":420},"joinField":"name","displayTemplate":"от {value} $/кв. м."}},"dynamicFilters":[{"id":"transform-1774344037487-dg1hpujr2","sourceBlockId":"gh-premium-1771840286937-48","field":"project-price","operator":"gte","skipIfEmpty":true},{"id":"transform-1774344051047-hn5ott3bf","sourceBlockId":"gh-premium-1771840286937-50","field":"project-price","operator":"lte","skipIfEmpty":true},{"id":"transform-1774344059919-4b6hmpkpb","sourceBlockId":"gh-premium-1771840286937-45","field":"location","operator":"eq","skipIfEmpty":true,"populateFrom":"houses[0].address","valueExtract":"value.split(',')[2].trim()"},{"id":"transform-1777015667852-ms8e4mxww","sourceBlockId":"gh-premium-1771840286937-54","field":"project-year","operator":"contains","skipIfEmpty":true},{"id":"transform-1777015966381-f4qavcgtd","sourceBlockId":"gh-premium-1771840286937-55","field":"project-year","operator":"contains","skipIfEmpty":true},{"id":"transform-1777015992059-l2k1ypty5","sourceBlockId":"gh-premium-1771840286937-56","field":"project-year","operator":"contains","skipIfEmpty":true}],"repeaterConfig":{"itemTemplate":"gh-premium-1771840286937-74","containerSelector":"[data-element-id=\"gh-premium-1771840286937-100\"]","arrayPath":"complexes","collectionLink":{"basePath":"/projects","slugField":"name","titleField":"title"}}}];
   
   // Collection context (injected by DeployService.deployCollection)
   const _collectionItem = null;
@@ -1196,6 +1249,15 @@ label {
     
     console.log('[Repeater] Template found:', templateElement);
     
+    // Сохраняем оригинальный inline display ОДНОКРАТНО (на повторных вызовах он уже = 'none').
+    // Иначе клон унаследует display:none и сломается layout.
+    var originalDisplay;
+    if (templateElement.hasAttribute('data-original-display')) {
+      originalDisplay = templateElement.getAttribute('data-original-display');
+    } else {
+      originalDisplay = templateElement.style.display || '';
+      templateElement.setAttribute('data-original-display', originalDisplay);
+    }
     // Скрываем оригинальный template
     templateElement.style.display = 'none';
     
@@ -1203,9 +1265,15 @@ label {
     // «братья» шаблона — карточки, которые были в HTML как образцы данных.
     // Прячем любой дочерний элемент с data-element-id (кроме самого шаблона),
     // т.к. тег карточки может отличаться (div vs a).
+    // ИСКЛЮЧЕНИЕ: hybrid-static-слайды (data-carousel-static="true") оставляем
+    // видимыми — это намеренно вставленные пользователем статические слайды
+    // в hybrid-режиме карусели (template + статика в одном треке).
     Array.from(container.children).forEach(function(child) {
       if (child.hasAttribute('data-repeater-item')) {
         child.remove();
+      } else if (child.hasAttribute('data-carousel-static')) {
+        // hybrid-static-слайд — не трогаем (видим, на своём месте в DOM)
+        return;
       } else if (child !== templateElement && child.hasAttribute('data-element-id')) {
         child.style.display = 'none';
         child.setAttribute('data-repeater-original', 'true');
@@ -1214,12 +1282,21 @@ label {
     
     console.log('[Repeater] Rendering', items.length, 'items with template:', config.itemTemplate);
     
+    // Якорь для вставки clones — узел, ИДУЩИЙ ПОСЛЕ template'а в DOM.
+    // Hybrid-MVP: clones размещаются СРАЗУ ПОСЛЕ template'а, поэтому static-children
+    // ДО template остаются слева, ПОСЛЕ template — справа от сгенерированных.
+    // Если template в конце контейнера (старый case без hybrid-static) — anchor=null,
+    // и insertBefore(clone, null) эквивалентен appendChild — обратная совместимость.
+    var insertAnchor = templateElement.nextSibling;
+    
     // Клонируем template для каждого элемента
     items.forEach(function(item, index) {
       console.log('[Repeater] Processing item #' + index + ':', JSON.stringify(item).substring(0, 200));
       
       const clone = templateElement.cloneNode(true);
-      clone.style.display = ''; // Показываем клон
+      // Восстанавливаем оригинальный display (flex/grid/block), а не пустую строку.
+      clone.style.display = originalDisplay;
+      clone.removeAttribute('data-original-display');
       // Сохраняем originalId для возможности обновления
       const originalId = clone.getAttribute('data-element-id');
       clone.setAttribute('data-repeater-item', index);
@@ -1261,9 +1338,10 @@ label {
         }
       }
       
-      // Вставляем клон в конец контейнера
-      // Не используем insertBefore, так как шаблон может быть в другом контейнере
-      container.appendChild(clone);
+      // Вставляем клон сразу ПОСЛЕ template'а (hybrid-MVP: static-children
+      // ДО template остаются слева, ПОСЛЕ — справа от сгенерированных).
+      // anchor=null → insertBefore работает как appendChild (обратная совместимость).
+      container.insertBefore(clone, insertAnchor);
     });
     
     console.log('[Repeater] Render complete');
@@ -2087,7 +2165,7 @@ label {
     var nextBtn = root.querySelector('[data-carousel-next]');
     var dotsContainer = root.querySelector('[data-carousel-dots]');
 
-    var state = { index: 0, slides: [], dots: [], timer: null, interacting: false };
+    var state = { index: 0, slides: [], dots: [], timer: null, interacting: false, dotActiveStyle: '', dotInactiveStyle: '' };
 
     function getSlides() {
       // Только прямые дети track. Фильтруем по data-carousel-slide если есть, иначе все children.
@@ -2108,6 +2186,14 @@ label {
         var s = state.slides[i];
         s.style.flex = '0 0 ' + (100 / n) + '%';
         s.style.width = (100 / n) + '%';
+        // Очищаем конкурирующие inline-свойства, которые могли прийти из БД
+        // (особенно у hybrid-static-слайдов): min-width/max-width в flex-item
+        // резолвятся ОТ track-width (= n*100% viewport), что растягивает слайд
+        // на N viewports и ломает transform всей карусели.
+        // ВАЖНО: flex-basis НЕ трогаем — его уже задал shorthand "flex" выше,
+        // его сброс пересобирает shorthand и обнуляет basis.
+        s.style.minWidth = '';
+        s.style.maxWidth = '';
       }
       // overflow:hidden на родителе track (чтобы соседние слайды не торчали)
       var parent = track.parentElement;
@@ -2118,38 +2204,71 @@ label {
       }
     }
 
+    function snapshotDotStyles() {
+      // Запоминаем cssText первой и второй точки как 'активный' и 'неактивный' стайл.
+      // Это нужно когда дизайнер задаёт активность через inline-стили (а не через .active класс).
+      if (state.dots.length >= 2) {
+        if (!state.dotActiveStyle) state.dotActiveStyle = state.dots[0].style.cssText;
+        if (!state.dotInactiveStyle) state.dotInactiveStyle = state.dots[1].style.cssText;
+      }
+    }
+
     function rebuildDots() {
       if (!dotsContainer) return;
       var existing = Array.prototype.slice.call(dotsContainer.children);
+      var marked = existing.filter(function(el){ return el.getAttribute && el.getAttribute('data-carousel-dot') === 'true'; });
       var template = dotsContainer.querySelector('[data-carousel-dot]');
 
+      // Pre-snapshot inline-стилей ДО любого изменения DOM. Иначе при N != existing.length
+      // мы попадаем в Case 2 (clone template) и теряем шанс снять inactive-стиль с
+      // существующих dots — все клоны остаются с активным стилем (bug pre-Stage6c).
+      // Условие state.dots.length>=2 сохраняется только в snapshotDotStyles() — здесь
+      // снимаем напрямую с existing для надёжности.
+      if (existing.length >= 1 && !state.dotActiveStyle) {
+        state.dotActiveStyle = existing[0].style.cssText;
+      }
+      if (existing.length >= 2 && !state.dotInactiveStyle) {
+        state.dotInactiveStyle = existing[1].style.cssText;
+      }
+
+      // Случай 1: есть готовые dots в нужном количестве — используем как есть.
+      if (existing.length === state.slides.length && existing.length > 0) {
+        state.dots = existing;
+        snapshotDotStyles();
+        for (var k = 0; k < existing.length; k++) {
+          existing[k].classList.remove(activeClass);
+          (function(idx, el){
+            el.addEventListener('click', function(){ goTo(idx, true); });
+          })(k, existing[k]);
+        }
+        return;
+      }
+
+      // Случай 2: один шаблон-точка — клонируем по числу слайдов
       if (template) {
-        // Шаблон — клонируем по числу слайдов
         var tplClone = template.cloneNode(true);
-        // Очищаем контейнер (включая шаблон)
+        // Очищаем контейнер
         while (dotsContainer.firstChild) dotsContainer.removeChild(dotsContainer.firstChild);
         state.dots = [];
         for (var i = 0; i < state.slides.length; i++) {
           var dot = tplClone.cloneNode(true);
           dot.removeAttribute('data-carousel-dot');
+          dot.classList.remove(activeClass);
           dot.setAttribute('data-carousel-dot-index', String(i));
+          // Если у нас уже есть запомненный inactive-стиль — применяем его
+          // СРАЗУ ко всем клонам. update() потом перепишет активный.
+          if (state.dotInactiveStyle) dot.style.cssText = state.dotInactiveStyle;
           (function(idx){
             dot.addEventListener('click', function(){ goTo(idx, true); });
           })(i);
           dotsContainer.appendChild(dot);
           state.dots.push(dot);
         }
-      } else if (existing.length === state.slides.length) {
-        // Готовые dots — используем как есть
-        state.dots = existing;
-        for (var j = 0; j < existing.length; j++) {
-          (function(idx, el){
-            el.addEventListener('click', function(){ goTo(idx, true); });
-          })(j, existing[j]);
-        }
-      } else {
-        state.dots = [];
+        return;
       }
+
+      // Случай 3: ничего не подошло — без точек
+      state.dots = [];
     }
 
     function update() {
@@ -2159,8 +2278,14 @@ label {
       var pct = -(state.index * (100 / n));
       track.style.transform = 'translateX(' + pct + '%)';
       for (var i = 0; i < state.dots.length; i++) {
-        if (i === state.index) state.dots[i].classList.add(activeClass);
-        else state.dots[i].classList.remove(activeClass);
+        var dot = state.dots[i];
+        if (i === state.index) {
+          dot.classList.add(activeClass);
+          if (state.dotActiveStyle) dot.style.cssText = state.dotActiveStyle;
+        } else {
+          dot.classList.remove(activeClass);
+          if (state.dotInactiveStyle) dot.style.cssText = state.dotInactiveStyle;
+        }
       }
     }
 

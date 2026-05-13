@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { AppDataSource } from '../config/database'
 import { DataBinding, DataBindingFullConfig, FilterConfig, SortConfig } from '../models/DataBinding'
 import { DataSource as DataSourceEntity } from '../models/DataSource'
+import { Page } from '../models/Page'
 import { secureDataSourceService, FetchConfig, AuthConfig } from '../services/SecureDataSourceService'
 import { cachedDataSourceService } from '../services/CachedDataSourceService'
 import { dataFilterService } from '../services/DataFilterService'
@@ -11,6 +12,7 @@ import { asyncHandler, NotFoundError, ValidationError, AppError } from '../middl
 
 const dataBindingRepository = AppDataSource.getRepository(DataBinding)
 const dataSourceRepository = AppDataSource.getRepository(DataSourceEntity)
+const pageRepository = AppDataSource.getRepository(Page)
 
 class DataBindingController {
 
@@ -483,9 +485,11 @@ class DataBindingController {
       } as unknown as FetchConfig
     }
 
-    const fetchResult = await cachedDataSourceService.fetchData(
-      binding.dataSource.id, finalFetchConfig, authConfig as unknown as AuthConfig
-    )
+    const fetchResult = binding.dataSource.type === 'page-variable'
+      ? await this.resolvePageVariable(binding)
+      : await cachedDataSourceService.fetchData(
+          binding.dataSource.id, finalFetchConfig, authConfig as unknown as AuthConfig
+        )
 
     if (!fetchResult.success) {
       await dataBindingRepository.update(binding.id, {
@@ -535,6 +539,31 @@ class DataBindingController {
       meta: transformResult.meta
     })
   })
+
+  /**
+   * Резолвит data source типа 'page-variable' напрямую из page.variables.
+   * Используется в редакторе/preview, чтобы избежать round-trip и обеспечить
+   * реактивный preview (изменение переменной → перерисовка репитера).
+   */
+  private async resolvePageVariable(binding: DataBinding): Promise<{
+    success: boolean
+    data: unknown
+    error?: { message: string }
+    metadata: { statusCode: number; headers: Record<string, string>; responseTime: number }
+  }> {
+    const startTime = Date.now()
+    const variableName = (binding.dataSource.config as any)?.variableName
+    const ok = (data: unknown) => ({
+      success: true,
+      data,
+      metadata: { statusCode: 200, headers: { 'x-data-source-type': 'page-variable' }, responseTime: Date.now() - startTime },
+    })
+    if (!variableName || !binding.pageId) return ok([])
+    const page = await pageRepository.findOne({ where: { id: binding.pageId } })
+    const vars = (page?.variables as any)?.variables || []
+    const def = vars.find((v: any) => v.name === variableName)
+    return ok(def?.defaultValue ?? [])
+  }
 
 
   /**

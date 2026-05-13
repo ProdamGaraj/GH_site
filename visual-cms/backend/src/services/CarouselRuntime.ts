@@ -43,7 +43,7 @@ export function generateCarouselRuntime(): string {
     var nextBtn = root.querySelector('[data-carousel-next]');
     var dotsContainer = root.querySelector('[data-carousel-dots]');
 
-    var state = { index: 0, slides: [], dots: [], timer: null, interacting: false };
+    var state = { index: 0, slides: [], dots: [], timer: null, interacting: false, dotActiveStyle: '', dotInactiveStyle: '' };
 
     function getSlides() {
       // Только прямые дети track. Фильтруем по data-carousel-slide если есть, иначе все children.
@@ -64,6 +64,14 @@ export function generateCarouselRuntime(): string {
         var s = state.slides[i];
         s.style.flex = '0 0 ' + (100 / n) + '%';
         s.style.width = (100 / n) + '%';
+        // Очищаем конкурирующие inline-свойства, которые могли прийти из БД
+        // (особенно у hybrid-static-слайдов): min-width/max-width в flex-item
+        // резолвятся ОТ track-width (= n*100% viewport), что растягивает слайд
+        // на N viewports и ломает transform всей карусели.
+        // ВАЖНО: flex-basis НЕ трогаем — его уже задал shorthand "flex" выше,
+        // его сброс пересобирает shorthand и обнуляет basis.
+        s.style.minWidth = '';
+        s.style.maxWidth = '';
       }
       // overflow:hidden на родителе track (чтобы соседние слайды не торчали)
       var parent = track.parentElement;
@@ -74,38 +82,71 @@ export function generateCarouselRuntime(): string {
       }
     }
 
+    function snapshotDotStyles() {
+      // Запоминаем cssText первой и второй точки как 'активный' и 'неактивный' стайл.
+      // Это нужно когда дизайнер задаёт активность через inline-стили (а не через .active класс).
+      if (state.dots.length >= 2) {
+        if (!state.dotActiveStyle) state.dotActiveStyle = state.dots[0].style.cssText;
+        if (!state.dotInactiveStyle) state.dotInactiveStyle = state.dots[1].style.cssText;
+      }
+    }
+
     function rebuildDots() {
       if (!dotsContainer) return;
       var existing = Array.prototype.slice.call(dotsContainer.children);
+      var marked = existing.filter(function(el){ return el.getAttribute && el.getAttribute('data-carousel-dot') === 'true'; });
       var template = dotsContainer.querySelector('[data-carousel-dot]');
 
+      // Pre-snapshot inline-стилей ДО любого изменения DOM. Иначе при N != existing.length
+      // мы попадаем в Case 2 (clone template) и теряем шанс снять inactive-стиль с
+      // существующих dots — все клоны остаются с активным стилем (bug pre-Stage6c).
+      // Условие state.dots.length>=2 сохраняется только в snapshotDotStyles() — здесь
+      // снимаем напрямую с existing для надёжности.
+      if (existing.length >= 1 && !state.dotActiveStyle) {
+        state.dotActiveStyle = existing[0].style.cssText;
+      }
+      if (existing.length >= 2 && !state.dotInactiveStyle) {
+        state.dotInactiveStyle = existing[1].style.cssText;
+      }
+
+      // Случай 1: есть готовые dots в нужном количестве — используем как есть.
+      if (existing.length === state.slides.length && existing.length > 0) {
+        state.dots = existing;
+        snapshotDotStyles();
+        for (var k = 0; k < existing.length; k++) {
+          existing[k].classList.remove(activeClass);
+          (function(idx, el){
+            el.addEventListener('click', function(){ goTo(idx, true); });
+          })(k, existing[k]);
+        }
+        return;
+      }
+
+      // Случай 2: один шаблон-точка — клонируем по числу слайдов
       if (template) {
-        // Шаблон — клонируем по числу слайдов
         var tplClone = template.cloneNode(true);
-        // Очищаем контейнер (включая шаблон)
+        // Очищаем контейнер
         while (dotsContainer.firstChild) dotsContainer.removeChild(dotsContainer.firstChild);
         state.dots = [];
         for (var i = 0; i < state.slides.length; i++) {
           var dot = tplClone.cloneNode(true);
           dot.removeAttribute('data-carousel-dot');
+          dot.classList.remove(activeClass);
           dot.setAttribute('data-carousel-dot-index', String(i));
+          // Если у нас уже есть запомненный inactive-стиль — применяем его
+          // СРАЗУ ко всем клонам. update() потом перепишет активный.
+          if (state.dotInactiveStyle) dot.style.cssText = state.dotInactiveStyle;
           (function(idx){
             dot.addEventListener('click', function(){ goTo(idx, true); });
           })(i);
           dotsContainer.appendChild(dot);
           state.dots.push(dot);
         }
-      } else if (existing.length === state.slides.length) {
-        // Готовые dots — используем как есть
-        state.dots = existing;
-        for (var j = 0; j < existing.length; j++) {
-          (function(idx, el){
-            el.addEventListener('click', function(){ goTo(idx, true); });
-          })(j, existing[j]);
-        }
-      } else {
-        state.dots = [];
+        return;
       }
+
+      // Случай 3: ничего не подошло — без точек
+      state.dots = [];
     }
 
     function update() {
@@ -115,8 +156,14 @@ export function generateCarouselRuntime(): string {
       var pct = -(state.index * (100 / n));
       track.style.transform = 'translateX(' + pct + '%)';
       for (var i = 0; i < state.dots.length; i++) {
-        if (i === state.index) state.dots[i].classList.add(activeClass);
-        else state.dots[i].classList.remove(activeClass);
+        var dot = state.dots[i];
+        if (i === state.index) {
+          dot.classList.add(activeClass);
+          if (state.dotActiveStyle) dot.style.cssText = state.dotActiveStyle;
+        } else {
+          dot.classList.remove(activeClass);
+          if (state.dotInactiveStyle) dot.style.cssText = state.dotInactiveStyle;
+        }
       }
     }
 

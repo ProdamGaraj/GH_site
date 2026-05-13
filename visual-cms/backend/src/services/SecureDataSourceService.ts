@@ -13,7 +13,7 @@ import { CredentialsManager } from './CredentialsManager'
 
 // Типы
 export interface FetchConfig {
-  type: 'rest-api' | 'feed' | 'graphql' | 'static'
+  type: 'rest-api' | 'feed' | 'graphql' | 'static' | 'page-variable'
   url?: string
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
   headers?: Record<string, string>
@@ -157,6 +157,19 @@ class SecureDataSourceService {
           return await this.fetchRestApi(config, authConfig, startTime)
         case 'graphql':
           return await this.fetchGraphQL(config, authConfig, startTime)
+        case 'page-variable':
+          // Данные page-variable не фетчатся с бэкенда — они инжектятся в HTML из page.variables
+          // и читаются runtime'ом DataBindingGenerator. Возвращаем пустой результат, чтобы
+          // редактор/preview не падал с 502.
+          return {
+            success: true,
+            data: [],
+            metadata: {
+              statusCode: 200,
+              headers: { 'x-data-source-type': 'page-variable' },
+              responseTime: Date.now() - startTime,
+            },
+          }
         default:
           throw new Error(`Unsupported data source type: ${config.type}`)
       }

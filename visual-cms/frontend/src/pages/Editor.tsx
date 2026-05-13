@@ -50,6 +50,7 @@ import { StatesPanel } from '@/features/editor/components/RightPanel/StatesPanel
 import { AnimationsPanel } from '@/features/editor/components/RightPanel/AnimationsPanel'
 import { ScriptsPanel } from '@/features/editor/components/RightPanel/ScriptsPanel'
 import { DataPanel } from '@/features/editor/components/RightPanel/DataPanel'
+import { SlidesPanel } from '@/features/editor/components/RightPanel/SlidesPanel'
 import { CSSPanel } from '@/features/editor/components/RightPanel/CSSPanel'
 import { LeftSidebar } from '@/features/editor/components/Sidebar/LeftSidebar'
 import { RightSidebar } from '@/features/editor/components/Sidebar/RightSidebar'
@@ -1000,6 +1001,11 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                 {/* Data Panel */}
                 {activeRightPanel === 'data' && (
                   <DataPanel pageId={type === 'page' ? id : undefined} libraryBlockId={type === 'block' ? id : undefined} />
+                )}
+                
+                {/* Slides Panel (carousel editor) */}
+                {activeRightPanel === 'slides' && (
+                  <SlidesPanel pageId={type === 'page' ? id : undefined} />
                 )}
                 
                 {/* CSS Panel */}

@@ -683,6 +683,15 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     
     console.log('[Repeater] Template found:', templateElement);
     
+    // Сохраняем оригинальный inline display ОДНОКРАТНО (на повторных вызовах он уже = 'none').
+    // Иначе клон унаследует display:none и сломается layout.
+    var originalDisplay;
+    if (templateElement.hasAttribute('data-original-display')) {
+      originalDisplay = templateElement.getAttribute('data-original-display');
+    } else {
+      originalDisplay = templateElement.style.display || '';
+      templateElement.setAttribute('data-original-display', originalDisplay);
+    }
     // Скрываем оригинальный template
     templateElement.style.display = 'none';
     
@@ -690,9 +699,15 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     // «братья» шаблона — карточки, которые были в HTML как образцы данных.
     // Прячем любой дочерний элемент с data-element-id (кроме самого шаблона),
     // т.к. тег карточки может отличаться (div vs a).
+    // ИСКЛЮЧЕНИЕ: hybrid-static-слайды (data-carousel-static="true") оставляем
+    // видимыми — это намеренно вставленные пользователем статические слайды
+    // в hybrid-режиме карусели (template + статика в одном треке).
     Array.from(container.children).forEach(function(child) {
       if (child.hasAttribute('data-repeater-item')) {
         child.remove();
+      } else if (child.hasAttribute('data-carousel-static')) {
+        // hybrid-static-слайд — не трогаем (видим, на своём месте в DOM)
+        return;
       } else if (child !== templateElement && child.hasAttribute('data-element-id')) {
         child.style.display = 'none';
         child.setAttribute('data-repeater-original', 'true');
@@ -701,12 +716,21 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     
     console.log('[Repeater] Rendering', items.length, 'items with template:', config.itemTemplate);
     
+    // Якорь для вставки clones — узел, ИДУЩИЙ ПОСЛЕ template'а в DOM.
+    // Hybrid-MVP: clones размещаются СРАЗУ ПОСЛЕ template'а, поэтому static-children
+    // ДО template остаются слева, ПОСЛЕ template — справа от сгенерированных.
+    // Если template в конце контейнера (старый case без hybrid-static) — anchor=null,
+    // и insertBefore(clone, null) эквивалентен appendChild — обратная совместимость.
+    var insertAnchor = templateElement.nextSibling;
+    
     // Клонируем template для каждого элемента
     items.forEach(function(item, index) {
       console.log('[Repeater] Processing item #' + index + ':', JSON.stringify(item).substring(0, 200));
       
       const clone = templateElement.cloneNode(true);
-      clone.style.display = ''; // Показываем клон
+      // Восстанавливаем оригинальный display (flex/grid/block), а не пустую строку.
+      clone.style.display = originalDisplay;
+      clone.removeAttribute('data-original-display');
       // Сохраняем originalId для возможности обновления
       const originalId = clone.getAttribute('data-element-id');
       clone.setAttribute('data-repeater-item', index);
@@ -748,9 +772,10 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         }
       }
       
-      // Вставляем клон в конец контейнера
-      // Не используем insertBefore, так как шаблон может быть в другом контейнере
-      container.appendChild(clone);
+      // Вставляем клон сразу ПОСЛЕ template'а (hybrid-MVP: static-children
+      // ДО template остаются слева, ПОСЛЕ — справа от сгенерированных).
+      // anchor=null → insertBefore работает как appendChild (обратная совместимость).
+      container.insertBefore(clone, insertAnchor);
     });
     
     console.log('[Repeater] Render complete');

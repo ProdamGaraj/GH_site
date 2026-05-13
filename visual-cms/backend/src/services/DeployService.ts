@@ -1235,13 +1235,11 @@ export class DeployService {
 
     // Find bindings that use library templates
     const templateIds = new Set<string>()
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     for (const binding of bindings) {
       const config = binding.config as any
-      // Check both libraryTemplateId (old) and templateId (new) for compatibility.
-      // Игнорируем non-UUID значения (in-page block id не является библиотечным блоком).
+      // Check both libraryTemplateId (old) and templateId (new) for compatibility
       const templateId = config.inputConfig?.libraryTemplateId || config.inputConfig?.templateId
-      if (templateId && UUID_RE.test(String(templateId))) {
+      if (templateId) {
         templateIds.add(templateId)
       }
     }

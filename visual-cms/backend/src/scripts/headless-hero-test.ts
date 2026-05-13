@@ -58,6 +58,34 @@ async function main() {
     console.log('  track.transform:', tStyle.transform)
   }
 
+  // Detail per clone
+  for (let i = 0; i < repeaterItems.length; i++) {
+    const c = repeaterItems[i] as any
+    console.log(`  clone[${i}]: display="${c.style.display}" bg="${(c.style.backgroundImage||'').substring(0,80)}" title="${c.querySelector('[data-bind="title"]')?.textContent?.substring(0,40)}"`)
+  }
+  if (dotsContainer) {
+    const dots = Array.from(dotsContainer.children) as any[]
+    for (let i = 0; i < dots.length; i++) {
+      console.log(`  dot[${i}] INIT: cssText="${dots[i].style.cssText.substring(0,90)}" active=${dots[i].classList.contains('active')}`)
+    }
+    // Simulate next-button click and re-inspect
+    const nextBtn = doc.querySelector('[data-carousel-next]') as any
+    if (nextBtn) {
+      nextBtn.click()
+      await new Promise(r => setTimeout(r, 50))
+      console.log('--- After next click ---')
+      for (let i = 0; i < dots.length; i++) {
+        console.log(`  dot[${i}] AFTER: cssText="${dots[i].style.cssText.substring(0,90)}" active=${dots[i].classList.contains('active')}`)
+      }
+      console.log('  track.transform:', (track as any).style.transform)
+    }
+  }
+  // Check template directly
+  const tmpl = doc.querySelector('[data-element-id="gh-1776249962431-7"]') as any
+  if (tmpl) {
+    console.log(`  template: display="${tmpl.style.display}" data-original-display="${tmpl.getAttribute('data-original-display')}"`)
+  }
+
   console.log('\n--- Console logs ---')
   for (const l of logs.slice(0, 80)) console.log(l)
 
