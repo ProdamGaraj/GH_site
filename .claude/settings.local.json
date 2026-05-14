@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\d.tolkunov\\\\CodeRepository\\\\GH_site\\\\visual-cms\\\\frontend\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\d.tolkunov\\\\CodeRepository\\\\GH_site\\\\visual-cms\\\\backend\" -Directory)",
+      "Bash(grep -E \"\\\\.tsx$|^-\")",
+      "Bash(xargs wc -l)",
+      "Bash(grep -r \"^\\\\s*//.*\" \"c:/Users/d.tolkunov/CodeRepository/GH_site/visual-cms/frontend/src/features/editor\" --include=\"*.tsx\")",
+      "Bash(grep -E \"\\\\.tsx?$|^d\")",
+      "Bash(grep -E \"\\\\.tsx?$\")",
+      "Bash(grep -r \"^[[:space:]]*//.*const\\\\|^[[:space:]]*//.*function\\\\|^[[:space:]]*//.*export\" \"c:/Users/d.tolkunov/CodeRepository/GH_site/visual-cms/frontend/src/features/editor\" --include=\"*.tsx\")",
+      "Bash(npx tsc *)",
+      "Bash(git -C \"c:/Users/d.tolkunov/CodeRepository/GH_site\" diff --stat)"
+    ]
+  }
+}

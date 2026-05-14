@@ -207,7 +207,7 @@ export type Breakpoint = 'desktop' | 'tablet' | 'mobile' | string
 export interface Browser {
   id: string
   name: string
-  viewportHeightOffset: number // Р’С‹СЃРѕС‚Р° РїР°РЅРµР»РµР№ Р±СЂР°СѓР·РµСЂР° + UI (РІ РїРёРєСЃРµР»СЏС…)
+  viewportHeightOffset: number // Высота панелей браузера + UI (в пикселях)
   icon?: string
   isDefault?: boolean
 }
@@ -217,9 +217,9 @@ export interface CustomBreakpoint {
   name: string
   width: number
   height?: number
-  browserId?: string // ID РІС‹Р±СЂР°РЅРЅРѕРіРѕ Р±СЂР°СѓР·РµСЂР° РґР»СЏ СЌС‚РѕРіРѕ breakpoint
+  browserId?: string // ID выбранного браузера для этого breakpoint
   icon?: 'monitor' | 'tablet' | 'smartphone' | 'laptop' | 'watch'
-  color?: string // Р¦РІРµС‚ РІС‹РґРµР»РµРЅРёСЏ РґР»СЏ viewport-СЃРїРµС†РёС„РёС‡РЅС‹С… СЌР»РµРјРµРЅС‚РѕРІ
+  color?: string // Цвет выделения для viewport-специфичных элементов
 }
 
 export interface StandardMonitor {
@@ -231,17 +231,17 @@ export interface StandardMonitor {
 }
 // Variation for responsive breakpoints
 export interface BlockNodeVariation {
-  // РџРµСЂРµРѕРїСЂРµРґРµР»РµРЅРёСЏ РґР»СЏ СѓРЅР°СЃР»РµРґРѕРІР°РЅРЅС‹С… СЌР»РµРјРµРЅС‚РѕРІ
+  // Переопределения для унаследованных элементов
   inheritedOverrides?: {
     [nodeId: string]: {
-      hidden?: boolean  // РЎРєСЂС‹С‚СЊ СѓРЅР°СЃР»РµРґРѕРІР°РЅРЅС‹Р№ СЌР»РµРјРµРЅС‚
+      hidden?: boolean  // Скрыть унаследованный элемент
       styles?: Partial<CSSProperties>
       attributes?: Record<string, string>
       content?: string
     }
   }
   
-  // РЎРїРµС†РёС„РёС‡РЅС‹Рµ РґРѕС‡РµСЂРЅРёРµ СЌР»РµРјРµРЅС‚С‹ (С‚РѕР»СЊРєРѕ РґР»СЏ СЌС‚РѕРіРѕ Р±СЂРµР№РєРїРѕРёРЅС‚Р°)
+  // Специфичные дочерние элементы (только для этого брейкпоинта)
   specificChildren?: BlockNode[]
 }
 
@@ -293,7 +293,7 @@ export interface BlockNode {
     breakpoints?: Array<{ id: string; name: string; width: number; height?: number }>
   }
   
-  // Р’Р°СЂРёР°С†РёРё РґР»СЏ СЂР°Р·РЅС‹С… Р±СЂРµР№РєРїРѕРёРЅС‚РѕРІ (РЅРµР·Р°РІРёСЃРёРјС‹Рµ DOM РґРµСЂРµРІСЊСЏ)
+  // Вариации для разных брейкпоинтов (независимые DOM деревья)
   variations?: {
     [breakpointId: string]: BlockNodeVariation
   }

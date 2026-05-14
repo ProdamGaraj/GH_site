@@ -1,11 +1,15 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useDataBindingWithTransforms } from '@/features/dataBindings/hooks/useDataBindingWithTransforms'
 import { useAppSelector, useAppDispatch } from '@/app/hooks'
 import { selectBlocks } from '@/features/blocks/blocksSlice'
 import { selectNode } from '@/features/editor/editorSlice'
+import { useComputedStyles } from '../../hooks/useComputedStyles'
 import { BlockNode, CSSProperties } from '@/shared/types'
 import { CanvasRenderer } from './CanvasRenderer'
 import { BlockNodeWithViewport } from '../../utils/variationUtils'
+import { getRepeatTemplate } from '../../utils/repeatTemplateHelper'
+import { getStaticBefore, getStaticAfter, prepareHybridStaticNode } from '../../utils/hybridStaticHelper'
+import { deepCloneNode } from '../../utils/carouselHelpers'
 
 interface RepeaterRendererProps {
   node: BlockNodeWithViewport
@@ -19,6 +23,34 @@ interface InputConfig {
   mode?: 'single' | 'repeater'
   templateId?: string
   fieldMappings?: Array<{ sourceField: string; targetProperty: string; elementId?: string }>
+}
+
+// Рекурсивно ищет первый file_url в объекте данных.
+// Вынесена в module-scope: чистая функция, нет зависимости от state/props,
+// что позволяет безопасно вызывать её из useEffect без TDZ-нарушений.
+const findFirstFileUrl = (value: any): string | undefined => {
+  if (!value) return undefined
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findFirstFileUrl(item)
+      if (found) return found
+    }
+    return undefined
+  }
+
+  if (typeof value === 'object') {
+    if (typeof value.file_url === 'string' && value.file_url.length > 0) {
+      return value.file_url
+    }
+
+    for (const child of Object.values(value)) {
+      const found = findFirstFileUrl(child)
+      if (found) return found
+    }
+  }
+
+  return undefined
 }
 
 /**
@@ -58,17 +90,222 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
   
   const blocks = useAppSelector(selectBlocks)
   const [repeaterItems, setRepeaterItems] = useState<BlockNodeWithViewport[]>([])
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0)
+  const containerRef = useRef<HTMLElement | null>(null)
+  const isCarouselTrack = node.attributes?.['data-carousel-track'] === 'true'
+  const computedContainerStyles = useComputedStyles(node)
 
-  // Получаем templateId из конфига привязки
+  const repeaterContainerStyles: React.CSSProperties = {
+    ...computedContainerStyles,
+    ...(isCarouselTrack
+      ? {
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          position: (computedContainerStyles.position as React.CSSProperties['position']) || 'relative',
+          scrollBehavior: 'smooth',
+        }
+      : {}),
+  }
+
+  // ====================== Derived state (вся мемоизация — перед эффектами и функциями) ======================
+  // Получаем templateId из конфига привязки.
+  // Мемоизируем производные значения, иначе при каждом ре-рендере родителя
+  // fieldMappings / fieldOverrides / templateBlock получают новую ссылку,
+  // что вызывает каскадный re-run useEffect ниже и бесконечный setRepeaterItems.
   const inputConfig = binding?.config?.inputConfig as InputConfig | undefined
+  const inputConfigRaw = inputConfig as any
   const templateId = inputConfig?.templateId
-  const fieldMappings = inputConfig?.fieldMappings || []
-  const arrayPath = (inputConfig as any)?.arrayPath // путь к массиву в данных, например "data"
+  const arrayPath = inputConfigRaw?.arrayPath // путь к массиву в данных, например "data"
+
+  const fieldMappings = useMemo(
+    () => inputConfig?.fieldMappings || [],
+    [inputConfig?.fieldMappings]
+  )
+
   const fieldOverrides: Record<string, { joinField: string; values: Record<string, string | number>; displayTemplate?: string }> =
-    (inputConfig as any)?.fieldOverrides || {}
+    useMemo(() => inputConfigRaw?.fieldOverrides || {}, [inputConfigRaw?.fieldOverrides])
 
   // Находим шаблон блока
-  const templateBlock = templateId ? blocks.find(b => b.id === templateId) : null
+  const templateBlock = useMemo(
+    () => (templateId ? blocks.find(b => b.id === templateId) : null) || null,
+    [blocks, templateId]
+  )
+
+  // Hybrid-MVP: первый non-static child трека — это template для клонирования.
+  // Все остальные children с data-carousel-static="true" должны рендериться как обычные слайды
+  // в их позиции относительно template'а. На бэке (DataBindingGenerator) — та же логика.
+  const trackTemplateChild = useMemo(() => getRepeatTemplate(node), [node])
+
+  const staticBeforeSlides = useMemo(
+    () => getStaticBefore(node, trackTemplateChild),
+    [node, trackTemplateChild]
+  )
+  const staticAfterSlides = useMemo(
+    () => getStaticAfter(node, trackTemplateChild),
+    [node, trackTemplateChild]
+  )
+
+  // Если non-static child — placeholder с linkedBlockId, раскрываем его в полную структуру из библиотеки.
+  // Это аналог templateBlock, но взятый из трека вместо binding.config.inputConfig.templateId.
+  const resolvedTrackTemplate = useMemo<BlockNode | null>(() => {
+    if (!trackTemplateChild) return null
+    const linkedId = trackTemplateChild.metadata?.linkedBlockId
+    if (typeof linkedId === 'string' && linkedId.length > 0) {
+      const linked = blocks.find(b => b.id === linkedId)
+      if (linked?.structure) return linked.structure
+    }
+    return trackTemplateChild
+  }, [blocks, trackTemplateChild])
+
+  // Раскрытие linked-static слайдов: если static-слайд — это placeholder с linkedBlockId,
+  // подменяем его структуру содержимым из library. На бэке это делает LinkedBlocksService при save,
+  // но в Canvas мы хотим видеть результат сразу — без обязательного промежуточного сохранения.
+  // Сохраняем id placeholder'а на корне, чтобы он матчился с allSlideIds и data-element-id в DOM.
+  // Дочерние id перевыдаются детерминированно (`${slide.id}-lib-N`), чтобы:
+  //   1) Не было коллизий с другими подобными слайдами на той же странице
+  //   2) Стабильность между ре-рендерами — React не пересоздаёт DOM, выделение элементов не теряется
+  //
+  // После раскрытия:
+  //   а) Прогоняем через prepareHybridStaticNode(template) — мержим layout-стили template-слайда
+  //      (height/display/position/выравнивание + flex-shrink: 0).
+  //   б) Дополнительно копируем width/min-width/max-width/flex-* template'а. В продакшене эти стили
+  //      проставляет CarouselRuntime.applyTrackLayout, поэтому prepareHybridStaticNode их намеренно
+  //      не трогает. В Canvas runtime не работает — без этих стилей library-блок остаётся со своей
+  //      родной шириной и не растягивается на полный слайд (выглядит "обрезанным").
+  const SLIDE_FULL_WIDTH_KEYS = ['width', 'minWidth', 'maxWidth', 'flex', 'flexBasis', 'flexGrow', 'flexShrink'] as const
+
+  const expandLinkedSlide = (slide: BlockNode, template: BlockNode | null): BlockNode => {
+    const linkedId = slide.metadata?.linkedBlockId
+    let expanded: BlockNode = slide
+
+    if (typeof linkedId === 'string' && linkedId.length > 0) {
+      // Не раскрываем если backend уже это сделал (children заполнены) — иначе перезатрём правки.
+      const alreadyExpanded = Array.isArray(slide.children) && slide.children.length > 0
+      if (!alreadyExpanded) {
+        const linked = blocks.find(b => b.id === linkedId)
+        if (linked?.structure) {
+          let counter = 0
+          const genId = () => `${slide.id}-lib-${counter++}`
+          const cloned = deepCloneNode(linked.structure, genId)
+          cloned.id = slide.id
+          cloned.attributes = { ...(cloned.attributes || {}), ...(slide.attributes || {}) }
+          cloned.metadata = { ...(cloned.metadata || {}), ...(slide.metadata || {}) }
+          expanded = cloned
+        }
+      }
+    }
+
+    // (а) Мержим layout-стили template'а (без width/flex — это делает prepareHybridStaticNode по дизайну).
+    const prepared = prepareHybridStaticNode(expanded, template)
+
+    // (б) Compensate for absent CarouselRuntime: переносим width/flex template'а вручную.
+    const tplProps = (template?.styles?.properties || {}) as Record<string, unknown>
+    const widthOverrides: Record<string, unknown> = {}
+    for (const key of SLIDE_FULL_WIDTH_KEYS) {
+      const v = tplProps[key]
+      if (v !== undefined && v !== null && v !== '') widthOverrides[key] = v
+    }
+    if (Object.keys(widthOverrides).length === 0) {
+      // template без явных width-стилей — используем reasonable default, чтобы слайд занял полный track.
+      widthOverrides.width = '100%'
+      widthOverrides.minWidth = '100%'
+      widthOverrides.flexShrink = 0
+    }
+
+    return {
+      ...prepared,
+      styles: {
+        ...(prepared.styles || { properties: {} }),
+        properties: {
+          ...((prepared.styles?.properties as Record<string, unknown>) || {}),
+          ...widthOverrides,
+        },
+      } as BlockNode['styles'],
+    }
+  }
+
+  const resolvedStaticBefore = useMemo(
+    () => staticBeforeSlides.map(s => expandLinkedSlide(s, resolvedTrackTemplate)),
+    [staticBeforeSlides, blocks, resolvedTrackTemplate]
+  )
+  const resolvedStaticAfter = useMemo(
+    () => staticAfterSlides.map(s => expandLinkedSlide(s, resolvedTrackTemplate)),
+    [staticAfterSlides, blocks, resolvedTrackTemplate]
+  )
+
+  // Полный набор id'шников всех слайдов в DOM-порядке: static-before, потом клоны, потом static-after.
+  // Навигация (Prev/Next/scroll/индикатор) опирается на этот массив, а не на repeaterItems —
+  // иначе static-слайды не достижимы кнопками и счётчик показывает неправильный total.
+  const allSlideIds = useMemo<string[]>(() => {
+    const before = resolvedStaticBefore.map(s => s.id)
+    const clones = repeaterItems.map(i => i.id)
+    const after = resolvedStaticAfter.map(s => s.id)
+    return [...before, ...clones, ...after]
+  }, [resolvedStaticBefore, resolvedStaticAfter, repeaterItems])
+
+  const totalSlides = allSlideIds.length
+
+  // ====================== Эффекты и функции навигации (используют derived state выше) ======================
+  useEffect(() => {
+    if (!isCarouselTrack) return
+    setActiveSlideIndex(0)
+    if (containerRef.current) containerRef.current.scrollLeft = 0
+  }, [isCarouselTrack, node.id, totalSlides])
+
+  const clampSlideIndex = (nextIndex: number) => {
+    if (totalSlides <= 0) return 0
+    return Math.min(Math.max(nextIndex, 0), totalSlides - 1)
+  }
+
+  const getSlideElements = (container: HTMLElement): HTMLElement[] => {
+    if (totalSlides === 0) return []
+    const ids = new Set(allSlideIds)
+    // Сохраняем порядок DOM-children: он совпадает с allSlideIds, потому что
+    // мы рендерим в том же порядке (static-before, clones, static-after).
+    return Array.from(container.children).filter((child): child is HTMLElement => {
+      if (!(child instanceof HTMLElement)) return false
+      const elementId = child.getAttribute('data-element-id')
+      return !!elementId && ids.has(elementId)
+    })
+  }
+
+  const scrollToSlide = (nextIndex: number) => {
+    if (!isCarouselTrack || !containerRef.current || totalSlides === 0) return
+    const targetIndex = clampSlideIndex(nextIndex)
+    const container = containerRef.current
+    const slides = getSlideElements(container)
+    const child = slides[targetIndex] || null
+    if (!child) return
+
+    container.scrollTo({
+      left: child.offsetLeft,
+      behavior: 'smooth',
+    })
+    setActiveSlideIndex(targetIndex)
+  }
+
+  const handleTrackScroll = (e: React.UIEvent<HTMLElement>) => {
+    if (!isCarouselTrack || totalSlides === 0) return
+    const container = e.currentTarget
+    const slides = getSlideElements(container)
+    if (slides.length === 0) return
+
+    const scrollLeft = container.scrollLeft
+    let nearestIndex = 0
+    let nearestDistance = Number.POSITIVE_INFINITY
+
+    slides.forEach((slide, index) => {
+      const distance = Math.abs(slide.offsetLeft - scrollLeft)
+      if (distance < nearestDistance) {
+        nearestDistance = distance
+        nearestIndex = index
+      }
+    })
+
+    if (nearestIndex !== activeSlideIndex) {
+      setActiveSlideIndex(nearestIndex)
+    }
+  }
 
   useEffect(() => {
     console.log('RepeaterRenderer effect:', { 
@@ -96,10 +333,15 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     
     console.log('Items array with length:', items.length, items)
 
-    // Используем шаблон из библиотеки блоков (по templateId)
-    // Или fallback на первый дочерний элемент контейнера
-    const template = templateBlock?.structure || node.children[0]
-    
+    // Источник template'а в порядке приоритета:
+    //   1) binding.config.inputConfig.templateId → blocks library (templateBlock)
+    //   2) Первый non-static child трека, раскрытый через linkedBlockId (если placeholder)
+    //   3) Сам non-static child как inline-template
+    // Раньше тут был fallback `node.children[0]`, который при hybrid-static настройке
+    // указывал на STATIC слайд и клонировал его как template — корень бага
+    // "одинаковый контент во всех клонированных слайдах".
+    const template = templateBlock?.structure || resolvedTrackTemplate
+
     if (!template) {
       console.warn(`Repeater block ${node.id} has no template block. templateId: ${templateId}`)
       setRepeaterItems([])
@@ -118,7 +360,30 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
 
     console.log('Created repeater items:', clonedItems.length, clonedItems)
     setRepeaterItems(clonedItems)
-  }, [data, node.children, node.id, templateBlock, templateId, fieldMappings, arrayPath])
+
+    // ДИАГНОСТИКА: проверяем, не приходят ли из data source дубликаты image URLs.
+    // Это частая причина "залипшего фона" на разных слайдах — корень обычно в JOIN/transform на бэкенде.
+    if (items.length > 1) {
+      const urlToIndices = new Map<string, number[]>()
+      items.forEach((it, idx) => {
+        const url = findFirstFileUrl(it)
+        if (!url) return
+        const list = urlToIndices.get(url) || []
+        list.push(idx)
+        urlToIndices.set(url, list)
+      })
+      const dupes = Array.from(urlToIndices.entries()).filter(([, idxs]) => idxs.length > 1)
+      if (dupes.length > 0) {
+        console.warn(
+          '[RepeaterRenderer] Duplicate image URLs in data — likely a backend transform/join issue, not a render bug.',
+          { bindingId: binding?.id, dupes }
+        )
+      }
+    }
+    // node.children намеренно не в deps — массив ссылочно нестабилен и заставлял useEffect перезапускаться на каждый рендер.
+    // Нужный нам derived state — resolvedTrackTemplate, который сам мемоизирован и реагирует на изменение детей.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, node.id, templateBlock, resolvedTrackTemplate, fieldMappings, arrayPath, binding?.id])
 
   // Функция клонирования блока с применением field mappings
   const cloneBlockNode = (
@@ -236,31 +501,6 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
       const firstFileUrl = findFirstFileUrl(dataItem)
       if (firstFileUrl) {
         return firstFileUrl
-      }
-    }
-
-    return undefined
-  }
-
-  const findFirstFileUrl = (value: any): string | undefined => {
-    if (!value) return undefined
-
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        const found = findFirstFileUrl(item)
-        if (found) return found
-      }
-      return undefined
-    }
-
-    if (typeof value === 'object') {
-      if (typeof value.file_url === 'string' && value.file_url.length > 0) {
-        return value.file_url
-      }
-
-      for (const child of Object.values(value)) {
-        const found = findFirstFileUrl(child)
-        if (found) return found
       }
     }
 
@@ -474,8 +714,10 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     
     return (
       <div 
-        ref={(el) => el}
-        style={{ ...(node.styles?.properties as React.CSSProperties || {}), ...loadingStyle }}
+        ref={(el) => {
+          containerRef.current = el as HTMLElement | null
+        }}
+        style={{ ...repeaterContainerStyles, ...loadingStyle }}
         data-element-id={node.id}
         className="repeater-loading"
       >
@@ -494,8 +736,10 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     
     return (
       <div 
-        ref={(el) => el}
-        style={{ ...(node.styles?.properties as React.CSSProperties || {}), ...errorStyle }}
+        ref={(el) => {
+          containerRef.current = el as HTMLElement | null
+        }}
+        style={{ ...repeaterContainerStyles, ...errorStyle }}
         data-element-id={node.id}
         className="repeater-error"
       >
@@ -514,8 +758,10 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     
     return (
       <div 
-        ref={(el) => el}
-        style={{ ...(node.styles?.properties as React.CSSProperties || {}), ...emptyStyle }}
+        ref={(el) => {
+          containerRef.current = el as HTMLElement | null
+        }}
+        style={{ ...repeaterContainerStyles, ...emptyStyle }}
         data-element-id={node.id}
         className="repeater-empty"
       >
@@ -526,29 +772,194 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
 
   // Обработчик клика - при клике на карточки внутри репитера выбираем контейнер-родитель
   const handleContainerClick = (e: React.MouseEvent) => {
+    const target = e.target
+    if (target instanceof Element && target.closest('[data-canvas-carousel-control="true"]')) {
+      return
+    }
     e.stopPropagation()
     dispatch(selectNode(node.id))
   }
 
+  const carouselControls = isCarouselTrack && totalSlides > 1 ? (
+    <div
+      data-canvas-carousel-control="true"
+      style={{
+        position: 'absolute',
+        right: 12,
+        bottom: 12,
+        display: 'flex',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        gap: 8,
+        zIndex: 10,
+        pointerEvents: 'none',
+      }}
+    >
+      <div
+        style={{
+          pointerEvents: 'none',
+          border: '1px solid #d1d5db',
+          borderRadius: 6,
+          background: 'rgba(255, 255, 255, 0.95)',
+          color: '#374151',
+          padding: '6px 10px',
+          fontSize: 12,
+          lineHeight: 1,
+          minWidth: 40,
+          textAlign: 'center',
+        }}
+      >
+        {activeSlideIndex + 1}/{totalSlides}
+      </div>
+      <button
+        data-canvas-carousel-control="true"
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          scrollToSlide(activeSlideIndex - 1)
+        }}
+        disabled={activeSlideIndex <= 0}
+        style={{
+          pointerEvents: 'auto',
+          border: '1px solid #d1d5db',
+          borderRadius: 6,
+          background: '#ffffff',
+          color: '#111827',
+          padding: '6px 10px',
+          fontSize: 12,
+          lineHeight: 1,
+          cursor: activeSlideIndex <= 0 ? 'not-allowed' : 'pointer',
+          opacity: activeSlideIndex <= 0 ? 0.5 : 0.95,
+        }}
+      >
+        Prev
+      </button>
+      <button
+        data-canvas-carousel-control="true"
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          scrollToSlide(activeSlideIndex + 1)
+        }}
+        disabled={activeSlideIndex >= totalSlides - 1}
+        style={{
+          pointerEvents: 'auto',
+          border: '1px solid #d1d5db',
+          borderRadius: 6,
+          background: '#ffffff',
+          color: '#111827',
+          padding: '6px 10px',
+          fontSize: 12,
+          lineHeight: 1,
+          cursor: activeSlideIndex >= totalSlides - 1 ? 'not-allowed' : 'pointer',
+          opacity: activeSlideIndex >= totalSlides - 1 ? 0.5 : 0.95,
+        }}
+      >
+        Next
+      </button>
+    </div>
+  ) : null
+
   // Рендерим контейнер с клонированными template блоками
   // Используем onClickCapture чтобы перехватить клики до дочерних элементов
+  if (isCarouselTrack) {
+    return React.createElement(
+      'div',
+      {
+        style: {
+          position: 'relative',
+          display: 'block',
+          width: '100%',
+        },
+      },
+      React.createElement(
+        node.tagName || 'div',
+        {
+          ref: (el: HTMLElement | null): void => {
+            containerRef.current = el
+          },
+          style: repeaterContainerStyles,
+          'data-element-id': node.id,
+          'data-repeater': 'true',
+          className: node.attributes?.class || node.attributes?.className || 'repeater-container',
+          onClickCapture: handleContainerClick,
+          onScroll: handleTrackScroll,
+        },
+        <>
+          {resolvedStaticBefore.map((slide) => (
+            <CanvasRenderer
+              key={slide.id}
+              node={slide as BlockNodeWithViewport}
+              editorType={editorType}
+              blockAlignment={blockAlignment}
+              rootNode={rootNode}
+            />
+          ))}
+          {repeaterItems.map((item) => (
+            <CanvasRenderer
+              key={item.id}
+              node={item}
+              editorType={editorType}
+              blockAlignment={blockAlignment}
+              rootNode={rootNode}
+            />
+          ))}
+          {resolvedStaticAfter.map((slide) => (
+            <CanvasRenderer
+              key={slide.id}
+              node={slide as BlockNodeWithViewport}
+              editorType={editorType}
+              blockAlignment={blockAlignment}
+              rootNode={rootNode}
+            />
+          ))}
+        </>
+      ),
+      carouselControls
+    )
+  }
+
   return React.createElement(
     node.tagName || 'div',
     {
-      style: node.styles?.properties as React.CSSProperties,
+      ref: (el: HTMLElement | null): void => {
+        containerRef.current = el
+      },
+      style: repeaterContainerStyles,
       'data-element-id': node.id,
       'data-repeater': 'true',
       className: node.attributes?.class || node.attributes?.className || 'repeater-container',
-      onClickCapture: handleContainerClick
+      onClickCapture: handleContainerClick,
+      onScroll: isCarouselTrack ? handleTrackScroll : undefined,
     },
-    repeaterItems.map((item) => (
-      <CanvasRenderer
-        key={item.id}
-        node={item}
-        editorType={editorType}
-        blockAlignment={blockAlignment}
-        rootNode={rootNode}
-      />
-    ))
+    <>
+      {staticBeforeSlides.map((slide) => (
+        <CanvasRenderer
+          key={slide.id}
+          node={slide as BlockNodeWithViewport}
+          editorType={editorType}
+          blockAlignment={blockAlignment}
+          rootNode={rootNode}
+        />
+      ))}
+      {repeaterItems.map((item) => (
+        <CanvasRenderer
+          key={item.id}
+          node={item}
+          editorType={editorType}
+          blockAlignment={blockAlignment}
+          rootNode={rootNode}
+        />
+      ))}
+      {staticAfterSlides.map((slide) => (
+        <CanvasRenderer
+          key={slide.id}
+          node={slide as BlockNodeWithViewport}
+          editorType={editorType}
+          blockAlignment={blockAlignment}
+          rootNode={rootNode}
+        />
+      ))}
+    </>
   )
 }

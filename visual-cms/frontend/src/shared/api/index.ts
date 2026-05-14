@@ -276,7 +276,7 @@ export const deployApi = {
 // Data Sources API
 export const dataSourceApi = {
   /**
-   * РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РёСЃС‚РѕС‡РЅРёРєРѕРІ РґР°РЅРЅС‹С… СЃ С„РёР»СЊС‚СЂР°С†РёРµР№ Рё РїР°РіРёРЅР°С†РёРµР№
+   * Получить список источников данных с фильтрацией и пагинацией
    */
   getAll: (filters?: DataSourcesFilter) => {
     const params = new URLSearchParams()
@@ -296,27 +296,27 @@ export const dataSourceApi = {
   },
 
   /**
-   * РџРѕР»СѓС‡РёС‚СЊ РѕРґРёРЅ РёСЃС‚РѕС‡РЅРёРє РґР°РЅРЅС‹С… РїРѕ ID
+   * Получить один источник данных по ID
    */
   getById: (id: string) => api.get<DataSource>(`/data-sources/${id}`),
 
   /**
-   * РЎРѕР·РґР°С‚СЊ РЅРѕРІС‹Р№ РёСЃС‚РѕС‡РЅРёРє РґР°РЅРЅС‹С…
+   * Создать новый источник данных
    */
   create: (data: CreateDataSourceRequest) => api.post<DataSource>('/data-sources', data),
 
   /**
-   * РћР±РЅРѕРІРёС‚СЊ РёСЃС‚РѕС‡РЅРёРє РґР°РЅРЅС‹С…
+   * Обновить источник данных
    */
   update: (id: string, data: UpdateDataSourceRequest) => api.put<DataSource>(`/data-sources/${id}`, data),
 
   /**
-   * РЈРґР°Р»РёС‚СЊ РёСЃС‚РѕС‡РЅРёРє РґР°РЅРЅС‹С…
+   * Удалить источник данных
    */
   delete: (id: string) => api.delete<void>(`/data-sources/${id}`),
 
   /**
-   * РўРµСЃС‚РёСЂРѕРІР°С‚СЊ РїРѕРґРєР»СЋС‡РµРЅРёРµ Рє СЃСѓС‰РµСЃС‚РІСѓСЋС‰РµРјСѓ РёСЃС‚РѕС‡РЅРёРєСѓ
+   * Тестировать подключение к существующему источнику
    */
   testConnection: (id: string) => api.post<TestConnectionResult>(`/data-sources/${id}/test`),
 
@@ -326,13 +326,13 @@ export const dataSourceApi = {
   revealCredentials: (id: string) => api.get<{ authConfig: Record<string, unknown> | null }>(`/data-sources/${id}/credentials`),
 
   /**
-   * РўРµСЃС‚РёСЂРѕРІР°С‚СЊ РЅРѕРІСѓСЋ РєРѕРЅС„РёРіСѓСЂР°С†РёСЋ (Р±РµР· СЃРѕС…СЂР°РЅРµРЅРёСЏ)
+   * Тестировать новую конфигурацию (без сохранения)
    */
   testNewConnection: (data: { type: string; config: unknown; authConfig?: unknown }) => 
     api.post<TestConnectionResult>('/data-sources/new/test', data),
 
   /**
-   * Р”СѓР±Р»РёСЂРѕРІР°С‚СЊ РёСЃС‚РѕС‡РЅРёРє РґР°РЅРЅС‹С…
+   * Дублировать источник данных
    */
   duplicate: (id: string, newName?: string) => 
     api.post<DataSource>(`/data-sources/${id}/duplicate`, { name: newName }),
@@ -367,35 +367,35 @@ import type {
 // Data Bindings API
 export const dataBindingApi = {
   /**
-   * РџРѕР»СѓС‡РёС‚СЊ РІСЃРµ РїСЂРёРІСЏР·РєРё
+   * Получить все привязки
    */
   getAll: () => api.get<DataBinding[]>('/data-bindings'),
 
   /**
-   * РџРѕР»СѓС‡РёС‚СЊ РїСЂРёРІСЏР·РєСѓ РїРѕ ID
+   * Получить привязку по ID
    */
   getById: (id: string) => api.get<DataBinding>(`/data-bindings/${id}`),
 
   /**
-   * РџРѕР»СѓС‡РёС‚СЊ РїСЂРёРІСЏР·РєРё РґР»СЏ Р±Р»РѕРєР°
+   * Получить привязки для блока
    */
   getByBlockId: (blockId: string, pageId?: string) => {
     return api.get<DataBinding[]>(`/data-bindings?blockId=${blockId}${pageId ? `&pageId=${pageId}` : ''}`)
   },
 
   /**
-   * РЎРѕР·РґР°С‚СЊ РїСЂРёРІСЏР·РєСѓ
+   * Создать привязку
    */
   create: (data: CreateDataBindingRequest) => api.post<DataBinding>('/data-bindings', data),
 
   /**
-   * РћР±РЅРѕРІРёС‚СЊ РїСЂРёРІСЏР·РєСѓ
+   * Обновить привязку
    */
   update: (id: string, data: UpdateDataBindingRequest) => 
     api.put<DataBinding>(`/data-bindings/${id}`, data),
 
   /**
-   * РЈРґР°Р»РёС‚СЊ РїСЂРёРІСЏР·РєСѓ
+   * Удалить привязку
    */
   delete: (id: string) => api.delete<void>(`/data-bindings/${id}`),
 

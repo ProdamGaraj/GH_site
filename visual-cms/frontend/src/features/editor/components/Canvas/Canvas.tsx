@@ -209,6 +209,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               height: `${currentBreakpoint.height}px`,
               minHeight: `${currentBreakpoint.height}px`,
               maxHeight: `${currentBreakpoint.height}px`,
+              overflow: 'auto',
             } : {}),
             transform: `scale(${zoom / 100})`,
             transformOrigin: 'top center',

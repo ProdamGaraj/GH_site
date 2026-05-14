@@ -18,7 +18,7 @@ interface CanvasRendererProps {
   isRoot?: boolean
   editorType?: 'page' | 'block'
   blockAlignment?: 'left' | 'center' | 'right'
-  rootNode?: BlockNode  // РџРµСЂРµРґР°РµРј root РґР»СЏ РїСЂРѕРІРµСЂРєРё РІР°СЂРёР°С†РёР№
+  rootNode?: BlockNode  // Передаём root для проверки вариаций
   libraryBlockId?: string // ID библиотечного блока для поиска привязок
 }
 
@@ -205,19 +205,19 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
     style: {
       ...computedStyles,
       ...dragStyle,
-      ...stateStyles, // РџСЂРёРјРµРЅСЏРµРј СЃС‚РёР»Рё СЃРѕСЃС‚РѕСЏРЅРёСЏ РїРѕРІРµСЂС… Р±Р°Р·РѕРІС‹С…
+      ...stateStyles, // Применяем стили состояния поверх базовых
       opacity: isDragging ? 0.5 : (stateStyles.opacity ?? computedStyles.opacity),
-      // Р”Р»СЏ root СЌР»РµРјРµРЅС‚Р° РІ responsive СЂРµР¶РёРјРµ РґРѕР±Р°РІР»СЏРµРј min-height: 100%
+      // Для root элемента в responsive режиме добавляем min-height: 100%
       ...(isRoot && editMode === 'responsive' ? {
         minHeight: '100%',
       } : {}),
-      // РќРµ РїРµСЂРµРѕРїСЂРµРґРµР»СЏРµРј СЃС‚РёР»Рё РІ page СЂРµРґР°РєС‚РѕСЂРµ РґР»СЏ С‚РѕС‡РЅРѕРіРѕ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ
-      // РўРѕР»СЊРєРѕ РґР»СЏ block СЂРµРґР°РєС‚РѕСЂР° РІ responsive СЂРµР¶РёРјРµ РїСЂРёРјРµРЅСЏРµРј РІС‹СЂР°РІРЅРёРІР°РЅРёРµ
+      // Не переопределяем стили в page редакторе для точного отображения
+      // Только для block редактора в responsive режиме применяем выравнивание
       ...(isRoot && editorType === 'block' && editMode === 'responsive' ? {
         marginLeft: blockAlignment === 'center' ? 'auto' : blockAlignment === 'right' ? 'auto' : '0',
         marginRight: blockAlignment === 'center' ? 'auto' : blockAlignment === 'left' ? 'auto' : '0'
       } : {}),
-      // Р”РѕР±Р°РІР»СЏРµРј transition РґР»СЏ РїР»Р°РІРЅРѕСЃС‚Рё
+      // Добавляем transition для плавности
       ...(statePreviewMode !== 'none' && node.styles?.stateTransition ? {
         transition: `${node.styles.stateTransition.properties.join(', ')} ${node.styles.stateTransition.duration}ms ${node.styles.stateTransition.easing}`,
       } : {}),
@@ -309,7 +309,7 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
     node.tagName || 'div',
     elementProps,
     <>
-      {/* РўРµРєСЃС‚РѕРІС‹Р№ РєРѕРЅС‚РµРЅС‚ Р±РµР· РѕР±С‘СЂС‚РєРё span РґР»СЏ РєРѕСЂСЂРµРєС‚РЅРѕРіРѕ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ */}
+      {/* Текстовый контент без обёртки span для корректного отображения */}
       {/* Data Binding Indicator */}
       {!isRoot && <DataBindingIndicator blockId={node.id} />}
       {node.content}
@@ -323,13 +323,13 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
           libraryBlockId={libraryBlockId}
         />
       ))}
-      {/* Empty state indicator for containers - РїРѕРєР°Р·С‹РІР°РµРј С‚РѕР»СЊРєРѕ РїСЂРё СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёРё */}
+      {/* Empty state indicator for containers - показываем только при редактировании */}
       {isContainer && node.children.length === 0 && !node.content && !isRoot && (
         <div className={cn(
           "flex items-center justify-center min-h-[40px] text-xs text-gray-400 border border-dashed border-gray-300 rounded m-1",
           isOver && "border-blue-400 bg-blue-50 text-blue-500"
         )}>
-          {isOver ? 'РћС‚РїСѓСЃС‚РёС‚Рµ' : 'РџСѓСЃС‚Рѕ'}
+          {isOver ? 'Отпустите' : 'Пусто'}
         </div>
       )}
     </>

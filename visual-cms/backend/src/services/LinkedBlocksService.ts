@@ -85,12 +85,21 @@ export class LinkedBlocksService {
 
       const libraryStructure = blockMap.get(linkedId)
       if (libraryStructure) {
-        // лубокая копия
+        // Глубокая копия
         let result = JSON.parse(JSON.stringify(libraryStructure))
-        // екурсивно обрабатываем вложенные linkedBlockId
+        // Рекурсивно обрабатываем вложенные linkedBlockId
         result = this._applyLinkedBlocks(result, blockMap, processingIds)
+        // Сохраняем id placeholder'а (стабильность для UI и предотвращение коллизий
+        // если один и тот же library блок используется несколько раз на странице) и
+        // его attributes — например data-carousel-static / data-carousel-slide для
+        // hybrid-карусели. Без этого после reload плейсхолдер теряет роль и слайд "исчезает".
         return {
           ...result,
+          id: structure.id || result.id,
+          attributes: {
+            ...(result.attributes || {}),
+            ...(structure.attributes || {}),
+          },
           metadata: {
             ...result.metadata,
             linkedBlockId: linkedId
@@ -215,24 +224,40 @@ export class LinkedBlocksService {
     return { updatedPages, errors }
   }
 
-  /** Рекурсивно заменяет linked block с указанным linkedBlockId на новую структуру */
-  private _replaceLinkedBlock(node: any, blockId: string, newStructure: any): any {
+  /**
+   * Схлопывает linked block в placeholder.
+   *
+   * Раньше функция записывала развёрнутую структуру library-блока прямо в page.structure,
+   * сохраняя только id и metadata.linkedBlockId — при этом терялись attributes плейсхолдера
+   * (в т.ч. data-carousel-static="true" у hybrid-static слайдов). После следующего F5 фронт
+   * получал узел без маркера и считал его обычным template'ом карусели → 4/4 вместо 5/5.
+   *
+   * Инвариант: полная структура linked-блока живёт только в библиотеке. На странице хранится
+   * только placeholder (children: []). При чтении страницы _applyLinkedBlocks подставляет
+   * актуальную структуру из библиотеки на лету. Поэтому syncBlockToAllPages здесь нужна
+   * только чтобы очистить устаревшие развёрнутые копии в page.structure (legacy-данные).
+   *
+   * @param newStructure — параметр оставлен для обратной совместимости вызова, но больше
+   *                       не используется: структура подставляется при чтении страницы.
+   */
+  private _replaceLinkedBlock(node: any, blockId: string, _newStructure: any): any {
     if (!node) return node
 
     if (node.metadata?.linkedBlockId === blockId) {
-      const result = JSON.parse(JSON.stringify(newStructure))
-      return {
-        ...result,
-        id: node.id,
-        metadata: {
-          ...result.metadata,
-          linkedBlockId: blockId,
-        },
+      const cleaned: any = { ...node, children: [] }
+      if (cleaned.variations) {
+        cleaned.variations = Object.fromEntries(
+          Object.entries(cleaned.variations).map(([bpId, variation]: [string, any]) => [
+            bpId,
+            { ...variation, specificChildren: [] },
+          ])
+        )
       }
+      return cleaned
     }
 
     if (node.children && Array.isArray(node.children)) {
-      node.children = node.children.map((child: any) => this._replaceLinkedBlock(child, blockId, newStructure))
+      node.children = node.children.map((child: any) => this._replaceLinkedBlock(child, blockId, _newStructure))
     }
 
     if (node.variations) {
@@ -241,7 +266,7 @@ export class LinkedBlocksService {
           node.variations[bpId] = {
             ...variation,
             specificChildren: variation.specificChildren.map(
-              (child: any) => this._replaceLinkedBlock(child, blockId, newStructure)
+              (child: any) => this._replaceLinkedBlock(child, blockId, _newStructure)
             ),
           }
         }

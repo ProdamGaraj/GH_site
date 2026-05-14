@@ -16,6 +16,9 @@ import { blockApi, pageApi } from '@/shared/api'
 import { generateNodeTreeCSS, generateResponsiveCSS, collectSpecificChildrenIds, generateFullHTML } from '../utils/styleGenerator'
 import type { BlockNode } from '@/shared/types'
 
+
+
+
 interface EditorToolbarProps {
   type: 'page' | 'block'
   blockId?: string
@@ -44,6 +47,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   pageSettings,
   children
 }) => {
+    
   const { id } = useParams()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -149,14 +153,43 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         setShowSaveDialog(true)
       } else {
         try {
-          // Сначала синхронизируем вложенные linked блоки в библиотеку
-          await syncNestedLinkedBlocksToLibrary(rootNode)
-          
+          // КРИТИЧНО: сначала нормализуем все узлы с linkedBlockId обратно в placeholder.
+          // Backend.getById → _applyLinkedBlocks разворачивает placeholder в полную структуру для рендера,
+          // и Redux state содержит этот развёрнутый узел. Если мы передадим его в syncNestedLinkedBlocksToLibrary
+          // ниже, она увидит developed structure (children > 0), guard не сработает, и эта структура
+          // запишется обратно в library — а это, в свою очередь, тригернёт на бэке
+          // BlockController.update → syncBlockToAllPages → _replaceLinkedBlock, которая ПЕРЕЗАПИШЕТ
+          // page.structure на ВСЕХ страницах развёрнутой копией БЕЗ атрибутов placeholder'а.
+          // Поэтому сначала сворачиваем, потом sync, потом save — все этапы видят placeholder, не developed.
+          const normalizeForSave = (node: BlockNode): BlockNode => {
+            if (!node) return node
+            if (node.metadata?.linkedBlockId) {
+              return {
+                ...node,
+                children: [],
+              }
+            }
+            if (Array.isArray(node.children) && node.children.length > 0) {
+              return {
+                ...node,
+                children: node.children.map(normalizeForSave),
+              }
+            }
+            return node
+          }
+          const normalizedRoot = normalizeForSave(rootNode)
+
+          // Только после нормализации синхронизируем вложенные linked блоки в библиотеку.
+          // Теперь все linked-узлы — placeholder'ы (children=[]), guard в syncNestedLinkedBlocksToLibrary
+          // их пропустит, и в библиотеку ничего не отправится. Это правильно: пользователь редактирует
+          // library блоки отдельно через handleSaveAllToLibrary, а не через обычное "Сохранить страницу".
+          await syncNestedLinkedBlocksToLibrary(normalizedRoot)
+
           // Сохраняем breakpoints в metadata root-узла для генерации responsive CSS при публикации
           const structureWithBreakpoints = {
-            ...rootNode,
+            ...normalizedRoot,
             metadata: {
-              ...rootNode.metadata,
+              ...normalizedRoot.metadata,
               breakpoints: breakpoints.map(bp => ({ id: bp.id, name: bp.name, width: bp.width, height: bp.height })),
             },
           }
@@ -209,10 +242,14 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           
           // 2. Синхронизируем вложенные linked блоки в библиотеку
           await syncNestedLinkedBlocksToLibrary(rootNode)
-          
-          // 3. Синхронизируем все страницы, которые используют этот блок
-          await syncBlockToPages(id!, rootNode)
-          
+
+          // Синхронизация со страницами выполняется бэкендом: BlockController.update →
+          // linkedBlocksService.syncBlockToAllPages → _replaceLinkedBlock, который
+          // схлопывает linked-узлы в placeholder с сохранением attributes. Дублирующая
+          // фронт-функция (syncBlockToPages → updateBlocksInStructure) убрана: она писала
+          // развёрнутую структуру без data-carousel-static, что ломало hybrid-static слайды
+          // карусели после повторной загрузки страницы (см. историю фиксов).
+
           dispatch(markAsSaved())
         } catch (error) {
           console.error('Failed to save block:', error)
@@ -225,11 +262,22 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   // Когда редактируешь Projects Grid внутри Projects Section - изменения сохраняются в библиотеку Projects Grid
   const syncNestedLinkedBlocksToLibrary = async (structure: BlockNode) => {
     const linkedNodes = findAllLinkedNodes(structure)
-    
+
     for (const node of linkedNodes) {
       const linkedBlockId = node.metadata?.linkedBlockId
       if (!linkedBlockId) continue
-      
+
+      // КРИТИЧНЫЙ GUARD: не пушим placeholder'ы (узлы без children) обратно в библиотеку.
+      // Placeholder создаётся через createBlockReferenceNode('linked') с children=[] и означает
+      // "сюда подставить структуру из библиотеки", а не "вот моя структура для библиотеки".
+      // Без этого guard'а в библиотеку записывалась пустая структура, что ломало все ссылки на этот блок.
+      // Аналогичный guard есть на бэкенде в LinkedBlocksService._collectLinkedNodes.
+      const hasContent = Array.isArray(node.children) && node.children.length > 0
+      if (!hasContent) {
+        console.log(`[Sync] Пропускаем placeholder без children: ${linkedBlockId}`)
+        continue
+      }
+
       try {
         // Создаём копию структуры для библиотеки (без linkedBlockId)
         const structureForLibrary = JSON.parse(JSON.stringify(node))
@@ -237,12 +285,12 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           delete structureForLibrary.metadata.linkedBlockId
           delete structureForLibrary.metadata.styleOverrides
         }
-        
+
         // Обновляем блок в библиотеке
         await blockApi.update(linkedBlockId, {
           structure: structureForLibrary
         })
-        
+
         console.log(`[Sync] Обновлён linked блок в библиотеке: ${linkedBlockId}`)
       } catch (error) {
         console.error(`[Sync] Ошибка обновления linked блока ${linkedBlockId}:`, error)
@@ -265,78 +313,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     return results
   }
   
-  // Функция синхронизации блока со всеми страницами, где он используется
-  const syncBlockToPages = async (blockId: string, blockStructure: BlockNode) => {
-    try {
-      // Получаем все страницы
-      const allPages = await pageApi.getAll()
-      
-      // Для каждой страницы проверяем, есть ли в ней этот блок
-      for (const page of allPages) {
-        if (!page.structure) continue
-        
-        // Ищем узлы с linkedBlockId === blockId
-        const hasBlock = findNodesWithLinkedBlockId(page.structure, blockId)
-        
-        if (hasBlock.length > 0) {
-          console.log(`Синхронизация блока ${blockId} на странице ${page.name}`)
-          
-          // Обновляем структуру страницы, заменяя блоки
-          const updatedStructure = updateBlocksInStructure(page.structure, blockId, blockStructure)
-          
-          // Сохраняем страницу
-          await pageApi.update(page.id, {
-            structure: updatedStructure,
-            name: page.name,
-            slug: page.slug,
-          })
-          
-          console.log(`Страница ${page.name} обновлена`)
-        }
-      }
-    } catch (error) {
-      console.error('Ошибка синхронизации блока со страницами:', error)
-    }
-  }
-  
-  // Найти все узлы с определённым linkedBlockId
-  const findNodesWithLinkedBlockId = (node: BlockNode, blockId: string): BlockNode[] => {
-    const results: BlockNode[] = []
-    
-    if (node.metadata?.linkedBlockId === blockId) {
-      results.push(node)
-    }
-    
-    for (const child of node.children || []) {
-      results.push(...findNodesWithLinkedBlockId(child, blockId))
-    }
-    
-    return results
-  }
-  
-  // Обновить все блоки с определённым linkedBlockId новой структурой
-  const updateBlocksInStructure = (pageStructure: BlockNode, blockId: string, newBlockStructure: BlockNode): BlockNode => {
-    // Если это нужный блок - заменяем его содержимое, сохраняя id и linkedBlockId
-    if (pageStructure.metadata?.linkedBlockId === blockId) {
-      return {
-        ...newBlockStructure,
-        id: pageStructure.id, // Сохраняем оригинальный id на странице
-        metadata: {
-          ...newBlockStructure.metadata,
-          linkedBlockId: blockId, // Сохраняем связь с библиотекой
-        },
-      }
-    }
-    
-    // Рекурсивно обрабатываем детей
-    return {
-      ...pageStructure,
-      children: pageStructure.children.map(child => 
-        updateBlocksInStructure(child, blockId, newBlockStructure)
-      ),
-    }
-  }
-
   const handleSaveNew = async () => {
     if (!rootNode) return
 

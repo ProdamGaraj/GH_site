@@ -1,5 +1,5 @@
 ﻿/**
- * РЎРµСЂРІРёСЃ РіРµРЅРµСЂР°С†РёРё HTML РёР· СЃС‚СЂСѓРєС‚СѓСЂС‹ СЃС‚СЂР°РЅРёС†С‹
+ * Сервис генерации HTML из структуры страницы
  */
 import { styleGenerator } from './StyleGenerator'
 import { generateDataBindingRuntime, type PageDataConfig } from './DataBindingGenerator'
@@ -346,10 +346,10 @@ ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
     const styles = this.renderStyles(node.styles?.properties || {})
     const attributes = this.renderAttributes(node.attributes || {})
     
-    // Р"РѕР±Р°РІР»СЏРµРј data-element-id РґР»СЏ CSS СЃРµР»РµРєС‚РѕСЂРѕРІ (hover, Р°РЅРёРјР°С†РёРї) Рё data-element-name
+    // Добавляем data-element-id для CSS селекторов (hover, анимации) и data-element-name
     const dataAttr = ` data-element-id="${node.id}"` + (node.metadata?.name ? ` data-element-name="${node.metadata.name.replace(/"/g, '&quot;')}"` : '')
     
-    // Void elements (СЃР°РјРѕР·Р°РєСЂС‹РІР°СЋС‰РёРµСЃСЏ)
+    // Void elements (самозакрывающиеся)
     const voidElements = ['input', 'img', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr']
     
     if (voidElements.includes(tagName.toLowerCase())) {
@@ -368,7 +368,7 @@ ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
     // Текстовый контент
     const textContent = node.content ? this.escapeHtml(node.content) : ''
     
-    // Р”РѕС‡РµСЂРЅРёРµ СЌР»РµРјРµРЅС‚С‹
+    // Дочерние элементы
     const childrenHtml = node.children?.map(child => 
       this.renderNode(child, indent + '  ')
     ).join('') || ''
@@ -399,7 +399,7 @@ ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
   }
 
   /**
-   * РљРѕРЅРІРµСЂС‚РёСЂСѓРµС‚ РѕР±СЉРµРєС‚ СЃС‚РёР»РµР№ РІ inline style Р°С‚СЂРёР±СѓС‚
+   * Конвертирует объект стилей в inline style атрибут
    */
   private renderStyles(properties: Record<string, string>): string {
     if (!properties || Object.keys(properties).length === 0) {
@@ -409,7 +409,7 @@ ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
     const cssString = Object.entries(properties)
       .filter(([_, value]) => value !== undefined && value !== null && value !== '')
       .map(([key, value]) => {
-        // РљРѕРЅРІРµСЂС‚РёСЂСѓРµРј camelCase РІ kebab-case
+        // Конвертируем camelCase в kebab-case
         const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase()
         return `${cssKey}: ${value}`
       })
@@ -419,7 +419,7 @@ ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
   }
 
   /**
-   * РљРѕРЅРІРµСЂС‚РёСЂСѓРµС‚ РѕР±СЉРµРєС‚ Р°С‚СЂРёР±СѓС‚РѕРІ РІ СЃС‚СЂРѕРєСѓ Р°С‚СЂРёР±СѓС‚РѕРІ
+   * Конвертирует объект атрибутов в строку атрибутов
    */
   private renderAttributes(attributes: Record<string, string>): string {
     if (!attributes || Object.keys(attributes).length === 0) {
@@ -433,7 +433,7 @@ ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
   }
 
   /**
-   * Р­РєСЂР°РЅРёСЂСѓРµС‚ HTML СЃРїРµС†СЃРёРјРІРѕР»С‹
+   * Экранирует HTML спецсимволы
    */
   private escapeHtml(text: string): string {
     if (!text) return ''
