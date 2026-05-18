@@ -1,6 +1,14 @@
 import type { BlockNode, LayoutMode } from '@/shared/types'
-
-// Drag and drop utilities for visual-cms
+import {
+  buildSlots,
+  distanceToSlot,
+  pickBestSlot,
+  type ChildRect,
+  type Line,
+  type LineOrientation,
+  type RankedSlot,
+  type Slot,
+} from './slotProximity'
 
 export interface DropIndicator {
   type: 'before' | 'after' | 'inside' | 'absolute-position'
@@ -9,6 +17,9 @@ export interface DropIndicator {
   position?: number
   absoluteCoords?: { x: number; y: number }
   rect?: DOMRect
+  // Line of the chosen slot in screen coords; rendered by DropIndicatorOverlay.
+  // Absent for absolute-position indicators.
+  slotLine?: Line
 }
 
 export interface DraggedElement {
@@ -18,59 +29,49 @@ export interface DraggedElement {
   sourceIndex: number
 }
 
-/**
- * Determines the layout mode of a container
- * First checks explicit layoutMode, then infers from CSS properties
- */
+// Must stay in sync with CanvasRenderer.tsx's `isContainer` check — the source
+// of truth for what `useDroppable` is enabled on. Diverging here causes the
+// algorithm to propose drop targets that dnd-kit refuses, producing visible
+// indicators with no actual drop.
+const CONTAINER_TAGS = new Set([
+  'div', 'section', 'article', 'header', 'footer', 'main', 'nav', 'aside',
+])
+
+// Containers whose rect is within this many screen-pixels from the cursor are
+// considered candidates. Zoom-agnostic because the algorithm compares
+// distance-to-slot vs distance-to-slot in the same coord system — this buffer
+// only widens the candidate set, it doesn't bias which slot wins.
+const CANDIDATE_BUFFER_PX = 24
+
 export const getLayoutMode = (node: BlockNode): LayoutMode => {
-  // Explicit layout mode takes priority
-  if (node.layoutMode) {
-    return node.layoutMode
-  }
-  
-  // Infer from CSS properties
+  if (node.layoutMode) return node.layoutMode
   const props = node.styles?.properties || {}
-  
-  // If container has position: relative/absolute and no display:flex/grid, treat as absolute layout
-  if ((props.position === 'relative' || props.position === 'absolute') && 
-      props.display !== 'flex' && props.display !== 'grid') {
+  if (
+    (props.position === 'relative' || props.position === 'absolute') &&
+    props.display !== 'flex' &&
+    props.display !== 'grid'
+  ) {
     return 'absolute'
   }
-  
-  // Check display property
-  if (props.display === 'grid') {
-    return 'grid'
-  }
-  
-  // Default to flex
+  if (props.display === 'grid') return 'grid'
   return 'flex'
 }
 
-/**
- * Checks if a container uses flow layout (flex or grid)
- */
 export const isFlowLayout = (node: BlockNode): boolean => {
   const mode = getLayoutMode(node)
   return mode === 'flex' || mode === 'grid'
 }
 
-/**
- * Checks if a container uses absolute positioning
- */
-export const isAbsoluteLayout = (node: BlockNode): boolean => {
-  return getLayoutMode(node) === 'absolute'
-}
+export const isAbsoluteLayout = (node: BlockNode): boolean =>
+  getLayoutMode(node) === 'absolute'
 
-/**
- * Finds the nearest droppable ancestor with a specific layout mode
- */
 export const findNearestDroppableAncestor = (
   root: BlockNode,
   nodeId: string,
   layoutFilter?: LayoutMode[]
 ): BlockNode | null => {
   const path: BlockNode[] = []
-  
+
   const findPath = (current: BlockNode, targetId: string): boolean => {
     path.push(current)
     if (current.id === targetId) return true
@@ -80,10 +81,9 @@ export const findNearestDroppableAncestor = (
     path.pop()
     return false
   }
-  
+
   findPath(root, nodeId)
-  
-  // Go through ancestors from closest to farthest
+
   for (let i = path.length - 2; i >= 0; i--) {
     const ancestor = path[i]
     if (ancestor.elementType === 'container') {
@@ -92,47 +92,9 @@ export const findNearestDroppableAncestor = (
       }
     }
   }
-  
   return null
 }
 
-/**
- * Calculate drop position for flow layouts (flex/grid)
- */
-export const calculateFlowDropPosition = (
-  _containerRect: DOMRect,
-  childRects: { id: string; rect: DOMRect }[],
-  mousePosition: { x: number; y: number },
-  flexDirection: string = 'row'
-): { position: number; indicator: 'before' | 'after' } => {
-  const isVertical = flexDirection === 'column' || flexDirection === 'column-reverse'
-  
-  if (childRects.length === 0) {
-    return { position: 0, indicator: 'before' }
-  }
-  
-  for (let i = 0; i < childRects.length; i++) {
-    const { rect } = childRects[i]
-    const midPoint = isVertical
-      ? rect.top + rect.height / 2
-      : rect.left + rect.width / 2
-    
-    const mousePos = isVertical ? mousePosition.y : mousePosition.x
-    
-    if (mousePos < midPoint) {
-      return { position: i, indicator: 'before' }
-    }
-  }
-  
-  return { position: childRects.length, indicator: 'after' }
-}
-
-/**
- * Calculate drop position for absolute layout
- * @param containerRect - Rectangle of the target container
- * @param mousePosition - Current mouse position
- * @param dragOffset - Offset from cursor to element's top-left corner (optional)
- */
 export const calculateAbsoluteDropPosition = (
   containerRect: DOMRect,
   mousePosition: { x: number; y: number },
@@ -145,60 +107,114 @@ export const calculateAbsoluteDropPosition = (
   }
 }
 
-/**
- * Edge zone threshold in pixels - area near container edges where dropping
- * will target the parent container instead
- * Увеличено до 40px для более комфортной работы с вложенностью
- */
-const EDGE_ZONE_SIZE = 40
-
-/**
- * Check if mouse is in the edge zone of a rect (near the borders)
- */
-const isInEdgeZone = (
+// Legacy midpoint-based position calculation, kept for any external caller.
+// New drop-target algorithm uses slot proximity instead.
+export const calculateFlowDropPosition = (
+  _containerRect: DOMRect,
+  childRects: { id: string; rect: DOMRect }[],
   mousePosition: { x: number; y: number },
-  rect: DOMRect,
-  edgeSize: number = EDGE_ZONE_SIZE
-): { inEdge: boolean; edge: 'top' | 'right' | 'bottom' | 'left' | null } => {
-  const { x, y } = mousePosition
-  
-  // Check if inside rect at all
-  if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-    return { inEdge: false, edge: null }
+  flexDirection: string = 'row'
+): { position: number; indicator: 'before' | 'after' } => {
+  const isVertical = flexDirection === 'column' || flexDirection === 'column-reverse'
+  if (childRects.length === 0) return { position: 0, indicator: 'before' }
+  for (let i = 0; i < childRects.length; i++) {
+    const { rect } = childRects[i]
+    const mid = isVertical ? rect.top + rect.height / 2 : rect.left + rect.width / 2
+    const pos = isVertical ? mousePosition.y : mousePosition.x
+    if (pos < mid) return { position: i, indicator: 'before' }
   }
-  
-  // Check each edge
-  if (y - rect.top < edgeSize) return { inEdge: true, edge: 'top' }
-  if (rect.bottom - y < edgeSize) return { inEdge: true, edge: 'bottom' }
-  if (x - rect.left < edgeSize) return { inEdge: true, edge: 'left' }
-  if (rect.right - x < edgeSize) return { inEdge: true, edge: 'right' }
-  
-  return { inEdge: false, edge: null }
+  return { position: childRects.length, indicator: 'after' }
 }
 
-/**
- * Find parent node in the tree
- */
-const findParentInTree = (root: BlockNode, childId: string): BlockNode | null => {
-  for (const child of root.children) {
-    if (child.id === childId) return root
-    const found = findParentInTree(child, childId)
-    if (found) return found
+const isContainerNode = (node: BlockNode): boolean => {
+  // html-code renders raw user HTML; its `children` are decorative and not
+  // owned by the editor's children array — drops into it would mutate state
+  // that isn't visible. Mirrors CanvasRenderer's same exclusion.
+  if (node.elementType === 'html-code') return false
+  return node.elementType === 'container' || CONTAINER_TAGS.has(node.tagName)
+}
+
+const isPointInRect = (p: { x: number; y: number }, r: DOMRect): boolean =>
+  p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom
+
+const isPointInExpandedRect = (p: { x: number; y: number }, r: DOMRect, buf: number): boolean =>
+  p.x >= r.left - buf && p.x <= r.right + buf &&
+  p.y >= r.top - buf && p.y <= r.bottom + buf
+
+const isDescendantOrSelf = (ancestor: BlockNode, id: string): boolean => {
+  if (ancestor.id === id) return true
+  for (const c of ancestor.children) {
+    if (isDescendantOrSelf(c, id)) return true
+  }
+  return false
+}
+
+const findNodeInTree = (root: BlockNode, id: string): BlockNode | null => {
+  if (root.id === id) return root
+  for (const c of root.children) {
+    const f = findNodeInTree(c, id)
+    if (f) return f
   }
   return null
 }
 
-/**
- * Get index of child in parent
- */
-// const getChildIndex = (parent: BlockNode, childId: string): number => {
-//   return parent.children.findIndex(c => c.id === childId)
-// }
+const getSlotOrientation = (node: BlockNode): LineOrientation => {
+  const dir = node.styles?.properties?.flexDirection || 'row'
+  return dir === 'column' || dir === 'column-reverse' ? 'horizontal' : 'vertical'
+}
 
-/**
- * Determines the best drop target based on mouse position
- * Supports edge zones for escaping to parent containers
- */
+interface Candidate {
+  node: BlockNode
+  rect: DOMRect
+  depth: number
+}
+
+const findCandidateContainers = (
+  root: BlockNode,
+  cursor: { x: number; y: number },
+  draggedNodeId: string,
+  elementRects: Map<string, DOMRect>
+): Candidate[] => {
+  const draggedNode = draggedNodeId ? findNodeInTree(root, draggedNodeId) : null
+  const candidates: Candidate[] = []
+
+  const visit = (node: BlockNode, depth: number): void => {
+    // Can't drop into self or own subtree.
+    if (draggedNode && isDescendantOrSelf(draggedNode, node.id)) return
+
+    // Locked nodes can't accept drops (mirrors useDroppable({disabled: isLocked})
+    // in CanvasRenderer). Skipping the whole subtree matches the renderer too —
+    // locked blocks lock all their descendants, so none of them are valid targets.
+    if (node.metadata?.locked) return
+
+    if (isContainerNode(node)) {
+      const rect = elementRects.get(node.id)
+      if (rect && isPointInExpandedRect(cursor, rect, CANDIDATE_BUFFER_PX)) {
+        candidates.push({ node, rect, depth })
+      }
+    }
+    for (const child of node.children) {
+      visit(child, depth + 1)
+    }
+  }
+
+  visit(root, 0)
+  return candidates
+}
+
+const absoluteFallback = (
+  node: BlockNode,
+  rect: DOMRect,
+  mouse: { x: number; y: number },
+  dragOffset?: { x: number; y: number }
+): DropIndicator => ({
+  type: 'absolute-position',
+  targetId: node.id,
+  targetParentId: node.id,
+  absoluteCoords: calculateAbsoluteDropPosition(rect, mouse, dragOffset),
+  rect,
+})
+
 export const determineDropTarget = (
   root: BlockNode,
   mousePosition: { x: number; y: number },
@@ -206,263 +222,179 @@ export const determineDropTarget = (
   elementRects: Map<string, DOMRect>,
   dragOffset?: { x: number; y: number }
 ): DropIndicator | null => {
-  // Build hierarchy of elements under mouse (from root to deepest)
-  const elementsUnderMouse: { node: BlockNode; rect: DOMRect; depth: number }[] = []
-  
-  const collectElements = (node: BlockNode, depth: number = 0) => {
-    const rect = elementRects.get(node.id)
-    if (rect && isPointInRect(mousePosition, rect)) {
-      // Don't consider the dragged node itself as a drop target
-      // Don't consider descendants of dragged node (can't drop into itself)
-      // BUT DO consider ancestors of dragged node (can drop to parent)
-      if (node.id !== draggedNodeId && !isAncestorOf(node, draggedNodeId, root)) {
-        elementsUnderMouse.push({ node, rect, depth })
-      }
-    }
-    for (const child of node.children) {
-      collectElements(child, depth + 1)
-    }
-  }
-  
-  collectElements(root)
-  
-  console.log('📍 Elements under mouse:', elementsUnderMouse.map(e => ({ 
-    name: e.node.metadata.name || e.node.tagName, 
-    depth: e.depth,
-    id: e.node.id.substring(0, 8)
-  })))
-  
-  if (elementsUnderMouse.length === 0) {
-    // Fallback to root if nothing under mouse
-    const rootRect = elementRects.get(root.id)
-    if (!rootRect) return null
-    return createDropIndicator(root, root.id, rootRect, mousePosition, elementRects, /* root, */ dragOffset)
-  }
-  
-  // Sort by depth (deepest first)
-  elementsUnderMouse.sort((a, b) => b.depth - a.depth)
-  
-  // Filter to only containers
-  const containers = elementsUnderMouse.filter(e => 
-    e.node.elementType === 'container' || 
-    e.node.children.length > 0 ||
-    ['div', 'section', 'article', 'header', 'footer', 'main', 'nav', 'aside'].includes(e.node.tagName)
-  )
-  
-  console.log('📦 Containers (sorted by depth):', containers.map(e => ({ 
-    name: e.node.metadata.name || e.node.tagName, 
-    depth: e.depth 
-  })))
-  
-  if (containers.length === 0) {
-    const rootRect = elementRects.get(root.id)
-    if (!rootRect) return null
-    return createDropIndicator(root, root.id, rootRect, mousePosition, elementRects, /* root, */ dragOffset)
-  }
-  
-  // Find the appropriate target based on edge zones and container proximity
-  // Улучшенная логика: проверяем все контейнеры, начиная с самого глубокого
-  let targetContainer = containers[0]
-  const deepest = containers[0]
-  const edgeInfo = isInEdgeZone(mousePosition, deepest.rect)
-  
-  console.log('🎯 Deepest:', deepest.node.metadata.name || deepest.node.tagName, 'inEdge:', edgeInfo.inEdge)
-  
-  // Если курсор в edge zone самого глубокого контейнера, пытаемся найти родителя
-  if (edgeInfo.inEdge && containers.length > 1) {
-    // Проверяем, есть ли у родителя дети на том же уровне, что и deepest
-    const parent = containers[1]
-    const parentRect = elementRects.get(parent.node.id)
-    
-    if (parentRect) {
-      // Проверяем расстояние от курсора до границ родителя
-      const distanceToParentEdge = Math.min(
-        mousePosition.y - parentRect.top,
-        parentRect.bottom - mousePosition.y,
-        mousePosition.x - parentRect.left,
-        parentRect.right - mousePosition.x
-      )
-      
-      // Если курсор близко к краю родителя (в пределах edge zone), используем родителя
-      // Это позволит размещать элементы между siblings на одном уровне
-      if (distanceToParentEdge <= EDGE_ZONE_SIZE) {
-        targetContainer = parent
-        console.log('⬆️ Using parent (near edge):', targetContainer.node.metadata.name || targetContainer.node.tagName)
-      } else {
-        // Иначе используем самый глубокий контейнер
-        targetContainer = deepest
-      }
-    }
-  }
-  
-  const { node: targetNode, rect: targetRect } = targetContainer
-  
-  return createDropIndicator(targetNode, targetNode.id, targetRect, mousePosition, elementRects, /* root, */ dragOffset)
-}
+  const candidates = findCandidateContainers(root, mousePosition, draggedNodeId, elementRects)
 
-/**
- * Creates a drop indicator based on target layout
- */
-const createDropIndicator = (
-  targetNode: BlockNode,
-  parentId: string,
-  containerRect: DOMRect,
-  mousePosition: { x: number; y: number },
-  elementRects: Map<string, DOMRect>,
-
-//   root: BlockNode,
-  dragOffset?: { x: number; y: number }
-): DropIndicator => {
-  const layoutMode = getLayoutMode(targetNode)
-  
-  if (layoutMode === 'absolute') {
-    const absoluteCoords = calculateAbsoluteDropPosition(containerRect, mousePosition, dragOffset)
-    return {
-      type: 'absolute-position',
-      targetId: targetNode.id,
-      targetParentId: parentId,
-      absoluteCoords,
-      rect: containerRect,
-    }
-  }
-  
-  // Flow layout (flex/grid)
-  const childRects = targetNode.children
-    .map(child => {
-      const rect = elementRects.get(child.id)
-      return rect ? { id: child.id, rect } : null
-    })
-    .filter((item): item is { id: string; rect: DOMRect } => item !== null)
-  
-  const flexDirection = targetNode.styles.properties.flexDirection || 'row'
-  const { position, indicator } = calculateFlowDropPosition(
-    containerRect,
-    childRects,
-    mousePosition,
-    flexDirection
-  )
-  
-  // Calculate indicator rect
-  let indicatorRect: DOMRect
-  if (childRects.length === 0) {
-    indicatorRect = containerRect
-  } else if (indicator === 'before' && position < childRects.length) {
-    indicatorRect = childRects[position].rect
-  } else if (position > 0) {
-    indicatorRect = childRects[position - 1].rect
-  } else {
-    indicatorRect = containerRect
-  }
-  
-  return {
-    type: position === 0 && childRects.length > 0 ? 'before' : indicator,
-    targetId: childRects[position]?.id || targetNode.id,
-    targetParentId: targetNode.id,
-    position,
-    rect: indicatorRect,
-  }
-}
-
-/**
- * Helper to check if point is inside rect
- */
-const isPointInRect = (point: { x: number; y: number }, rect: DOMRect): boolean => {
-  return (
-    point.x >= rect.left &&
-    point.x <= rect.right &&
-    point.y >= rect.top &&
-    point.y <= rect.bottom
-  )
-}
-
-/**
- * Check if node contains a descendant with given id
- */
-const isDescendant = (node: BlockNode, descendantId: string): boolean => {
-  for (const child of node.children) {
-    if (child.id === descendantId) return true
-    if (isDescendant(child, descendantId)) return true
-  }
-  return false
-}
-
-/**
- * Check if targetNode is inside (descendant of) the dragged node
- * This means we can't drop the dragged node into its own children
- */
-const isAncestorOf = (targetNode: BlockNode, draggedNodeId: string, root: BlockNode): boolean => {
-  // Find the dragged node first
-  const findNode = (node: BlockNode, id: string): BlockNode | null => {
-    if (node.id === id) return node
-    for (const child of node.children) {
-      const found = findNode(child, id)
-      if (found) return found
-    }
+  if (candidates.length === 0) {
+    // Cursor isn't near any container (e.g. autoscroll dragged it off-canvas).
+    // Return null so the caller can keep the previous indicator sticky —
+    // returning a synthetic absolute-position-on-root indicator here breaks
+    // the drop, since handleDragEnd can't insert into a flex root by absolute
+    // coords and `position` is undefined.
     return null
   }
-  
-  const draggedNode = findNode(root, draggedNodeId)
-  if (!draggedNode) return false
-  
-  // Check if targetNode is a descendant of draggedNode
-  return isDescendant(draggedNode, targetNode.id)
+
+  // Absolute container under cursor → free positioning takes over.
+  // Pick the deepest one strictly containing the cursor.
+  const absUnder = candidates
+    .filter(c => getLayoutMode(c.node) === 'absolute' && isPointInRect(mousePosition, c.rect))
+    .sort((a, b) => b.depth - a.depth)
+
+  if (absUnder.length > 0) {
+    const a = absUnder[0]
+    return absoluteFallback(a.node, a.rect, mousePosition, dragOffset)
+  }
+
+  // Build slots across all flow candidates; rank by distance.
+  type CandidateRankedSlot = RankedSlot & { container: BlockNode }
+  const ranked: CandidateRankedSlot[] = []
+
+  for (const c of candidates) {
+    if (getLayoutMode(c.node) === 'absolute') continue
+
+    // Skip "leaf-wrapper" containers: non-empty containers whose children are
+    // ALL non-containers (text/image/input labels etc.). The cursor is almost
+    // always sitting inside one of these, so their internal slots have ~0
+    // distance and would always win over the structurally-meaningful slots in
+    // the parent row/grid — dropping a whole block *inside* a stat label
+    // instead of beside it. Such a container still participates as a CHILD in
+    // its parent's slot computation, so you can still drop around it. Empty
+    // containers are kept (they're a valid "drop inside" target).
+    if (
+      c.node.children.length > 0 &&
+      !c.node.children.some(ch => isContainerNode(ch))
+    ) {
+      continue
+    }
+
+    // Keep dragged in children when building slots — slot.position must be
+    // an index into c.node.children (unfiltered), because that's what
+    // editorSlice.reorderNode expects when source === target (it does its own
+    // remove + adjustedIndex math). Slots adjacent to the dragged node map to
+    // its current location and are skipped below.
+    const childRects: ChildRect[] = []
+    for (const ch of c.node.children) {
+      const r = elementRects.get(ch.id)
+      if (r) childRects.push({ id: ch.id, rect: r })
+    }
+    const draggedIdx = childRects.findIndex(cr => cr.id === draggedNodeId)
+
+    const primary = getSlotOrientation(c.node)
+    const slots = buildSlots(c.node.id, c.rect, childRects, primary)
+
+    // Grid: also generate slots in the perpendicular orientation so corners
+    // resolve by axis nearest to cursor.
+    if (getLayoutMode(c.node) === 'grid' && childRects.length > 1) {
+      const perp: LineOrientation = primary === 'vertical' ? 'horizontal' : 'vertical'
+      slots.push(...buildSlots(c.node.id, c.rect, childRects, perp))
+    }
+
+    for (const s of slots) {
+      // Slots adjacent to the dragged node sit at its current position — they'd
+      // produce a no-op reorder. Skip them.
+      if (draggedIdx !== -1 && (s.position === draggedIdx || s.position === draggedIdx + 1)) {
+        continue
+      }
+      ranked.push({
+        slot: s,
+        distance: distanceToSlot(mousePosition, s),
+        depth: c.depth,
+        container: c.node,
+      })
+    }
+  }
+
+  if (ranked.length === 0) {
+    // Every flow candidate was a leaf-wrapper (or absolute). Fall back to the
+    // shallowest non-absolute container so the drop still lands somewhere
+    // sensible (appended) instead of silently failing / sticking.
+    const fallback = candidates
+      .filter(c => getLayoutMode(c.node) !== 'absolute')
+      .sort((a, b) => a.depth - b.depth)[0]
+    if (!fallback) return null
+    return {
+      type: 'inside',
+      targetId: fallback.node.id,
+      targetParentId: fallback.node.id,
+      position: fallback.node.children.length,
+      rect: fallback.rect,
+    }
+  }
+
+  const best = pickBestSlot(ranked) as CandidateRankedSlot | null
+  if (!best) return null
+
+  return slotToIndicator(best.slot, best.container, draggedNodeId, elementRects)
 }
 
-/**
- * Get all element rects from DOM
- */
+const slotToIndicator = (
+  slot: Slot,
+  container: BlockNode,
+  _draggedNodeId: string,
+  elementRects: Map<string, DOMRect>
+): DropIndicator => {
+  // slot.position is an UNFILTERED index into container.children (see the
+  // build-slots loop in determineDropTarget for why) — index it directly.
+  const children = container.children
+  const isEmpty = children.length === 0
+  const isAfterLast = slot.position >= children.length
+
+  let indicatorType: DropIndicator['type']
+  let targetId: string
+  if (isEmpty) {
+    indicatorType = 'inside'
+    targetId = container.id
+  } else if (isAfterLast) {
+    indicatorType = 'after'
+    targetId = children[children.length - 1].id
+  } else {
+    indicatorType = 'before'
+    targetId = children[slot.position].id
+  }
+
+  return {
+    type: indicatorType,
+    targetId,
+    targetParentId: container.id,
+    position: slot.position,
+    rect: elementRects.get(container.id),
+    slotLine: slot.line,
+  }
+}
+
 export const collectElementRects = (rootElement: HTMLElement): Map<string, DOMRect> => {
   const rects = new Map<string, DOMRect>()
-  
   const elements = rootElement.querySelectorAll('[data-element-id]')
   elements.forEach(el => {
     const id = el.getAttribute('data-element-id')
-    if (id) {
-      rects.set(id, el.getBoundingClientRect())
-    }
+    if (id) rects.set(id, el.getBoundingClientRect())
   })
-  
   return rects
 }
 
-/**
- * Find the closest container element to a given point
- */
 export const findClosestContainer = (
   root: BlockNode,
   mousePosition: { x: number; y: number },
   elementRects: Map<string, DOMRect>,
   excludeId?: string
 ): BlockNode | null => {
-  let closestContainer: BlockNode | null = null
-  let minDistance = Infinity
-  
-  const findClosest = (node: BlockNode) => {
-    if (node.id === excludeId) return
-    
-    const rect = elementRects.get(node.id)
-    if (!rect) return
-    
-    const isContainer = node.elementType === 'container' || node.children.length > 0
-    if (!isContainer) return
-    
-    const distance = getDistanceToRect(mousePosition, rect)
-    if (distance < minDistance) {
-      minDistance = distance
-      closestContainer = node
-    }
-    
-    for (const child of node.children) {
-      findClosest(child)
-    }
-  }
-  
-  findClosest(root)
-  return closestContainer
-}
+  let closest: BlockNode | null = null
+  let minDist = Infinity
 
-const getDistanceToRect = (point: { x: number; y: number }, rect: DOMRect): number => {
-  const centerX = rect.left + rect.width / 2
-  const centerY = rect.top + rect.height / 2
-  return Math.sqrt(Math.pow(point.x - centerX, 2) + Math.pow(point.y - centerY, 2))
+  const visit = (node: BlockNode): void => {
+    if (node.id === excludeId) return
+    const rect = elementRects.get(node.id)
+    if (rect && isContainerNode(node)) {
+      const cx = rect.left + rect.width / 2
+      const cy = rect.top + rect.height / 2
+      const d = Math.hypot(mousePosition.x - cx, mousePosition.y - cy)
+      if (d < minDist) {
+        minDist = d
+        closest = node
+      }
+    }
+    for (const c of node.children) visit(c)
+  }
+
+  visit(root)
+  return closest
 }

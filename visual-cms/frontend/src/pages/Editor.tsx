@@ -123,6 +123,17 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const dropIndicatorRef = useRef<DropIndicator | null>(null)
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  // Last (cursor, dnd-kit delta) tuple used to suppress sub-pixel re-runs.
+  // Storing delta too is needed for autoscroll: when the canvas scrolls but the
+  // cursor stays still in viewport coords, only delta changes, and skipping
+  // would otherwise leave the indicator stale.
+  const lastMousePosRef = useRef<{ x: number; y: number; dx: number; dy: number } | null>(null)
+  // Cursor's true viewport coords (clientX/Y), kept in sync via a global
+  // pointermove listener. We can't derive these from dnd-kit's event.delta
+  // because delta includes ancestor-scroll adjustments — during autoscroll
+  // that makes mousePosition diverge from getBoundingClientRect's viewport
+  // space, and isPointInRect stops matching any container.
+  const cursorRef = useRef<{ x: number; y: number } | null>(null)
   
   // Auto-save hook - ОТКЛЮЧЕНО, сохранение только по кнопке
   const isNewDocument = !id || id === 'new'
@@ -140,6 +151,17 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
     },
   })
   
+  // Global pointer tracking — see cursorRef declaration for why dnd-kit's delta
+  // is unusable. Listener stays mounted for the editor's lifetime; pointermove
+  // is cheap and only updates a ref.
+  useEffect(() => {
+    const onPointerMove = (e: PointerEvent) => {
+      cursorRef.current = { x: e.clientX, y: e.clientY }
+    }
+    window.addEventListener('pointermove', onPointerMove, { passive: true })
+    return () => window.removeEventListener('pointermove', onPointerMove)
+  }, [])
+
   // Keep ref in sync with state
   useEffect(() => {
     dropIndicatorRef.current = dropIndicator
@@ -328,6 +350,18 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
     const { active, activatorEvent } = event
     const dragData = active.data.current as DragItem
 
+    // Reset per-drag refs. Without this, leftovers from the previous drag
+    // (stale indicator, stale subpixel-skip baseline) leak into the new one.
+    dropIndicatorRef.current = null
+    lastMousePosRef.current = null
+
+    // Seed cursorRef from the mousedown event in case pointermove hasn't fired
+    // yet (drag activates as soon as the activation distance is exceeded).
+    const startEvent = activatorEvent as MouseEvent
+    if (startEvent && typeof startEvent.clientX === 'number') {
+      cursorRef.current = { x: startEvent.clientX, y: startEvent.clientY }
+    }
+
     if (dragData?.type === 'canvas-element' && dragData.node) {
       dispatch(startDrag({ nodeId: dragData.node.id }))
       setActiveNode(dragData.node)
@@ -356,15 +390,39 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
 
     const { active, activatorEvent } = event
     const dragData = active.data.current as DragItem
-    
-    // Get mouse position
-    const mouseEvent = activatorEvent as MouseEvent
-    if (!mouseEvent) return
-    
-    const mousePosition = {
-      x: mouseEvent.clientX + (event.delta?.x || 0),
-      y: mouseEvent.clientY + (event.delta?.y || 0),
+
+    // Prefer the global pointer-tracking ref over activatorEvent.clientX + delta.
+    // dnd-kit's delta includes ancestor-scroll adjustments, so during canvas
+    // autoscroll the derived coords drift out of viewport space and stop
+    // matching getBoundingClientRect-based element rects.
+    const tracked = cursorRef.current
+    const mouseEvent = activatorEvent as MouseEvent | null
+    const mousePosition = tracked
+      ? tracked
+      : mouseEvent
+        ? {
+            x: mouseEvent.clientX + (event.delta?.x || 0),
+            y: mouseEvent.clientY + (event.delta?.y || 0),
+          }
+        : null
+    if (!mousePosition) return
+
+    // Skip sub-pixel updates — but compare BOTH viewport coords and dnd-kit's
+    // delta. During canvas autoscroll the cursor stays put in viewport space
+    // while delta keeps changing (it tracks scroll-adjusted translation), so a
+    // pure-coord check would freeze the indicator until the user moves again.
+    const delta = event.delta || { x: 0, y: 0 }
+    const last = lastMousePosRef.current
+    if (
+      last &&
+      Math.abs(last.x - mousePosition.x) < 1 &&
+      Math.abs(last.y - mousePosition.y) < 1 &&
+      Math.abs(last.dx - delta.x) < 1 &&
+      Math.abs(last.dy - delta.y) < 1
+    ) {
+      return
     }
+    lastMousePosRef.current = { x: mousePosition.x, y: mousePosition.y, dx: delta.x, dy: delta.y }
 
     // Collect all element rects
     const canvasElement = document.querySelector('[data-canvas="true"]')
@@ -429,12 +487,17 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
     }
     
     if (indicator) {
+      // Sync ref synchronously — useEffect-based sync runs after render and
+      // races with handleDragEnd (which reads dropIndicatorRef.current). A fast
+      // release right after the last move would otherwise drop with a stale ref.
+      dropIndicatorRef.current = indicator
       setDropIndicator(indicator)
-      
+
       // Get target container rect for highlight
       const targetParentRect = elementRects.get(indicator.targetParentId)
       setTargetContainerRect(targetParentRect || null)
-      
+
+
       // Get layout mode
       const targetParent = findNodeById(rootNode, indicator.targetParentId)
       if (targetParent) {
@@ -454,10 +517,13 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
     // Use ref to get the latest indicator value
     const currentIndicator = dropIndicatorRef.current
 
-    // Clear drag state
+    // Clear drag state — both React state and the ref. setDropIndicator(null)
+    // alone leaves dropIndicatorRef holding the just-used value until the
+    // useEffect re-syncs after render, which races a quick re-drag.
     dispatch(endDrag())
     setActiveNode(null)
     setDropIndicator(null)
+    dropIndicatorRef.current = null
     setTargetContainerRect(null)
 
     // === Handle layer-item drag (from structure panel) ===
@@ -782,6 +848,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
     dispatch(endDrag())
     setActiveNode(null)
     setDropIndicator(null)
+    dropIndicatorRef.current = null
     setTargetContainerRect(null)
   }, [dispatch])
 
@@ -815,6 +882,11 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
+      autoScroll={{
+        // dnd-kit default acceleration is 10; scroll speed scales linearly
+        // with it. 11.5 ≈ +15% faster autoscroll when dragging off-screen.
+        acceleration: 11.5,
+      }}
       measuring={{
         droppable: {
           strategy: MeasuringStrategy.Always,

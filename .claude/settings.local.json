@@ -11,7 +11,8 @@
       "Bash(grep -E \"\\\\.tsx?$\")",
       "Bash(grep -r \"^[[:space:]]*//.*const\\\\|^[[:space:]]*//.*function\\\\|^[[:space:]]*//.*export\" \"c:/Users/d.tolkunov/CodeRepository/GH_site/visual-cms/frontend/src/features/editor\" --include=\"*.tsx\")",
       "Bash(npx tsc *)",
-      "Bash(git -C \"c:/Users/d.tolkunov/CodeRepository/GH_site\" diff --stat)"
+      "Bash(git -C \"c:/Users/d.tolkunov/CodeRepository/GH_site\" diff --stat)",
+      "Bash(npx vitest *)"
     ]
   }
 }

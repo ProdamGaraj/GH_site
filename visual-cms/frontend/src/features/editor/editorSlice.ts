@@ -11,6 +11,7 @@ import {
   removeNodeFromTree,
   insertNodeIntoTree,
 } from '@/features/editor/utils/treeUtils'
+import { getLayoutMode } from '@/features/editor/utils/dndUtils'
 
 interface DragState {
   isDragging: boolean
@@ -789,9 +790,14 @@ const editorSlice = createSlice({
       const { tree: treeWithoutNode, removed } = removeNodeFromTree(state.rootNode, nodeId)
       if (!removed) return
       
-      // If target is absolute positioned, update the node's position styles
+      // If target is absolute positioned, update the node's position styles.
+      // Use the inferred layout mode rather than the raw `layoutMode` field —
+      // legacy data often leaves the field undefined while still rendering as
+      // flex via `display: flex`. Without inference, absolute styles wouldn't
+      // be stripped on move-into-flex and the block would float in the corner.
+      const targetLayoutMode = getLayoutMode(targetParent)
       let nodeToInsert = removed
-      if (targetParent.layoutMode === 'absolute' && absolutePosition) {
+      if (targetLayoutMode === 'absolute' && absolutePosition) {
         nodeToInsert = {
           ...removed,
           styles: {
@@ -804,7 +810,7 @@ const editorSlice = createSlice({
             },
           },
         }
-      } else if (targetParent.layoutMode === 'flex' || targetParent.layoutMode === 'grid') {
+      } else if (targetLayoutMode === 'flex' || targetLayoutMode === 'grid') {
         // Remove absolute positioning when moving to flex/grid container
         const { position: _pos, left: _l, top: _t, right: _r, bottom: _b, ...restProperties } = removed.styles.properties
         nodeToInsert = {
