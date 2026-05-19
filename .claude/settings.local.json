@@ -34,7 +34,8 @@
       "Read(//c/Users/d.tolkunov/.claude/projects/d--CodeRepository-GH-site/**)",
       "Bash(node -e \"console.log\\('root', require\\('./package.json'\\).version\\); console.log\\('frontend', require\\('./frontend/package.json'\\).version\\); console.log\\('backend', require\\('./backend/package.json'\\).version\\)\")",
       "Bash(grep -rniE \"addEventListener\\\\\\\\\\(['\\\\\"]keydown|onKeyDown|ctrl\\\\\\\\+|useHotkey|metaKey|ctrlKey\" frontend/src --include=*.ts --include=*.tsx)",
-      "Bash(grep -niE \"e\\\\\\\\.key|case '|ctrlKey|Delete|Backspace|'c'|'v'|'d'|'s'|'z'\")"
+      "Bash(grep -niE \"e\\\\\\\\.key|case '|ctrlKey|Delete|Backspace|'c'|'v'|'d'|'s'|'z'\")",
+      "Bash(echo \"tsc errors: $\\(npx tsc --noEmit 2>&1)"
     ]
   }
 }

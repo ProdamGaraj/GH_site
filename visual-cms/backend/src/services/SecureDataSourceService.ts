@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import { CredentialsManager } from './CredentialsManager'
+import { safeFetch } from '../utils/ssrfGuard'
 
 /**
  * Secure Data Source Service
@@ -198,13 +199,7 @@ class SecureDataSourceService {
     authConfig?: AuthConfig,
     startTime: number = Date.now()
   ): Promise<FetchResult> {
-    console.log('🌐 [SecureDataSourceService.fetchRestApi] config.url:', config.url)
-    console.log('🌐 [SecureDataSourceService.fetchRestApi] config.method:', config.method)
-    console.log('🌐 [SecureDataSourceService.fetchRestApi] config.queryParams:', config.queryParams)
-    
     const url = this.buildUrl(config.url!, config.queryParams, authConfig)
-    console.log('🌐 [SecureDataSourceService.fetchRestApi] Built URL:', url)
-    
     const headers = this.buildHeaders(config.headers, authConfig)
     
     const fetchOptions: RequestInit = {
@@ -230,7 +225,7 @@ class SecureDataSourceService {
       }
     }
 
-    const response = await fetch(url, fetchOptions)
+    const response = await safeFetch(url, fetchOptions)
     const responseTime = Date.now() - startTime
 
     // Парсим response headers
@@ -293,7 +288,7 @@ class SecureDataSourceService {
     const headers = this.buildHeaders(config.headers, authConfig)
     ;(headers as Record<string, string>)['Content-Type'] = 'application/json'
 
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -355,9 +350,6 @@ class SecureDataSourceService {
     queryParams?: Record<string, string>,
     authConfig?: AuthConfig
   ): string {
-    console.log('🔗 [buildUrl] Input baseUrl:', baseUrl)
-    console.log('🔗 [buildUrl] Input queryParams:', queryParams)
-    
     if (!baseUrl) {
       console.error('❌ [buildUrl] baseUrl is empty or undefined!')
       throw new Error('baseUrl is required for API request')
@@ -386,9 +378,7 @@ class SecureDataSourceService {
       url.searchParams.append('token', token)
     }
 
-    const result = url.toString()
-    console.log('🔗 [buildUrl] Result URL:', result)
-    return result
+    return url.toString()
   }
 
   /**
@@ -468,7 +458,7 @@ class SecureDataSourceService {
       throw new Error('Invalid OAuth2 config for token refresh')
     }
 
-    const response = await fetch(authConfig.tokenUrl, {
+    const response = await safeFetch(authConfig.tokenUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
