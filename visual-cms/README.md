@@ -125,6 +125,7 @@ MinIO (S3-совместимое хранилище), Zod, Jest + ts-jest.
 
 - [QUICKSTART.md](QUICKSTART.md) — установка и запуск
 - [PROJECT_STATUS_REPORT.md](PROJECT_STATUS_REPORT.md) — состояние проекта (единый статус-документ)
+- [KNOWN_ISSUES.md](KNOWN_ISSUES.md) — трекер недоработок и нестабильных мест
 - [docs/feature-inventory.md](docs/feature-inventory.md) — канонический реестр функций
 - [docs/data-binding-system-spec.md](docs/data-binding-system-spec.md) — ТЗ системы Data Binding
 - [docs/dynamic-project-pages-spec.md](docs/dynamic-project-pages-spec.md) — ТЗ динамических страниц проектов (черновик)

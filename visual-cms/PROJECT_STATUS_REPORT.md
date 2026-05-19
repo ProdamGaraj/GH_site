@@ -55,8 +55,10 @@ frontend (редактор)  ->  backend (Express + TypeORM + PostgreSQL)  ->  p
   дашборд, таймсерии, устройства/гео/источники, realtime, статистика блоков.
 - Коллекции, медиа-хранилище (MinIO, обработка через `sharp`), mock-сервер.
 - Инфраструктура: CORS, helmet/CSP, rate limiting, шифрование credentials,
-  Zod-валидация запросов, кастомные классы ошибок, health-checks,
-  Prometheus-метрики, Docker Compose.
+  Zod-валидация запросов, кастомные классы ошибок, Docker Compose.
+  Базовый `GET /health` (инлайн в `app.ts`) работает. Расширенные
+  `routes/health.ts` (`/metrics` Prometheus, `/health/live`, `/health/ready`)
+  реализованы, но НЕ смонтированы — см. KNOWN_ISSUES.md, A1.
 
 Персистенция БД: `synchronize: false`; идемпотентные SQL-миграции из
 `backend/src/migrations` применяются автоматически на старте через
@@ -120,10 +122,14 @@ PostgreSQL 5432, Redis 6379, MinIO 9000/9001.
   тестируемость.
 - HTML-импорт частично: `exportUtils.domElementToNewBlockNode` не подключён к UI;
   см. статус в [docs/html-import-guide.md](docs/html-import-guide.md).
+- Расширенные health-эндпоинты и Prometheus-метрики (`routes/health.ts`)
+  реализованы, но роутер не смонтирован — наблюдаемость в проде отсутствует.
 - `npm audit` (backend): присутствуют уязвимости в зависимостях — требуется
   отдельный разбор.
 
-Полный список нереализованного с критичностью — feature-inventory, часть 2.
+Отслеживание состояния этих и других недоработок ведётся в
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md). Полный список нереализованного с
+критичностью — feature-inventory, часть 2.
 
 ---
 
@@ -157,6 +163,7 @@ PostgreSQL 5432, Redis 6379, MinIO 9000/9001.
 
 - [README.md](README.md) — обзор и запуск
 - [QUICKSTART.md](QUICKSTART.md) — детальная установка
+- [KNOWN_ISSUES.md](KNOWN_ISSUES.md) — трекер недоработок и нестабильных мест
 - [docs/feature-inventory.md](docs/feature-inventory.md) — канонический реестр функций
 - [docs/data-binding-system-spec.md](docs/data-binding-system-spec.md) — ТЗ Data Binding
 - [docs/dynamic-project-pages-spec.md](docs/dynamic-project-pages-spec.md) — ТЗ динамических страниц (черновик)

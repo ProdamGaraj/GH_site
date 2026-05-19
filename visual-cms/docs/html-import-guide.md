@@ -1,11 +1,11 @@
 # Руководство по созданию HTML-страниц для импорта в Visual CMS
 
-> Статус (на 19 мая 2026): руководство описывает ЦЕЛЕВОЙ формат HTML для импорта.
-> Импорт подключён НЕ полностью: парсер `domElementToNewBlockNode`
-> (`frontend/src/features/editor/utils/exportUtils.ts`) присутствует, но не
-> вызывается из UI. До завершения интеграции рассматривайте документ как
-> спецификацию формата, а не как описание работающей функции. См.
-> [../PROJECT_STATUS_REPORT.md](../PROJECT_STATUS_REPORT.md), раздел 5.
+> Статус (на 19 мая 2026): HTML/JSON-импорт РАБОТАЕТ через `importContent`/
+> `importFromHTML` (`ImportModal` / `ExportImportModal`). Отдельный помощник
+> `domElementToNewBlockNode` (`frontend/src/features/editor/utils/exportUtils.ts`)
+> — мёртвый код, из UI не вызывается (см. KNOWN_ISSUES.md, A2). Документ
+> описывает целевой формат HTML; крайние случаи парсинга сверяйте с
+> реализацией `importFromHTML`.
 
 ## Содержание
 
