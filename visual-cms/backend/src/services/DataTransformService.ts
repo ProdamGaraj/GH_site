@@ -93,6 +93,52 @@ class DataTransformService {
   private sandboxTimeout = 1000 // 1 секунда на выполнение скрипта
 
   /**
+   * Безопасные глобали для vm-песочницы (общие для обоих путей исполнения).
+   */
+  private safeGlobals(): Record<string, unknown> {
+    return {
+      JSON: { parse: JSON.parse, stringify: JSON.stringify },
+      String, Number, Boolean, Array, Object, Math, Date,
+      parseInt, parseFloat, isNaN, isFinite,
+      encodeURIComponent, decodeURIComponent,
+    }
+  }
+
+  /**
+   * Синхронно исполнить обёрнутый код в vm и вернуть sandbox.result.
+   *
+   * ВНИМАНИЕ: node `vm` НЕ является security-песочницей (тривиальный escape).
+   * Это известный риск B1 (см. KNOWN_ISSUES.md) — закрытие RCE планируется
+   * отдельным шагом (expr-eval + декларативные трансформации).
+   * Ошибки намеренно не перехватываются — обработка на вызывающей стороне.
+   */
+  private runSync(wrappedCode: string, sandbox: Record<string, unknown>): unknown {
+    const vmContext = vm.createContext(sandbox)
+    vm.runInContext(wrappedCode, vmContext, {
+      timeout: this.sandboxTimeout,
+      displayErrors: true,
+    })
+    return (sandbox as { result?: unknown }).result
+  }
+
+  /**
+   * Асинхронно исполнить обёрнутый код. Обёртка обязана вызвать
+   * __resolve(result) / __reject(error) (sandbox должен содержать ключи
+   * __resolve/__reject). Те же ограничения безопасности, что и у runSync.
+   */
+  private runAsync(wrappedCode: string, sandbox: Record<string, unknown>): Promise<unknown> {
+    const vmContext = vm.createContext(sandbox)
+    return new Promise((resolve, reject) => {
+      sandbox.__resolve = resolve
+      sandbox.__reject = reject
+      vm.runInContext(wrappedCode, vmContext, {
+        timeout: this.sandboxTimeout,
+        displayErrors: true,
+      })
+    })
+  }
+
+  /**
    * Применить маппинг полей к данным
    */
   applyMapping(
@@ -275,7 +321,7 @@ class DataTransformService {
     context: TransformContext
   ): unknown {
     try {
-      // Создаём безопасный sandbox
+      // Создаём безопасный sandbox (общие safe-globals + специфичные поля)
       const sandbox = {
         value,
         item: context.item,
@@ -283,26 +329,8 @@ class DataTransformService {
         items: context.items,
         variables: context.variables || {},
         pageData: context.pageData || {},
-        // Безопасные утилиты
-        JSON: {
-          parse: JSON.parse,
-          stringify: JSON.stringify
-        },
-        String,
-        Number,
-        Boolean,
-        Array,
-        Object,
-        Math,
-        Date,
-        parseInt,
-        parseFloat,
-        isNaN,
-        isFinite,
-        encodeURIComponent,
-        decodeURIComponent,
-        // Результат
-        result: undefined
+        ...this.safeGlobals(),
+        result: undefined,
       }
 
       // Оборачиваем код в функцию
@@ -312,14 +340,7 @@ class DataTransformService {
         })(value, item, index, items, variables, pageData);
       `
 
-      // Создаём контекст и выполняем
-      const vmContext = vm.createContext(sandbox)
-      vm.runInContext(wrappedCode, vmContext, {
-        timeout: this.sandboxTimeout,
-        displayErrors: true
-      })
-
-      return sandbox.result
+      return this.runSync(wrappedCode, sandbox)
     } catch (error: any) {
       console.error('Transform execution error:', error.message)
       throw new Error(`Transform error: ${error.message}`)
@@ -376,10 +397,7 @@ class DataTransformService {
         items: context.items,
         variables: context.variables || {},
         pageData: context.pageData || {},
-        JSON: { parse: JSON.parse, stringify: JSON.stringify },
-        String, Number, Boolean, Array, Object, Math, Date,
-        parseInt, parseFloat, isNaN, isFinite,
-        encodeURIComponent, decodeURIComponent,
+        ...this.safeGlobals(),
         Promise,
         result: undefined,
         __resolve: undefined as unknown,
@@ -389,22 +407,13 @@ class DataTransformService {
       const wrappedCode = `
         (async function() {
           const value = item;
-          \${field.expression}
+          ${field.expression}
         })().then(function(r) { result = r; __resolve(r); }).catch(__reject);
       `
 
-      const vmContext = vm.createContext(sandbox)
-
-      return await new Promise((resolve, reject) => {
-        sandbox.__resolve = resolve
-        sandbox.__reject = reject
-        vm.runInContext(wrappedCode, vmContext, {
-          timeout: this.sandboxTimeout,
-          displayErrors: true,
-        })
-      })
+      return await this.runAsync(wrappedCode, sandbox)
     } catch (error: any) {
-      throw new Error(`Async compute error: \${error.message}`)
+      throw new Error(`Async compute error: ${error.message}`)
     }
   }
 
@@ -726,13 +735,7 @@ class DataTransformService {
         }).call(this);
       `
 
-      const vmContext = vm.createContext(sandbox)
-      vm.runInContext(wrappedCode, vmContext, {
-        timeout: this.sandboxTimeout,
-        displayErrors: true,
-      })
-
-      return sandbox.result
+      return this.runSync(wrappedCode, sandbox)
     }
 
     /**
@@ -758,20 +761,11 @@ class DataTransformService {
           const $var = this.$var;
           const $data = this.$data;
           const $page = this.$page;
-          \${expression}
+          ${expression}
         }).call(this).then(function(r) { result = r; __resolve(r); }).catch(__reject);
       `
 
-      const vmContext = vm.createContext(sandbox)
-
-      return await new Promise((resolve, reject) => {
-        sandbox.__resolve = resolve
-        sandbox.__reject = reject
-        vm.runInContext(wrappedCode, vmContext, {
-          timeout: this.sandboxTimeout,
-          displayErrors: true,
-        })
-      })
+      return await this.runAsync(wrappedCode, sandbox)
     }
 
     /**
@@ -785,12 +779,7 @@ class DataTransformService {
         variables: context.variables || {},
         dataSources: context.dataSources || {},
         pageData: context.pageData || {},
-        // Безопасные утилиты
-        JSON: { parse: JSON.parse, stringify: JSON.stringify },
-        String, Number, Boolean, Array, Object, Math, Date,
-        parseInt, parseFloat, isNaN, isFinite,
-        encodeURIComponent, decodeURIComponent,
-        // Результат
+        ...this.safeGlobals(),
         result: undefined,
       }
     }

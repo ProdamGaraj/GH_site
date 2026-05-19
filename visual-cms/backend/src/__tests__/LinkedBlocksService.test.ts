@@ -351,4 +351,138 @@ describe('LinkedBlocksService', () => {
       expect(targetNode.metadata.linkedBlockId).toBe('B-deep')
     })
   })
+
+  /**
+   * B2 регресс: placeholder-инвариант для hybrid-карусели.
+   *
+   * Историческая ошибка: при синхронизации развёрнутая структура library
+   * писалась в page и терялись attributes плейсхолдера (в т.ч.
+   * data-carousel-static). После reload слайд терял роль и карусель
+   * показывала 4/4 вместо 5/5.
+   *
+   * Инвариант, который пинится тут:
+   *  - collapse (syncBlockToAllPages): узел остаётся placeholder (children: []),
+   *    его id/attributes/linkedBlockId сохраняются, library в page НЕ
+   *    просачивается, число слайдов в треке не меняется;
+   *  - read/expand (updateLinkedBlocks): library-структура подставляется, но
+   *    attributes плейсхолдера ПЕРЕКРЫВАЮТ library-attributes (карусель-маркеры
+   *    выживают), id/linkedBlockId сохранены, число слайдов сохранено (5/5).
+   */
+  describe('B2 regression: hybrid-carousel placeholder invariant', () => {
+    const LIB_ID = 'carousel-slide-block'
+
+    const makeTrack = (slide4: any) => ({
+      id: 'root',
+      children: [
+        {
+          id: 'carousel-track',
+          attributes: { 'data-carousel-track': 'true' },
+          children: [
+            { id: 's0', tagName: 'div', attributes: { 'data-carousel-slide': '0' }, children: [] },
+            { id: 's1', tagName: 'div', attributes: { 'data-carousel-slide': '1' }, children: [] },
+            { id: 's2', tagName: 'div', attributes: { 'data-carousel-slide': '2' }, children: [] },
+            { id: 's3', tagName: 'div', attributes: { 'data-carousel-slide': '3' }, children: [] },
+            slide4,
+          ],
+        },
+      ],
+    })
+
+    it('collapse: linked-слайд схлопывается в placeholder, атрибуты и счёт 5/5 сохранены, library НЕ просачивается', async () => {
+      const repo: any = (AppDataSource.getRepository as any)()
+
+      // На странице — legacy: linked-слайд уже развёрнут (есть children)
+      const page = {
+        id: 'page-carousel',
+        name: 'P',
+        slug: 'p',
+        structure: makeTrack({
+          id: 'slide-linked',
+          tagName: 'div',
+          metadata: { linkedBlockId: LIB_ID, name: 'Promo slide' },
+          attributes: { 'data-carousel-slide': '4', 'data-carousel-static': 'true' },
+          children: [{ id: 'legacy-expanded', tagName: 'img' }],
+        }),
+      }
+      repo.find.mockResolvedValueOnce([page])
+
+      await service.syncBlockToAllPages(LIB_ID, {
+        id: 'lib-root',
+        tagName: 'div',
+        children: [{ id: 'lib-img', tagName: 'img' }],
+      })
+
+      const saved = repo.save.mock.calls[0][0]
+      const track = saved.structure.children[0]
+      expect(track.children).toHaveLength(5) // счёт слайдов не изменился
+
+      const placeholder = track.children[4]
+      expect(placeholder.id).toBe('slide-linked')
+      expect(placeholder.children).toEqual([]) // placeholder, library НЕ просочилась
+      expect(placeholder.metadata.linkedBlockId).toBe(LIB_ID)
+      // карусель-маркеры плейсхолдера сохранены
+      expect(placeholder.attributes['data-carousel-static']).toBe('true')
+      expect(placeholder.attributes['data-carousel-slide']).toBe('4')
+    })
+
+    it('read/expand: library подставляется, атрибуты плейсхолдера перекрывают library, счёт 5/5', async () => {
+      const repo: any = (AppDataSource.getRepository as any)()
+
+      const structure = makeTrack({
+        id: 'slide-linked',
+        tagName: 'div',
+        metadata: { linkedBlockId: LIB_ID },
+        attributes: { 'data-carousel-slide': '4', 'data-carousel-static': 'true' },
+        children: [], // placeholder
+      })
+
+      repo.find.mockResolvedValueOnce([
+        {
+          id: LIB_ID,
+          structure: {
+            id: 'lib-root',
+            tagName: 'section',
+            attributes: { class: 'promo', 'data-carousel-slide': 'LIB' },
+            children: [{ id: 'lib-img', tagName: 'img', children: [] }],
+          },
+        },
+      ])
+
+      const result = await service.updateLinkedBlocks(structure)
+
+      const track = result.children[0]
+      expect(track.children).toHaveLength(5) // карусель остаётся 5/5
+
+      const expanded = track.children[4]
+      expect(expanded.id).toBe('slide-linked') // id плейсхолдера сохранён
+      expect(expanded.metadata.linkedBlockId).toBe(LIB_ID)
+      expect(expanded.children).toEqual([{ id: 'lib-img', tagName: 'img', children: [] }]) // library-контент
+      // attributes плейсхолдера ПЕРЕКРЫВАЮТ library
+      expect(expanded.attributes['data-carousel-static']).toBe('true')
+      expect(expanded.attributes['data-carousel-slide']).toBe('4')
+      // library-attributes тоже присутствуют (merge)
+      expect(expanded.attributes.class).toBe('promo')
+    })
+
+    it('_replaceLinkedBlock: НИКОГДА не пишет library-children в page (защита от реинтродукции expand)', () => {
+      const node = {
+        id: 'n',
+        metadata: { linkedBlockId: 'X' },
+        attributes: { 'data-carousel-static': 'true' },
+        children: [{ id: 'old-expanded' }],
+        variations: { mobile: { specificChildren: [{ id: 'm1' }] } },
+      }
+
+      const out = (service as any)._replaceLinkedBlock(node, 'X', {
+        id: 'lib',
+        children: [{ id: 'libc1' }, { id: 'libc2' }],
+      })
+
+      expect(out.id).toBe('n')
+      expect(out.children).toEqual([])
+      expect(out.variations.mobile.specificChildren).toEqual([])
+      expect(out.metadata.linkedBlockId).toBe('X')
+      expect(out.attributes['data-carousel-static']).toBe('true')
+    })
+  })
 })

@@ -4,10 +4,17 @@
 > Статус: Черновик  
 > Проект: Visual CMS
 >
-> Статус реализации (на 19 мая 2026): ЧАСТИЧНО, не покрыто тестами.
-> Документ — черновик ТЗ. Функция «создание страниц проекта на лету» помечена
-> в истории как нестабильная и непротестированная. Перед опорой на этот документ
-> сверяйтесь с кодом и [../PROJECT_STATUS_REPORT.md](../PROJECT_STATUS_REPORT.md).
+> Статус реализации (на 19 мая 2026): РЕАЛИЗОВАНО через подсистему Collections
+> (`Collection`/`CollectionOverride`, `CollectionController`, маршруты
+> `/api/collections`). Динамические страницы проекта = коллекция: шаблонная
+> страница (`templatePageId`, `isTemplate`) + источник данных →
+> N страниц под `basePath`, slug из `slugField`/`titleField`, overrides
+> по элементу. Логика генерации покрыта тестами
+> (`backend/src/__tests__/CollectionController.getItems.test.ts`, 19).
+> Документ — исторический черновик ТЗ; терминология может отличаться от кода
+> (в коде — Collections). Источник истины по статусу:
+> [../KNOWN_ISSUES.md](../KNOWN_ISSUES.md) (B3) и
+> [../PROJECT_STATUS_REPORT.md](../PROJECT_STATUS_REPORT.md).
 
 ---
 
