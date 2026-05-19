@@ -1,186 +1,131 @@
-# 🚀 Быстрый старт Visual CMS
+# Быстрый старт Visual CMS
 
-## Шаг 1: Установка зависимостей
+Обзор проекта — [README.md](README.md). Состояние и техдолг —
+[PROJECT_STATUS_REPORT.md](PROJECT_STATUS_REPORT.md). Реестр функций —
+[docs/feature-inventory.md](docs/feature-inventory.md).
+
+## Шаг 1. Зависимости
 
 ```bash
-# Корневые зависимости
-npm install
-
-# Frontend
-cd frontend
-npm install
-
-# Backend
-cd ../backend
-npm install
+npm install                 # корневые скрипты (concurrently и пр.)
+cd frontend && npm install
+cd ../backend && npm install
 ```
 
-## Шаг 2: Настройка окружения
+Backend тянет `sharp` (нативный модуль обработки изображений). Для его сборки
+нужен тулчейн: на Windows — Visual C++ Build Tools, на Linux —
+`build-essential` и `python3`. Если `sharp` не собрался, `MediaService`
+не запустится — переустановите зависимости backend после установки тулчейна.
 
-Скопируйте файл с переменными окружения:
+## Шаг 2. Окружение backend
 
 ```bash
 cd backend
-copy .env.example .env
+cp .env.example .env
 ```
 
-Отредактируйте `.env` файл если нужно изменить настройки.
+Переменные (`backend/.env.example`):
 
-## Шаг 3: Запуск инфраструктуры
+```text
+PORT=5000
+NODE_ENV=development
+DATABASE_URL=postgresql://cms_user:cms_password@localhost:5432/visual_cms
+REDIS_URL=redis://localhost:6379
+S3_ENDPOINT=http://localhost:9000
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadmin
+S3_BUCKET=cms-media
+JWT_SECRET=your-secret-key-change-in-production
+JWT_EXPIRES_IN=7d
+```
 
-### Вариант А: Использовать Docker
+Примечание: переменные `JWT_*` присутствуют в шаблоне, но аутентификация в коде
+не реализована (выносится во внешний сервис) — они зарезервированы.
+
+## Шаг 3. Инфраструктура
+
+Вариант А — Docker (из корня):
 
 ```bash
-# Из корневой директории
-docker-compose up -d
-
-# Проверить статус
+npm run docker:up     # PostgreSQL 5432, Redis 6379, MinIO 9000/9001
 docker-compose ps
 ```
 
-Это запустит:
-- PostgreSQL на порту 5432
-- Redis на порту 6379
-- MinIO на портах 9000/9001
+Вариант Б — локальные PostgreSQL/Redis/MinIO с настройкой `.env` под них.
 
-### Вариант Б: Локальная установка
+Схема БД создаётся автоматически при первом старте backend: `synchronize: false`,
+идемпотентные миграции из `backend/src/migrations` применяются через
+`runSafeMigrations`. Отдельная команда миграции не требуется.
 
-Установите PostgreSQL, Redis и MinIO локально и настройте переменные окружения в `.env`.
-
-## Шаг 4: Запуск приложения
-
-### Запуск Frontend и Backend вместе
+## Шаг 4. Запуск
 
 ```bash
-# Из корневой директории
-npm run dev
+npm run dev           # frontend + backend параллельно (из корня)
 ```
 
-### Или по отдельности
+Или раздельно: `cd frontend && npm run dev` и `cd backend && npm run dev`.
 
-**Frontend (в одном терминале):**
-```bash
-cd frontend
-npm run dev
-```
+## Шаг 5. Адреса
 
-**Backend (в другом терминале):**
-```bash
-cd backend
-npm run dev
-```
+- Frontend: <http://localhost:3000>
+- Backend API: <http://localhost:5000/api>
+- Swagger UI: <http://localhost:5000/api/docs>
+- MinIO Console: <http://localhost:9001> (minioadmin / minioadmin)
 
-## Шаг 5: Открыть приложение
+## Структура проекта
 
-Откройте браузер и перейдите на:
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:5000/api
-- **MinIO Console**: http://localhost:9001 (minioadmin/minioadmin)
-
-## 📖 Структура проекта
-
-```
+```text
 visual-cms/
-├── frontend/              # React приложение
-│   ├── src/
-│   │   ├── app/          # Redux store, routes
-│   │   ├── features/     # Feature-based modules
-│   │   ├── pages/        # Page components
-│   │   ├── shared/       # Shared components, types
-│   │   └── widgets/      # Composite components
-│   └── package.json
-├── backend/               # Node.js API
-│   ├── src/
-│   │   ├── config/       # Configuration
-│   │   ├── controllers/  # Route controllers
-│   │   ├── models/       # TypeORM entities
-│   │   └── routes/       # API routes
-│   └── package.json
-├── docker-compose.yml     # Docker services
-└── package.json          # Root package.json
+├── frontend/   # app/ (store, routes), features/, pages/, shared/, widgets/
+├── backend/    # config/, controllers/, models/, routes/, services/,
+│               # middleware/, migrations/, schemas/, docs/ (OpenAPI), __tests__/
+├── public-site/# сгенерированные статические сайты (nginx)
+├── docs/       # спецификации и реестр функций
+└── docker-compose.yml
 ```
 
-## 🎯 Первые шаги
+## Первые шаги
 
-1. **Создайте первую страницу:**
-   - Нажмите "Создать страницу" на главной
-   - Перетащите элементы из левой панели на холст
-   - Настройте свойства в правой панели
-   - Сохраните
+1. Создать страницу: на главной — «Создать страницу», перетащить элементы
+   из левой панели на холст, настроить свойства справа, сохранить
+   (есть автосохранение с debounce).
+2. Layout-режимы: выбрать контейнер, в правой панели переключить
+   flex/grid/absolute/table, настроить специфичные свойства.
+3. Переиспользуемый блок: раздел «Блоки» — создать и сохранить;
+   использовать на страницах через библиотеку (linked-блоки
+   синхронизируются из библиотеки при чтении страницы).
 
-2. **Попробуйте разные режимы layout:**
-   - Выберите контейнер
-   - В правой панели выберите: Flex, Grid, Absolute или Table
-   - Настройте специфичные свойства
-
-3. **Создайте переиспользуемый блок:**
-   - Перейдите в раздел "Блоки"
-   - Создайте новый блок
-   - Сохраните его
-   - Используйте в других страницах через библиотеку
-
-## 🛠️ Полезные команды
+## Тесты
 
 ```bash
-# Остановить Docker контейнеры
-docker-compose down
-
-# Пересобрать контейнеры
-docker-compose up --build
-
-# Просмотр логов
-docker-compose logs -f
-
-# Очистить все (включая volumes)
-docker-compose down -v
-
-# Build для production
-npm run build
+cd backend  && npm test   # Jest + ts-jest (21 suite, 447 тестов)
+cd frontend && npm test   # Vitest (176 тестов)
 ```
 
-## ⚡ Горячие клавиши
+E2E-тестов нет. Покрытие как метрика не измеряется.
 
-- `Ctrl + S` - Сохранить (скоро)
-- `Ctrl + Z` - Отменить (скоро)
-- `Ctrl + Y` - Повторить (скоро)
-- `Delete` - Удалить выбранный элемент (скоро)
+## Полезные команды
 
-## 🐛 Отладка
+```bash
+docker-compose down       # остановить контейнеры
+docker-compose up --build # пересобрать
+docker-compose logs -f    # логи
+docker-compose down -v    # очистить включая volumes
+npm run build             # прод-сборка frontend + backend (из корня)
+```
 
-### Frontend не запускается
-- Проверьте что Node.js версии 18+
-- Удалите `node_modules` и переустановите: `npm install`
-- Проверьте порт 3000 свободен
+## Горячие клавиши
 
-### Backend не подключается к БД
-- Убедитесь что PostgreSQL запущен: `docker-compose ps`
-- Проверьте `.env` файл
-- Проверьте логи: `docker-compose logs postgres`
+Глобальные горячие клавиши (Ctrl+S/Z/Y, Delete) пока не реализованы —
+см. feature-inventory, часть 2, пункт M2.
 
-### Drag & Drop не работает
-- Откройте консоль браузера (F12)
-- Проверьте ошибки в консоли
-- Убедитесь что элемент перетаскивается на контейнер
+## Отладка
 
-## 📚 Документация
-
-- [Архитектура проекта](../docs/visual-constructor-architecture.md)
-- [План реализации](../docs/visual-constructor-implementation-plan.md)
-- [Использование CMS](../docs/company-website-cms-plan.md)
-
-## 💡 Реализованные возможности
-
-- [x] Undo/Redo
-- [x] Адаптивность (desktop, tablet, mobile views + custom breakpoints)
-- [x] Custom CSS редактор (Monaco)
-- [x] Библиотека готовых блоков (SavedBlocksLibrary)
-- [x] Экспорт в HTML/CSS/React/Vue
-- [x] Сохранение на backend с автосохранением
-- [x] Data Binding система (INPUT/OUTPUT/REPEATER)
-- [x] Реактивные переменные
-- [x] Inline редактирование текста
-- [x] Загрузка изображений
-- [x] Визуальные контролы для Flexbox/Grid
-- [x] Валидация Drag & Drop
-
-Удачи в разработке! 🚀
+- Frontend не стартует: Node.js 18+, переустановить `node_modules`,
+  проверить занятость порта 3000.
+- Backend не подключается к БД: PostgreSQL поднят (`docker-compose ps`),
+  корректный `DATABASE_URL` в `.env`, логи `docker-compose logs postgres`.
+- Ошибка импорта `sharp` в backend: не собран нативный модуль — установить
+  тулчейн (см. Шаг 1) и переустановить зависимости backend.
+- Drag&Drop: открыть консоль браузера (F12), проверить ошибки, убедиться,
+  что элемент бросается в контейнер.

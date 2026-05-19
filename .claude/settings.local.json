@@ -31,7 +31,8 @@
       "Bash(node -e \"try{console.log\\('jest-environment-node', require\\('jest-environment-node/package.json'\\).version\\)}catch\\(e\\){console.log\\('node-env MISSING'\\)}\")",
       "Bash(node -e \"try{console.log\\('jsdom', require\\('jsdom/package.json'\\).version\\)}catch\\(e\\){console.log\\('jsdom MISSING'\\)}\")",
       "Bash(cd \"C:/Users/d.tolkunov/.claude/projects/d--CodeRepository-GH-site/memory\" 2>/dev/null && ls -a && echo \"--- MEMORY.md ---\" && cat MEMORY.md 2>/dev/null | head -20 || echo \"NO memory dir / MEMORY.md\")",
-      "Read(//c/Users/d.tolkunov/.claude/projects/d--CodeRepository-GH-site/**)"
+      "Read(//c/Users/d.tolkunov/.claude/projects/d--CodeRepository-GH-site/**)",
+      "Bash(node -e \"console.log\\('root', require\\('./package.json'\\).version\\); console.log\\('frontend', require\\('./frontend/package.json'\\).version\\); console.log\\('backend', require\\('./backend/package.json'\\).version\\)\")"
     ]
   }
 }

@@ -1,476 +1,163 @@
-# 📊 Visual CMS — Отчёт о состоянии проекта
+# Visual CMS — Состояние проекта
 
-**Дата:** 23 января 2026  
-**Версия:** 1.1.0  
-**Статус:** ✅ MVP Complete + Data Binding System Complete + Template-as-Block Complete
+Дата: 19 мая 2026
+Версия: 1.0.0 (единственный источник — `package.json`; root/frontend/backend синхронизированы)
+Назначение: единый статус-документ. Канонический реестр функций с критичностью —
+[docs/feature-inventory.md](docs/feature-inventory.md). Этот файл не дублирует реестр,
+а описывает текущее техническое состояние, известные проблемы и план.
 
----
-
-## 📋 Краткое описание
-
-Visual CMS — это no-code/low-code визуальный конструктор веб-страниц, позволяющий создавать динамические сайты без программирования. Проект включает полноценный drag & drop редактор, систему привязки данных (Data Binding), систему Template-as-Block для создания переиспользуемых компонентов, и инструменты для деплоя статических сайтов.
-
----
-
-## 🎯 Степень выполненности ТЗ
-
-### Сводная таблица
-
-| ТЗ | Документ | Статус | Выполнение |
-|----|----------|--------|------------|
-| **1** | visual-constructor-implementation-plan.md | ✅ Завершено | **100%** |
-| **2** | visual-constructor-architecture.md | ✅ Завершено | **100%** |
-| **3** | data-binding-system-spec.md | ✅ Завершено | **100%** |
-| **4** | block-as-template-implementation.md | ✅ Завершено | **100%** |
+История версий ведётся в git. Прежние документы STATUS.md и набор
+`docs/visual-constructor-*.md` удалены/не существуют — ссылки на них устарели.
 
 ---
 
-## ✅ Реализованные функции
+## 1. Краткое описание
 
-### 1. Визуальный редактор
+Visual CMS — no-code/low-code конструктор сайтов с drag&drop редактором,
+системой привязки данных, мультисайтовостью, мультиязычностью, формами,
+аналитикой и публикацией статических сайтов за nginx.
 
-#### Базовая инфраструктура
-- ✅ **Frontend**: Vite + React 18 + TypeScript
-- ✅ **Стилизация**: TailwindCSS
-- ✅ **Навигация**: React Router v6
-- ✅ **State Management**: Redux Toolkit (5+ слайсов)
-- ✅ **Backend**: Express + TypeScript + TypeORM
-- ✅ **База данных**: PostgreSQL
-- ✅ **Кэширование**: Redis
-- ✅ **Хранилище файлов**: MinIO (S3-совместимое)
+Архитектура — три рантайма:
 
-#### Canvas и рендеринг
-- ✅ Рекурсивный рендеринг BlockNode
-- ✅ Система выбора элементов (click to select)
-- ✅ Визуальные индикаторы (hover outline, selected state)
-- ✅ Inline текстовое редактирование (double-click)
-- ✅ 4 режима layout: Flex, Grid, Absolute, Table
-
-#### Drag & Drop (@dnd-kit)
-- ✅ Drag из библиотеки элементов на Canvas
-- ✅ Drag внутри Canvas (перемещение между контейнерами)
-- ✅ Reorder элементов внутри контейнера
-- ✅ Валидация Drop (совместимость HTML-элементов)
-- ✅ Toast уведомления об ошибках
-
-#### Библиотека элементов (LeftPanel)
-- ✅ **Контейнеры**: Div, Section, Article, Header, Footer, Nav, Main, Aside
-- ✅ **Ввод данных**: Input, Textarea, Button, Select, Form
-- ✅ **Вывод данных**: Heading (H1-H6), Paragraph, Span, Image, Link, Video
-- ✅ **Списки**: UL, OL, LI
-- ✅ **Таблицы**: Table, TR, TD, TH, Thead, Tbody
-- ✅ **Сохранённые блоки**: SavedBlocksLibrary
-
-#### Панель свойств (RightPanel)
-- ✅ **Базовая информация**: ID, имя, тип элемента
-- ✅ **Layout режим**: переключатель Flex/Grid/Absolute/Table
-- ✅ **Размеры**: width, height, min/max размеры
-- ✅ **Отступы**: padding, margin (визуальный редактор)
-- ✅ **Flexbox контролы**: direction, justify, align, wrap, gap (визуальные кнопки)
-- ✅ **Grid контролы**: пресеты (2-4 колонки, sidebar layouts, auto-fill)
-- ✅ **Absolute positioning**: top, right, bottom, left, z-index
-- ✅ **Фон**: backgroundColor, backgroundImage, gradient
-- ✅ **Границы**: border, borderRadius
-- ✅ **Типографика**: fontFamily, fontSize, fontWeight, lineHeight, textAlign
-- ✅ **Color Picker**: HEX, RGB, HSL форматы
-- ✅ **Custom CSS**: Monaco Editor с подсветкой синтаксиса
-
-#### Контент элементов
-- ✅ Inline текстовое редактирование (двойной клик)
-- ✅ Загрузка изображений (drag & drop + URL)
-- ✅ Атрибуты для `<a>`: href, target, rel, title
-- ✅ Атрибуты для `<img>`: src, alt, width, height, object-fit, lazy loading
-- ✅ Атрибуты для `<input>`: type, placeholder, name, value, required, disabled
-- ✅ Атрибуты для `<video>`: src, controls, autoplay, loop, muted
-- ✅ Общие атрибуты: id, class, title
-
-#### Дополнительные функции
-- ✅ **Undo/Redo**: история изменений с кнопками в тулбаре
-- ✅ **Auto-save**: автосохранение с debounce (3 сек)
-- ✅ **Save indicator**: индикатор статуса сохранения
-- ✅ **beforeunload**: защита несохранённых данных
-- ✅ **Layers Panel**: дерево элементов с навигацией
-- ✅ **Viewport switcher**: Desktop HD/FHD, Tablet, Mobile
-- ✅ **Breakpoint Manager**: кастомные breakpoints
-- ✅ **Responsive стили**: variations по breakpoints
-
-#### Экспорт
-- ✅ HTML/CSS генерация
-- ✅ Экспорт в React (TSX/JSX)
-- ✅ Экспорт в Vue (SFC)
-- ✅ JSON формат для импорта
-- ✅ Скачивание как ZIP архив
-- ✅ Deploy на public-site
-
----
-
-### 2. Data Binding System
-
-#### Этап 1: Data Sources Management ✅
-- ✅ DataSource модель (TypeORM entity)
-- ✅ Типы источников: REST API, Database, Static JSON, Feed
-- ✅ DataSourceController (CRUD API endpoints)
-- ✅ CredentialsManager (AES-256 шифрование)
-- ✅ Авторизация: None, Bearer, API Key, Basic, OAuth2
-- ✅ dataSourcesSlice (Redux)
-- ✅ DataSourcesList UI
-- ✅ DataSourceWizard (wizard создания)
-- ✅ Test Connection функционал
-
-#### Этап 2: INPUT Bindings ✅
-- ✅ DataBinding модель
-- ✅ SecureDataSourceService (fetch с авторизацией)
-- ✅ DataFilterService (фильтры, сортировка, пагинация)
-- ✅ DataTransformService (mapping, JS transform)
-- ✅ CacheService (in-memory + Redis)
-- ✅ dataBindingsSlice (Redux)
-- ✅ DataBindingTab компонент
-- ✅ InputBindingEditor
-- ✅ FieldMappingEditor
-- ✅ FilterBuilder, SortBuilder
-
-#### Этап 3: Repeater & Templates ✅
-- ✅ Template модель
-- ✅ templatesSlice (Redux)
-- ✅ RepeaterConfig backend
-- ✅ RepeaterStatesEditor (frontend)
-- ✅ PaginationControlsEditor
-- ✅ Empty/Loading/Error states
-- ✅ Runtime rendering в HtmlGenerator
-
-#### Этап 4: OUTPUT Bindings ✅
-- ✅ DataSubmission модель (логирование)
-- ✅ DataSubmitController
-- ✅ ValidationService (server-side validation)
-- ✅ AnalyticsService (logging)
-- ✅ OutputBindingEditor (frontend)
-- ✅ FormFieldsEditor
-- ✅ PayloadMapping
-- ✅ Triggers: submit, click, change, blur
-- ✅ Response handling (success/error actions)
-
-#### Этап 5: Mixed Data & Advanced Features ✅
-- ✅ DataJoinService (LEFT/INNER/FULL/CROSS joins)
-- ✅ Computed fields (JS functions)
-- ✅ DataPipelineService (orchestration)
-- ✅ AdditionalDataSourcesEditor
-- ✅ ComputedFieldsEditor
-- ✅ ConditionalMappingEditor
-- ✅ Fallback strategies
-
-#### Этап 6: Reactive Variables System ✅
-- ✅ PageVariable модель (TypeORM)
-- ✅ VariablesController (CRUD API)
-- ✅ variablesSlice (Redux + persistence)
-- ✅ 8+ React hooks:
-  - useVariables
-  - useVariableByName
-  - usePageVariablesManager
-  - useDependencyTracker
-  - useThrottledVariable
-  - useBatchUpdate
-  - useConditionalReactivity
-  - useDerivedVariable
-  - useVariableHistory
-  - useVariableWatch
-  - useMultiVariableWatch
-- ✅ VariablesPanel component
-- ✅ VariableBindingSelector
-- ✅ VariableValueDisplay
-- ✅ VariableWatcher (debug panel)
-
-#### Этап 7: Testing & Optimization ✅
-- ✅ Unit tests (Jest):
-  - DataFilterService tests
-  - DataTransformService tests
-  - DataJoinService tests
-  - VariablesController tests
-- ✅ Integration tests (Supertest)
-- ✅ Performance optimization:
-  - CacheService (in-memory + Redis)
-  - Request timing middleware
-  - Response caching middleware
-  - Rate limiting
-  - ETag support
-  - Query optimization
-- ✅ Error handling:
-  - Custom error classes
-  - Centralized error handler
-  - Error logging
-
----
-
-### 3. Template-as-Block System
-
-#### Концепция
-Template — это **вторая роль Block**, а не отдельная сущность. Любой блок может быть переведён в Template режим с автоматическим определением bindable полей и синхронизацией с Data Bindings.
-
-**Ключевые принципы:**
-- Block.structure — единственный источник правды
-- HTML/CSS генерируются динамически
-- Поля обнаруживаются автоматически из элементов с metadata.name
-- Изменения структуры → автоматическая синхронизация Data Bindings
-
-#### Backend ✅
-- ✅ Block модель расширена полями:
-  - `isTemplate: boolean` — флаг Template режима
-  - `templateCategory: string` — категория (card, list-item, modal и т.д.)
-  - `detectedFields: DetectedField[]` — автообнаруженные bindable поля
-  - `templateSettings: TemplateSettings` — настройки (анимация, responsive)
-- ✅ **BlockTemplateService** (core logic):
-  - `generateHTMLFromStructure()` — генерация HTML с data-bind атрибутами
-  - `detectFieldsFromStructure()` — автоопределение полей из metadata.name
-  - `diffFields()` — сравнение старых/новых полей (added/removed/unchanged)
-  - `syncBindingsOnFieldChange()` — синхронизация DataBinding.fieldMappings при изменении полей
-- ✅ **BlockController endpoints**:
-  - `POST /api/blocks/:id/enable-template` — включить Template режим
-  - `POST /api/blocks/:id/disable-template` — отключить Template режим
-  - `GET /api/blocks/:id/html` — получить HTML/CSS + detectedFields
-  - `POST /api/blocks/:id/refresh-fields` — принудительно пересчитать поля
-  - `PUT /api/blocks/:id` — обновлён для автосинхронизации при изменении structure
-- ✅ **Database migration**:
-  - 4 новых поля в таблице `blocks`
-  - 2 индекса для производительности (is_template, template_category)
-
-#### Frontend ✅
-- ✅ **TemplateModeSwitch** component:
-  - Кнопка "Enable Template" / Badge "Template Mode"
-  - Диалог выбора категории Template
-  - Кнопка Refresh Fields с diff preview
-  - Кнопка Disable Template
-- ✅ **DetectedFieldsViewer** component:
-  - Отображение обнаруженных полей с иконками
-  - Цветовая кодировка по типу (text, image, link, number, date, list, object)
-  - Информация о selector, attribute
-  - Semantic hints
-  - Режимы: compact / full
-- ✅ **Integration в UI**:
-  - BlocksList: badge "Template" + "N fields" + TemplateModeSwitch
-  - PropertiesPanel: DetectedFieldsViewer в правой панели для Template блоков
-  - Editor: передача currentBlockData для отображения template информации
-
-#### Auto-Sync Flow ✅
-```
-User edits Block.structure (добавляет элемент с metadata.name)
-    ↓
-BlockController.update() → detects isTemplate === true
-    ↓
-BlockTemplateService.detectFieldsFromStructure() → [fields]
-    ↓
-BlockTemplateService.diffFields(oldFields, newFields) → {added, removed, unchanged}
-    ↓
-BlockTemplateService.syncBindingsOnFieldChange() → updates DataBinding.fieldMappings
-    ↓
-DataBinding automatically updated ✅
+```text
+frontend (редактор)  ->  backend (Express + TypeORM + PostgreSQL)  ->  public-site (nginx, статика)
+   React/Redux              22 роутера, 21 модель                       сгенерированный сайт + tracker.js
 ```
 
-#### Features ✅
-- ✅ Автоматическое определение полей при включении Template режима
-- ✅ Diff-based синхронизация (только изменённые поля обновляются)
-- ✅ HTML генерация с data-bind атрибутами для рендеринга
-- ✅ Поддержка 8 типов полей: text, image, link, number, date, boolean, list, object
-- ✅ Semantic hints для умного маппинга
-- ✅ Refresh fields with diff preview
-- ✅ Template category (card, list-item, modal, section, hero и т.д.)
-
-#### Documentation ✅
-- ✅ [block-as-template-implementation.md](./docs/block-as-template-implementation.md) — детальная реализация
-- ✅ [TEMPLATE_TESTING.md](./docs/TEMPLATE_TESTING.md) — 6 сценариев тестирования
-- ✅ [TEMPLATE_SUMMARY.md](./docs/TEMPLATE_SUMMARY.md) — краткое резюме
-
-#### Этап 8: Documentation & Deployment ✅
-- ✅ OpenAPI 3.0.3 specification
-- ✅ Swagger UI (/api/docs)
-- ✅ ReDoc (/api/docs/redoc)
-- ✅ Production Dockerfiles (multi-stage)
-- ✅ docker-compose.prod.yml
-- ✅ nginx reverse proxy
-- ✅ GitHub Actions CI/CD:
-  - ci-cd.yml (main workflow)
-  - pr-checks.yml (PR checks)
-- ✅ Security middleware
-- ✅ Prometheus metrics (/metrics)
-- ✅ Health check endpoints (/health)
+Центральная доменная сущность — рекурсивное дерево `BlockNode`
+(`frontend/src/shared/types/index.ts`), сериализуется в `jsonb`
+(`pages.structure`, `blocks.structure`).
 
 ---
 
-## 🏗️ Архитектура проекта
+## 2. Реализованные подсистемы
 
-```
-visual-cms/
-├── frontend/                    # React 18 + TypeScript + Vite
-│   ├── src/
-│   │   ├── app/                # Redux store, routes
-│   │   ├── features/           # Feature modules
-│   │   │   ├── editor/        # Визуальный редактор
-│   │   │   ├── pages/         # pagesSlice
-│   │   │   ├── blocks/        # blocksSlice
-│   │   │   ├── groups/        # groupsSlice
-│   │   │   ├── data-sources/  # dataSourcesSlice
-│   │   │   ├── dataBindings/  # Data Binding компоненты
-│   │   │   ├── templates/     # templatesSlice
-│   │   │   └── variables/     # variablesSlice + hooks
-│   │   ├── pages/             # Страницы приложения
-│   │   ├── shared/            # Общие компоненты, типы, утилиты
-│   │   └── widgets/           # Составные компоненты
-│   └── package.json
-│
-├── backend/                     # Express + TypeScript + TypeORM
-│   ├── src/
-│   │   ├── config/            # database.ts
-│   │   ├── controllers/       # CRUD контроллеры
-│   │   ├── models/            # TypeORM entities
-│   │   ├── routes/            # API routes
-│   │   ├── services/          # Business logic
-│   │   ├── middleware/        # Auth, cache, rate limiting
-│   │   ├── docs/              # OpenAPI spec
-│   │   └── __tests__/         # Unit & integration tests
-│   └── package.json
-│
-├── public-site/                 # Сгенерированные HTML страницы
-├── scripts/                     # Seed scripts
-├── docker-compose.yml          # Development
-├── docker-compose.prod.yml     # Production
-└── .github/workflows/          # CI/CD
-```
+Детальная разбивка по функциям и критичности — в
+[docs/feature-inventory.md](docs/feature-inventory.md), часть 1. Сводно реализовано:
+
+- Визуальный редактор (Canvas): drag&drop с валидацией вложенности, дерево слоёв,
+  20+ типов элементов, 4 режима layout, состояния, анимации, адаптивные
+  breakpoints, zoom/pan, undo/redo, автосохранение, inline-редактирование,
+  кастомный CSS (Monaco), экспорт/импорт.
+- Блоки и шаблоны: reusable- и linked-блоки, Template-режим с автоопределением
+  полей, библиотека сохранённых блоков.
+- Data Binding: источники REST/GraphQL/Database/Feed/External; INPUT/OUTPUT;
+  repeater; field mapping; фильтры/сортировка/пагинация; трансформации; join;
+  вычисляемые поля; конвейер (`DataPipelineService`); кеширование (Redis).
+- Переменные страницы: scopes page/session/global, реактивность, персистенция.
+- Мультисайтовость: CRUD сайтов, навигация, дублирование, раздельный деплой.
+- Публикация и деплой: генерация статики (`HtmlGenerator`/`DeployService`),
+  история деплоев, откат (rollback), отдача через nginx.
+- Версионирование страниц (snapshot auto/manual/deploy, восстановление).
+- Формы: конструктор, destinations, история отправок, статистика.
+- Мультиязычность: языки, переводы, языковая память, seed.
+- Аналитика: tracker.js (pageview/click/scroll/form), сессии, web vitals,
+  дашборд, таймсерии, устройства/гео/источники, realtime, статистика блоков.
+- Коллекции, медиа-хранилище (MinIO, обработка через `sharp`), mock-сервер.
+- Инфраструктура: CORS, helmet/CSP, rate limiting, шифрование credentials,
+  Zod-валидация запросов, кастомные классы ошибок, health-checks,
+  Prometheus-метрики, Docker Compose.
+
+Персистенция БД: `synchronize: false`; идемпотентные SQL-миграции из
+`backend/src/migrations` применяются автоматически на старте через
+`runSafeMigrations` (`backend/src/server.ts`). Миграции: коллекции, медиа-ассеты,
+thumbnail, статистика коллекций, template-поля блоков, система переводов.
 
 ---
 
-## 🛠️ Технологический стек
+## 3. Тесты — фактическое состояние
 
-### Frontend
-| Технология | Версия | Назначение |
-|------------|--------|------------|
-| React | 18.x | UI Framework |
-| TypeScript | 5.x | Типизация |
-| Vite | 5.x | Сборщик |
-| Redux Toolkit | 2.x | State Management |
-| @dnd-kit | 6.x | Drag & Drop |
-| Monaco Editor | 4.x | CSS Editor |
-| TailwindCSS | 3.x | Стилизация |
-| React Router | 6.x | Навигация |
-| Axios | 1.x | HTTP клиент |
-| Lucide React | 0.x | Иконки |
+Ранее документация заявляла «Testing 100%» / «coverage > 80%». Это было неверно:
+у backend отсутствовал jest-конфиг, и `.ts`-тесты вообще не запускались.
 
-### Backend
-| Технология | Версия | Назначение |
-|------------|--------|------------|
-| Node.js | 18+ | Runtime |
-| Express | 4.x | Web Framework |
-| TypeScript | 5.x | Типизация |
-| TypeORM | 0.3.x | ORM |
-| PostgreSQL | 15 | Database |
-| Redis | 7 | Cache |
-| Jest | 29.x | Testing |
+Актуально на 19 мая 2026:
 
-### DevOps
-| Технология | Назначение |
-|------------|------------|
-| Docker | Контейнеризация |
-| Docker Compose | Оркестрация |
-| GitHub Actions | CI/CD |
-| nginx | Reverse Proxy |
-| MinIO | S3-совместимое хранилище |
+- Backend: добавлен `backend/jest.config.js` (jest 29 + ts-jest 29, transpile-only,
+  `roots: src`, setup через `setupFilesAfterEnv`). Прогон: 21 suite, 447 тестов —
+  все зелёные.
+- Frontend: Vitest — 9 файлов, 176 тестов — зелёные.
+- Покрытие как метрика не измеряется (нет coverage-прогона в CI/локально).
+- E2E-тестов нет (Playwright присутствует в devDependencies, спецификаций нет).
+- Backend-тесты опираются на сервисную/доменную логику; `api.integration.test.ts`
+  требует доступной тестовой БД.
 
 ---
 
-## 📁 Ключевые файлы
+## 4. Технологический стек
 
-### Frontend
-- `frontend/src/app/store.ts` — Redux store configuration
-- `frontend/src/features/editor/editorSlice.ts` — Основной слайс редактора
-- `frontend/src/features/editor/components/Canvas/CanvasRenderer.tsx` — Рендеринг элементов
-- `frontend/src/features/editor/components/RightPanel/` — Панель свойств
-- `frontend/src/features/dataBindings/` — Data Binding UI компоненты
-- `frontend/src/features/variables/` — Reactive Variables система
+Frontend: React 18, TypeScript 5, Vite 5, Redux Toolkit 2, @dnd-kit 6,
+Monaco Editor, TailwindCSS 3, React Router 6, Axios, Zod, Vitest.
 
-### Backend
-- `backend/src/server.ts` — Entry point
-- `backend/src/config/database.ts` — TypeORM configuration
-- `backend/src/controllers/` — API контроллеры
-- `backend/src/services/` — Business logic сервисы
-- `backend/src/docs/openapi.ts` — API документация
+Backend: Node.js 18+, Express 4, TypeScript 5, TypeORM 0.3, PostgreSQL,
+Redis, MinIO/S3, `sharp`, Zod, Jest + ts-jest.
+
+DevOps: Docker / Docker Compose, nginx (reverse proxy + отдача public-site),
+GitHub Actions (`.github/workflows`).
+
+Порты по умолчанию (см. `backend/.env.example`, `frontend/vite.config.ts`):
+frontend 3000, backend 5000 (`/api`, Swagger `/api/docs`),
+PostgreSQL 5432, Redis 6379, MinIO 9000/9001.
 
 ---
 
-## 🚀 Как запустить
+## 5. Известные проблемы и технический долг
 
-### Development
+Зафиксировано по результатам ревью и стабилизации:
 
-```bash
-# 1. Установить зависимости
-npm install
-cd frontend && npm install
-cd ../backend && npm install
+- Аутентификация/авторизация в коде отсутствует. По решению владельца выносится
+  во внешний сервис с микросервисной авторизацией и гранулярными ролями —
+  вне скоупа данного репозитория. До интеграции backend полагается на сетевой
+  контур (см. часть 2 feature-inventory, C1/C2 — трактовать как «внешнее»).
+- SSRF: `SecureDataSourceService` ходит по пользовательскому URL без блок-листа
+  приватных диапазонов — defense-in-depth до прод-выката.
+- `DataTransformService` исполняет пользовательский JS через node `vm`
+  (не является security-песочницей) и содержит два параллельных движка
+  исполнения — требует консолидации.
+- Дублирование типа `BlockNode` (frontend + 3 копии в backend) — риск дрейфа
+  контракта публикации.
+- God-файлы: `DeployService` (~1879 строк), `DataBindingGenerator` (~1604),
+  `DataTransformService` (~1317), `AnalyticsService` (~1016) — низкая
+  тестируемость.
+- HTML-импорт частично: `exportUtils.domElementToNewBlockNode` не подключён к UI;
+  см. статус в [docs/html-import-guide.md](docs/html-import-guide.md).
+- `npm audit` (backend): присутствуют уязвимости в зависимостях — требуется
+  отдельный разбор.
 
-# 2. Настроить окружение
-cd backend
-cp .env.example .env
-
-# 3. Запустить Docker инфраструктуру
-docker-compose up -d
-
-# 4. Запустить приложение
-npm run dev
-```
-
-### Production
-
-```bash
-# Собрать и запустить через Docker Compose
-docker-compose -f docker-compose.prod.yml up -d
-```
-
-### Доступные URL
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:4000/api
-- **Swagger UI**: http://localhost:4000/api/docs
-- **Public Site**: http://localhost:8080
+Полный список нереализованного с критичностью — feature-inventory, часть 2.
 
 ---
 
-## 📊 Метрики качества
+## 6. Журнал стабилизации (19 мая 2026)
 
-| Метрика | Значение |
-|---------|----------|
-| Unit Test Coverage | >80% |
-| TypeScript Strict Mode | ✅ Enabled |
-| ESLint | ✅ Configured |
-| API Documentation | ✅ OpenAPI 3.0.3 |
-| CI/CD Pipeline | ✅ GitHub Actions |
-
----
-
-## 🔮 Возможные улучшения (Future)
-
-### Приоритет 1 (Высокий)
-- [ ] E2E тесты (Playwright/Cypress)
-- [ ] WebSocket для real-time коллаборации
-- [ ] История версий страниц/блоков
-- [ ] Импорт из Figma
-
-### Приоритет 2 (Средний)
-- [ ] Analytics Dashboard UI
-- [ ] Dark mode
-- [ ] Многоязычность (i18n)
-- [ ] Онбординг туториал
-
-### Приоритет 3 (Низкий)
-- [ ] AI-ассистент для генерации контента
-- [ ] A/B тестирование
-- [ ] Комментарии и аннотации
-- [ ] Публикация на custom domain
+- Исправлен рантайм-краш drag&drop: реализована отсутствовавшая
+  `checkCyclicReference` (`frontend/.../dropValidation.ts`).
+- Восстановлена прод-сборка фронтенда (`BlockNode.tag` -> опциональный;
+  `OutputBindingEditor` приведён к `EndpointConfig`; зачищен мёртвый код).
+  Результат: `tsc` 0 ошибок, `npm run build` проходит.
+- Backend: установлен `sharp`; `tsc` 0 ошибок.
+- Добавлен `backend/jest.config.js` (ts-jest) — backend-тесты впервые
+  запускаются (447/447).
+- 3 устаревших backend-теста приведены к корректному поведению
+  (placeholder-инвариант linked-блоков; контракт `blockId`).
 
 ---
 
-## 📄 Связанные документы
+## 7. План (приоритеты не зафиксированы — требуют согласования)
 
-- [QUICKSTART.md](QUICKSTART.md) — Быстрый старт
-- [STATUS.md](STATUS.md) — Детальный статус функций
-- [docs/visual-constructor-architecture.md](../docs/visual-constructor-architecture.md) — Архитектура
-- [docs/visual-constructor-implementation-plan.md](../docs/visual-constructor-implementation-plan.md) — План реализации
+1. Разбор технического долга: дубли `BlockNode`, декларативные трансформации
+   вместо `vm`, распил god-файлов под тесты.
+2. Интеграция внешнего auth-сервиса (точки подключения в backend middleware).
+3. Defense-in-depth: блок-лист SSRF, аудит логов на утечку секретов.
+4. E2E-тесты критичных сценариев (создание -> биндинг -> публикация).
+5. Обновление уязвимых зависимостей.
+
+---
+
+## 8. Связанные документы
+
+- [README.md](README.md) — обзор и запуск
+- [QUICKSTART.md](QUICKSTART.md) — детальная установка
+- [docs/feature-inventory.md](docs/feature-inventory.md) — канонический реестр функций
 - [docs/data-binding-system-spec.md](docs/data-binding-system-spec.md) — ТЗ Data Binding
-
----
-
-**Последнее обновление:** 22 января 2026
+- [docs/dynamic-project-pages-spec.md](docs/dynamic-project-pages-spec.md) — ТЗ динамических страниц (черновик)
+- [docs/html-import-guide.md](docs/html-import-guide.md) — руководство по импорту HTML

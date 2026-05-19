@@ -256,8 +256,10 @@ describe('LinkedBlocksService', () => {
       const savedPage = repo.save.mock.calls[0][0]
       const replacedNode = savedPage.structure.children[0]
       expect(replacedNode.id).toBe('original-node-id') // id ноды страницы сохранён
-      expect(replacedNode.metadata.linkedBlockId).toBe('block-Y') // linkedBlockId восстановлен
-      expect(replacedNode.children).toEqual(newStructure.children) // содержимое из библиотеки
+      expect(replacedNode.metadata.linkedBlockId).toBe('block-Y') // linkedBlockId сохранён
+      // Placeholder-инвариант: page хранит только заглушку (children: []),
+      // полная структура живёт в библиотеке и подставляется при чтении (_applyLinkedBlocks).
+      expect(replacedNode.children).toEqual([])
     })
 
     it('возвращает пустой результат, если ни одна страница не использует блок', async () => {
@@ -343,7 +345,9 @@ describe('LinkedBlocksService', () => {
       const savedPage = repo.save.mock.calls[0][0]
       const targetNode = savedPage.structure.children[0].children[0].children[0]
       expect(targetNode.id).toBe('target')
-      expect(targetNode.tagName).toBe('section')
+      // Placeholder-инвариант: вложенный linked-узел тоже схлопывается в заглушку,
+      // library-структура (tagName: 'section') в page НЕ просачивается.
+      expect(targetNode.children).toEqual([])
       expect(targetNode.metadata.linkedBlockId).toBe('B-deep')
     })
   })

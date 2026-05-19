@@ -258,8 +258,10 @@ describe('dataBinding.schema', () => {
         expect(r.data.priority).toBe(0)
       }
     })
-    it('rejects non-uuid blockId', () => {
-      expect(createDataBindingSchema.safeParse({ ...valid, blockId: 'bad' }).success).toBe(false)
+    it('rejects empty blockId', () => {
+      // blockId — это id BlockNode (generateId() = `${Date.now()}-${rand}`), не uuid;
+      // модель хранит его как varchar(255). Контракт схемы: непустая строка (.min(1)).
+      expect(createDataBindingSchema.safeParse({ ...valid, blockId: '' }).success).toBe(false)
     })
     it('accepts all binding types', () => {
       for (const bt of ['input', 'output', 'two-way']) {
