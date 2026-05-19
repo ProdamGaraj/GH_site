@@ -952,7 +952,7 @@ function tagToElementType(tagName: string): BlockNode['elementType'] {
 /**
  * Convert a DOM Element to a fresh BlockNode (for newly added elements)
  */
-function domElementToNewBlockNode(el: Element): BlockNode | null {
+export function domElementToNewBlockNode(el: Element): BlockNode | null {
   const tagName = el.tagName.toLowerCase()
   if (['script', 'style', 'meta', 'link', 'head', 'title', 'noscript'].includes(tagName)) {
     return null

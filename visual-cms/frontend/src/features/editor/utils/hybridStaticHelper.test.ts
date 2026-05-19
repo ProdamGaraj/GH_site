@@ -144,7 +144,7 @@ describe('extractTemplateLayoutStyles', () => {
         properties: {
           width: '100%',
           minWidth: '100%',
-          flexShrink: 0,
+          flexShrink: '0',
           height: '100vh',
           display: 'flex',
           alignItems: 'center',
@@ -192,7 +192,7 @@ describe('prepareHybridStaticNode', () => {
       properties: {
         width: '100%',
         minWidth: '100%',
-        flexShrink: 0,
+        flexShrink: '0',
         height: '100vh',
         display: 'flex',
         alignItems: 'center',
@@ -243,7 +243,7 @@ describe('prepareHybridStaticNode', () => {
 
   it('layout template имеет приоритет над собственными layout-стилями узла (кроме width/flex-*)', () => {
     const node = mk({
-      styles: { properties: { width: '50%', height: '500px', flexShrink: 1 } },
+      styles: { properties: { width: '50%', height: '500px', flexShrink: '1' } },
     })
     const out = prepareHybridStaticNode(node, tpl)
     const props = out.styles?.properties as Record<string, unknown>
@@ -253,7 +253,7 @@ describe('prepareHybridStaticNode', () => {
     // но CarouselRuntime всё равно перезапишет его inline-style'ом на (100/n)%
     expect(props.width).toBe('50%')
     // flexShrink узла перекрывает fallback (own > fallback)
-    expect(props.flexShrink).toBe(1)
+    expect(props.flexShrink).toBe('1')
   })
 
   it('не мутирует исходный узел', () => {

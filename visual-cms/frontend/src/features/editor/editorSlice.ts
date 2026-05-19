@@ -6,7 +6,6 @@ import { findNodeInTree } from '@/features/editor/utils/variationUtils'
 import {
   findNodeById,
   findParentNode,
-  getNodePath,
   isDescendantOf,
   removeNodeFromTree,
   insertNodeIntoTree,

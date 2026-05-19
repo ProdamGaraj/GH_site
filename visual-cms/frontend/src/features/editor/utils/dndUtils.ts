@@ -29,6 +29,18 @@ export interface DraggedElement {
   sourceIndex: number
 }
 
+// TEMPORARY drop-target diagnostic. Logs only when the (tag, payload) changes,
+// so dragMove firing every frame doesn't spam the console. Remove once the
+// drop-position investigation is closed.
+let __ddtLast = ''
+const ddtDiag = (tag: string, payload: Record<string, unknown>) => {
+  const sig = tag + '|' + JSON.stringify(payload)
+  if (sig === __ddtLast) return
+  __ddtLast = sig
+  // eslint-disable-next-line no-console
+  console.log(`[DDT ${tag}]`, payload)
+}
+
 // Must stay in sync with CanvasRenderer.tsx's `isContainer` check — the source
 // of truth for what `useDroppable` is enabled on. Diverging here causes the
 // algorithm to propose drop targets that dnd-kit refuses, producing visible
@@ -42,6 +54,17 @@ const CONTAINER_TAGS = new Set([
 // distance-to-slot vs distance-to-slot in the same coord system — this buffer
 // only widens the candidate set, it doesn't bias which slot wins.
 const CANDIDATE_BUFFER_PX = 24
+
+// Per-nesting-level penalty (screen px) added to a slot's distance. The cursor
+// is almost always sitting inside some deeply-nested element, so its internal
+// slots have near-zero raw distance and would always beat the structurally
+// meaningful slots between higher-level blocks — visually bisecting a cohesive
+// block (e.g. a timeline entry) instead of snapping above/below it. The bias
+// makes a deeper slot win only when the cursor is decisively on its edge, so
+// shallow "between blocks" placement is the default while intentional
+// drop-inside still works when you aim precisely. Same-level siblings share the
+// same bias, so the touching-siblings behaviour is unaffected.
+const DEPTH_BIAS_PX = 28
 
 export const getLayoutMode = (node: BlockNode): LayoutMode => {
   if (node.layoutMode) return node.layoutMode
@@ -158,7 +181,48 @@ const findNodeInTree = (root: BlockNode, id: string): BlockNode | null => {
   return null
 }
 
-const getSlotOrientation = (node: BlockNode): LineOrientation => {
+// Direct parent of `childId`. Mirrors editorSlice/treeUtils.findParentNode so
+// the drop-time source parent matches the one startDrag stored.
+const findParentOf = (root: BlockNode, childId: string): BlockNode | null => {
+  for (const c of root.children) {
+    if (c.id === childId) return root
+    const f = findParentOf(c, childId)
+    if (f) return f
+  }
+  return null
+}
+
+// Orientation of the slot LINES for a container:
+//   'vertical'   = vertical lines  → children flow horizontally (row)
+//   'horizontal' = horizontal lines → children flow vertically (column)
+//
+// Prefer GEOMETRY over the CSS property: flexDirection is frequently absent
+// from styles.properties (set via layoutMode / a class / left at the CSS
+// default), which made the old property-only check fall back to 'row' and draw
+// a vertical line through a visually-vertical stack. With ≥2 child rects we
+// measure how their centres spread: a larger vertical spread than horizontal
+// means a column. Falls back to the property only when geometry is unavailable.
+const getSlotOrientation = (
+  node: BlockNode,
+  childRects?: ChildRect[]
+): LineOrientation => {
+  if (childRects && childRects.length >= 2) {
+    let minCx = Infinity, maxCx = -Infinity, minCy = Infinity, maxCy = -Infinity
+    for (const { rect } of childRects) {
+      const cx = rect.left + rect.width / 2
+      const cy = rect.top + rect.height / 2
+      if (cx < minCx) minCx = cx
+      if (cx > maxCx) maxCx = cx
+      if (cy < minCy) minCy = cy
+      if (cy > maxCy) maxCy = cy
+    }
+    const spreadX = maxCx - minCx
+    const spreadY = maxCy - minCy
+    // Clear winner by geometry.
+    if (Math.abs(spreadX - spreadY) > 4) {
+      return spreadY > spreadX ? 'horizontal' : 'vertical'
+    }
+  }
   const dir = node.styles?.properties?.flexDirection || 'row'
   return dir === 'column' || dir === 'column-reverse' ? 'horizontal' : 'vertical'
 }
@@ -202,6 +266,54 @@ const findCandidateContainers = (
   return candidates
 }
 
+type CandidateRankedSlot = RankedSlot & { container: BlockNode }
+
+// Build the candidate slots for ONE container with RAW (un-biased) distance.
+// Shared by the main ranking loop and the empty-ranking fallback so the two
+// can't drift apart. Caller is responsible for any depth bias / heuristic
+// container filtering — this just turns a container into its child-gap slots.
+const buildContainerRankedSlots = (
+  c: Candidate,
+  mousePosition: { x: number; y: number },
+  draggedNodeId: string,
+  elementRects: Map<string, DOMRect>
+): CandidateRankedSlot[] => {
+  // EXCLUDE the dragged element from slot geometry. dnd-kit applies a
+  // transform to the still-mounted source element during the drag, so its
+  // rect follows the cursor — feeding that moving rect into buildSlots (which
+  // sorts children by rect) scrambles slot order and produces wrong lines.
+  // The dragged element is re-introduced purely as a tree index later, via
+  // slot.beforeId/afterId in slotToIndicator. Dropping next to its origin
+  // still resolves to a clean no-op there.
+  const childRects: ChildRect[] = []
+  for (const ch of c.node.children) {
+    if (ch.id === draggedNodeId) continue
+    const r = elementRects.get(ch.id)
+    if (r) childRects.push({ id: ch.id, rect: r })
+  }
+
+  // childRects is built from c.node.children in tree/DOM order — the true
+  // sibling order and exactly what reorderNode expects. Pass keepOrder so
+  // buildSlots does NOT re-sort by (possibly degenerate) rects, which was
+  // scrambling beforeId/afterId and flinging the drop to position 0 / last.
+  const primary = getSlotOrientation(c.node, childRects)
+  const slots = buildSlots(c.node.id, c.rect, childRects, primary, true)
+
+  // Grid: also generate slots in the perpendicular orientation so corners
+  // resolve by the axis nearest the cursor.
+  if (getLayoutMode(c.node) === 'grid' && childRects.length > 1) {
+    const perp: LineOrientation = primary === 'vertical' ? 'horizontal' : 'vertical'
+    slots.push(...buildSlots(c.node.id, c.rect, childRects, perp, true))
+  }
+
+  return slots.map(s => ({
+    slot: s,
+    distance: distanceToSlot(mousePosition, s),
+    depth: c.depth,
+    container: c.node,
+  }))
+}
+
 const absoluteFallback = (
   node: BlockNode,
   rect: DOMRect,
@@ -222,6 +334,80 @@ export const determineDropTarget = (
   elementRects: Map<string, DOMRect>,
   dragOffset?: { x: number; y: number }
 ): DropIndicator | null => {
+  // === Source-parent anchor (canvas-element reorder) ===
+  // Page-level drag moves whole blocks among their peers; a block's internals
+  // are edited via the block editor, not by hovering on the page. So when an
+  // EXISTING element is dragged, the ONLY valid target is its own source
+  // parent — slots are the gaps between its direct children, and we snap to
+  // the one nearest the cursor (hover the upper half of a sibling → line above
+  // it, lower half → below it). Deterministic; removes the entire "cursor is
+  // deep inside a huge section so a deep slot wins" failure class.
+  //
+  // Runs BEFORE the candidates / off-canvas checks and with NO cursor-in-rect
+  // gate: a wide block's grab point often sits left of the page content (or in
+  // the centered page's side margin), and distanceToSlot already degrades
+  // gracefully when the cursor is outside a slot's x-span — the nearest gap
+  // still tracks cursor Y. Absolute source parents fall through (handled by the
+  // absolute logic / handleDragMove clamping). Library items (no
+  // draggedNodeId) and unresolved parents fall through to the heuristic path.
+  const draggedNode = draggedNodeId ? findNodeInTree(root, draggedNodeId) : null
+  if (draggedNode) {
+    const sourceParent = findParentOf(root, draggedNodeId)
+    const sourceParentRect = sourceParent ? elementRects.get(sourceParent.id) : undefined
+    ddtDiag('anchor-eval', {
+      draggedNodeId,
+      draggedFound: !!draggedNode,
+      sourceParent: sourceParent
+        ? `${sourceParent.metadata?.name || sourceParent.tagName}#${sourceParent.id.slice(0, 6)}`
+        : null,
+      sourceParentLayout: sourceParent ? getLayoutMode(sourceParent) : null,
+      sourceParentRect: !!sourceParentRect,
+    })
+    if (sourceParent && getLayoutMode(sourceParent) !== 'absolute') {
+      if (sourceParentRect) {
+        const anchor: Candidate = { node: sourceParent, rect: sourceParentRect, depth: 0 }
+        const anchorBest = pickBestSlot(
+          buildContainerRankedSlots(anchor, mousePosition, draggedNodeId, elementRects)
+        ) as CandidateRankedSlot | null
+        if (anchorBest) {
+          const ind = slotToIndicator(
+            anchorBest.slot,
+            anchorBest.container,
+            draggedNodeId,
+            elementRects
+          )
+          const childById = (id: string | null) =>
+            id == null
+              ? null
+              : (() => {
+                  const ch = sourceParent.children.find(x => x.id === id)
+                  return ch ? ch.metadata?.name || ch.tagName : id.slice(0, 6)
+                })()
+          const rectsSummary = sourceParent.children.map(ch => {
+            const rr = elementRects.get(ch.id)
+            return `${ch.metadata?.name || ch.tagName}:${rr ? Math.round(rr.top) + '/' + Math.round(rr.height) : 'NO_RECT'}`
+          })
+          ddtDiag('anchor-hit', {
+            beforeId: childById(anchorBest.slot.beforeId),
+            afterId: childById(anchorBest.slot.afterId),
+            indType: ind.type,
+            indTarget: childById(ind.targetId) || ind.targetId.slice(0, 6),
+            indPos: ind.position,
+            slotOrient: anchorBest.slot.orientation,
+            slotLineY: Math.round(anchorBest.slot.line.y1),
+            childCount: sourceParent.children.length,
+            rects: rectsSummary,
+          })
+          return ind
+        }
+        ddtDiag('anchor-no-slot', { childCount: sourceParent.children.length })
+        // No usable slot (e.g. dragged is the only child) → fall through.
+      }
+    }
+  } else if (draggedNodeId) {
+    ddtDiag('anchor-dragged-not-found', { draggedNodeId })
+  }
+
   const candidates = findCandidateContainers(root, mousePosition, draggedNodeId, elementRects)
 
   if (candidates.length === 0) {
@@ -244,21 +430,25 @@ export const determineDropTarget = (
     return absoluteFallback(a.node, a.rect, mousePosition, dragOffset)
   }
 
-  // Build slots across all flow candidates; rank by distance.
-  type CandidateRankedSlot = RankedSlot & { container: BlockNode }
+  // Build slots across all flow candidates; rank by depth-biased distance.
   const ranked: CandidateRankedSlot[] = []
+
+  // Size of the dragged element (canvas-element drags only — library items have
+  // no rect yet). Used to reject containers that are too small to sensibly hold
+  // a block this big: you don't drop a 150px section *inside* a 120px timeline
+  // entry, you drop it *beside* the entry.
+  const draggedRect = draggedNodeId ? elementRects.get(draggedNodeId) : undefined
+  const SIZE_FACTOR = 0.9
 
   for (const c of candidates) {
     if (getLayoutMode(c.node) === 'absolute') continue
 
     // Skip "leaf-wrapper" containers: non-empty containers whose children are
-    // ALL non-containers (text/image/input labels etc.). The cursor is almost
-    // always sitting inside one of these, so their internal slots have ~0
-    // distance and would always win over the structurally-meaningful slots in
-    // the parent row/grid — dropping a whole block *inside* a stat label
-    // instead of beside it. Such a container still participates as a CHILD in
-    // its parent's slot computation, so you can still drop around it. Empty
-    // containers are kept (they're a valid "drop inside" target).
+    // ALL non-containers (text/image/input labels etc.). The cursor almost
+    // always sits inside one, so its internal slots (raw distance ~0) would
+    // beat the structurally meaningful slots in the parent — dropping a whole
+    // block *inside* a stat label instead of beside it. It still participates
+    // as a CHILD of its parent's slots. Empty containers are kept.
     if (
       c.node.children.length > 0 &&
       !c.node.children.some(ch => isContainerNode(ch))
@@ -266,61 +456,46 @@ export const determineDropTarget = (
       continue
     }
 
-    // Keep dragged in children when building slots — slot.position must be
-    // an index into c.node.children (unfiltered), because that's what
-    // editorSlice.reorderNode expects when source === target (it does its own
-    // remove + adjustedIndex math). Slots adjacent to the dragged node map to
-    // its current location and are skipped below.
-    const childRects: ChildRect[] = []
-    for (const ch of c.node.children) {
-      const r = elementRects.get(ch.id)
-      if (r) childRects.push({ id: ch.id, rect: r })
-    }
-    const draggedIdx = childRects.findIndex(cr => cr.id === draggedNodeId)
-
-    const primary = getSlotOrientation(c.node)
-    const slots = buildSlots(c.node.id, c.rect, childRects, primary)
-
-    // Grid: also generate slots in the perpendicular orientation so corners
-    // resolve by axis nearest to cursor.
-    if (getLayoutMode(c.node) === 'grid' && childRects.length > 1) {
-      const perp: LineOrientation = primary === 'vertical' ? 'horizontal' : 'vertical'
-      slots.push(...buildSlots(c.node.id, c.rect, childRects, perp))
+    // Skip containers smaller (along the flow axis) than the dragged block.
+    // column flow → compare heights; row flow → compare widths.
+    if (draggedRect && c.node.children.length > 0) {
+      const primary = getSlotOrientation(c.node)
+      const containerExtent = primary === 'horizontal' ? c.rect.height : c.rect.width
+      const draggedExtent =
+        primary === 'horizontal' ? draggedRect.height : draggedRect.width
+      if (containerExtent < draggedExtent * SIZE_FACTOR) continue
     }
 
-    for (const s of slots) {
-      // Slots adjacent to the dragged node sit at its current position — they'd
-      // produce a no-op reorder. Skip them.
-      if (draggedIdx !== -1 && (s.position === draggedIdx || s.position === draggedIdx + 1)) {
-        continue
+    for (const r of buildContainerRankedSlots(c, mousePosition, draggedNodeId, elementRects)) {
+      // Depth-biased distance: deeper slots are penalised so shallow
+      // "between blocks" placement wins unless the cursor is right on a deep
+      // slot's edge. See DEPTH_BIAS_PX.
+      ranked.push({ ...r, distance: r.distance + c.depth * DEPTH_BIAS_PX })
+    }
+  }
+
+  let best = pickBestSlot(ranked) as CandidateRankedSlot | null
+
+  if (!best) {
+    // Heuristic filters removed every slot source. DON'T emit a static
+    // 'inside' indicator — the overlay renders that as a bar at the
+    // container's vertical center, which looks frozen mid-block and ignores
+    // the cursor. Instead build real child-gap slots (no filters) for the
+    // shallowest flow container that strictly contains the cursor, so the
+    // indicator still follows the cursor and sits on a real child boundary.
+    const containing = candidates
+      .filter(c => getLayoutMode(c.node) !== 'absolute' && isPointInRect(mousePosition, c.rect))
+      .sort((a, b) => a.depth - b.depth)
+    for (const c of containing) {
+      const fb = buildContainerRankedSlots(c, mousePosition, draggedNodeId, elementRects)
+      const pick = pickBestSlot(fb) as CandidateRankedSlot | null
+      if (pick) {
+        best = pick
+        break
       }
-      ranked.push({
-        slot: s,
-        distance: distanceToSlot(mousePosition, s),
-        depth: c.depth,
-        container: c.node,
-      })
     }
   }
 
-  if (ranked.length === 0) {
-    // Every flow candidate was a leaf-wrapper (or absolute). Fall back to the
-    // shallowest non-absolute container so the drop still lands somewhere
-    // sensible (appended) instead of silently failing / sticking.
-    const fallback = candidates
-      .filter(c => getLayoutMode(c.node) !== 'absolute')
-      .sort((a, b) => a.depth - b.depth)[0]
-    if (!fallback) return null
-    return {
-      type: 'inside',
-      targetId: fallback.node.id,
-      targetParentId: fallback.node.id,
-      position: fallback.node.children.length,
-      rect: fallback.rect,
-    }
-  }
-
-  const best = pickBestSlot(ranked) as CandidateRankedSlot | null
   if (!best) return null
 
   return slotToIndicator(best.slot, best.container, draggedNodeId, elementRects)
@@ -332,30 +507,43 @@ const slotToIndicator = (
   _draggedNodeId: string,
   elementRects: Map<string, DOMRect>
 ): DropIndicator => {
-  // slot.position is an UNFILTERED index into container.children (see the
-  // build-slots loop in determineDropTarget for why) — index it directly.
+  // Derive the tree-insertion index from the slot's neighbour IDs, NOT from
+  // slot.position. buildSlots sorts children by rect, and the dragged element
+  // is excluded from that geometry, so slot.position is a sorted/filtered
+  // index that does not line up with container.children. Mapping by id is
+  // robust to sorting, filtering and mid-drag rect transforms.
   const children = container.children
-  const isEmpty = children.length === 0
-  const isAfterLast = slot.position >= children.length
+  const idx = (id: string | null) =>
+    id == null ? -1 : children.findIndex(ch => ch.id === id)
 
   let indicatorType: DropIndicator['type']
   let targetId: string
-  if (isEmpty) {
+  let position: number
+
+  if (children.length === 0 || (slot.beforeId == null && slot.afterId == null)) {
+    // Empty container (or geometry produced no neighbours) → drop inside.
     indicatorType = 'inside'
     targetId = container.id
-  } else if (isAfterLast) {
-    indicatorType = 'after'
-    targetId = children[children.length - 1].id
-  } else {
+    position = children.length
+  } else if (slot.afterId != null) {
+    // Insert BEFORE the child that visually follows the slot.
+    const after = idx(slot.afterId)
     indicatorType = 'before'
-    targetId = children[slot.position].id
+    targetId = slot.afterId
+    position = after === -1 ? children.length : after
+  } else {
+    // After-last slot: insert AFTER the child that precedes it.
+    const before = idx(slot.beforeId)
+    indicatorType = 'after'
+    targetId = slot.beforeId as string
+    position = before === -1 ? children.length : before + 1
   }
 
   return {
     type: indicatorType,
     targetId,
     targetParentId: container.id,
-    position: slot.position,
+    position,
     rect: elementRects.get(container.id),
     slotLine: slot.line,
   }

@@ -30,6 +30,14 @@ export interface Slot {
   position: number
   orientation: LineOrientation
   line: Line
+  // IDs of the children immediately before / after this slot, in VISUAL order.
+  // null = container edge (before the first child / after the last child).
+  // Consumers must derive tree-insertion indices from these IDs, not from
+  // `position`: buildSlots sorts children by rect, so `position` is a
+  // sorted-array index that diverges from tree order whenever visual order
+  // differs (e.g. a dragged element whose rect is transformed mid-drag).
+  beforeId: string | null
+  afterId: string | null
 }
 
 export interface RankedSlot {
@@ -60,7 +68,14 @@ export function buildSlots(
   containerId: string,
   containerRect: DOMRect,
   children: ChildRect[],
-  orientation: LineOrientation
+  orientation: LineOrientation,
+  // When true, children are assumed to ALREADY be in the desired order (tree /
+  // DOM order) and are NOT sorted by rect. Sorting by rect is fragile: if any
+  // child has a degenerate bounding rect (zero-size wrapper, display:contents,
+  // mid-transition), the sort scrambles sibling order and slot.beforeId/afterId
+  // end up non-adjacent — which makes the resolved insertion index jump to an
+  // extreme. Callers that already have reliable order should pass true.
+  keepOrder = false
 ): Slot[] {
   if (children.length === 0) {
     return [emptySlot(containerId, containerRect, orientation)]
@@ -68,12 +83,14 @@ export function buildSlots(
 
   const isVert = orientation === 'vertical'
 
-  // Sort children along the flow axis.
+  // Sort children along the flow axis (unless the caller vouches for order).
   // vertical lines → children flow horizontally → sort by left
   // horizontal lines → children flow vertically → sort by top
-  const sorted = [...children].sort((a, b) =>
-    isVert ? a.rect.left - b.rect.left : a.rect.top - b.rect.top
-  )
+  const sorted = keepOrder
+    ? children
+    : [...children].sort((a, b) =>
+        isVert ? a.rect.left - b.rect.left : a.rect.top - b.rect.top
+      )
 
   const slots: Slot[] = []
 
@@ -82,6 +99,8 @@ export function buildSlots(
     position: 0,
     orientation,
     line: edgeLine(sorted[0].rect, isVert ? 'left' : 'top'),
+    beforeId: null,
+    afterId: sorted[0].id,
   })
 
   for (let i = 0; i < sorted.length - 1; i++) {
@@ -90,6 +109,8 @@ export function buildSlots(
       position: i + 1,
       orientation,
       line: betweenLine(sorted[i].rect, sorted[i + 1].rect, isVert),
+      beforeId: sorted[i].id,
+      afterId: sorted[i + 1].id,
     })
   }
 
@@ -98,6 +119,8 @@ export function buildSlots(
     position: sorted.length,
     orientation,
     line: edgeLine(sorted[sorted.length - 1].rect, isVert ? 'right' : 'bottom'),
+    beforeId: sorted[sorted.length - 1].id,
+    afterId: null,
   })
 
   return slots
@@ -116,6 +139,8 @@ function emptySlot(
       position: 0,
       orientation,
       line: { x1: cx, y1: rect.top + pad, x2: cx, y2: rect.bottom - pad },
+      beforeId: null,
+      afterId: null,
     }
   }
   const cy = rect.top + rect.height / 2
@@ -124,6 +149,8 @@ function emptySlot(
     position: 0,
     orientation,
     line: { x1: rect.left + pad, y1: cy, x2: rect.right - pad, y2: cy },
+    beforeId: null,
+    afterId: null,
   }
 }
 

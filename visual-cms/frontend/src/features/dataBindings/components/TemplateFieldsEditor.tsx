@@ -27,7 +27,7 @@ const FIELD_TYPES: { value: DetectedFieldType; label: string }[] = [
 
 const EMPTY_FORM = { name: '', type: 'text' as DetectedFieldType, hidden: false, selector: '', description: '' }
 
-export const TemplateFieldsEditor: React.FC<TemplateFieldsEditorProps> = ({ fields, blockId, onFieldsChange }) => {
+export const TemplateFieldsEditor: React.FC<TemplateFieldsEditorProps> = ({ fields, onFieldsChange }) => {
   const [localFields, setLocalFields] = useState<DetectedField[]>(fields)
   const [showAddForm, setShowAddForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)

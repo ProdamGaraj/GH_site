@@ -4,6 +4,7 @@ import { updateBinding, selectBindingsSaving } from '@/features/dataBindings/dat
 import type {
   DataBinding,
   OutputBindingConfig,
+  EndpointConfig,
   ValidationRule,
 } from '@/shared/types/dataBinding'
 import { FieldMappingEditor } from './FieldMappingEditor'
@@ -71,7 +72,6 @@ export const OutputBindingEditor: React.FC<OutputBindingEditorProps> = ({
   const [config, setConfig] = useState<OutputBindingConfig>(
     binding.config.outputConfig || {
       trigger: 'submit',
-      method: 'POST',
       payloadMappings: [],
     }
   )
@@ -81,6 +81,15 @@ export const OutputBindingEditor: React.FC<OutputBindingEditorProps> = ({
   // Обновление конфигурации
   const updateConfig = (updates: Partial<OutputBindingConfig>) => {
     setConfig(prev => ({ ...prev, ...updates }))
+    setHasChanges(true)
+  }
+
+  // Обновление вложенного endpoint-конфига (path/method/contentType и т.д.)
+  const updateEndpoint = (updates: Partial<EndpointConfig>) => {
+    setConfig(prev => ({
+      ...prev,
+      endpoint: { path: '', method: 'POST', ...prev.endpoint, ...updates },
+    }))
     setHasChanges(true)
   }
 
@@ -286,9 +295,9 @@ export const OutputBindingEditor: React.FC<OutputBindingEditorProps> = ({
                   {HTTP_METHODS.map(method => (
                     <button
                       key={method}
-                      onClick={() => updateConfig({ method })}
+                      onClick={() => updateEndpoint({ method })}
                       className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        (config.method || 'POST') === method
+                        (config.endpoint?.method || 'POST') === method
                           ? 'bg-blue-600 text-white'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
@@ -305,8 +314,8 @@ export const OutputBindingEditor: React.FC<OutputBindingEditorProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={config.endpoint || ''}
-                  onChange={(e) => updateConfig({ endpoint: e.target.value })}
+                  value={config.endpoint?.path || ''}
+                  onChange={(e) => updateEndpoint({ path: e.target.value })}
                   placeholder="Оставьте пустым для использования URL из Data Source"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
@@ -320,8 +329,8 @@ export const OutputBindingEditor: React.FC<OutputBindingEditorProps> = ({
                   Content-Type
                 </label>
                 <select
-                  value={config.contentType || 'application/json'}
-                  onChange={(e) => updateConfig({ contentType: e.target.value })}
+                  value={config.endpoint?.contentType || 'application/json'}
+                  onChange={(e) => updateEndpoint({ contentType: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="application/json">application/json</option>

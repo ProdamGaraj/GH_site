@@ -302,7 +302,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
             metaDescription: result.metadata?.description || '',
             keywords: result.metadata?.keywords?.join(', ') || '',
             ogImage: result.metadata?.ogImage || '',
-            scripts: result.metadata?.scripts || [],
+            scripts: result.scripts || [],
           })
 
           // Load data bindings for all blocks on this page

@@ -4,9 +4,9 @@ import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
 import { ColorPicker } from '@/shared/components/ColorPicker'
 import { ExpandableButton } from '@/shared/components/ExpandableButton'
-import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, ExternalLink, ChevronDown, Palette, Pencil, FileText, Library, FileDown, Info, Code2, Database, Zap, MousePointer } from 'lucide-react'
+import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, ExternalLink, ChevronDown, Palette, Pencil, FileText, Library, FileDown, Code2 } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor, selectInlineBlockEdit, startInlineBlockEdit, cancelInlineBlockEdit, finishInlineBlockEdit, selectActiveRightPanelTab, setActiveRightPanelTab } from '@/features/editor/editorSlice'
+import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor, selectInlineBlockEdit, startInlineBlockEdit, cancelInlineBlockEdit, finishInlineBlockEdit } from '@/features/editor/editorSlice'
 import { createBlock, updateBlock, selectBlocksSaving, selectBlocks } from '@/features/blocks/blocksSlice'
 import { createPage, updatePage, selectPagesSaving } from '@/features/pages/pagesSlice'
 import { BreakpointManager } from './BreakpointManager'
@@ -68,8 +68,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const canRedo = useAppSelector(selectCanRedo)
   const canvasColor = useAppSelector(selectCanvasColor)
   const inlineBlockEdit = useAppSelector(selectInlineBlockEdit)
-  const activeRightPanelTab = useAppSelector(selectActiveRightPanelTab)
-  
+
   const isNewBlock = id === 'new' || !id
   const isPageEditor = _type === 'page'
   const isSaving = isPageEditor ? isSavingPages : isSavingBlocks
@@ -1119,7 +1118,7 @@ interface PreviewModalProps {
   onClose: () => void
 }
 
-const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, pageId, onClose }) => {
+const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onClose }) => {
   const [selectedBreakpoint, setSelectedBreakpoint] = useState(breakpoints[0]?.id || 'desktop')
   const [isManualMode, setIsManualMode] = useState(false)
   const [manualWidth, setManualWidth] = useState(1440)

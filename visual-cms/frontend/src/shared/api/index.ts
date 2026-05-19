@@ -419,11 +419,9 @@ export const dataBindingApi = {
 }
 
 // Import transform types
-import type { 
-  FetchWithTransformsRequest, 
+import type {
+  FetchWithTransformsRequest,
   FetchWithTransformsResponse,
-  FilterCondition,
-  DataTransform 
 } from '@/shared/types/transforms'
 
 // Re-export data binding types

@@ -266,8 +266,7 @@ const dataBindingsSlice = createSlice({
         
         // MERGE bindings instead of replacing - add new bindings, update existing ones
         const newBindings = action.payload
-        const existingIds = new Set(state.items.map(b => b.id))
-        
+
         // Update existing and add new
         for (const binding of newBindings) {
           const idx = state.items.findIndex(b => b.id === binding.id)

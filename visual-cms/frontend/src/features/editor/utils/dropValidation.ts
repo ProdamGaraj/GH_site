@@ -8,7 +8,7 @@
  */
 
 import type { BlockNode } from '@/shared/types'
-import { findParentNode } from '@/features/editor/utils/treeUtils'
+import { findParentNode, isDescendantOf } from '@/features/editor/utils/treeUtils'
 
 export interface DropValidationResult {
   isValid: boolean
@@ -199,17 +199,35 @@ export const checkLayoutCompatibility = (
 }
 
 /**
+ * Проверка циклической ссылки.
+ *
+ * Перемещение элемента внутрь самого себя или внутрь одного из своих
+ * потомков создало бы цикл в дереве. Возвращает true, если такой drop
+ * недопустим: targetNode совпадает с перетаскиваемым элементом либо
+ * является его потомком в пределах rootNode.
+ */
+export const checkCyclicReference = (
+  draggedNodeId: string,
+  targetNode: BlockNode,
+  rootNode: BlockNode
+): boolean => {
+  if (!targetNode || !draggedNodeId) return false
+  if (targetNode.id === draggedNodeId) return true
+  return isDescendantOf(rootNode, draggedNodeId, targetNode.id)
+}
+
+/**
  * Главная функция валидации drop
  */
 export const validateDrop = (context: DropContext): DropValidationResult => {
-  const { draggedNode, libraryItem, targetNode } = context
-  
+  const { draggedNode, libraryItem, targetNode, rootNode } = context
+
   // Получаем tagName перетаскиваемого элемента
   const draggedTagName = draggedNode?.tagName || libraryItem?.tagName || 'div'
-  
+
   // 1. Проверка на циклическую ссылку (только для canvas elements)
   if (draggedNode) {
-    if (checkCyclicReference(draggedNode.id, targetNode)) {
+    if (checkCyclicReference(draggedNode.id, targetNode, rootNode)) {
       return {
         isValid: false,
         reason: 'Нельзя переместить элемент внутрь его собственных потомков',

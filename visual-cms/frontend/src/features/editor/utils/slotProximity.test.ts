@@ -36,12 +36,16 @@ describe('distanceToSlot', () => {
     position: 0,
     orientation: 'vertical',
     line: { x1: 50, y1: 0, x2: 50, y2: 100 },
+    beforeId: null,
+    afterId: null,
   }
   const hSlot: Slot = {
     containerId: 'c',
     position: 0,
     orientation: 'horizontal',
     line: { x1: 0, y1: 50, x2: 100, y2: 50 },
+    beforeId: null,
+    afterId: null,
   }
 
   it('vertical slot: point on the line is distance 0', () => {
@@ -131,6 +135,8 @@ describe('pickBestSlot', () => {
       position: 0,
       orientation: 'vertical',
       line: { x1: 0, y1: 0, x2: 0, y2: 0 },
+      beforeId: null,
+      afterId: null,
     },
     distance: dist,
     depth,
@@ -217,12 +223,16 @@ describe('integration scenarios', () => {
       position: 0,
       orientation: 'vertical',
       line: { x1: 50, y1: 0, x2: 50, y2: 100 },
+      beforeId: null,
+      afterId: null,
     }
     const slotB: Slot = {
       containerId: 'inner',
       position: 0,
       orientation: 'vertical',
       line: { x1: 50, y1: 0, x2: 50, y2: 100 },
+      beforeId: null,
+      afterId: null,
     }
     const cursor: Point = { x: 50, y: 50 }
     const ranked: RankedSlot[] = [

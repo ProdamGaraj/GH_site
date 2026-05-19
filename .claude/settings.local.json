@@ -12,7 +12,26 @@
       "Bash(grep -r \"^[[:space:]]*//.*const\\\\|^[[:space:]]*//.*function\\\\|^[[:space:]]*//.*export\" \"c:/Users/d.tolkunov/CodeRepository/GH_site/visual-cms/frontend/src/features/editor\" --include=\"*.tsx\")",
       "Bash(npx tsc *)",
       "Bash(git -C \"c:/Users/d.tolkunov/CodeRepository/GH_site\" diff --stat)",
-      "Bash(npx vitest *)"
+      "Bash(npx vitest *)",
+      "Bash(cd d:/CodeRepository/GH_site/visual-cms/backend; echo \"=== middleware ===\"; ls src/middleware/; echo \"=== jwt/bcrypt usage ===\"; grep -rl \"jsonwebtoken\\\\|bcrypt\\\\|authMiddleware\\\\|requireAuth\\\\|req.user\" src/ 2>/dev/null; echo \"=== eval / new Function \\(code injection\\) ===\"; grep -rln \"new Function\\\\|eval\\(\\\\|expr-eval\\\\|vm\\\\.runIn\" src/ 2>/dev/null; echo \"=== test files \\(backend\\) ===\"; find src/__tests__ -name \"*.test.ts\" | sort; echo \"=== test files \\(frontend\\) ===\"; cd ../frontend; find src -name \"*.test.ts\" -o -name \"*.test.tsx\" -o -name \"*.spec.ts\" | sort)",
+      "Read(//d/CodeRepository/**)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(echo \"--- EXIT:$? ---\")",
+      "Bash(echo \"--- total errors: $\\(npx tsc --noEmit 2>&1)",
+      "Bash(tee /tmp/fe_tsc.txt)",
+      "Read(//tmp/**)",
+      "Bash(tee /tmp/fe_tsc2.txt)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(node -e \"require\\('sharp'\\); console.log\\('sharp OK', require\\('sharp/package.json'\\).version\\)\")",
+      "Bash(tee /tmp/be_tsc.txt)",
+      "Bash(npx jest *)",
+      "Bash(sed 's|.*/||')",
+      "Bash(node -e \"try{console.log\\('jest-environment-jsdom', require\\('jest-environment-jsdom/package.json'\\).version\\)}catch\\(e\\){console.log\\('jsdom-env MISSING'\\)}\")",
+      "Bash(node -e \"try{console.log\\('jest-environment-node', require\\('jest-environment-node/package.json'\\).version\\)}catch\\(e\\){console.log\\('node-env MISSING'\\)}\")",
+      "Bash(node -e \"try{console.log\\('jsdom', require\\('jsdom/package.json'\\).version\\)}catch\\(e\\){console.log\\('jsdom MISSING'\\)}\")",
+      "Bash(cd \"C:/Users/d.tolkunov/.claude/projects/d--CodeRepository-GH-site/memory\" 2>/dev/null && ls -a && echo \"--- MEMORY.md ---\" && cat MEMORY.md 2>/dev/null | head -20 || echo \"NO memory dir / MEMORY.md\")",
+      "Read(//c/Users/d.tolkunov/.claude/projects/d--CodeRepository-GH-site/**)"
     ]
   }
 }

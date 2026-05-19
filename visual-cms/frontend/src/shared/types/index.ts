@@ -247,7 +247,8 @@ export interface BlockNodeVariation {
 
 // Block Node structure
 export interface BlockNode {
-  tag: string
+  /** @deprecated legacy-поле; источник истины — tagName. UI читает через `tag || 'div'`. */
+  tag?: string
   id: string
   elementType: ElementType
   tagName: string
