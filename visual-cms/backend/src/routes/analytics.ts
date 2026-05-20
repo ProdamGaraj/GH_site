@@ -2,6 +2,7 @@ import { Router } from 'express'
 import path from 'path'
 import fs from 'fs'
 import { AnalyticsController } from '../controllers/AnalyticsController'
+import { logger } from '../services/Logger'
 
 const router = Router()
 const controller = new AnalyticsController()
@@ -35,7 +36,7 @@ router.get('/tracker.js', (_req, res) => {
     })
     res.send(script)
   } catch (err: any) {
-    console.error('Failed to serve tracker.js:', err.message)
+    logger.error('Failed to serve tracker.js', err as Error)
     res.status(500).send('// tracker.js not available')
   }
 })

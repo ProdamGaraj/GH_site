@@ -5,6 +5,7 @@ import { blockTemplateService } from '../services/BlockTemplateService'
 import { linkedBlocksService } from '../services/LinkedBlocksService'
 import { asyncHandler, NotFoundError, ValidationError } from '../middleware'
 import { cacheService } from '../services/CacheService'
+import { logger } from '../services/Logger'
 
 const blockRepository = AppDataSource.getRepository(Block)
 
@@ -71,8 +72,8 @@ export class BlockController {
       block.detectedFields = newFields
 
       // Sync bindings asynchronously
-      blockTemplateService.syncBindingsOnFieldChange(id, diff).catch(err => {
-        console.error('Error syncing bindings:', err)
+      blockTemplateService.syncBindingsOnFieldChange(id, diff).catch((err: unknown) => {
+        logger.error('Error syncing bindings', err instanceof Error ? err : undefined)
       })
     }
 
@@ -84,12 +85,12 @@ export class BlockController {
       try {
         const syncResult = await linkedBlocksService.syncBlockToAllPages(id, block.structure)
         if (syncResult.updatedPages.length > 0) {
-          console.log(`[BlockSync] Блок ${block.name} синхронизирован на страницы: ${syncResult.updatedPages.join(', ')}`)
+          logger.info(`[BlockSync] Блок ${block.name} синхронизирован на страницы: ${syncResult.updatedPages.join(', ')}`)
           // Затронутые страницы изменились — кеш страниц устарел
           await cacheService.invalidateByTag('pages')
         }
         if (syncResult.errors.length > 0) {
-          console.error(`[BlockSync] Ошибки: ${syncResult.errors.join('; ')}`)
+          logger.error(`[BlockSync] Ошибки: ${syncResult.errors.join('; ')}`)
         }
         // Возвращаем результат синхронизации вместе с блоком
         res.json({
@@ -100,7 +101,7 @@ export class BlockController {
           }
         })
       } catch (syncErr: any) {
-        console.error('[BlockSync] Sync failed:', syncErr)
+        logger.error('[BlockSync] Sync failed', syncErr instanceof Error ? syncErr : undefined)
         // Блок уже сохранён — возвращаем его даже если синхронизация упала
         res.json(block)
       }

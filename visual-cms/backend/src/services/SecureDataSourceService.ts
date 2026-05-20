@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { CredentialsManager } from './CredentialsManager'
 import { safeFetch } from '../utils/ssrfGuard'
+import { logger } from './Logger'
 
 /**
  * Secure Data Source Service
@@ -351,7 +352,7 @@ class SecureDataSourceService {
     authConfig?: AuthConfig
   ): string {
     if (!baseUrl) {
-      console.error('❌ [buildUrl] baseUrl is empty or undefined!')
+      logger.error('buildUrl: baseUrl is empty or undefined')
       throw new Error('baseUrl is required for API request')
     }
     

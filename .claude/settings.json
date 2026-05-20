@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npx jest *)",
-      "Bash(echo \"EXIT=$?\")"
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(grep -n 'console\\\\.\\\\\\(log\\\\|warn\\\\|error\\\\|info\\\\|debug\\\\\\)\\\\|from '\\\\''.*Logger'\\\\''\\\\|import .*logger' src/__TRACKED_VAR__)",
+      "Bash(grep -nE '^import |^const .*require\\\\\\(' src/__TRACKED_VAR__)"
     ]
   }
 }

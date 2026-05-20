@@ -19,6 +19,7 @@ import { PageDataConfig } from './DataBindingGenerator'
 import { translationService } from './TranslationService'
 import { languageService } from './LanguageService'
 import { MacroV2Client } from './MacroV2Client'
+import { logger } from './Logger'
 import { mapComplexStats, type ProjectStats } from './ProjectStatsAggregator'
 import { CredentialsManager } from './CredentialsManager'
 
@@ -136,7 +137,7 @@ export class DeployService {
         this.generateRobotsTxt(page.site)
       }
 
-      console.log(`✅ Deployed: ${fileName} (site: ${page.site?.slug || 'default'})`)
+      logger.info(`Deployed: ${fileName} (site: ${page.site?.slug || 'default'})`)
 
       return {
         success: true,
@@ -146,7 +147,7 @@ export class DeployService {
         publicUrl: `${PUBLIC_SITE_URL}/${page.slug === 'index' || page.slug === 'home' ? '' : page.slug}`
       }
     } catch (error: any) {
-      console.error('Deploy error:', error)
+      logger.error('Deploy error', error instanceof Error ? error : undefined)
       return {
         success: false,
         message: 'Ошибка при публикации',
@@ -246,7 +247,7 @@ export class DeployService {
           // Deploy translations for this page
           await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir)
           
-          console.log(`✅ Deployed: ${fileName} (site: ${page.site?.slug || 'default'})`)
+          logger.info(`Deployed: ${fileName} (site: ${page.site?.slug || 'default'})`)
         } catch (err: any) {
           errors.push(`Ошибка при генерации "${page.name}": ${err.message}`)
         }
@@ -356,7 +357,7 @@ export class DeployService {
           await this.pageRepository.save(page)
 
           await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir)
-          console.log(`✅ Site "${site.slug}" deployed: ${fileName}`)
+          logger.info(`Site "${site.slug}" deployed: ${fileName}`)
         } catch (err: any) {
           errors.push(`Ошибка "${page.name}": ${err.message}`)
         }
@@ -372,7 +373,7 @@ export class DeployService {
           const colResult = await this.deployCollection(collection.id)
           deployedPages.push(...colResult.deployedPages)
           errors.push(...colResult.errors)
-          console.log(`📦 Collection "${collection.name}": ${colResult.deployedPages.length} pages`)
+          logger.info(`Collection "${collection.name}": ${colResult.deployedPages.length} pages`)
         } catch (colErr: any) {
           errors.push(`Collection "${collection.name}": ${colErr.message}`)
         }
@@ -428,7 +429,7 @@ export class DeployService {
         if (collection.useCache && collection.cachedApiData && Array.isArray(collection.cachedApiData)) {
           items = collection.cachedApiData
           errors.push(`API fetch failed (${fetchErr.message}), using cached data from ${collection.lastCachedAt?.toISOString()}`)
-          console.warn(`⚠️ Collection ${collection.name}: API failed, using cache`)
+          logger.warn(`Collection ${collection.name}: API failed, using cache`)
         } else {
           return {
             success: false,
@@ -496,7 +497,7 @@ export class DeployService {
         statsByItemId = await this.fetchProjectStats(collection, items)
       } catch (statsErr: any) {
         errors.push(`Stats fetch failed: ${statsErr.message}`)
-        console.warn(`⚠️ Collection ${collection.name}: stats failed —`, statsErr.message)
+        logger.warn(`Collection ${collection.name}: stats failed`, { error: statsErr.message })
       }
 
       for (const item of items) {
@@ -575,7 +576,7 @@ export class DeployService {
           fs.writeFileSync(filePath, html, 'utf-8')
           deployedPages.push(`${collection.basePath.replace(/^\/|\/$/g, '')}/${itemSlug}.html`)
 
-          console.log(`✅ Collection "${collection.name}": deployed ${itemSlug}.html (${override ? 'custom' : 'template'})`)
+          logger.info(`Collection "${collection.name}": deployed ${itemSlug}.html (${override ? 'custom' : 'template'})`)
         } catch (itemErr: any) {
           errors.push(`Error deploying "${itemTitle}" (${itemSlug}): ${itemErr.message}`)
         }
@@ -588,7 +589,7 @@ export class DeployService {
         errors,
       }
     } catch (error: any) {
-      console.error('Deploy collection error:', error)
+      logger.error('Deploy collection error', error instanceof Error ? error : undefined)
       return { success: false, message: 'Ошибка при публикации коллекции', deployedPages, errors: [error.message] }
     }
   }
@@ -696,7 +697,7 @@ export class DeployService {
     try {
       await this.collectionRepository.save(collection)
     } catch (saveErr: any) {
-      console.warn(`⚠️ failed to persist cachedStatsData: ${saveErr.message}`)
+      logger.warn(`failed to persist cachedStatsData: ${saveErr.message}`)
     }
 
     return result
@@ -1182,10 +1183,10 @@ export class DeployService {
           // Рекурсивно ищем блок с metadata.linkedBlockId === libraryTemplateId
           templateId = findByLinkedId(node, libraryTemplateId)
           if (templateId) {
-            console.log(`✅ Found template by linkedBlockId ${libraryTemplateId} -> ${templateId}`)
+            logger.debug(`Found template by linkedBlockId ${libraryTemplateId} -> ${templateId}`)
             return true
           }
-          console.log(`❌ Template with linkedBlockId ${libraryTemplateId} not found in container ${containerId}`)
+          logger.warn(`Template with linkedBlockId ${libraryTemplateId} not found in container ${containerId}`)
         }
         
         // Fallback: ищем первый блок с isTemplate=true или берём первого ребёнка
@@ -1193,14 +1194,14 @@ export class DeployService {
           const templateChild = node.children.find((child: any) => child.metadata?.isTemplate === true)
           if (templateChild?.id) {
             templateId = templateChild.id
-            console.log(`Using template-marked child: ${templateId}`)
+            logger.debug(`Using template-marked child: ${templateId}`)
             return true
           }
           
           const firstChild = node.children[0]
           if (firstChild?.id) {
             templateId = firstChild.id
-            console.log(`⚠️ Using first child as fallback template: ${templateId}`)
+            logger.debug(`Using first child as fallback template: ${templateId}`)
             return true
           }
         }
@@ -1253,7 +1254,7 @@ export class DeployService {
     const templateMap = new Map<string, any>()
     for (const template of templates) {
       templateMap.set(template.id, template.structure)
-      console.log(`📦 Loaded library template: ${template.id} (${template.name})`)
+      logger.debug(`Loaded library template: ${template.id} (${template.name})`)
     }
 
     // Recursively inject templates into containers (BOTTOM-UP: children first, then parent)
@@ -1319,7 +1320,7 @@ export class DeployService {
             )
             
             if (!templateExists) {
-              console.log(`✅ Injecting template ${libraryTemplateId} into container ${node.id}`)
+              logger.debug(`Injecting template ${libraryTemplateId} into container ${node.id}`)
               // Clone template structure and mark it with linkedBlockId
               const templateWithMeta = {
                 ...templateStructure,
@@ -1330,12 +1331,12 @@ export class DeployService {
               }
               updatedNode.children = [templateWithMeta, ...updatedNode.children]
             } else {
-              console.log(`⏭️ Template ${libraryTemplateId} already exists in descendants of ${node.id}, skipping injection`)
+              logger.debug(`Template ${libraryTemplateId} already exists in descendants of ${node.id}, skipping injection`)
             }
             
             node = updatedNode
           } else {
-            console.warn(`⚠️ Template ${libraryTemplateId} not found in database`)
+            logger.warn(`Template ${libraryTemplateId} not found in database`)
           }
         }
       }
@@ -1413,7 +1414,7 @@ export class DeployService {
 
           fs.writeFileSync(filePath, localizedHtml, 'utf-8')
           deployedPages.push(`${lang.code}/${fileName}`)
-          console.log(`✅ Deployed [${lang.code}]: ${lang.code}/${fileName}`)
+          logger.info(`Deployed [${lang.code}]: ${lang.code}/${fileName}`)
         } catch (err: any) {
           errors.push(`Ошибка при генерации "${page.name}" [${lang.code}]: ${err.message}`)
         }
@@ -1457,16 +1458,16 @@ export class DeployService {
       const { blockIds, linkedBlockIds } = this.collectBlockIdsWithLinks(structure)
       
       if (!blockIds.length) {
-        console.log('No blocks found in page structure')
+        logger.debug('No blocks found in page structure')
         return undefined
       }
 
       // Создаем маппинг linkedBlockId -> реальный blockId на странице ПЕРЕД загрузкой привязок
       const linkedBlockIdMapping = this.buildLinkedBlockMapping(structure)
       
-      console.log('🗺️ Linked block mapping:', linkedBlockIdMapping)
-      console.log('📋 Block IDs on page:', blockIds.slice(0, 5))
-      console.log('🔗 Linked block IDs on page:', linkedBlockIds)
+      logger.debug('Linked block mapping', { mapping: linkedBlockIdMapping })
+      logger.debug('Block IDs on page', { blockIds: blockIds.slice(0, 5) })
+      logger.debug('Linked block IDs on page', { linkedBlockIds })
 
       // Загружаем активные bindings для этих блоков
       // ВАЖНО: Берем ТОЛЬКО привязки для этой страницы (pageId = pageId)
@@ -1492,7 +1493,7 @@ export class DeployService {
         .orderBy('binding.priority', 'ASC')
         .getMany()
       
-      console.log('🔍 Raw bindings from DB:', bindings.map(b => ({ id: b.id, blockId: b.blockId, pageId: b.pageId })))
+      logger.debug('Raw bindings from DB', { bindings: bindings.map(b => ({ id: b.id, blockId: b.blockId, pageId: b.pageId })) })
       
       // Фильтруем: если есть привязка с pageId, она имеет приоритет над привязкой без pageId
       const bindingsByBlockId = new Map<string, any>()
@@ -1506,12 +1507,12 @@ export class DeployService {
       const filteredBindings = Array.from(bindingsByBlockId.values())
 
       if (!filteredBindings.length) {
-        console.log('❌ No active bindings found for blocks:', blockIds.slice(0, 5))
-        console.log('❌ Page ID:', pageId)
+        logger.warn('No active bindings found for blocks', { blockIds: blockIds.slice(0, 5) })
+        logger.debug('Page ID', { pageId })
         return undefined
       }
 
-      console.log(`✅ Found ${filteredBindings.length} bindings for ${blockIds.length} blocks`)
+      logger.info(`Found ${filteredBindings.length} bindings for ${blockIds.length} blocks`)
 
       // Собираем уникальные data sources
       const dataSourcesMap = new Map<string, DataSourceEntity>()
@@ -1564,14 +1565,14 @@ export class DeployService {
           // Если привязка для linked блока - используем маппинг
           if (linkedBlockIdMapping[binding.blockId]) {
             actualBlockId = linkedBlockIdMapping[binding.blockId]
-            console.log(`✅ Mapping binding blockId ${binding.blockId} -> actual page blockId ${actualBlockId}`)
+            logger.debug(`Mapping binding blockId ${binding.blockId} -> actual page blockId ${actualBlockId}`)
           } else if (!blockIds.includes(binding.blockId)) {
             // Если этот blockId вообще не найден на странице - логируем ошибку
-            console.warn(`⚠️ Binding blockId ${binding.blockId} NOT FOUND on page!`)
-            console.warn(`⚠️ Available blockIds: ${blockIds.slice(0, 10).join(', ')}...`)
+            logger.warn(`Binding blockId ${binding.blockId} NOT FOUND on page`)
+            logger.warn(`Available blockIds: ${blockIds.slice(0, 10).join(', ')}...`)
             return null // Пропускаем эту привязку
           } else {
-            console.log(`ℹ️ Binding blockId ${binding.blockId} is direct (found on page)`)
+            logger.debug(`Binding blockId ${binding.blockId} is direct (found on page)`)
           }
           
           if (binding.bindingType === 'input' && inputConfig) {
@@ -1585,11 +1586,11 @@ export class DeployService {
               const foundTemplate = this.findTemplateInContainer(structure, actualBlockId, libraryTemplateId)
               if (foundTemplate) {
                 templateId = foundTemplate
-                console.log(`✅ Found template for container ${actualBlockId}: ${templateId}`)
+                logger.debug(`Found template for container ${actualBlockId}: ${templateId}`)
               } else {
                 // Fallback: всегда используем libraryTemplateId
                 templateId = libraryTemplateId
-                console.log(`⚠️ Fallback: using libraryTemplateId for itemTemplate: ${templateId}`)
+                logger.debug(`Fallback: using libraryTemplateId for itemTemplate: ${templateId}`)
               }
             }
             
@@ -1671,13 +1672,13 @@ export class DeployService {
           
           // Пропускаем если уже есть биндинг с таким же template
           if (seenTemplates.has(templateKey)) {
-            console.log(`⏭️ Skipping duplicate repeater binding for template: ${templateKey}`)
+            logger.debug(`Skipping duplicate repeater binding for template: ${templateKey}`)
             return false
           }
           
           // Пропускаем если уже есть биндинг для этого контейнера
           if (seenContainers.has(containerKey)) {
-            console.log(`⏭️ Skipping duplicate repeater binding for container: ${containerKey}`)
+            logger.debug(`Skipping duplicate repeater binding for container: ${containerKey}`)
             return false
           }
           
@@ -1687,14 +1688,14 @@ export class DeployService {
         return true
       })
 
-      console.log(`📦 Prepared data config for page ${pageId}:`, {
+      logger.debug(`Prepared data config for page ${pageId}`, {
         dataSources: config.dataSources.length,
-        bindings: config.bindings.length
+        bindings: config.bindings.length,
       })
 
       return config
     } catch (error) {
-      console.error('Error preparing page data config:', error)
+      logger.error('Error preparing page data config', error instanceof Error ? error : undefined)
       return undefined
     }
   }
@@ -1845,7 +1846,7 @@ Golden House - Public Site
     xml += '</urlset>\n'
 
     fs.writeFileSync(path.join(siteDir, 'sitemap.xml'), xml, 'utf-8')
-    console.log(`✅ Generated sitemap.xml for site "${site.slug}" (${pages.length} pages)`)
+    logger.info(`Generated sitemap.xml for site "${site.slug}" (${pages.length} pages)`)
   }
 
   /**
@@ -1863,7 +1864,7 @@ Golden House - Public Site
     robots += `Sitemap: ${baseUrl}/sitemap.xml\n`
 
     fs.writeFileSync(path.join(siteDir, 'robots.txt'), robots, 'utf-8')
-    console.log(`✅ Generated robots.txt for site "${site.slug}"`)
+    logger.info(`Generated robots.txt for site "${site.slug}"`)
   }
 
   private escapeXml(str: string): string {

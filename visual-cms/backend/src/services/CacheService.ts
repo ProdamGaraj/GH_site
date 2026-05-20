@@ -6,6 +6,7 @@
  */
 
 import { createClient, RedisClientType } from 'redis'
+import { logger } from './Logger'
 
 // ==================== TYPES ====================
 
@@ -156,13 +157,13 @@ class RedisCache {
       })
 
       this.client.on('error', (err) => {
-        console.error('Redis Client Error:', err)
+        logger.error('Redis Client Error', err instanceof Error ? err : undefined)
       })
 
       await this.client.connect()
       this.connected = true
     } catch (error) {
-      console.error('Failed to connect to Redis:', error)
+      logger.error('Failed to connect to Redis', error instanceof Error ? error : undefined)
       this.connected = false
     }
   }
@@ -190,7 +191,7 @@ class RedisCache {
       this.stats.misses++
       return null
     } catch (error) {
-      console.error('Redis get error:', error)
+      logger.error('Redis get error', error instanceof Error ? error : undefined)
       return null
     }
   }
@@ -215,7 +216,7 @@ class RedisCache {
         }
       }
     } catch (error) {
-      console.error('Redis set error:', error)
+      logger.error('Redis set error', error instanceof Error ? error : undefined)
     }
   }
 
@@ -226,7 +227,7 @@ class RedisCache {
       const result = await this.client.del(`cache:${key}`)
       return result > 0
     } catch (error) {
-      console.error('Redis delete error:', error)
+      logger.error('Redis delete error', error instanceof Error ? error : undefined)
       return false
     }
   }
@@ -242,7 +243,7 @@ class RedisCache {
       await this.client.del(`cache:tag:${tag}`)
       return result
     } catch (error) {
-      console.error('Redis invalidateByTag error:', error)
+      logger.error('Redis invalidateByTag error', error instanceof Error ? error : undefined)
       return 0
     }
   }
@@ -257,7 +258,7 @@ class RedisCache {
       }
       this.stats = { hits: 0, misses: 0 }
     } catch (error) {
-      console.error('Redis clear error:', error)
+      logger.error('Redis clear error', error instanceof Error ? error : undefined)
     }
   }
 

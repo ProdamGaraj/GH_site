@@ -1,4 +1,5 @@
 import AWS from 'aws-sdk'
+import { logger } from './Logger'
 
 /**
  * S3-совместимый клиент для MinIO.
@@ -32,8 +33,7 @@ export class MinioStorageService {
     } catch (err: any) {
       if (err.statusCode === 404 || err.code === 'NotFound' || err.code === 'NoSuchBucket') {
         await this.s3.createBucket({ Bucket: this.bucket }).promise()
-        // eslint-disable-next-line no-console
-        console.log(`📦 Created MinIO bucket: ${this.bucket}`)
+        logger.info(`Created MinIO bucket: ${this.bucket}`)
       } else if (err.statusCode !== 403) {
         // 403 means bucket exists but we can't head — proceed (PutObject works with creds)
         throw err
@@ -59,8 +59,7 @@ export class MinioStorageService {
         .putBucketPolicy({ Bucket: this.bucket, Policy: JSON.stringify(policy) })
         .promise()
     } catch (err: any) {
-      // eslint-disable-next-line no-console
-      console.warn(`⚠️  Failed to set bucket policy on ${this.bucket}:`, err.message)
+      logger.warn(`Failed to set bucket policy on ${this.bucket}`, { error: err.message })
     }
 
     this.initialized = true

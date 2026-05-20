@@ -10,6 +10,7 @@
 
 import vm from 'vm'
 import { dataFilterService } from './DataFilterService'
+import { logger } from './Logger'
 import type { FieldMapping, ComputedField, ConditionalMapping, FilterOperator } from '../models/DataBinding'
 
 // Типы
@@ -157,7 +158,7 @@ class DataTransformService {
         const value = this.resolveMapping(mapping, fullContext)
         this.setNestedValue(result, mapping.targetProperty, value)
       } catch (error) {
-        console.error(`Error applying mapping for ${mapping.targetProperty}:`, error)
+        logger.error(`Error applying mapping for ${mapping.targetProperty}`, error instanceof Error ? error : undefined)
         // Используем fallback при ошибке
         if (mapping.fallbackValue !== undefined) {
           this.setNestedValue(result, mapping.targetProperty, mapping.fallbackValue)
@@ -342,7 +343,7 @@ class DataTransformService {
 
       return this.runSync(wrappedCode, sandbox)
     } catch (error: any) {
-      console.error('Transform execution error:', error.message)
+      logger.error('Transform execution error', error instanceof Error ? error : undefined)
       throw new Error(`Transform error: ${error.message}`)
     }
   }
@@ -373,7 +374,7 @@ class DataTransformService {
           )
         }
       } catch (error) {
-        console.error(`Error computing field ${field.name}:`, error)
+        logger.error(`Error computing field ${field.name}`, error instanceof Error ? error : undefined)
         result[field.name] = null
       }
     }
@@ -595,7 +596,7 @@ class DataTransformService {
               { item: formData }
             )
           } catch (error) {
-            console.warn(`Transform error for ${mapping.sourceField}:`, error)
+            logger.warn(`Transform error for ${mapping.sourceField}`, undefined, error instanceof Error ? error : undefined)
             // Fallback на оригинальное значение
           }
         }
@@ -648,7 +649,7 @@ class DataTransformService {
           try {
             enriched[field.name] = this.executeComputedField(field.expression, fullContext)
           } catch (error) {
-            console.error(`Error computing field "${field.name}":`, error)
+            logger.error(`Error computing field "${field.name}"`, error instanceof Error ? error : undefined)
             enriched[field.name] = null
           }
         }
@@ -698,7 +699,7 @@ class DataTransformService {
                   fullContext
                 )
               } catch (error) {
-                console.error(`Error computing async field "${field.name}":`, error)
+                logger.error(`Error computing async field "${field.name}"`, error instanceof Error ? error : undefined)
                 enriched[field.name] = null
               }
             }
@@ -991,7 +992,7 @@ class DataTransformService {
           }
         }
       } catch (error: any) {
-        console.error('Transform error:', error)
+        logger.error('Transform error', error instanceof Error ? error : undefined)
         return {
           success: false,
           data: [],
@@ -1064,7 +1065,7 @@ class DataTransformService {
           return this.applyUniqueFilter(items, transform.field!, transform.keepFirst !== false)
           
         default:
-          console.warn(`Unknown transform type: ${(transform as any).type}`)
+          logger.warn(`Unknown transform type: ${(transform as any).type}`)
           return items
       }
     }
@@ -1145,7 +1146,7 @@ class DataTransformService {
         case 'isEmpty':
           return this.isEmpty(value)
         default:
-          console.warn(`Unknown operator: ${condition.operator}`)
+          logger.warn(`Unknown operator: ${condition.operator}`)
           return true
       }
     }

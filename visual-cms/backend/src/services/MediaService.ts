@@ -4,6 +4,7 @@ import { AppDataSource } from '../config/database'
 import { MediaAsset, MediaKind } from '../models/MediaAsset'
 import { minioStorageService } from './MinioStorageService'
 import { ValidationError } from '../middleware'
+import { logger } from './Logger'
 
 const IMAGE_MIMES = new Set([
   'image/jpeg',
@@ -111,8 +112,7 @@ export class MediaService {
         thumbnailStorageKey = `${id}.thumb.webp`
         await minioStorageService.putObject(thumbnailStorageKey, thumb, 'image/webp')
       } catch (err: any) {
-        // eslint-disable-next-line no-console
-        console.warn(`[MediaService] thumbnail generation failed for ${file.originalname}:`, err?.message)
+        logger.warn(`[MediaService] thumbnail generation failed for ${file.originalname}`, { error: err?.message })
         thumbnailStorageKey = null
       }
     }
@@ -226,8 +226,7 @@ export class MediaService {
         await minioStorageService.deleteObject(asset.thumbnailStorageKey)
       }
     } catch (err: any) {
-      // eslint-disable-next-line no-console
-      console.warn(`[MediaService] failed to delete object ${asset.storageKey}:`, err.message)
+      logger.warn(`[MediaService] failed to delete object ${asset.storageKey}`, { error: err.message })
     }
     await this.repo().delete(id)
     return true

@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm'
 import * as fs from 'fs'
 import * as path from 'path'
+import { logger } from '../services/Logger'
 
 /**
  * Запускает идемпотентные SQL-миграции из папки migrations/.
@@ -24,7 +25,7 @@ export async function runSafeMigrations(dataSource: DataSource): Promise<void> {
     // Читаем SQL-файлы из папки миграций
     const migrationsDir = path.join(__dirname)
     if (!fs.existsSync(migrationsDir)) {
-      console.log('📋 No migrations directory found, skipping')
+      logger.info('No migrations directory found, skipping')
       return
     }
 
@@ -47,21 +48,21 @@ export async function runSafeMigrations(dataSource: DataSource): Promise<void> {
       const sqlPath = path.join(migrationsDir, file)
       const sql = fs.readFileSync(sqlPath, 'utf-8')
 
-      console.log(`📋 Applying migration: ${file}`)
+      logger.info(`Applying migration: ${file}`)
       try {
         await queryRunner.query(sql)
         await queryRunner.query(
           `INSERT INTO _applied_migrations (name) VALUES ($1)`,
           [file]
         )
-        console.log(`✅ Migration applied: ${file}`)
+        logger.info(`Migration applied: ${file}`)
       } catch (err: any) {
-        console.error(`❌ Migration failed: ${file}`, err.message)
+        logger.error(`Migration failed: ${file}`, err instanceof Error ? err : undefined)
         throw err
       }
     }
 
-    console.log('📋 All migrations up to date')
+    logger.info('All migrations up to date')
   } finally {
     await queryRunner.release()
   }

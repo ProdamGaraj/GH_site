@@ -24,8 +24,9 @@
   backend-тесты запускаются (21 suite / 447 тестов), frontend Vitest (176).
   Покрытие как метрика не измеряется.
 - 11.7 «Health Checks /metrics, readiness» и 11.9 «Prometheus метрики» —
-  ЗАВЫШЕНО: код есть (`backend/src/routes/health.ts`), но роутер не
-  смонтирован, эндпоинты недостижимы. См. [../KNOWN_ISSUES.md](../KNOWN_ISSUES.md), A1.
+  РЕАЛИЗОВАНО (A1 закрыт 2026-05-19): `routes/health.ts` смонтирован в `app.ts`,
+  доступны `/health`, `/health/live`, `/health/ready`, `/health/detailed`,
+  `/metrics`. См. [../KNOWN_ISSUES.md](../KNOWN_ISSUES.md), A1.
 
 Состояние недоработок и нестабильных мест отслеживается в
 [../KNOWN_ISSUES.md](../KNOWN_ISSUES.md). Остальные пункты ниже актуальны на

@@ -3,6 +3,7 @@ import cors from 'cors'
 import helmet from 'helmet'
 import dotenv from 'dotenv'
 import routes from './routes'
+import healthRouter from './routes/health'
 import swaggerRouter from './docs/swagger'
 import { 
   errorHandler, 
@@ -68,15 +69,10 @@ app.use('/api/docs', swaggerRouter)
 // Routes
 app.use('/api', routes)
 
-// Health check with stats
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-  })
-})
+// Health & metrics: /health, /health/live, /health/ready, /health/detailed,
+// /metrics (Prometheus). Ранее routes/health.ts был реализован, но не
+// смонтирован (KNOWN_ISSUES A1).
+app.use(healthRouter)
 
 // Stats endpoint (development only)
 if (process.env.NODE_ENV !== 'production') {

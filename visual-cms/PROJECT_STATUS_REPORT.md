@@ -56,9 +56,9 @@ frontend (редактор)  ->  backend (Express + TypeORM + PostgreSQL)  ->  p
 - Коллекции, медиа-хранилище (MinIO, обработка через `sharp`), mock-сервер.
 - Инфраструктура: CORS, helmet/CSP, rate limiting, шифрование credentials,
   Zod-валидация запросов, кастомные классы ошибок, Docker Compose.
-  Базовый `GET /health` (инлайн в `app.ts`) работает. Расширенные
-  `routes/health.ts` (`/metrics` Prometheus, `/health/live`, `/health/ready`)
-  реализованы, но НЕ смонтированы — см. KNOWN_ISSUES.md, A1.
+  Health/метрики смонтированы (`app.use(healthRouter)`): `/health`,
+  `/health/live`, `/health/ready`, `/health/detailed`, `/metrics`
+  (Prometheus). Закрыто в A1 — см. KNOWN_ISSUES.md.
 
 Персистенция БД: `synchronize: false`; идемпотентные SQL-миграции из
 `backend/src/migrations` применяются автоматически на старте через
@@ -122,8 +122,6 @@ PostgreSQL 5432, Redis 6379, MinIO 9000/9001.
   тестируемость.
 - HTML-импорт частично: `exportUtils.domElementToNewBlockNode` не подключён к UI;
   см. статус в [docs/html-import-guide.md](docs/html-import-guide.md).
-- Расширенные health-эндпоинты и Prometheus-метрики (`routes/health.ts`)
-  реализованы, но роутер не смонтирован — наблюдаемость в проде отсутствует.
 - `npm audit` (backend): присутствуют уязвимости в зависимостях — требуется
   отдельный разбор.
 

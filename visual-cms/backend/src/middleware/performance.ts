@@ -6,6 +6,7 @@
 
 import { Request, Response, NextFunction } from 'express'
 import { cacheService } from '../services/CacheService'
+import { logger } from '../services/Logger'
 
 // ==================== TYPES ====================
 
@@ -76,7 +77,7 @@ export function requestTiming(req: Request, res: Response, next: NextFunction): 
 
     // Log slow requests
     if (duration > 1000) {
-      console.warn(`Slow request: ${req.method} ${req.path} took ${duration}ms`)
+      logger.warn(`Slow request: ${req.method} ${req.path} took ${duration}ms`)
     }
 
     return originalEnd(chunk, encoding, callback)
@@ -180,7 +181,7 @@ export function responseCache(options: CacheMiddlewareOptions = {}) {
       const cacheTags = typeof tags === 'function' ? tags(req) : tags
 
       cacheService.set(cacheKey, cacheEntry, { ttl, tags: cacheTags })
-        .catch(err => console.error('Cache set error:', err))
+        .catch((err: unknown) => logger.error('Cache set error', err instanceof Error ? err : undefined, { err }))
 
       res.setHeader('X-Cache', 'MISS')
       return originalJson(body)

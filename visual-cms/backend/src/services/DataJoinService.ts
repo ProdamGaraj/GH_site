@@ -10,6 +10,8 @@
  * - Data enrichment
  */
 
+import { logger } from './Logger'
+
 export type JoinType = 'left' | 'inner' | 'full' | 'cross'
 
 export type MergeStrategy = 
@@ -409,7 +411,7 @@ class DataJoinService {
         try {
           enriched[field.name] = field.compute(record, data, variables)
         } catch (error) {
-          console.error(`Error computing field "${field.name}":`, error)
+          logger.error(`Error computing field "${field.name}"`, error as Error)
           enriched[field.name] = null
         }
       }
@@ -444,7 +446,7 @@ class DataJoinService {
             try {
               enriched[field.name] = await field.compute(record, data, variables)
             } catch (error) {
-              console.error(`Error computing async field "${field.name}":`, error)
+              logger.error(`Error computing async field "${field.name}"`, error as Error)
               enriched[field.name] = null
             }
           }

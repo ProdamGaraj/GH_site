@@ -154,6 +154,40 @@ class ChildLogger {
 export const logger = new Logger()
 
 /**
+ * Маскирует чувствительные значения перед логированием.
+ *
+ * Рекурсивно (с ограничением глубины) проходит объект/массив и заменяет
+ * значения ключей, похожих на секреты (token/secret/password/key/
+ * authorization/cookie/credential), на '***'. Циклы и слишком глубокая
+ * вложенность безопасно усечены.
+ */
+const SECRET_KEY_RE = /(token|secret|password|passwd|pwd|api[_-]?key|key|authorization|auth|cookie|credential)/i
+
+export function redact<T>(value: T, depth = 0, seen = new WeakSet<object>()): T {
+  if (depth > 6 || value === null || typeof value !== 'object') {
+    return value
+  }
+  if (seen.has(value as object)) {
+    return '[Circular]' as unknown as T
+  }
+  seen.add(value as object)
+
+  if (Array.isArray(value)) {
+    return value.map((v) => redact(v, depth + 1, seen)) as unknown as T
+  }
+
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (SECRET_KEY_RE.test(k) && v != null && typeof v !== 'object') {
+      out[k] = '***'
+    } else {
+      out[k] = redact(v, depth + 1, seen)
+    }
+  }
+  return out as unknown as T
+}
+
+/**
  * Request logger middleware
  */
 export const requestLogger = (req: any, res: any, next: any) => {

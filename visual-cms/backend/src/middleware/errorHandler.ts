@@ -5,6 +5,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express'
+import { logger } from '../services/Logger'
 
 // ==================== ERROR CLASSES ====================
 
@@ -166,9 +167,13 @@ export function errorHandler(
 ): void {
   // Log error
   if (!(error instanceof AppError) || !error.isOperational) {
-    console.error('Unhandled error:', error)
+    logger.error('Unhandled error', error instanceof Error ? error : undefined)
   } else if (process.env.NODE_ENV !== 'production') {
-    console.error(`[${(error as AppError).code}] ${error.message}`, (error as AppError).details ? JSON.stringify((error as AppError).details, null, 2) : '')
+    logger.error(
+      `[${(error as AppError).code}] ${error.message}`,
+      error instanceof Error ? error : undefined,
+      (error as AppError).details ? { details: (error as AppError).details } : undefined
+    )
   }
 
   // Determine status code

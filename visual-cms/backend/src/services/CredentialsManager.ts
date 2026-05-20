@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { logger } from './Logger'
 
 /**
  * CredentialsManager - Сервис для безопасного управления учётными данными
@@ -25,7 +26,7 @@ const getEncryptionKey = (): Buffer => {
   if (!key) {
     // В development используем fallback ключ (НЕ ДЛЯ PRODUCTION!)
     if (process.env.NODE_ENV === 'development') {
-      console.warn('⚠️ WARNING: Using default encryption key. Set ENCRYPTION_KEY in production!')
+      logger.warn('Using default encryption key. Set ENCRYPTION_KEY in production!')
       return crypto.scryptSync('default-dev-key-not-for-production', 'salt', 32)
     }
     throw new Error('ENCRYPTION_KEY environment variable is required')
@@ -128,7 +129,7 @@ export class CredentialsManager {
    */
   static async getFromSecrets(ref: SecretsReference): Promise<string | undefined> {
     // Stub для будущей интеграции
-    console.warn(`Secrets Manager integration not implemented. Provider: ${ref.provider}, Secret: ${ref.secretId}`)
+    logger.warn('Secrets Manager integration not implemented', { provider: ref.provider, secretId: ref.secretId })
     
     // В будущем здесь будет:
     // if (ref.provider === 'aws') {
