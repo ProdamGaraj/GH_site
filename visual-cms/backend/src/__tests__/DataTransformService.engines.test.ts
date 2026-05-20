@@ -49,7 +49,8 @@ describe('DataTransformService — engine1 (sync, golden)', () => {
   it('applyFieldMappingsToPayload: transform применяется к полю формы', async () => {
     const out = await dataTransformService.applyFieldMappingsToPayload(
       { n: '  hi  ' },
-      [{ id: 'm1', sourceField: 'n', targetProperty: 'name', transform: 'return value.trim()' }] as any
+      // B1ф2: метод-вызовы (.trim()) больше не поддерживаются; используется helper trim().
+      [{ id: 'm1', sourceField: 'n', targetProperty: 'name', transform: 'trim(value)' }] as any
     )
     expect(out.name).toBe('hi')
   })
@@ -61,7 +62,8 @@ describe('DataTransformService — engine2 (sync, golden)', () => {
       [{ p: 10 }],
       [
         { name: 'withVar', expression: 'return item.p + $var("bonus")' },
-        { name: 'withData', expression: 'return $data("extra").length' },
+        // B1ф2: вместо .length используется helper len().
+        { name: 'withData', expression: 'len($data("extra"))' },
         { name: 'withPage', expression: 'return $page.lang' },
       ] as any,
       { variables: { bonus: 5 }, dataSources: { extra: [1, 2] }, pageData: { lang: 'ru' } }
@@ -84,7 +86,9 @@ describe('DataTransformService — async (корректность после ф
   it('applyComputedFields: async-поле возвращает результат (engine1)', async () => {
     const out = await dataTransformService.applyComputedFields(
       { a: 2 },
-      [{ name: 'ax', isAsync: true, expression: 'return await Promise.resolve(item.a * 10)' }] as any
+      // B1ф2: await/Promise в expr-eval не нужны (sync); async-флаг сохраняет path,
+      // но выражение вычисляется синхронно.
+      [{ name: 'ax', isAsync: true, expression: 'item.a * 10' }] as any
     )
     expect(out.ax).toBe(20)
   })
@@ -92,7 +96,7 @@ describe('DataTransformService — async (корректность после ф
   it('addComputedFieldsAsync: async-поле возвращает результат (engine2)', async () => {
     const out = (await dataTransformService.addComputedFieldsAsync(
       [{ p: 3 }],
-      [{ name: 'q', isAsync: true, expression: 'return await Promise.resolve(item.p + 1)' }] as any
+      [{ name: 'q', isAsync: true, expression: 'item.p + 1' }] as any
     )) as any[]
     expect(out[0].q).toBe(4)
   })

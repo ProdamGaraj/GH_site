@@ -4,7 +4,12 @@
       "Bash(npx jest *)",
       "Bash(echo \"EXIT=$?\")",
       "Bash(grep -n 'console\\\\.\\\\\\(log\\\\|warn\\\\|error\\\\|info\\\\|debug\\\\\\)\\\\|from '\\\\''.*Logger'\\\\''\\\\|import .*logger' src/__TRACKED_VAR__)",
-      "Bash(grep -nE '^import |^const .*require\\\\\\(' src/__TRACKED_VAR__)"
+      "Bash(grep -nE '^import |^const .*require\\\\\\(' src/__TRACKED_VAR__)",
+      "Bash(grep -nE \"domElementToNewBlockNode|new BlockNode|elementType|tagToElementType|parseInlineStyleToCamelCase|children|orphan|unmatched|//\")",
+      "Bash(tee /tmp/fe.txt)",
+      "Bash(grep -v \"test\\\\|interface\\\\|type\\\\|//\")",
+      "Bash(grep -rnE \"<textarea|MonacoEditor|placeholder=.*return |//.*JS|JavaScript\" frontend/src/features/dataBindings/components --include=*.tsx)",
+      "Bash(node -e \"try{const Parser=require\\('expr-eval'\\).Parser; const p=new Parser\\(\\); const e=p.parse\\('a + b * 2'\\); console.log\\('eval:', e.evaluate\\({a:1,b:3}\\)\\); console.log\\('vars:', e.variables\\(\\)\\)}catch\\(e\\){console.log\\('ERR',e.message\\)}\")"
     ]
   }
 }

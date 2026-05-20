@@ -159,7 +159,8 @@ describe('DataTransformService', () => {
       const computedFields: ComputedFieldConfig[] = [
         {
           name: 'fullName',
-          expression: 'return `${item.firstName} ${item.lastName}`'
+          // B1ф2: template-литералы в expr-eval не поддерживаются → helper concat().
+          expression: 'concat(item.firstName, " ", item.lastName)'
         }
       ]
       const result = dataTransformService.addComputedFields(testItems, computedFields) as Record<string, unknown>[]
@@ -181,7 +182,7 @@ describe('DataTransformService', () => {
 
     it('should handle multiple computed fields', () => {
       const computedFields: ComputedFieldConfig[] = [
-        { name: 'fullName', expression: 'return `${item.firstName} ${item.lastName}`' },
+        { name: 'fullName', expression: 'concat(item.firstName, " ", item.lastName)' },
         { name: 'total', expression: 'return item.price * item.quantity' },
         { name: 'hasDiscount', expression: 'return item.price > 75' }
       ]
