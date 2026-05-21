@@ -124,14 +124,3 @@ export function evaluateSafeExpression(
   }
 }
 
-/**
- * Проверяет, разрешено ли исполнение legacy JS через node `vm`.
- * По умолчанию — НЕТ (закрытие RCE-класса).
- *
- * Для обратной совместимости поведения существующих DataBinding-записей
- * можно включить через переменную окружения `ALLOW_USER_JS=true`. В этом
- * случае при попытке исполнения логгер пишет deprecation-warning.
- */
-export function isLegacyJsAllowed(): boolean {
-  return process.env.ALLOW_USER_JS === 'true'
-}

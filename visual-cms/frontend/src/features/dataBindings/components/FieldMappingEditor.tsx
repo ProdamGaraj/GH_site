@@ -178,17 +178,24 @@ export const FieldMappingEditor: React.FC<FieldMappingEditorProps> = ({
                   {/* Трансформация */}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Трансформация (JavaScript)
+                      Трансформация (выражение)
                     </label>
                     <textarea
                       value={mapping.transform || ''}
                       onChange={(e) => updateMapping(mapping.id, { transform: e.target.value })}
-                      placeholder="value.toUpperCase()"
+                      placeholder="upper(value)"
                       rows={2}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono"
                     />
                     <p className="text-xs text-gray-400 mt-1">
-                      Переменная <code className="bg-gray-100 px-1 rounded">value</code> содержит значение поля
+                      Выражение над <code className="bg-gray-100 px-1 rounded">value</code>. Доступны
+                      helper'ы: <code>upper</code>, <code>lower</code>, <code>trim</code>,
+                      <code>concat</code>, <code>len</code>, <code>slice</code>, <code>replace</code>,
+                      <code>round/floor/ceil</code>, <code>default(a,b)</code>, <code>if(c,a,b)</code>.
+                      Либо short-name: <code>uppercase</code>, <code>lowercase</code>,
+                      <code>trim</code>, <code>number</code>, <code>round</code>, <code>length</code>,
+                      <code>json</code>, <code>template:...</code>, <code>replace:from|to</code>,
+                      <code>truncate:N</code>, <code>slice:S|E</code>.
                     </p>
                   </div>
 

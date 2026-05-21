@@ -5,7 +5,6 @@
 import {
   evaluateSafeExpression,
   stripReturn,
-  isLegacyJsAllowed,
   UnsafeExpressionError,
 } from '../services/safeExpression'
 
@@ -100,21 +99,4 @@ describe('safeExpression', () => {
     })
   })
 
-  describe('isLegacyJsAllowed', () => {
-    afterEach(() => {
-      delete process.env.ALLOW_USER_JS
-    })
-    it('по умолчанию false (RCE закрыт)', () => {
-      delete process.env.ALLOW_USER_JS
-      expect(isLegacyJsAllowed()).toBe(false)
-    })
-    it('true только при ALLOW_USER_JS="true"', () => {
-      process.env.ALLOW_USER_JS = 'true'
-      expect(isLegacyJsAllowed()).toBe(true)
-      process.env.ALLOW_USER_JS = '1'
-      expect(isLegacyJsAllowed()).toBe(false)
-      process.env.ALLOW_USER_JS = 'yes'
-      expect(isLegacyJsAllowed()).toBe(false)
-    })
-  })
 })

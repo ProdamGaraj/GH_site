@@ -12,6 +12,10 @@ import { describe, expect, it } from 'vitest'
 import editorReducer, {
   loadEditor,
   replaceChildren,
+  duplicateNode,
+  copyNode,
+  pasteFromClipboard,
+  selectNode,
 } from './editorSlice'
 import type { BlockNode } from '@/shared/types'
 
@@ -135,5 +139,89 @@ describe('editorSlice.replaceChildren', () => {
     // rootNode не должен измениться
     expect(next.rootNode).toBe(seeded.rootNode)
     expect(next.history.length).toBe(beforeLen)
+  })
+})
+
+/**
+ * C1 — клавиатурные действия: duplicate / copy / paste.
+ * Тестируем reducer'ы напрямую (без UI keydown-слоя).
+ */
+describe('editorSlice — C1: duplicate / copy / paste', () => {
+  it('duplicateNode: создаёт sibling с новыми id сразу после оригинала', () => {
+    const state = initState(buildTree())
+    // track имеет children: [old-1, old-2, old-3]; дублируем old-2
+    const next = editorReducer(state, duplicateNode('old-2'))
+    const track = next.rootNode!.children[0]
+    expect(track.children).toHaveLength(4)
+    expect(track.children[0].id).toBe('old-1')
+    expect(track.children[1].id).toBe('old-2') // оригинал на месте
+    // дубликат — следом, с новым id (не равен old-2)
+    expect(track.children[2].id).not.toBe('old-2')
+    expect(track.children[3].id).toBe('old-3')
+    // дубль выбран
+    expect(next.selectedNodeId).toBe(track.children[2].id)
+    expect(next.isDirty).toBe(true)
+  })
+
+  it('duplicateNode: не дублирует root (нет родителя)', () => {
+    const state = initState(buildTree())
+    const beforeLen = state.history.length
+    const next = editorReducer(state, duplicateNode('root'))
+    expect(next.history.length).toBe(beforeLen)
+    expect(next.rootNode).toBe(state.rootNode)
+  })
+
+  it('duplicateNode: вложенные children тоже получают новые id', () => {
+    const tree = mk({
+      id: 'root',
+      children: [
+        mk({ id: 'parent', children: [mk({ id: 'child' })] }),
+      ],
+    })
+    const state = initState(tree)
+    const next = editorReducer(state, duplicateNode('parent'))
+    const dup = next.rootNode!.children[1]
+    expect(dup.id).not.toBe('parent')
+    expect(dup.children).toHaveLength(1)
+    expect(dup.children[0].id).not.toBe('child')
+  })
+
+  it('copyNode → pasteFromClipboard: вставляет sibling после selectedNodeId с новым id', () => {
+    let s = initState(buildTree())
+    s = editorReducer(s, copyNode('old-1'))
+    expect(s.clipboard).not.toBeNull()
+    expect(s.clipboard!.id).toBe('old-1') // id в буфере — оригинальный
+
+    // Выбираем old-3 и вставляем — должно вставиться siblingом после old-3
+    s = editorReducer(s, selectNode('old-3'))
+    s = editorReducer(s, pasteFromClipboard())
+    const track = s.rootNode!.children[0]
+    expect(track.children).toHaveLength(4)
+    expect(track.children[2].id).toBe('old-3')
+    // вставленный — следом, с НОВЫМ id (перегенерация при paste)
+    expect(track.children[3].id).not.toBe('old-1')
+    expect(s.selectedNodeId).toBe(track.children[3].id)
+  })
+
+  it('pasteFromClipboard: no-op если буфер пуст или нет выбранного', () => {
+    const empty = initState(buildTree())
+    // Нет выбранного — no-op
+    const next1 = editorReducer(empty, pasteFromClipboard())
+    expect(next1.rootNode).toBe(empty.rootNode)
+
+    // Выбран, но буфер пуст — тоже no-op
+    const withSel = editorReducer(empty, selectNode('old-1'))
+    const next2 = editorReducer(withSel, pasteFromClipboard())
+    expect(next2.rootNode).toBe(withSel.rootNode)
+  })
+
+  it('pasteFromClipboard: при выборе root добавляет последним child root', () => {
+    let s = initState(buildTree())
+    s = editorReducer(s, copyNode('sibling'))
+    s = editorReducer(s, selectNode('root'))
+    s = editorReducer(s, pasteFromClipboard())
+    // root изначально имел [track, sibling]; теперь должен иметь третьего ребёнка
+    expect(s.rootNode!.children).toHaveLength(3)
+    expect(s.rootNode!.children[2].id).not.toBe('sibling') // новый id
   })
 })

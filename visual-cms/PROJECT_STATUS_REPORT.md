@@ -110,16 +110,16 @@ PostgreSQL 5432, Redis 6379, MinIO 9000/9001.
   во внешний сервис с микросервисной авторизацией и гранулярными ролями —
   вне скоупа данного репозитория. До интеграции backend полагается на сетевой
   контур (см. часть 2 feature-inventory, C1/C2 — трактовать как «внешнее»).
-- SSRF: `SecureDataSourceService` ходит по пользовательскому URL без блок-листа
-  приватных диапазонов — defense-in-depth до прод-выката.
-- `DataTransformService` исполняет пользовательский JS через node `vm`
-  (не является security-песочницей) и содержит два параллельных движка
-  исполнения — требует консолидации.
+- SSRF в `SecureDataSourceService` — закрыто в B4 (`ssrfGuard` + `safeFetch`).
+- `DataTransformService` user-code исполнение — закрыто в B1 (фазы 1+2.A+2.B+
+  2.C, 2026-05-20): vm-путь удалён полностью, используется только `expr-eval`
+  через `safeExpression.ts` с helper-функциями. См. KNOWN_ISSUES B1 и
+  [docs/data-binding-migration.md](docs/data-binding-migration.md).
 - Дублирование типа `BlockNode` (frontend + 3 копии в backend) — риск дрейфа
   контракта публикации.
 - God-файлы: `DeployService` (~1879 строк), `DataBindingGenerator` (~1604),
-  `DataTransformService` (~1317), `AnalyticsService` (~1016) — низкая
-  тестируемость.
+  `DataTransformService` (~1100 после cutover), `AnalyticsService` (~1016) —
+  низкая тестируемость.
 - HTML-импорт частично: `exportUtils.domElementToNewBlockNode` не подключён к UI;
   см. статус в [docs/html-import-guide.md](docs/html-import-guide.md).
 - `npm audit` (backend): присутствуют уязвимости в зависимостях — требуется
@@ -148,12 +148,12 @@ PostgreSQL 5432, Redis 6379, MinIO 9000/9001.
 
 ## 7. План (приоритеты не зафиксированы — требуют согласования)
 
-1. Разбор технического долга: дубли `BlockNode`, декларативные трансформации
-   вместо `vm`, распил god-файлов под тесты.
+1. Разбор технического долга: дубли `BlockNode`, распил god-файлов
+   (`DeployService` 1879, `DataBindingGenerator` 1604, `AnalyticsService` 1016)
+   под тесты.
 2. Интеграция внешнего auth-сервиса (точки подключения в backend middleware).
-3. Defense-in-depth: блок-лист SSRF, аудит логов на утечку секретов.
-4. E2E-тесты критичных сценариев (создание -> биндинг -> публикация).
-5. Обновление уязвимых зависимостей.
+3. E2E-тесты критичных сценариев (создание -> биндинг -> публикация).
+4. Обновление уязвимых зависимостей (`npm audit`).
 
 ---
 

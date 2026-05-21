@@ -51,6 +51,9 @@ interface EditorState {
   statePreviewMode: 'none' | 'hover' | 'active' | 'focus' | 'disabled'
   // Цвет фона холста
   canvasColor: string
+  // Буфер обмена (для Ctrl+C / Ctrl+V): хранит копию узла без перегенерации id.
+  // id регенерируются при pasteFromClipboard, чтобы избежать коллизий.
+  clipboard: BlockNode | null
 }
 
 const initialState: EditorState = {
@@ -113,6 +116,7 @@ const initialState: EditorState = {
   },
   statePreviewMode: 'none',
   canvasColor: '#ffffff',
+  clipboard: null,
 }
 
 // Helper to push to history (call after modifying rootNode)
@@ -138,6 +142,57 @@ const pushToHistory = (state: EditorState) => {
     state.history = state.history.slice(state.history.length - MAX_HISTORY_SIZE)
     state.historyIndex = state.history.length - 1
   }
+}
+
+/**
+ * Глубокое клонирование узла с регенерацией всех id (для duplicate/paste).
+ * Корректно переименовывает id во вложенных children и variations.specificChildren;
+ * для variations.inheritedOverrides ключи мапятся со старых id на новые
+ * (если override ссылался на узел внутри клонированного поддерева).
+ */
+const cloneWithNewIds = (node: BlockNode): BlockNode => {
+  const idMap = new Map<string, string>()
+
+  const clone = (n: BlockNode): BlockNode => {
+    const newId = generateId()
+    idMap.set(n.id, newId)
+    const cloned: BlockNode = {
+      ...n,
+      id: newId,
+      children: (n.children || []).map(clone),
+    }
+    if (n.variations) {
+      const nv: typeof n.variations = {}
+      for (const [bpId, variation] of Object.entries(n.variations)) {
+        nv[bpId] = {
+          ...variation,
+          specificChildren: (variation.specificChildren || []).map(clone),
+        }
+      }
+      cloned.variations = nv
+    }
+    return cloned
+  }
+
+  const cloned = clone(node)
+
+  // Второй проход — переписываем inheritedOverrides по idMap.
+  const remap = (n: BlockNode): BlockNode => {
+    if (n.variations) {
+      for (const [bpId, variation] of Object.entries(n.variations)) {
+        if (variation.inheritedOverrides) {
+          const remapped: typeof variation.inheritedOverrides = {}
+          for (const [oldId, override] of Object.entries(variation.inheritedOverrides)) {
+            remapped[idMap.get(oldId) || oldId] = override
+          }
+          n.variations[bpId] = { ...variation, inheritedOverrides: remapped }
+        }
+      }
+    }
+    n.children.forEach(remap)
+    return n
+  }
+  return remap(cloned)
 }
 
 const editorSlice = createSlice({
@@ -1293,6 +1348,66 @@ const editorSlice = createSlice({
         state.selectedNodeId = children[0].id
       }
     },
+
+    // ─── C1: clipboard / duplicate / copy / paste ───────────────────
+    /**
+     * Дублирует узел: создаёт клон с новыми id и вставляет следующим siblingом
+     * после оригинала. Нельзя дублировать root.
+     */
+    duplicateNode: (state, action: PayloadAction<string>) => {
+      if (!state.rootNode) return
+      const nodeId = action.payload
+      if (nodeId === state.rootNode.id) return
+      const parent = findParentNode(state.rootNode, nodeId)
+      if (!parent) return
+      const index = parent.children.findIndex(c => c.id === nodeId)
+      if (index < 0) return
+      const duplicate = cloneWithNewIds(parent.children[index])
+      state.rootNode = insertNodeIntoTree(state.rootNode, parent.id, duplicate, index + 1)
+      state.selectedNodeId = duplicate.id
+      state.isDirty = true
+      pushToHistory(state)
+    },
+
+    /**
+     * Копирует узел в буфер обмена (id сохраняются; перегенерация — при вставке).
+     */
+    copyNode: (state, action: PayloadAction<string>) => {
+      if (!state.rootNode) return
+      const node = findNodeById(state.rootNode, action.payload)
+      if (!node) return
+      state.clipboard = JSON.parse(JSON.stringify(node))
+    },
+
+    /**
+     * Вставляет содержимое буфера обмена с регенерацией id. Если выбран root —
+     * добавляется последним ребёнком; иначе — siblingом после выбранного.
+     */
+    pasteFromClipboard: (state) => {
+      if (!state.rootNode || !state.clipboard) return
+      const selectedId = state.selectedNodeId
+      if (!selectedId) return
+
+      let parentId: string
+      let insertIndex: number | undefined
+      if (selectedId === state.rootNode.id) {
+        parentId = state.rootNode.id
+        insertIndex = undefined
+      } else {
+        const parent = findParentNode(state.rootNode, selectedId)
+        if (!parent) return
+        const idx = parent.children.findIndex(c => c.id === selectedId)
+        if (idx < 0) return
+        parentId = parent.id
+        insertIndex = idx + 1
+      }
+
+      const duplicate = cloneWithNewIds(state.clipboard)
+      state.rootNode = insertNodeIntoTree(state.rootNode, parentId, duplicate, insertIndex)
+      state.selectedNodeId = duplicate.id
+      state.isDirty = true
+      pushToHistory(state)
+    },
   },
 })
 
@@ -1346,7 +1461,12 @@ export const {
   saveToHistory,
   setCanvasColor,
   replaceChildren,
+  duplicateNode,
+  copyNode,
+  pasteFromClipboard,
 } = editorSlice.actions
+
+export const selectClipboard = (state: RootState) => state.editor.clipboard
 
 // Selectors
 export const selectRootNode = (state: RootState) => state.editor.rootNode

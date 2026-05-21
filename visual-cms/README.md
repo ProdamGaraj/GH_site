@@ -128,6 +128,7 @@ MinIO (S3-совместимое хранилище), Zod, Jest + ts-jest.
 - [KNOWN_ISSUES.md](KNOWN_ISSUES.md) — трекер недоработок и нестабильных мест
 - [docs/feature-inventory.md](docs/feature-inventory.md) — канонический реестр функций
 - [docs/data-binding-system-spec.md](docs/data-binding-system-spec.md) — ТЗ системы Data Binding
+- [docs/data-binding-migration.md](docs/data-binding-migration.md) — миграция JS-выражений на expr-eval (B1 фаза 2)
 - [docs/dynamic-project-pages-spec.md](docs/dynamic-project-pages-spec.md) — ТЗ динамических страниц проектов (черновик)
 - [docs/html-import-guide.md](docs/html-import-guide.md) — руководство по подготовке HTML к импорту
 

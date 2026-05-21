@@ -283,14 +283,21 @@ export const ComputedFieldsEditor: React.FC<ComputedFieldsEditorProps> = ({
                       <textarea
                         value={field.expression}
                         onChange={(e) => updateField(field.id, { expression: e.target.value })}
-                        placeholder="return item.firstName + ' ' + item.lastName"
+                        placeholder='concat(item.firstName, " ", item.lastName)'
                         rows={6}
                         className="w-full px-3 py-2 font-mono text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-900 text-green-400"
                         spellCheck={false}
                       />
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      JavaScript expression. Use <code>item</code> for current data, <code>$var("name")</code> for variables.
+                      Безопасное выражение (без произвольного JS). Доступны:{' '}
+                      <code>item</code>, <code>index</code>, <code>items</code>,
+                      <code>$page</code>, функции <code>$var("name")</code> и{' '}
+                      <code>$data("alias")</code>. Helper'ы:{' '}
+                      <code>upper/lower/trim/concat/len/slice/replace/round/floor/ceil/default/if</code>.
+                      Member-access по точке (<code>item.user.name</code>) и тернарник{' '}
+                      (<code>a ? b : c</code>). Метод-вызовы (<code>.toUpperCase()</code>) и
+                      шаблонные литералы НЕ поддерживаются — используйте helper'ы.
                     </p>
                   </div>
 

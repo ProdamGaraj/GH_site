@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
@@ -6,7 +6,7 @@ import { ColorPicker } from '@/shared/components/ColorPicker'
 import { ExpandableButton } from '@/shared/components/ExpandableButton'
 import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, ExternalLink, ChevronDown, Palette, Pencil, FileText, Library, FileDown, Code2 } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor, selectInlineBlockEdit, startInlineBlockEdit, cancelInlineBlockEdit, finishInlineBlockEdit } from '@/features/editor/editorSlice'
+import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor, selectInlineBlockEdit, startInlineBlockEdit, cancelInlineBlockEdit, finishInlineBlockEdit, deleteNode, duplicateNode, copyNode, pasteFromClipboard, selectSelectedNodeId, selectClipboard } from '@/features/editor/editorSlice'
 import { createBlock, updateBlock, selectBlocksSaving, selectBlocks } from '@/features/blocks/blocksSlice'
 import { createPage, updatePage, selectPagesSaving } from '@/features/pages/pagesSlice'
 import { BreakpointManager } from './BreakpointManager'
@@ -68,6 +68,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const canRedo = useAppSelector(selectCanRedo)
   const canvasColor = useAppSelector(selectCanvasColor)
   const inlineBlockEdit = useAppSelector(selectInlineBlockEdit)
+  const selectedNodeId = useAppSelector(selectSelectedNodeId)
+  const clipboard = useAppSelector(selectClipboard)
 
   const isNewBlock = id === 'new' || !id
   const isPageEditor = _type === 'page'
@@ -93,7 +95,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     setZoomInput(String(zoom))
   }, [zoom])
 
-  // Keyboard shortcuts for undo/redo
+  // Keyboard shortcuts: undo/redo + C1 (delete/duplicate/copy/paste).
+  // Ctrl+S обрабатывается отдельным effect'ом ниже — после определения handleSave.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Skip if user is typing in input/textarea
@@ -101,19 +104,37 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
         return
       }
-      
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+
+      const isCtrl = e.ctrlKey || e.metaKey
+
+      if (isCtrl && e.key === 'z' && !e.shiftKey) {
         e.preventDefault()
         if (canUndo) dispatch(undo())
-      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+      } else if (isCtrl && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
         e.preventDefault()
         if (canRedo) dispatch(redo())
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodeId && selectedNodeId !== rootNode?.id) {
+        // C1: удалить выбранный узел (кроме root).
+        e.preventDefault()
+        dispatch(deleteNode(selectedNodeId))
+      } else if (isCtrl && e.key === 'd' && selectedNodeId) {
+        // C1: дублировать.
+        e.preventDefault()
+        dispatch(duplicateNode(selectedNodeId))
+      } else if (isCtrl && e.key === 'c' && selectedNodeId) {
+        // C1: копировать в буфер.
+        e.preventDefault()
+        dispatch(copyNode(selectedNodeId))
+      } else if (isCtrl && e.key === 'v' && clipboard) {
+        // C1: вставить из буфера.
+        e.preventDefault()
+        dispatch(pasteFromClipboard())
       }
     }
-    
+
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [dispatch, canUndo, canRedo])
+  }, [dispatch, canUndo, canRedo, selectedNodeId, rootNode?.id, clipboard])
 
   const handleViewportChange = (newViewport: string) => {
     // При выборе 'base' переключаемся в base режим, иначе в responsive
@@ -256,7 +277,28 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       }
     }
   }
-  
+
+  // C1: Ctrl+S — явное сохранение. Используем ref, чтобы effect не реатачился
+  // на каждый рендер (handleSave пересоздаётся как arrow function).
+  const handleSaveRef = useRef(handleSave)
+  useEffect(() => {
+    handleSaveRef.current = handleSave
+  })
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 's' && !e.shiftKey) {
+        e.preventDefault()
+        void handleSaveRef.current()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   // Функция для синхронизации вложенных linked блоков в библиотеку
   // Когда редактируешь Projects Grid внутри Projects Section - изменения сохраняются в библиотеку Projects Grid
   const syncNestedLinkedBlocksToLibrary = async (structure: BlockNode) => {

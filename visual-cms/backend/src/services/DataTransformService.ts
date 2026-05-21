@@ -8,10 +8,9 @@
  * Сервис для трансформации данных, маппинга полей и вычисляемых значений.
  */
 
-import vm from 'vm'
 import { dataFilterService } from './DataFilterService'
 import { logger } from './Logger'
-import { evaluateSafeExpression, isLegacyJsAllowed } from './safeExpression'
+import { evaluateSafeExpression } from './safeExpression'
 import type { FieldMapping, ComputedField, ConditionalMapping, FilterOperator } from '../models/DataBinding'
 
 // Типы
@@ -92,54 +91,6 @@ export function normalizeToList(value: unknown): unknown[] {
 }
 
 class DataTransformService {
-  private sandboxTimeout = 1000 // 1 секунда на выполнение скрипта
-
-  /**
-   * Безопасные глобали для vm-песочницы (общие для обоих путей исполнения).
-   */
-  private safeGlobals(): Record<string, unknown> {
-    return {
-      JSON: { parse: JSON.parse, stringify: JSON.stringify },
-      String, Number, Boolean, Array, Object, Math, Date,
-      parseInt, parseFloat, isNaN, isFinite,
-      encodeURIComponent, decodeURIComponent,
-    }
-  }
-
-  /**
-   * Синхронно исполнить обёрнутый код в vm и вернуть sandbox.result.
-   *
-   * ВНИМАНИЕ: node `vm` НЕ является security-песочницей (тривиальный escape).
-   * Это известный риск B1 (см. KNOWN_ISSUES.md) — закрытие RCE планируется
-   * отдельным шагом (expr-eval + декларативные трансформации).
-   * Ошибки намеренно не перехватываются — обработка на вызывающей стороне.
-   */
-  private runSync(wrappedCode: string, sandbox: Record<string, unknown>): unknown {
-    const vmContext = vm.createContext(sandbox)
-    vm.runInContext(wrappedCode, vmContext, {
-      timeout: this.sandboxTimeout,
-      displayErrors: true,
-    })
-    return (sandbox as { result?: unknown }).result
-  }
-
-  /**
-   * Асинхронно исполнить обёрнутый код. Обёртка обязана вызвать
-   * __resolve(result) / __reject(error) (sandbox должен содержать ключи
-   * __resolve/__reject). Те же ограничения безопасности, что и у runSync.
-   */
-  private runAsync(wrappedCode: string, sandbox: Record<string, unknown>): Promise<unknown> {
-    const vmContext = vm.createContext(sandbox)
-    return new Promise((resolve, reject) => {
-      sandbox.__resolve = resolve
-      sandbox.__reject = reject
-      vm.runInContext(wrappedCode, vmContext, {
-        timeout: this.sandboxTimeout,
-        displayErrors: true,
-      })
-    })
-  }
-
   /**
    * Применить маппинг полей к данным
    */
@@ -343,8 +294,7 @@ class DataTransformService {
     value: unknown,
     context: TransformContext
   ): unknown {
-    // Безопасный путь: expr-eval (B1 фаза 2). vm используется только под
-    // переменной окружения ALLOW_USER_JS=true (legacy, deprecated).
+    // B1 фаза 2.C: только expr-eval. vm-путь удалён.
     const safeSandbox: Record<string, unknown> = {
       value,
       item: context.item,
@@ -356,29 +306,8 @@ class DataTransformService {
     try {
       return evaluateSafeExpression(transformCode, safeSandbox)
     } catch (safeErr) {
-      if (!isLegacyJsAllowed()) {
-        logger.warn(
-          'Unsafe transform expression rejected (set ALLOW_USER_JS=true for legacy vm path)',
-          { transformCode }
-        )
-        throw new Error(`Transform error: ${(safeErr as Error).message}`)
-      }
-      logger.warn(
-        'Legacy user-JS in transform executed via vm (deprecated). Migrate to built-in transforms or expr-eval.',
-        { transformCode }
-      )
-      try {
-        const vmSandbox = { ...safeSandbox, ...this.safeGlobals(), result: undefined }
-        const wrappedCode = `
-          result = (function(value, item, index, items, variables, pageData) {
-            ${transformCode}
-          })(value, item, index, items, variables, pageData);
-        `
-        return this.runSync(wrappedCode, vmSandbox)
-      } catch (vmErr: any) {
-        logger.error('Transform execution error (vm legacy)', vmErr instanceof Error ? vmErr : undefined)
-        throw new Error(`Transform error: ${vmErr.message}`)
-      }
+      logger.warn('Transform expression rejected by safe evaluator', { transformCode })
+      throw new Error(`Transform error: ${(safeErr as Error).message}`)
     }
   }
 
@@ -423,8 +352,8 @@ class DataTransformService {
     field: ComputedField,
     context: TransformContext
   ): Promise<unknown> {
-    // Безопасный путь: expr-eval (sync; async-выражения не поддерживаются —
-    // мигрируйте на additionalDataSources/join или включите ALLOW_USER_JS).
+    // B1 фаза 2.C: только expr-eval (sync). Для асинхронных вычислений
+    // используйте `additionalDataSources` + join вместо JS-await.
     const safeSandbox: Record<string, unknown> = {
       value: context.item,
       item: context.item,
@@ -436,36 +365,8 @@ class DataTransformService {
     try {
       return evaluateSafeExpression(field.expression, safeSandbox)
     } catch (safeErr) {
-      if (!isLegacyJsAllowed()) {
-        logger.warn(
-          'Unsafe async-computed expression rejected (set ALLOW_USER_JS=true for legacy vm path)',
-          { fieldName: field.name }
-        )
-        throw new Error(`Async compute error: ${(safeErr as Error).message}`)
-      }
-      logger.warn(
-        'Legacy user-JS in async-computed executed via vm (deprecated). Migrate to additionalDataSources/join.',
-        { fieldName: field.name }
-      )
-      try {
-        const vmSandbox: Record<string, unknown> = {
-          ...safeSandbox,
-          ...this.safeGlobals(),
-          Promise,
-          result: undefined,
-          __resolve: undefined as unknown,
-          __reject: undefined as unknown,
-        }
-        const wrappedCode = `
-          (async function() {
-            const value = item;
-            ${field.expression}
-          })().then(function(r) { result = r; __resolve(r); }).catch(__reject);
-        `
-        return await this.runAsync(wrappedCode, vmSandbox)
-      } catch (vmErr: any) {
-        throw new Error(`Async compute error: ${vmErr.message}`)
-      }
+      logger.warn('Async-computed expression rejected by safe evaluator', { fieldName: field.name })
+      throw new Error(`Async compute error: ${(safeErr as Error).message}`)
     }
   }
 
@@ -772,7 +673,7 @@ class DataTransformService {
       expression: string,
       context: TransformContext
     ): unknown {
-      // Безопасный путь через expr-eval с helpers $var/$data и переменной $page.
+      // B1 фаза 2.C: только expr-eval. Доступны helpers $var/$data и переменная $page.
       const safeSandbox: Record<string, unknown> = {
         item: context.item,
         index: context.index,
@@ -787,42 +688,20 @@ class DataTransformService {
       try {
         return evaluateSafeExpression(expression, safeSandbox, extraHelpers)
       } catch (safeErr) {
-        if (!isLegacyJsAllowed()) {
-          logger.warn(
-            'Unsafe computed expression rejected (set ALLOW_USER_JS=true for legacy vm path)',
-            { expression }
-          )
-          throw safeErr
-        }
-        logger.warn(
-          'Legacy user-JS in computed-field executed via vm (deprecated). Migrate to built-in/expr-eval.',
-          { expression }
-        )
-        const sandbox = this.createSandbox(context)
-        const wrappedCode = `
-          result = (function() {
-            const item = this.item;
-            const index = this.index;
-            const items = this.items;
-            const $var = (name) => this.variables[name];
-            const $data = (alias) => this.dataSources[alias] || [];
-            const $page = this.pageData;
-
-            ${expression}
-          }).call(this);
-        `
-        return this.runSync(wrappedCode, sandbox)
+        logger.warn('Computed expression rejected by safe evaluator', { expression })
+        throw safeErr
       }
     }
 
     /**
-     * Выполнить async вычисляемое поле (безопасно через vm sandbox)
+     * Выполнить async вычисляемое поле (sync через expr-eval; обёрнуто в Promise).
      */
     private async executeComputedFieldAsync(
       expression: string,
       context: TransformContext
     ): Promise<unknown> {
-      // Безопасный путь: expr-eval (sync; async-выражения не поддерживаются).
+      // B1 фаза 2.C: только expr-eval. Для асинхронных вычислений используйте
+      // additionalDataSources + join вместо JS-await.
       const safeSandbox: Record<string, unknown> = {
         item: context.item,
         index: context.index,
@@ -837,54 +716,8 @@ class DataTransformService {
       try {
         return evaluateSafeExpression(expression, safeSandbox, extraHelpers)
       } catch (safeErr) {
-        if (!isLegacyJsAllowed()) {
-          logger.warn(
-            'Unsafe async-computed expression rejected (set ALLOW_USER_JS=true for legacy vm path)',
-            { expression }
-          )
-          throw safeErr
-        }
-        logger.warn(
-          'Legacy user-JS in async-computed-field executed via vm (deprecated). Migrate to additionalDataSources/join.',
-          { expression }
-        )
-        const sandbox = this.createSandbox(context)
-        Object.assign(sandbox, {
-          Promise,
-          __resolve: undefined as unknown,
-          __reject: undefined as unknown,
-          $var: (name: string) => (context.variables || {} as Record<string, unknown>)[name],
-          $data: (alias: string) =>
-            ((context.dataSources || {}) as Record<string, unknown[]>)[alias] || [],
-          $page: context.pageData || {},
-        })
-
-        const wrappedCode = `
-          (async function() {
-            const $var = this.$var;
-            const $data = this.$data;
-            const $page = this.$page;
-            ${expression}
-          }).call(this).then(function(r) { result = r; __resolve(r); }).catch(__reject);
-        `
-
-        return await this.runAsync(wrappedCode, sandbox)
-      }
-    }
-
-    /**
-     * Создать sandbox для безопасного выполнения кода
-     */
-    private createSandbox(context: TransformContext): Record<string, unknown> {
-      return {
-        item: context.item,
-        index: context.index,
-        items: context.items,
-        variables: context.variables || {},
-        dataSources: context.dataSources || {},
-        pageData: context.pageData || {},
-        ...this.safeGlobals(),
-        result: undefined,
+        logger.warn('Async-computed expression rejected by safe evaluator', { expression })
+        throw safeErr
       }
     }
 
