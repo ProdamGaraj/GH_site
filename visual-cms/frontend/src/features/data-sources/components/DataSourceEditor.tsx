@@ -76,6 +76,14 @@ interface FormData {
   headers: { key: string; value: string }[]
   queryParams: { key: string; value: string }[]
   timeout: number
+  // Тестирование подключения по конкретному endpoint'у/методу (base URL часто
+  // отдаёт ошибку). Пусто → тест по базовому URL.
+  testEndpoint: string
+  testMethod: string
+  // Тело тестового запроса (JSON) для POST/PUT/PATCH.
+  testBody: string
+  // Отключить проверку TLS-сертификата (небезопасно). Влияет на тест и боевые запросы.
+  insecureTLS: boolean
   // Feed
   pollingEnabled: boolean
   pollingInterval: number
@@ -114,6 +122,10 @@ const initialFormData: FormData = {
   headers: [{ key: '', value: '' }],
   queryParams: [],
   timeout: 30000,
+  testEndpoint: '',
+  testMethod: 'GET',
+  testBody: '',
+  insecureTLS: false,
   pollingEnabled: false,
   pollingInterval: 60,
   cacheTTL: 300,
@@ -226,6 +238,10 @@ export const DataSourceEditor: React.FC = () => {
       headers: headersArr.length > 0 ? headersArr : [{ key: '', value: '' }],
       queryParams: queryParamsArr,
       timeout: config?.timeout || 30000,
+      testEndpoint: (config?.testEndpoint as string) || '',
+      testMethod: (config?.testMethod as string) || 'GET',
+      testBody: (config?.testBody as string) || '',
+      insecureTLS: (config?.insecureTLS as boolean) || false,
       // Feed
       pollingEnabled: config?.pollingEnabled || false,
       pollingInterval: config?.pollingInterval || 60,
@@ -349,6 +365,14 @@ export const DataSourceEditor: React.FC = () => {
           queryParams: Object.keys(queryParamsObj).length > 0 ? queryParamsObj : undefined,
           timeout: formData.timeout,
           cacheTTL: formData.cacheTTL || 0,
+          ...(formData.testEndpoint.trim()
+            ? {
+                testEndpoint: formData.testEndpoint.trim(),
+                testMethod: formData.testMethod,
+                ...(formData.testBody.trim() ? { testBody: formData.testBody.trim() } : {}),
+              }
+            : {}),
+          ...(formData.insecureTLS ? { insecureTLS: true } : {}),
         }
       case 'feed':
         return {
@@ -360,6 +384,14 @@ export const DataSourceEditor: React.FC = () => {
           pollingInterval: formData.pollingInterval,
           cacheTTL: formData.cacheTTL || 0,
           timeout: formData.timeout,
+          ...(formData.testEndpoint.trim()
+            ? {
+                testEndpoint: formData.testEndpoint.trim(),
+                testMethod: formData.testMethod,
+                ...(formData.testBody.trim() ? { testBody: formData.testBody.trim() } : {}),
+              }
+            : {}),
+          ...(formData.insecureTLS ? { insecureTLS: true } : {}),
         }
       case 'graphql':
         return {
@@ -437,8 +469,15 @@ export const DataSourceEditor: React.FC = () => {
     if (!formData.type) return
 
     if (id) {
-      // Existing DS — use saved (decrypted) credentials from DB
-      await dispatch(testDataSourceConnection(id))
+      // Existing DS — use saved (decrypted) credentials from DB. Тестовый endpoint/метод
+      // передаём override'ом, чтобы протестировать правку без пересохранения.
+      await dispatch(testDataSourceConnection({
+        id,
+        testEndpoint: formData.testEndpoint.trim(),
+        testMethod: formData.testMethod,
+        testBody: formData.testBody.trim() || undefined,
+        insecureTLS: formData.insecureTLS,
+      }))
     } else {
       // New DS — send form data directly
       await dispatch(testNewDataSourceConnection({
@@ -1008,6 +1047,70 @@ export const DataSourceEditor: React.FC = () => {
           {/* ══ Section 4: Test ══ */}
           <Section title="Тестирование подключения" icon={<CheckCircle size={18} className="text-cyan-500" />} defaultOpen={false}>
             <div className="space-y-4 max-w-xl">
+              {(formData.type === 'rest-api' || formData.type === 'feed') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Тестировать по методу
+                  </label>
+                  <div className="flex gap-2">
+                    <select
+                      value={formData.testMethod}
+                      onChange={e => updateForm({ testMethod: e.target.value })}
+                      className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    >
+                      {['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    <Input
+                      className="flex-1"
+                      value={formData.testEndpoint}
+                      onChange={e => updateForm({ testEndpoint: e.target.value })}
+                      placeholder="/health или https://api.example.com/ping"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Запрос для проверки связи (health или любой возвращающий данные). Относительный
+                    путь (например <code>tools/list</code>) добавляется к Base URL; абсолютный (http…)
+                    используется как есть. Заголовки и авторизация берутся из источника. Если пусто —
+                    тест по базовому URL.
+                  </p>
+
+                  {['POST', 'PUT', 'PATCH'].includes(formData.testMethod) && (
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Тело запроса (JSON)
+                      </label>
+                      <textarea
+                        value={formData.testBody}
+                        onChange={e => updateForm({ testBody: e.target.value })}
+                        placeholder={'{\n  "key": "value"\n}'}
+                        rows={4}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-xs focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Отправляется только для методов с телом. Должно быть валидным JSON.
+                      </p>
+                    </div>
+                  )}
+
+                  <label className="mt-3 flex items-start gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={formData.insecureTLS}
+                      onChange={e => updateForm({ insecureTLS: e.target.checked })}
+                      className="mt-0.5 rounded"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Игнорировать ошибки TLS-сертификата
+                      <span className="block text-xs text-amber-600">
+                        Небезопасно: отключает проверку сертификата (например, при CERT_HAS_EXPIRED).
+                        Применяется к тесту и боевым запросам. Только для доверенных источников.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              )}
               <div className="flex items-center gap-4">
                 <Button onClick={handleTest} disabled={testing}>
                   {testing ? (

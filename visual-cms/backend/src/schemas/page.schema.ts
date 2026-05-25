@@ -34,6 +34,14 @@ export const updatePageSchema = z.object({
   structure: z.record(z.unknown()).nullable().optional(),
   status: z.enum(['draft', 'published', 'archived']).optional(),
   isTemplate: z.boolean().optional(),
+  // Решения пользователя по изменённым linked-блокам (instanceId -> действие).
+  // Применяются в PageController.update перед сохранением структуры.
+  decisions: z.record(z.enum(['push', 'static', 'revert'])).optional(),
+})
+
+// POST /api/pages/:id/save-preflight — детект расхождения linked-блоков перед сохранением
+export const savePreflightSchema = z.object({
+  structure: z.record(z.unknown()),
 })
 
 // PUT /api/pages/:id/data-sources

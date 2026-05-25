@@ -12,6 +12,7 @@ import { Site } from './Site'
 import { DataSource } from './DataSource'
 import { Page } from './Page'
 import { CollectionOverride } from './CollectionOverride'
+import type { DataTransformConfig } from '../services/DataTransformService'
 
 export type CollectionLinkMode = 'auto' | 'manual' | 'disabled'
 export type CollectionItemsOrder = 'api' | 'alphabetical' | 'custom'
@@ -79,6 +80,14 @@ export class Collection {
 
   @Column({ type: 'varchar', length: 50, default: 'api' })
   itemsOrder!: CollectionItemsOrder
+
+  // --- Серверные трансформации элементов из API ---
+  // include/exclude (по условию), sort, limit, unique, prepend, append.
+  // Применяются DataTransformService при чтении (getItems) и деплое. Кеш
+  // cachedApiData хранит сырой массив — трансформации применяются на чтении,
+  // поэтому их изменение действует сразу.
+  @Column('jsonb', { nullable: true })
+  transforms?: DataTransformConfig[]
 
   // --- Кеш и polling (Проблема 4 & 8) ---
   @Column({ type: 'boolean', default: true })

@@ -67,7 +67,9 @@ mockDataSource.getRepository.mockImplementation((entity: any) => {
 jest.mock('../services/LinkedBlocksService', () => ({
   linkedBlocksService: {
     updateLinkedBlocks: jest.fn((s: any) => Promise.resolve(s)),
-    syncLinkedBlocksToLibrary: jest.fn(() => Promise.resolve()),
+    applyLinkedDecisions: jest.fn((s: any) => ({ structure: s, libraryWrites: [] })),
+    syncBlockToAllPages: jest.fn(() => Promise.resolve({ updatedPages: [], errors: [] })),
+    detectChangedLinkedInstances: jest.fn(() => Promise.resolve([])),
   },
 }))
 

@@ -1,7 +1,21 @@
 import crypto from 'crypto'
+import { Agent } from 'undici'
 import { CredentialsManager } from './CredentialsManager'
 import { safeFetch } from '../utils/ssrfGuard'
 import { logger } from './Logger'
+
+/**
+ * Ленивый undici-Agent с отключённой проверкой TLS-сертификата.
+ * Используется только когда у источника явно включён insecureTLS.
+ * Создаётся один раз (переиспользует пул соединений).
+ */
+let insecureAgent: Agent | undefined
+function getInsecureAgent(): Agent {
+  if (!insecureAgent) {
+    insecureAgent = new Agent({ connect: { rejectUnauthorized: false } })
+  }
+  return insecureAgent
+}
 
 /**
  * Secure Data Source Service
@@ -23,6 +37,12 @@ export interface FetchConfig {
   body?: unknown
   bodyFormat?: 'json' | 'form-data' | 'raw'
   timeout?: number
+  /**
+   * Отключить проверку TLS-сертификата (rejectUnauthorized=false). Небезопасно —
+   * только для внутренних/доверенных API со сломанным/самоподписанным сертификатом.
+   * Применяется к реальным запросам и к тесту подключения.
+   */
+  insecureTLS?: boolean
   // GraphQL
   query?: string
   variables?: Record<string, unknown>
@@ -176,12 +196,20 @@ class SecureDataSourceService {
           throw new Error(`Unsupported data source type: ${config.type}`)
       }
     } catch (error: any) {
+      // undici прячет реальную причину под общим "fetch failed" — раскрываем
+      // error.cause (ECONNREFUSED/ENOTFOUND/таймаут/TLS), иначе сообщение
+      // бесполезно для диагностики.
+      const cause = error?.cause
+      const causeMsg = cause ? (cause.code || cause.message || String(cause)) : undefined
+      const message = causeMsg && causeMsg !== error.message
+        ? `${error.message}: ${causeMsg}`
+        : error.message
       return {
         success: false,
         error: {
           code: 'FETCH_ERROR',
-          message: error.message,
-          details: error.stack
+          message,
+          details: cause?.stack || error.stack
         },
         metadata: {
           statusCode: 0,
@@ -207,6 +235,11 @@ class SecureDataSourceService {
       method: config.method || 'GET',
       headers,
       signal: AbortSignal.timeout(config.timeout || this.defaultTimeout)
+    }
+
+    // Опциональный обход проверки TLS-сертификата (только для доверенных источников).
+    if (config.insecureTLS) {
+      ;(fetchOptions as any).dispatcher = getInsecureAgent()
     }
 
     // Body для POST/PUT/PATCH

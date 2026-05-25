@@ -4,6 +4,7 @@
  */
 
 import { api } from './index'
+import type { DataTransform } from '@/shared/types/transforms'
 
 export interface Collection {
   id: string
@@ -24,6 +25,7 @@ export interface Collection {
   pollInterval: number
   indexPageId: string | null
   statsDataSourceId: string | null
+  transforms?: DataTransform[]
   cachedApiData: unknown[] | null
   lastCachedAt: string | null
   overrides: CollectionOverride[]
@@ -58,6 +60,7 @@ export interface CreateCollectionDto {
   cacheTtl?: number
   pollInterval?: number
   statsDataSourceId?: string | null
+  transforms?: DataTransform[]
 }
 
 export interface UpdateCollectionDto {
@@ -76,6 +79,7 @@ export interface UpdateCollectionDto {
   cacheTtl?: number
   pollInterval?: number
   statsDataSourceId?: string | null
+  transforms?: DataTransform[]
 }
 
 export interface CreateOverrideDto {

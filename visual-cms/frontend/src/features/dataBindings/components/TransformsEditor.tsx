@@ -11,7 +11,8 @@
  */
 
 import React, { useState } from 'react'
-import type { 
+import { MultiValueInput } from './MultiValueInput'
+import type {
   DataTransform,
   ExcludeTransform,
   IncludeTransform,
@@ -338,9 +339,14 @@ export const TransformsEditor: React.FC<TransformsEditorProps> = ({
         const isMultiValue = transform.filter.operator === 'in' || transform.filter.operator === 'notIn'
         const isUnary = transform.filter.operator === 'exists' || transform.filter.operator === 'isEmpty'
 
-        // Для in/notIn значение хранится как массив. Отображаем как CSV.
-        const displayValue = Array.isArray(transform.filter.value)
-          ? transform.filter.value.join(', ')
+        // Для in/notIn значение хранится как массив. Multi-value ввод —
+        // через MultiValueInput (local raw state, чтобы запятая не «съедалась»
+        // при наборе). Для single-value операторов оставляем обычный input.
+        const multiValueArr: string[] = Array.isArray(transform.filter.value)
+          ? (transform.filter.value as unknown[]).map(v => String(v))
+          : []
+        const singleDisplayValue = Array.isArray(transform.filter.value)
+          ? (transform.filter.value as unknown[]).map(v => String(v)).join(', ')
           : String(transform.filter.value ?? '')
 
         return (
@@ -383,17 +389,13 @@ export const TransformsEditor: React.FC<TransformsEditorProps> = ({
               </select>
               {!isUnary && (
                 isMultiValue ? (
-                  <textarea
-                    value={displayValue}
-                    onChange={(e) => updateTransform(transform.id, {
-                      filter: {
-                        ...transform.filter,
-                        value: e.target.value
-                          .split(/[,\n;]/)
-                          .map(v => v.trim())
-                          .filter(v => v.length > 0)
-                      }
+                  <MultiValueInput
+                    value={multiValueArr}
+                    onChange={(next) => updateTransform(transform.id, {
+                      filter: { ...transform.filter, value: next }
                     })}
+                    multiline
+                    separators={/[,\n;]/}
                     placeholder="value1, value2, value3"
                     rows={1}
                     className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900 font-mono resize-y min-h-[40px]"
@@ -401,7 +403,7 @@ export const TransformsEditor: React.FC<TransformsEditorProps> = ({
                 ) : (
                   <input
                     type="text"
-                    value={displayValue}
+                    value={singleDisplayValue}
                     onChange={(e) => updateTransform(transform.id, {
                       filter: { ...transform.filter, value: e.target.value }
                     })}

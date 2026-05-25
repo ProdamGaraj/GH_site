@@ -2,12 +2,14 @@ import { Request, Response } from 'express'
 import { AppDataSource } from '../config/database'
 import { Page } from '../models/Page'
 import { PageVersion } from '../models/PageVersion'
+import { Block } from '../models/Block'
 import { linkedBlocksService } from '../services/LinkedBlocksService'
 import { asyncHandler, NotFoundError, AppError } from '../middleware'
 import { cacheService } from '../services/CacheService'
 
 const pageRepository = AppDataSource.getRepository(Page)
 const versionRepository = AppDataSource.getRepository(PageVersion)
+const blockRepository = AppDataSource.getRepository(Block)
 
 export class PageController {
   getAll = asyncHandler(async (req: Request, res: Response) => {
@@ -49,6 +51,22 @@ export class PageController {
     res.status(201).json(page)
   })
 
+  /**
+   * Preflight перед сохранением страницы: какие linked-блоки на странице разошлись
+   * с библиотекой. Фронт по этому списку показывает модалку выбора действия.
+   * Сравнение идёт против структуры из тела запроса (несохранённое состояние редактора),
+   * а не против сохранённой page.structure.
+   */
+  savePreflight = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const page = await pageRepository.findOne({ where: { id }, select: ['id'] })
+    if (!page) {
+      throw new NotFoundError('Page', id)
+    }
+    const changedInstances = await linkedBlocksService.detectChangedLinkedInstances(req.body.structure)
+    res.json({ changedInstances })
+  })
+
   update = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params
 
@@ -58,8 +76,27 @@ export class PageController {
       throw new NotFoundError('Page', id)
     }
 
+    // Решения по изменённым linked-блокам не являются полем страницы — извлекаем до Object.assign.
+    const decisions = (req.body.decisions || {}) as Record<string, 'push' | 'static' | 'revert'>
+    delete req.body.decisions
+
+    // Применяем решения к структуре: схлопываем linked-блоки в placeholder (инвариант B2),
+    // 'static' отделяет блок, 'push' дополнительно пишет содержимое в библиотеку.
     if (req.body.structure) {
-      await linkedBlocksService.syncLinkedBlocksToLibrary(req.body.structure)
+      const { structure, libraryWrites } = linkedBlocksService.applyLinkedDecisions(req.body.structure, decisions)
+      req.body.structure = structure
+
+      for (const write of libraryWrites) {
+        const block = await blockRepository.findOne({ where: { id: write.blockId } })
+        if (!block) continue
+        block.structure = write.structure
+        await blockRepository.save(block)
+        // Распространяем на остальные страницы (схлопывание legacy-копий) и чистим кеши.
+        await linkedBlocksService.syncBlockToAllPages(write.blockId, write.structure)
+      }
+      if (libraryWrites.length > 0) {
+        await cacheService.invalidateByTag('blocks')
+      }
     }
 
     // Auto-save version snapshot before overwriting

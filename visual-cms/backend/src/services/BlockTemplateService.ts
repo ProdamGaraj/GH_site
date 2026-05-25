@@ -10,23 +10,9 @@
 import type { DetectedField, DetectedFieldType } from '../models/Template'
 import { AppDataSource } from '../config/database'
 import { DataBinding } from '../models/DataBinding'
+import type { BlockNode } from '../types/blockNode'
 
 const dataBindingRepository = AppDataSource.getRepository(DataBinding)
-
-interface BlockNode {
-  id: string
-  tagName: string
-  elementType: string
-  content?: string
-  attributes?: Record<string, string>
-  styles?: {
-    properties?: Record<string, string>
-  }
-  metadata?: {
-    name?: string
-  }
-  children?: BlockNode[]
-}
 
 interface FieldDiff {
   added: DetectedField[]

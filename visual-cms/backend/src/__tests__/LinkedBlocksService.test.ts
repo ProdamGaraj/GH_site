@@ -1,6 +1,6 @@
 /**
- * LinkedBlocksService — unit-тесты для _collectLinkedNodes guard
- * и для syncBlockToAllPages (auto-sync library → pages).
+ * LinkedBlocksService — unit-тесты для syncBlockToAllPages (library → pages),
+ * applyLinkedDecisions (решения пользователя) и detectChangedLinkedInstances.
  */
 
 // Mock database before importing the service.
@@ -25,144 +25,6 @@ describe('LinkedBlocksService', () => {
 
   beforeEach(() => {
     service = new LinkedBlocksService()
-  })
-
-  describe('syncLinkedBlocksToLibrary — placeholder guard', () => {
-    // Access private method via bracket notation for testing
-    const collectLinkedNodes = (node: any): Map<string, any> => {
-      const result = new Map<string, any>()
-      ;(service as any)._collectLinkedNodes(node, result)
-      return result
-    }
-
-    it('should NOT collect placeholder nodes (0 children)', () => {
-      const structure = {
-        id: 'root',
-        children: [
-          {
-            id: 'gh-tpl-header',
-            tagName: 'header',
-            metadata: { name: 'Header (linked)', linkedBlockId: 'block-123' },
-            children: [],
-          },
-        ],
-      }
-
-      const result = collectLinkedNodes(structure)
-      expect(result.size).toBe(0)
-    })
-
-    it('should NOT collect placeholder nodes (no children property)', () => {
-      const structure = {
-        id: 'root',
-        children: [
-          {
-            id: 'gh-tpl-header',
-            tagName: 'header',
-            metadata: { name: 'Header (linked)', linkedBlockId: 'block-123' },
-          },
-        ],
-      }
-
-      const result = collectLinkedNodes(structure)
-      expect(result.size).toBe(0)
-    })
-
-    it('should collect linked nodes WITH children', () => {
-      const structure = {
-        id: 'root',
-        children: [
-          {
-            id: 'gh-tpl-header',
-            tagName: 'header',
-            metadata: { name: 'Header (linked)', linkedBlockId: 'block-123' },
-            children: [
-              { id: 'logo', tagName: 'a', content: 'GOLDEN HOUSE', children: [] },
-              { id: 'nav', tagName: 'nav', children: [{ id: 'link1', tagName: 'a' }] },
-            ],
-          },
-        ],
-      }
-
-      const result = collectLinkedNodes(structure)
-      expect(result.size).toBe(1)
-      expect(result.has('block-123')).toBe(true)
-      expect(result.get('block-123').children.length).toBe(2)
-    })
-
-    it('should handle mixed: some placeholders, some with content', () => {
-      const structure = {
-        id: 'root',
-        children: [
-          {
-            id: 'header-placeholder',
-            tagName: 'header',
-            metadata: { linkedBlockId: 'header-block' },
-            children: [],
-          },
-          {
-            id: 'section',
-            children: [
-              {
-                id: 'footer-real',
-                tagName: 'footer',
-                metadata: { linkedBlockId: 'footer-block' },
-                children: [{ id: 'copyright', tagName: 'p', content: '© 2026' }],
-              },
-            ],
-          },
-        ],
-      }
-
-      const result = collectLinkedNodes(structure)
-      expect(result.size).toBe(1)
-      expect(result.has('header-block')).toBe(false)
-      expect(result.has('footer-block')).toBe(true)
-    })
-
-    it('should handle deeply nested linked nodes', () => {
-      const structure = {
-        id: 'root',
-        children: [
-          {
-            id: 'wrapper',
-            children: [
-              {
-                id: 'inner',
-                children: [
-                  {
-                    id: 'deep-linked',
-                    metadata: { linkedBlockId: 'deep-block' },
-                    children: [{ id: 'child', tagName: 'div' }],
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      }
-
-      const result = collectLinkedNodes(structure)
-      expect(result.size).toBe(1)
-      expect(result.has('deep-block')).toBe(true)
-    })
-
-    it('should handle node without metadata', () => {
-      const structure = {
-        id: 'root',
-        children: [
-          { id: 'plain-node', tagName: 'div', children: [] },
-        ],
-      }
-
-      const result = collectLinkedNodes(structure)
-      expect(result.size).toBe(0)
-    })
-
-    it('should handle null/undefined input', () => {
-      expect(collectLinkedNodes(null).size).toBe(0)
-      expect(collectLinkedNodes(undefined).size).toBe(0)
-    })
   })
 
   describe('syncBlockToAllPages — auto-sync library → pages', () => {
@@ -483,6 +345,163 @@ describe('LinkedBlocksService', () => {
       expect(out.variations.mobile.specificChildren).toEqual([])
       expect(out.metadata.linkedBlockId).toBe('X')
       expect(out.attributes['data-carousel-static']).toBe('true')
+    })
+  })
+
+  /**
+   * applyLinkedDecisions — применение решений пользователя к структуре перед сохранением.
+   * Чистый метод (без БД); сайд-эффекты в библиотеку возвращаются как libraryWrites.
+   */
+  describe('applyLinkedDecisions', () => {
+    const makePage = () => ({
+      id: 'root',
+      children: [
+        {
+          id: 'footer-inst',
+          tagName: 'footer',
+          metadata: { linkedBlockId: 'lib-footer', name: 'Footer', styleOverrides: { x: 1 } },
+          attributes: { 'data-carousel-static': 'true' },
+          children: [{ id: 'c1', tagName: 'p', content: 'изменено' }],
+          variations: { mobile: { specificChildren: [{ id: 'm1' }] } },
+        },
+        {
+          id: 'plain',
+          tagName: 'div',
+          metadata: {},
+          children: [{ id: 'header-inst', metadata: { linkedBlockId: 'lib-header' }, children: [{ id: 'h1' }] }],
+        },
+      ],
+    })
+
+    it("'push' пишет содержимое в библиотеку (без linkedBlockId/styleOverrides) и схлопывает инстанс", () => {
+      const { structure, libraryWrites } = service.applyLinkedDecisions(makePage(), { 'footer-inst': 'push' })
+
+      expect(libraryWrites).toHaveLength(1)
+      expect(libraryWrites[0].blockId).toBe('lib-footer')
+      expect(libraryWrites[0].structure.metadata.linkedBlockId).toBeUndefined()
+      expect(libraryWrites[0].structure.metadata.styleOverrides).toBeUndefined()
+      expect(libraryWrites[0].structure.children).toHaveLength(1) // содержимое сохранено для библиотеки
+
+      const footer = structure.children[0]
+      expect(footer.id).toBe('footer-inst')
+      expect(footer.children).toEqual([]) // на странице — placeholder
+      expect(footer.metadata.linkedBlockId).toBe('lib-footer')
+      expect(footer.attributes['data-carousel-static']).toBe('true')
+      expect(footer.variations.mobile.specificChildren).toEqual([])
+    })
+
+    it("'static' убирает linkedBlockId и замораживает содержимое; библиотека не трогается", () => {
+      const { structure, libraryWrites } = service.applyLinkedDecisions(makePage(), { 'footer-inst': 'static' })
+
+      expect(libraryWrites).toHaveLength(0)
+      const footer = structure.children[0]
+      expect(footer.metadata.linkedBlockId).toBeUndefined()
+      expect(footer.children).toHaveLength(1) // содержимое заморожено развёрнутым
+      expect(footer.children[0].content).toBe('изменено')
+    })
+
+    it("'revert' схлопывает инстанс в placeholder без записи в библиотеку", () => {
+      const { structure, libraryWrites } = service.applyLinkedDecisions(makePage(), { 'footer-inst': 'revert' })
+      expect(libraryWrites).toHaveLength(0)
+      expect(structure.children[0].children).toEqual([])
+      expect(structure.children[0].metadata.linkedBlockId).toBe('lib-footer')
+    })
+
+    it('без решения linked-инстанс схлопывается в placeholder (правка не сохраняется)', () => {
+      const { structure, libraryWrites } = service.applyLinkedDecisions(makePage(), {})
+      expect(libraryWrites).toHaveLength(0)
+      // оба linked-инстанса схлопнуты
+      expect(structure.children[0].children).toEqual([])
+      expect(structure.children[1].children[0].children).toEqual([])
+    })
+
+    it('разные решения для разных инстансов применяются независимо (вложенный header)', () => {
+      const { structure, libraryWrites } = service.applyLinkedDecisions(makePage(), {
+        'footer-inst': 'static',
+        'header-inst': 'push',
+      })
+      expect(libraryWrites.map((w) => w.blockId)).toEqual(['lib-header'])
+      expect(structure.children[0].metadata.linkedBlockId).toBeUndefined() // footer static
+      const header = structure.children[1].children[0]
+      expect(header.children).toEqual([]) // header collapsed
+      expect(header.metadata.linkedBlockId).toBe('lib-header')
+    })
+
+    it('не-linked узлы остаются нетронутыми по содержимому', () => {
+      const { structure } = service.applyLinkedDecisions(makePage(), {})
+      expect(structure.children[1].id).toBe('plain')
+      expect(structure.children[1].tagName).toBe('div')
+    })
+  })
+
+  /**
+   * detectChangedLinkedInstances — какие linked-инстансы разошлись с библиотекой.
+   * Использует замоканный blockRepository.find.
+   */
+  describe('detectChangedLinkedInstances', () => {
+    const repo: any = (AppDataSource as any).getRepository()
+
+    beforeEach(() => {
+      repo.find.mockReset()
+      repo.find.mockResolvedValue([])
+    })
+
+    const libBlock = {
+      id: 'lib-footer',
+      name: 'Footer',
+      structure: {
+        id: 'lib-root',
+        tagName: 'footer',
+        styles: { properties: { padding: '40px' } },
+        attributes: { class: 'footer' },
+        metadata: { name: 'Footer' },
+        children: [{ id: 'c1', tagName: 'p', content: 'оригинал', styles: { properties: {} }, attributes: {}, metadata: {}, children: [] }],
+      },
+    }
+
+    const expandedInstance = (override: any = {}) => ({
+      id: 'root',
+      children: [
+        {
+          ...JSON.parse(JSON.stringify(libBlock.structure)),
+          id: 'footer-inst',
+          attributes: { class: 'footer', 'data-carousel-static': 'true' },
+          metadata: { name: 'Footer', linkedBlockId: 'lib-footer' },
+          ...override,
+        },
+      ],
+    })
+
+    it('идентичный инстанс (только overlay) → пустой список', async () => {
+      repo.find.mockResolvedValueOnce([libBlock])
+      const result = await service.detectChangedLinkedInstances(expandedInstance())
+      expect(result).toEqual([])
+    })
+
+    it('изменённый текст → инстанс в списке с changes и именем блока', async () => {
+      repo.find.mockResolvedValueOnce([libBlock])
+      const changed = expandedInstance()
+      changed.children[0].children[0].content = 'НОВЫЙ ТЕКСТ'
+      const result = await service.detectChangedLinkedInstances(changed)
+      expect(result).toHaveLength(1)
+      expect(result[0].instanceId).toBe('footer-inst')
+      expect(result[0].linkedBlockId).toBe('lib-footer')
+      expect(result[0].blockName).toBe('Footer')
+      expect(result[0].changes.length).toBeGreaterThan(0)
+    })
+
+    it('блок отсутствует в библиотеке → пропускается (нет эталона)', async () => {
+      repo.find.mockResolvedValueOnce([]) // библиотека пуста
+      const changed = expandedInstance()
+      changed.children[0].children[0].content = 'X'
+      const result = await service.detectChangedLinkedInstances(changed)
+      expect(result).toEqual([])
+    })
+
+    it('нет linked-инстансов → пустой список без запроса к БД', async () => {
+      const result = await service.detectChangedLinkedInstances({ id: 'r', children: [{ id: 'plain', children: [] }] })
+      expect(result).toEqual([])
+      expect(repo.find).not.toHaveBeenCalled()
     })
   })
 })

@@ -3,6 +3,30 @@ import { z } from 'zod'
 const linkModeEnum = z.enum(['auto', 'manual', 'disabled'])
 const itemsOrderEnum = z.enum(['api', 'alphabetical', 'custom'])
 
+// Серверная трансформация элементов коллекции (как у дата-биндингов).
+// Совпадает с DataTransform фронтенда / DataTransformConfig бэкенда.
+const transformFilterOperatorEnum = z.enum([
+  'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains', 'containsAny', 'notContains',
+  'startsWith', 'endsWith', 'in', 'notIn', 'between', 'exists', 'isEmpty',
+])
+const transformFilterSchema = z.object({
+  field: z.string(),
+  operator: transformFilterOperatorEnum,
+  value: z.unknown().optional(),
+}).passthrough()
+const collectionTransformSchema = z.object({
+  id: z.string().optional(),
+  type: z.enum(['include', 'exclude', 'prepend', 'append', 'sort', 'limit', 'unique']),
+  enabled: z.boolean().optional(),
+  filter: transformFilterSchema.optional(),
+  staticItems: z.array(z.unknown()).optional(),
+  field: z.string().optional(),
+  order: z.enum(['asc', 'desc']).optional(),
+  limit: z.number().optional(),
+  offset: z.number().optional(),
+  keepFirst: z.boolean().optional(),
+}).passthrough()
+
 // POST /api/collections
 export const createCollectionSchema = z.object({
   siteId: z.string().uuid('Invalid site ID'),
@@ -36,6 +60,8 @@ export const createCollectionSchema = z.object({
   pollInterval: z.number().int().min(0).max(86400).optional().default(300),
 
   indexPageId: z.string().uuid().nullable().optional(),
+
+  transforms: z.array(collectionTransformSchema).optional(),
 })
 
 // PUT /api/collections/:id
@@ -70,6 +96,8 @@ export const updateCollectionSchema = z.object({
   pollInterval: z.number().int().min(0).max(86400).optional(),
 
   indexPageId: z.string().uuid().nullable().optional(),
+
+  transforms: z.array(collectionTransformSchema).optional(),
 })
 
 // POST /api/collections/:id/overrides

@@ -10,6 +10,22 @@ import { AppDataSource } from '../config/database'
 import { Block } from '../models/Block'
 import { Page } from '../models/Page'
 import { In } from 'typeorm'
+import { diffLinkedInstance, LinkedChange } from './linkedBlockDiff'
+
+/** Решение пользователя по одному изменённому linked-инстансу. */
+export type LinkedDecision = 'push' | 'static' | 'revert'
+
+/** Описание изменённого инстанса для UI-модалки. */
+export interface ChangedLinkedInstance {
+  /** id узла-инстанса на странице (стабильный ключ для решения). */
+  instanceId: string
+  /** id блока в библиотеке. */
+  linkedBlockId: string
+  /** Имя блока для отображения. */
+  blockName: string
+  /** Детализация изменений внутри блока (для раскрытия в модалке). */
+  changes: LinkedChange[]
+}
 
 const blockRepository = AppDataSource.getRepository(Block)
 const pageRepository = AppDataSource.getRepository(Page)
@@ -133,72 +149,6 @@ export class LinkedBlocksService {
   }
 
   /**
-   * Синхронизирует изменения linked блоков со страницы в библиотеку.
-   * Batch-подход: собирает все linked блоки, загружает одним запросом, сохраняет массово.
-   */
-  async syncLinkedBlocksToLibrary(structure: any): Promise<void> {
-    if (!structure) return
-
-    // Шаг 1: собрать все linked узлы и их структуры
-    const linkedNodes = new Map<string, any>() // linkedId -> structure for library
-    this._collectLinkedNodes(structure, linkedNodes)
-
-    if (linkedNodes.size === 0) return
-
-    // Шаг 2: загрузить все блоки одним запросом
-    const blocks = await blockRepository.find({
-      where: { id: In(Array.from(linkedNodes.keys())) }
-    })
-
-    // Шаг 3: обновить структуры и сохранить массово
-    const toSave: Block[] = []
-    for (const block of blocks) {
-      const nodeStructure = linkedNodes.get(block.id)
-      if (nodeStructure) {
-        const structureForLibrary = JSON.parse(JSON.stringify(nodeStructure))
-        if (structureForLibrary.metadata) {
-          delete structureForLibrary.metadata.linkedBlockId
-          delete structureForLibrary.metadata.styleOverrides
-        }
-        block.structure = structureForLibrary
-        toSave.push(block)
-      }
-    }
-
-    if (toSave.length > 0) {
-      await blockRepository.save(toSave)
-    }
-  }
-
-  /** Рекурсивно собирает linked узлы: linkedId -> структура для библиотеки */
-  private _collectLinkedNodes(node: any, result: Map<string, any>): void {
-    if (!node) return
-    if (node.metadata?.linkedBlockId) {
-      // Не синхронизируем placeholder'ы (ноды без children) обратно в библиотеку —
-      // это пустые заглушки, которые заполняются из библиотеки при деплое
-      const hasContent = Array.isArray(node.children) && node.children.length > 0
-      if (hasContent) {
-        result.set(node.metadata.linkedBlockId, node)
-      }
-    }
-    if (node.children && Array.isArray(node.children)) {
-      for (const child of node.children) {
-        this._collectLinkedNodes(child, result)
-      }
-    }
-    // Traverse viewport-specific children (responsive variations)
-    if (node.variations) {
-      for (const variation of Object.values(node.variations) as any[]) {
-        if (variation.specificChildren && Array.isArray(variation.specificChildren)) {
-          for (const child of variation.specificChildren) {
-            this._collectLinkedNodes(child, result)
-          }
-        }
-      }
-    }
-  }
-
-  /**
    * Синхронизирует обновлённый блок библиотеки на все страницы, где он используется как linked block.
    */
   async syncBlockToAllPages(blockId: string, newStructure: any): Promise<{ updatedPages: string[]; errors: string[] }> {
@@ -244,16 +194,7 @@ export class LinkedBlocksService {
     if (!node) return node
 
     if (node.metadata?.linkedBlockId === blockId) {
-      const cleaned: any = { ...node, children: [] }
-      if (cleaned.variations) {
-        cleaned.variations = Object.fromEntries(
-          Object.entries(cleaned.variations).map(([bpId, variation]: [string, any]) => [
-            bpId,
-            { ...variation, specificChildren: [] },
-          ])
-        )
-      }
-      return cleaned
+      return this._collapseNodeToPlaceholder(node)
     }
 
     if (node.children && Array.isArray(node.children)) {
@@ -333,6 +274,160 @@ export class LinkedBlocksService {
       }
     }
     return false
+  }
+
+  /**
+   * Схлопывает один узел в placeholder: children: [], variations.specificChildren: [].
+   * id/attributes/metadata (включая linkedBlockId и карусель-маркеры) сохраняются.
+   * Полная структура подставляется при чтении через _applyLinkedBlocks.
+   */
+  private _collapseNodeToPlaceholder(node: any): any {
+    const cleaned: any = { ...node, children: [] }
+    if (cleaned.variations) {
+      cleaned.variations = Object.fromEntries(
+        Object.entries(cleaned.variations).map(([bpId, variation]: [string, any]) => [
+          bpId,
+          { ...variation, specificChildren: [] },
+        ])
+      )
+    }
+    return cleaned
+  }
+
+  /** Готовит развёрнутый инстанс к записи в библиотеку: убирает linkedBlockId и styleOverrides. */
+  private _cleanForLibrary(node: any): any {
+    const copy = JSON.parse(JSON.stringify(node))
+    if (copy.metadata) {
+      delete copy.metadata.linkedBlockId
+      delete copy.metadata.styleOverrides
+    }
+    return copy
+  }
+
+  /** Рекурсивно собирает linked-инстансы (узлы с linkedBlockId) с их instanceId. */
+  private _collectLinkedInstances(node: any, out: Array<{ instanceId: string; linkedBlockId: string; node: any }>): void {
+    if (!node) return
+    if (node.metadata?.linkedBlockId && node.id) {
+      out.push({ instanceId: node.id, linkedBlockId: node.metadata.linkedBlockId, node })
+    }
+    if (Array.isArray(node.children)) {
+      for (const child of node.children) this._collectLinkedInstances(child, out)
+    }
+    if (node.variations) {
+      for (const variation of Object.values(node.variations) as any[]) {
+        if (Array.isArray(variation.specificChildren)) {
+          for (const child of variation.specificChildren) this._collectLinkedInstances(child, out)
+        }
+      }
+    }
+  }
+
+  /**
+   * Детектирует linked-инстансы на странице, контент которых разошёлся с библиотекой.
+   * Используется при сохранении страницы (preflight): по результату фронт показывает
+   * модалку выбора действия (в библиотеку / сделать статическим / откатить).
+   *
+   * Инстансы, у которых нет соответствующего блока в библиотеке, пропускаются — для них
+   * нет «эталона» сравнения (это, как правило, осиротевшие ссылки или ещё не сохранённые
+   * секции; см. отдельную фичу «создать блок из секции»).
+   */
+  async detectChangedLinkedInstances(structure: any): Promise<ChangedLinkedInstance[]> {
+    if (!structure) return []
+
+    const instances: Array<{ instanceId: string; linkedBlockId: string; node: any }> = []
+    this._collectLinkedInstances(structure, instances)
+    if (instances.length === 0) return []
+
+    const linkedIds = Array.from(new Set(instances.map((i) => i.linkedBlockId)))
+    const blocks = await blockRepository.find({ where: { id: In(linkedIds) } })
+    const blockMap = new Map<string, any>()
+    for (const block of blocks) {
+      blockMap.set(block.id, { structure: block.structure, name: block.name })
+    }
+
+    const changed: ChangedLinkedInstance[] = []
+    for (const inst of instances) {
+      const lib = blockMap.get(inst.linkedBlockId)
+      if (!lib || !lib.structure) continue
+      const diff = diffLinkedInstance(inst.node, lib.structure)
+      if (diff.changed) {
+        changed.push({
+          instanceId: inst.instanceId,
+          linkedBlockId: inst.linkedBlockId,
+          blockName: inst.node.metadata?.name || lib.name || 'Блок',
+          changes: diff.changes,
+        })
+      }
+    }
+    return changed
+  }
+
+  /**
+   * Применяет решения пользователя к структуре страницы перед сохранением и возвращает
+   * новую структуру + список записей в библиотеку (их выполняет контроллер, т.к. это
+   * сайд-эффекты в БД).
+   *
+   * Правила для каждого linked-инстанса:
+   *  - 'push'   — содержимое инстанса записывается в библиотеку (libraryWrites),
+   *               сам инстанс схлопывается в placeholder (контент придёт из библиотеки).
+   *  - 'static' — у инстанса удаляется metadata.linkedBlockId, содержимое замораживается
+   *               развёрнутым (блок становится обычным, обновления из библиотеки не приходят).
+   *  - 'revert' / без решения — инстанс схлопывается в placeholder (правка не сохраняется,
+   *               при чтении подставится версия библиотеки).
+   *  - неизменённый linked-инстанс — тоже схлопывается в placeholder (инвариант B2).
+   *
+   * Примечание по 'static': замораживается весь поддерев инстанса как есть; вложенные
+   * linked-блоки внутри также теряют связь (поведение «отделить блок целиком»).
+   */
+  applyLinkedDecisions(
+    structure: any,
+    decisions: Record<string, LinkedDecision>
+  ): { structure: any; libraryWrites: Array<{ blockId: string; structure: any }> } {
+    const libraryWrites: Array<{ blockId: string; structure: any }> = []
+
+    const walk = (node: any): any => {
+      if (!node) return node
+
+      if (node.metadata?.linkedBlockId && node.id) {
+        const decision = decisions[node.id]
+
+        if (decision === 'static') {
+          const metadata = { ...node.metadata }
+          delete metadata.linkedBlockId
+          // Содержимое замораживается как есть; дети не схлопываются.
+          return { ...node, metadata }
+        }
+
+        if (decision === 'push') {
+          libraryWrites.push({ blockId: node.metadata.linkedBlockId, structure: this._cleanForLibrary(node) })
+          return this._collapseNodeToPlaceholder(node)
+        }
+
+        // 'revert', без решения, либо неизменённый — схлопываем в placeholder.
+        return this._collapseNodeToPlaceholder(node)
+      }
+
+      let result = node
+      if (Array.isArray(node.children)) {
+        result = { ...result, children: node.children.map(walk) }
+      }
+      if (node.variations) {
+        result = {
+          ...result,
+          variations: Object.fromEntries(
+            Object.entries(node.variations).map(([bpId, variation]: [string, any]) => [
+              bpId,
+              Array.isArray(variation.specificChildren)
+                ? { ...variation, specificChildren: variation.specificChildren.map(walk) }
+                : variation,
+            ])
+          ),
+        }
+      }
+      return result
+    }
+
+    return { structure: walk(structure), libraryWrites }
   }
 }
 

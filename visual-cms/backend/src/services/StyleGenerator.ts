@@ -2,87 +2,14 @@
  * Сервис генерации CSS для hover, анимаций и других динамических стилей
  */
 
-interface CSSProperties {
-  [key: string]: string | undefined
-}
-
-interface StateStyles {
-  hover?: CSSProperties
-  active?: CSSProperties
-  focus?: CSSProperties
-  disabled?: CSSProperties
-}
-
-interface StateTransition {
-  duration: number
-  easing: string
-  properties: string[]
-}
-
-interface AnimationKeyframe {
-  offset: number
-  properties: CSSProperties
-}
-
-interface Animation {
-  id: string
-  preset?: string
-  trigger: 'load' | 'scroll-into-view' | 'click' | 'loop'
-  duration: number
-  delay: number
-  easing: string
-  iterationCount: number | 'infinite'
-  keyframes?: AnimationKeyframe[]
-}
-
-interface BlockScript {
-  id: string
-  name: string
-  code: string
-  trigger: 'load' | 'click' | 'hover' | 'scroll' | 'custom'
-  enabled: boolean
-}
-
-interface BlockNodeVariation {
-  inheritedOverrides?: {
-    [nodeId: string]: {
-      hidden?: boolean
-      styles?: CSSProperties
-      attributes?: Record<string, string>
-      content?: string
-    }
-  }
-  specificChildren?: BlockNode[]
-}
-
-interface BreakpointDef {
-  id: string
-  name: string
-  width: number
-  height?: number
-}
-
-interface BlockNode {
-  id: string
-  tagName: string
-  children: BlockNode[]
-  styles: {
-    properties: CSSProperties
-    states?: StateStyles
-    stateTransition?: StateTransition
-  }
-  animations?: Animation[]
-  scripts?: BlockScript[]
-  variations?: {
-    [breakpointId: string]: BlockNodeVariation
-  }
-  metadata?: {
-    name?: string
-    customHeadHtml?: string
-    customBodyEndHtml?: string
-    breakpoints?: BreakpointDef[]
-  }
-}
+import type {
+  BlockNode,
+  CSSProperties,
+  StateStyles,
+  StateTransition,
+  Animation,
+  BreakpointDef,
+} from '../types/blockNode'
 
 // Animation preset keyframes
 const ANIMATION_KEYFRAMES: Record<string, string> = {

@@ -1,8 +1,4 @@
-﻿// Ensure API URL always ends with /api
-const getApiBaseUrl = (): string => {
-  const envUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000'
-  return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`
-}
+﻿import { getApiBaseUrl } from './baseUrl'
 
 const API_BASE_URL = getApiBaseUrl()
 
@@ -113,6 +109,10 @@ export const pageApi = {
   create: (data: CreatePageDto) => api.post<Page>('/pages', data),
   update: (id: string, data: UpdatePageDto) => api.put<Page>(`/pages/${id}`, data),
   delete: (id: string) => api.delete<void>(`/pages/${id}`),
+  // Preflight перед сохранением: какие linked-блоки разошлись с библиотекой.
+  // Возвращает список изменённых инстансов для модалки выбора действия.
+  savePreflight: (id: string, structure: BlockNode) =>
+    api.post<{ changedInstances: ChangedLinkedInstance[] }>(`/pages/${id}/save-preflight`, { structure }),
   // Page-level data settings (variables + dataSources). Используется SlidesTab,
   // чтобы не таскать огромный page.structure при сохранении hero-слайдов.
   getDataSettings: (id: string) =>
@@ -220,6 +220,26 @@ export interface UpdatePageDto {
   }
   status?: 'draft' | 'published' | 'archived'
   siteId?: string | null
+  /** Решения по изменённым linked-блокам (instanceId -> действие). */
+  decisions?: Record<string, LinkedDecision>
+}
+
+/** Действие пользователя над изменённым linked-блоком при сохранении страницы. */
+export type LinkedDecision = 'push' | 'static' | 'revert'
+
+/** Один тип изменения внутри linked-инстанса (для отображения в модалке). */
+export interface LinkedChange {
+  kind: 'content' | 'styles' | 'tagName' | 'layoutMode' | 'attributes' | 'variations' | 'child-added' | 'child-removed' | 'reorder'
+  path: string
+  label: string
+}
+
+/** Изменённый linked-инстанс, обнаруженный preflight'ом. */
+export interface ChangedLinkedInstance {
+  instanceId: string
+  linkedBlockId: string
+  blockName: string
+  changes: LinkedChange[]
 }
 
 export interface CreateSiteDto {
@@ -318,7 +338,10 @@ export const dataSourceApi = {
   /**
    * Тестировать подключение к существующему источнику
    */
-  testConnection: (id: string) => api.post<TestConnectionResult>(`/data-sources/${id}/test`),
+  testConnection: (
+    id: string,
+    override?: { testEndpoint?: string; testMethod?: string; testBody?: string; insecureTLS?: boolean }
+  ) => api.post<TestConnectionResult>(`/data-sources/${id}/test`, override),
 
   /**
    * Получить дешифрованный authConfig

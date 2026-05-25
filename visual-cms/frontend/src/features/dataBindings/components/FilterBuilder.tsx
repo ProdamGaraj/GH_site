@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { MultiValueInput } from './MultiValueInput'
 import type { FilterConfig, FilterOperator } from '@/shared/types/dataBinding'
 
 interface FilterBuilderProps {
@@ -234,25 +235,28 @@ export const FilterBuilder: React.FC<FilterBuilderProps> = ({ filters, onChange 
                           <span className="text-gray-400 ml-1">(мин,макс)</span>
                         )}
                       </label>
-                      <input
-                        type="text"
-                        value={Array.isArray(filter.value) ? filter.value.join(',') : String(filter.value || '')}
-                        onChange={(e) => {
-                          let newValue: unknown = e.target.value
-                          if (filter.operator === 'in' || filter.operator === 'notIn' || filter.operator === 'between') {
-                            newValue = e.target.value.split(',').map(v => v.trim())
+                      {(filter.operator === 'in' || filter.operator === 'notIn' || filter.operator === 'between') ? (
+                        <MultiValueInput
+                          value={Array.isArray(filter.value)
+                            ? (filter.value as unknown[]).map(v => String(v))
+                            : (filter.value !== undefined && filter.value !== null && filter.value !== ''
+                                ? [String(filter.value)]
+                                : [])}
+                          onChange={(next) => updateFilter(filter.id, { value: next })}
+                          placeholder={
+                            filter.operator === 'between' ? '10, 100' : 'value1, value2, value3'
                           }
-                          updateFilter(filter.id, { value: newValue })
-                        }}
-                        placeholder={
-                          filter.operator === 'in' || filter.operator === 'notIn'
-                            ? 'value1, value2, value3'
-                            : filter.operator === 'between'
-                            ? '10, 100'
-                            : 'значение'
-                        }
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
-                      />
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={String(filter.value ?? '')}
+                          onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
+                          placeholder="значение"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
+                        />
+                      )}
                     </div>
                   )}
 

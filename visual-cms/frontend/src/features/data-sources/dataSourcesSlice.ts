@@ -115,9 +115,16 @@ export const deleteDataSource = createAsyncThunk(
  */
 export const testDataSourceConnection = createAsyncThunk(
   'dataSources/testConnection',
-  async (id: string, { rejectWithValue }) => {
+  async (
+    arg:
+      | string
+      | { id: string; testEndpoint?: string; testMethod?: string; testBody?: string; insecureTLS?: boolean },
+    { rejectWithValue }
+  ) => {
     try {
-      return await dataSourceApi.testConnection(id)
+      // Поддерживаем и старую форму (id), и override тестовых параметров.
+      const { id, ...override } = typeof arg === 'string' ? { id: arg } : arg
+      return await dataSourceApi.testConnection(id, Object.keys(override).length ? override : undefined)
     } catch (error: any) {
       return rejectWithValue(error.message || 'Connection test failed')
     }

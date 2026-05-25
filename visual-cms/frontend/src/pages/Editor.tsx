@@ -745,15 +745,19 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
         // dragData.id contains the library block ID
         const libraryBlockId = dragData.id
         
+        // Linked-вставка из библиотеки. Корень получает linkedBlockId и имя блока
+        // из библиотеки (dragData.label) БЕЗ суффикса "(копия)" — это живая ссылка,
+        // а не копия (иначе суффикс накапливается: "Footer (копия) (копия)").
+        // Дети НЕ блокируются (locked): содержимое linked-блока редактируется прямо
+        // на канвасе, а расхождения с библиотекой разрешаются модалкой при сохранении
+        // (🟢 в библиотеку / 🟡 статический / 🔴 откатить).
         const cloneNodeWithNewIds = (node: BlockNode, isRoot = true): BlockNode => {
           return {
             ...node,
             id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             metadata: {
               ...node.metadata,
-              locked: !isRoot, // Lock children but not root
-              name: isRoot ? `${node.metadata?.name || 'Блок'} (копия)` : node.metadata?.name,
-              // Сохраняем связь с блоком в библиотеке для корневого элемента
+              name: isRoot ? (dragData.label || node.metadata?.name || 'Блок') : node.metadata?.name,
               linkedBlockId: isRoot ? libraryBlockId : node.metadata?.linkedBlockId,
             },
             children: node.children.map(child => cloneNodeWithNewIds(child, false)),

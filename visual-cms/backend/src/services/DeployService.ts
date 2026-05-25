@@ -22,6 +22,7 @@ import { MacroV2Client } from './MacroV2Client'
 import { logger } from './Logger'
 import { mapComplexStats, type ProjectStats } from './ProjectStatsAggregator'
 import { CredentialsManager } from './CredentialsManager'
+import { applyCollectionTransforms } from '../utils/collectionTransforms'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
@@ -439,6 +440,11 @@ export class DeployService {
           }
         }
       }
+
+      // Серверные трансформации элементов коллекции (include/exclude/sort/limit/unique/...).
+      // Кеш (cachedApiData) хранит сырой массив; применяются на чтении, поэтому
+      // совпадает с preview (CollectionController.getItems).
+      items = applyCollectionTransforms(items, collection.transforms)
 
       if (items.length === 0) {
         return { success: true, message: 'Коллекция пуста — нет элементов для генерации', deployedPages: [], errors: [] }

@@ -12,6 +12,7 @@ import { cacheService } from '../services/CacheService'
 import { cachedDataSourceService } from '../services/CachedDataSourceService'
 import { FetchConfig, AuthConfig } from '../services/SecureDataSourceService'
 import { CredentialsManager } from '../services/CredentialsManager'
+import { applyCollectionTransforms } from '../utils/collectionTransforms'
 
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
 
@@ -171,6 +172,10 @@ export class CollectionController {
         items = collection.cachedApiData as any[]
       }
     }
+
+    // Серверные трансформации элементов коллекции (include/exclude/sort/limit/unique/...).
+    // Кеш (cachedApiData) хранит сырой массив; трансформации применяются на чтении.
+    items = applyCollectionTransforms(items, collection.transforms)
 
     // Мёржим с overrides — match по apiItemId, затем fallback по apiItemSlug
     const overridesByItemId = new Map(

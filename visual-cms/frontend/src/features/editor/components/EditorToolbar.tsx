@@ -4,15 +4,17 @@ import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
 import { ColorPicker } from '@/shared/components/ColorPicker'
 import { ExpandableButton } from '@/shared/components/ExpandableButton'
-import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, ExternalLink, ChevronDown, Palette, Pencil, FileText, Library, FileDown, Code2 } from 'lucide-react'
+import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, ExternalLink, ChevronDown, Palette, Pencil, FileText, Library, Code2 } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor, selectInlineBlockEdit, startInlineBlockEdit, cancelInlineBlockEdit, finishInlineBlockEdit, deleteNode, duplicateNode, copyNode, pasteFromClipboard, selectSelectedNodeId, selectClipboard } from '@/features/editor/editorSlice'
+import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, loadEditor, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor, selectInlineBlockEdit, startInlineBlockEdit, cancelInlineBlockEdit, finishInlineBlockEdit, deleteNode, duplicateNode, copyNode, pasteFromClipboard, selectSelectedNodeId, selectClipboard } from '@/features/editor/editorSlice'
 import { createBlock, updateBlock, selectBlocksSaving, selectBlocks } from '@/features/blocks/blocksSlice'
-import { createPage, updatePage, selectPagesSaving } from '@/features/pages/pagesSlice'
+import { createPage, updatePage, fetchPageById, selectPagesSaving } from '@/features/pages/pagesSlice'
 import { BreakpointManager } from './BreakpointManager'
 import { ExportImportModal } from './ExportImportModal'
 import { FullPageHtmlEditor } from './FullPageHtmlEditor'
+import { LinkedChangesModal } from './LinkedChangesModal'
 import { blockApi, pageApi } from '@/shared/api'
+import type { ChangedLinkedInstance, LinkedDecision } from '@/shared/api'
 import { generateNodeTreeCSS, generateResponsiveCSS, collectSpecificChildrenIds, generateFullHTML } from '../utils/styleGenerator'
 import type { BlockNode } from '@/shared/types'
 
@@ -89,6 +91,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const [blockSaveResult, setBlockSaveResult] = useState<{ success: boolean; message: string } | null>(null)
   const [saveResult, setSaveResult] = useState<{ success: boolean; message: string } | null>(null)
   const [showHtmlEditor, setShowHtmlEditor] = useState(false)
+  // Модалка разрешения расхождений linked-блоков при сохранении страницы.
+  const [linkedModalOpen, setLinkedModalOpen] = useState(false)
+  const [changedInstances, setChangedInstances] = useState<ChangedLinkedInstance[]>([])
+  const [pendingSaveStructure, setPendingSaveStructure] = useState<BlockNode | null>(null)
 
   // Sync zoomInput with redux zoom when it changes externally
   React.useEffect(() => {
@@ -173,70 +179,29 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         setShowSaveDialog(true)
       } else {
         try {
-          // КРИТИЧНО: сначала нормализуем все узлы с linkedBlockId обратно в placeholder.
-          // Backend.getById → _applyLinkedBlocks разворачивает placeholder в полную структуру для рендера,
-          // и Redux state содержит этот развёрнутый узел. Если мы передадим его в syncNestedLinkedBlocksToLibrary
-          // ниже, она увидит developed structure (children > 0), guard не сработает, и эта структура
-          // запишется обратно в library — а это, в свою очередь, тригернёт на бэке
-          // BlockController.update → syncBlockToAllPages → _replaceLinkedBlock, которая ПЕРЕЗАПИШЕТ
-          // page.structure на ВСЕХ страницах развёрнутой копией БЕЗ атрибутов placeholder'а.
-          // Поэтому сначала сворачиваем, потом sync, потом save — все этапы видят placeholder, не developed.
-          const normalizeForSave = (node: BlockNode): BlockNode => {
-            if (!node) return node
-            if (node.metadata?.linkedBlockId) {
-              return {
-                ...node,
-                children: [],
-              }
-            }
-            if (Array.isArray(node.children) && node.children.length > 0) {
-              return {
-                ...node,
-                children: node.children.map(normalizeForSave),
-              }
-            }
-            return node
-          }
-          const normalizedRoot = normalizeForSave(rootNode)
-
-          // Только после нормализации синхронизируем вложенные linked блоки в библиотеку.
-          // Теперь все linked-узлы — placeholder'ы (children=[]), guard в syncNestedLinkedBlocksToLibrary
-          // их пропустит, и в библиотеку ничего не отправится. Это правильно: пользователь редактирует
-          // library блоки отдельно через handleSaveAllToLibrary, а не через обычное "Сохранить страницу".
-          await syncNestedLinkedBlocksToLibrary(normalizedRoot)
-
-          // Сохраняем breakpoints в metadata root-узла для генерации responsive CSS при публикации
+          // Сохраняем breakpoints в metadata root-узла для генерации responsive CSS при публикации.
+          // Структура передаётся как есть (развёрнутая): backend сам схлопнёт linked-блоки в
+          // placeholder (инвариант B2) и применит решения пользователя по изменённым блокам.
           const structureWithBreakpoints = {
-            ...normalizedRoot,
+            ...rootNode,
             metadata: {
-              ...normalizedRoot.metadata,
+              ...rootNode.metadata,
               breakpoints: breakpoints.map(bp => ({ id: bp.id, name: bp.name, width: bp.width, height: bp.height })),
             },
           }
-          
-          const updateData: Record<string, unknown> = {
-              structure: structureWithBreakpoints,
-              status: pageSettings.status,
-              metadata: {
-                title: pageSettings.metaTitle || undefined,
-                description: pageSettings.metaDescription || undefined,
-                keywords: pageSettings.keywords ? pageSettings.keywords.split(',').map(k => k.trim()) : [],
-                ogImage: pageSettings.ogImage || undefined,
-                scripts: (pageSettings as any).scripts || [],
-              }
-            }
-          // Only include name/slug when non-empty to avoid validation errors
-          if (pageSettings.name) updateData.name = pageSettings.name
-          if (pageSettings.slug) updateData.slug = pageSettings.slug
-          
-          await dispatch(updatePage({
-            id: id!,
-            data: updateData as any,
-          })).unwrap()
-          
-          dispatch(markAsSaved())
-          setSaveResult({ success: true, message: 'Страница сохранена' })
-          setTimeout(() => setSaveResult(null), 3000)
+
+          // Preflight: какие linked-блоки на странице разошлись с библиотекой.
+          const { changedInstances: changed } = await pageApi.savePreflight(id!, structureWithBreakpoints as BlockNode)
+
+          if (changed.length === 0) {
+            // Расхождений нет — сохраняем сразу (linked схлопнутся на бэке).
+            await commitPageSave(structureWithBreakpoints as BlockNode, {}, true)
+          } else {
+            // Есть расхождения — показываем модалку выбора действия.
+            setPendingSaveStructure(structureWithBreakpoints as BlockNode)
+            setChangedInstances(changed)
+            setLinkedModalOpen(true)
+          }
         } catch (error: any) {
           console.error('Failed to save page:', error)
           setSaveResult({ success: false, message: error?.message || 'Ошибка сохранения' })
@@ -276,6 +241,79 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         }
       }
     }
+  }
+
+  /**
+   * Сохраняет страницу с принятыми решениями по linked-блокам.
+   * @param allResolved — все ли изменённые блоки получили решение. Если нет — страница
+   *   остаётся «грязной» (markAsSaved не вызывается): нерешённые правки живут только в
+   *   редакторе и пропадут при перезагрузке (pending).
+   */
+  const commitPageSave = async (
+    structure: BlockNode,
+    decisions: Record<string, LinkedDecision>,
+    allResolved: boolean
+  ) => {
+    if (!pageSettings) return
+    const updateData: Record<string, unknown> = {
+      structure,
+      status: pageSettings.status,
+      decisions,
+      metadata: {
+        title: pageSettings.metaTitle || undefined,
+        description: pageSettings.metaDescription || undefined,
+        keywords: pageSettings.keywords ? pageSettings.keywords.split(',').map(k => k.trim()) : [],
+        ogImage: pageSettings.ogImage || undefined,
+        scripts: (pageSettings as any).scripts || [],
+      },
+    }
+    if (pageSettings.name) updateData.name = pageSettings.name
+    if (pageSettings.slug) updateData.slug = pageSettings.slug
+
+    await dispatch(updatePage({ id: id!, data: updateData as any })).unwrap()
+
+    if (allResolved) {
+      // Перечитываем страницу: GET разворачивает linked-блоки из библиотеки, поэтому
+      // канвас сразу отражает результат (revert → версия библиотеки, static → отвязанный
+      // блок, push → синхронизированное содержимое). loadEditor сбрасывает историю и
+      // снимает флаг «не сохранено». При наличии pending-блоков релоад НЕ делаем —
+      // иначе нерешённые правки (схлопнутые на сервере) пропали бы раньше времени.
+      try {
+        const fresh = await dispatch(fetchPageById(id!)).unwrap()
+        if (fresh?.structure) dispatch(loadEditor(fresh.structure))
+        else dispatch(markAsSaved())
+      } catch {
+        dispatch(markAsSaved())
+      }
+      setSaveResult({ success: true, message: 'Страница сохранена' })
+    } else {
+      setSaveResult({ success: true, message: 'Сохранено; часть блоков осталась несохранённой' })
+    }
+    setTimeout(() => setSaveResult(null), 3000)
+  }
+
+  // Применить решения из модалки и сохранить страницу.
+  const handleLinkedCommit = async (decisions: Record<string, LinkedDecision>) => {
+    if (!pendingSaveStructure) return
+    const allResolved = Object.keys(decisions).length === changedInstances.length
+    try {
+      await commitPageSave(pendingSaveStructure, decisions, allResolved)
+    } catch (error: any) {
+      console.error('Failed to save page:', error)
+      setSaveResult({ success: false, message: error?.message || 'Ошибка сохранения' })
+      setTimeout(() => setSaveResult(null), 5000)
+    } finally {
+      setLinkedModalOpen(false)
+      setPendingSaveStructure(null)
+      setChangedInstances([])
+    }
+  }
+
+  // Отмена сохранения целиком — ничего не пишется.
+  const handleLinkedCancel = () => {
+    setLinkedModalOpen(false)
+    setPendingSaveStructure(null)
+    setChangedInstances([])
   }
 
   // C1: Ctrl+S — явное сохранение. Используем ref, чтобы effect не реатачился
@@ -614,36 +652,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     }
   }
 
-  // Сохранить изменения только для этой страницы (не трогать библиотеку)
-  const handleSaveForPageOnly = async () => {
-    if (!rootNode || !id || !pageSettings) return
-    
-    setIsSavingToLibrary(true)
-    setBlockSaveResult(null)
-    
-    try {
-      // Просто сохраняем страницу с текущей структурой
-      await pageApi.update(id, {
-        structure: cleanNode(rootNode),
-        name: pageSettings.name,
-        slug: pageSettings.slug,
-      })
-      dispatch(markAsSaved())
-      
-      setBlockSaveResult({ success: true, message: 'Страница сохранена (библиотека не изменена)' })
-      setTimeout(() => setBlockSaveResult(null), 3000)
-      
-      // Выходим из режима редактирования блоков
-      dispatch(finishInlineBlockEdit())
-    } catch (error) {
-      console.error('Ошибка сохранения страницы:', error)
-      setBlockSaveResult({ success: false, message: 'Ошибка: ' + (error as Error).message })
-      setTimeout(() => setBlockSaveResult(null), 5000)
-    } finally {
-      setIsSavingToLibrary(false)
-    }
-  }
-
   // Центральная часть - действия НА странице (масштаб, цвета, viewport и т.д.)
   const centerContent = (
     <>
@@ -962,14 +970,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             variant="primary"
             title="Сохранить изменения блоков в библиотеку и на страницу"
           />
-          <ExpandableButton
-            icon={isSavingToLibrary ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
-            label="Только страница"
-            onClick={handleSaveForPageOnly}
-            disabled={isSavingToLibrary || !isDirty}
-            variant="secondary"
-            title="Сохранить только для этой страницы (библиотека не изменится)"
-          />
         </>
       ) : (
         <ExpandableButton
@@ -1016,6 +1016,14 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   // Модальные окна и диалоги
   const modalsContent = (
     <>
+      {/* Разрешение расхождений linked-блоков при сохранении страницы */}
+      <LinkedChangesModal
+        isOpen={linkedModalOpen}
+        changedInstances={changedInstances}
+        onCommit={handleLinkedCommit}
+        onClose={handleLinkedCancel}
+      />
+
       {/* Full Page HTML Editor */}
       <FullPageHtmlEditor
         isOpen={showHtmlEditor}

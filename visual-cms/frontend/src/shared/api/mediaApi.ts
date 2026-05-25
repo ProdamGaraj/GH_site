@@ -10,6 +10,7 @@
  */
 
 import { api } from './index'
+import { getApiBaseUrl } from './baseUrl'
 
 export type MediaKind = 'image' | 'video'
 
@@ -66,10 +67,6 @@ export interface UpdateMediaInput {
   tags?: string[]
 }
 
-const getApiBaseUrl = (): string => {
-  const envUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000'
-  return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`
-}
 const API_BASE = getApiBaseUrl()
 
 function buildQuery(filter: MediaListFilter): string {

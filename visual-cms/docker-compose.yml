@@ -7,8 +7,11 @@ services:
       target: development
     ports:
       - "3000:3000"
-    environment:
-      - VITE_API_URL=http://localhost:5000
+    # VITE_API_URL намеренно не задан: дефолт в коде — относительный '/api',
+    # запросы идут same-origin через vite-proxy (см. vite.config.ts). Это
+    # работает в локальном dev, через port-forward и через https-туннели
+    # (Dev Tunnels / ngrok / Cloudflare Tunnel). Задавать абсолютный URL
+    # нельзя — он зашьётся в бандл и сломает доступ с другого хоста.
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -31,6 +34,10 @@ services:
       - PUBLIC_MEDIA_URL=/media
       - PUBLIC_SITE_DIR=/app/public-site
       - PUBLIC_SITE_URL=https://localhost
+      # SSRF allowlist: доверенные внутренние хосты, которые резолвятся в
+      # приватные IP и иначе блокируются ssrfGuard (см. B4 в KNOWN_ISSUES).
+      # Точное совпадение hostname, lowercase, через запятую.
+      - SSRF_ALLOWED_HOSTS=api.macrocrm.gh.uz
     volumes:
       - ./backend:/app
       - /app/node_modules

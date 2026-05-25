@@ -7,6 +7,7 @@ import {
   updatePageDataSourcesSchema,
   updatePageVariablesSchema,
   updateDataSettingsSchema,
+  savePreflightSchema,
 } from '../schemas/page.schema'
 import { responseCache } from '../middleware'
 
@@ -17,6 +18,7 @@ router.get('/', responseCache({ ttl: 30, tags: ['pages'] }), pageController.getA
 router.get('/:id', pageController.getById)
 router.post('/', validate(createPageSchema), pageController.create)
 router.put('/:id', validate(updatePageSchema), pageController.update)
+router.post('/:id/save-preflight', validate(savePreflightSchema), pageController.savePreflight)
 router.delete('/:id', pageController.delete)
 router.post('/:id/publish', pageController.publish)
 

@@ -22,6 +22,8 @@ import {
 } from '@/features/collections/collectionsSlice'
 import { fetchSites, selectSites } from '@/features/sites/sitesSlice'
 import type { CreateCollectionDto, UpdateCollectionDto } from '@/shared/api/collectionApi'
+import { TransformsEditor } from '@/features/dataBindings/components/TransformsEditor'
+import type { DataTransform } from '@/shared/types/transforms'
 
 // Inline data source fetch (пока нет отдельного thunk для всех DS по сайту)
 import { api } from '@/shared/api/index'
@@ -71,6 +73,9 @@ export const CollectionEditor: React.FC = () => {
     pollInterval: 300,
   })
 
+  // Серверные трансформации элементов коллекции (include/exclude/sort/limit/unique/...).
+  const [transforms, setTransforms] = useState<DataTransform[]>([])
+
   const [dataSources, setDataSources] = useState<DataSourceOption[]>([])
   const [pages, setPages] = useState<PageOption[]>([])
   const [overrideForm, setOverrideForm] = useState({ apiItemId: '', apiItemSlug: '', customPageId: '' })
@@ -111,6 +116,7 @@ export const CollectionEditor: React.FC = () => {
         cacheTtl: collection.cacheTtl,
         pollInterval: collection.pollInterval,
       })
+      setTransforms((collection.transforms as DataTransform[]) || [])
     }
   }, [collection, isNew])
 
@@ -145,6 +151,7 @@ export const CollectionEditor: React.FC = () => {
       const payload = {
         ...form,
         statsDataSourceId: form.statsDataSourceId ? form.statsDataSourceId : null,
+        transforms,
       }
       if (isNew) {
         const result = await dispatch(createCollection(payload as CreateCollectionDto)).unwrap()
@@ -320,6 +327,16 @@ export const CollectionEditor: React.FC = () => {
                   </select>
                 </div>
               </div>
+            </div>
+
+            {/* Transforms */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Трансформации элементов</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                Серверная обработка результатов из API: Include/Exclude по условию, Sort, Limit, Unique,
+                Prepend/Append. Применяется и в превью, и при публикации страниц.
+              </p>
+              <TransformsEditor transforms={transforms} onChange={setTransforms} />
             </div>
 
             {/* Cache & polling */}

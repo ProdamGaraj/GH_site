@@ -7,6 +7,7 @@ import { cachedDataSourceService } from '../services/CachedDataSourceService'
 import { Like, In } from 'typeorm'
 import { asyncHandler, NotFoundError, ValidationError } from '../middleware'
 import { cacheService } from '../services/CacheService'
+import { resolveTestUrl } from '../utils/testUrl'
 
 export class DataSourceController {
   private getRepository() {
@@ -193,8 +194,20 @@ export class DataSourceController {
       authConfig = bodyAuthConfig
     }
 
+    // Override тестового endpoint/метода из тела запроса — чтобы протестировать
+    // правку «Тестировать по методу» у существующего источника без пересохранения.
+    // Влияет только на текущий тест; config в БД не меняется.
+    const overrideKeys = ['testEndpoint', 'testMethod', 'testBody', 'insecureTLS']
+    if (req.body && overrideKeys.some(k => Object.prototype.hasOwnProperty.call(req.body, k))) {
+      const override: Record<string, unknown> = {}
+      for (const k of overrideKeys) {
+        if (Object.prototype.hasOwnProperty.call(req.body, k)) override[k] = req.body[k]
+      }
+      config = { ...config, ...override }
+    }
+
     const startTime = Date.now()
-    const result = await this.performConnectionTest(type, config, authConfig)
+    const result = await this.performConnectionTestWithRetry(type, config, authConfig)
     const responseTime = Date.now() - startTime
 
     if (id && id !== 'new') {
@@ -217,7 +230,7 @@ export class DataSourceController {
   testNewConnection = asyncHandler(async (req: Request, res: Response) => {
     const { type, config, authConfig } = req.body
     const startTime = Date.now()
-    const result = await this.performConnectionTest(type, config, authConfig)
+    const result = await this.performConnectionTestWithRetry(type, config, authConfig)
     const responseTime = Date.now() - startTime
 
     res.json({
@@ -281,6 +294,9 @@ export class DataSourceController {
   /**
    * Проверяет, является ли authConfig замаскированным (с frontend)
    */
+  /**
+   * Проверяет, является ли authConfig замаскированным (с frontend)
+   */
   private isMaskedAuthConfig(authConfig: Record<string, unknown>): boolean {
     const sensitiveFields = ['token', 'key', 'password', 'clientSecret', 'accessToken', 'refreshToken', 'appSecret']
 
@@ -292,6 +308,41 @@ export class DataSourceController {
     }
 
     return false
+  }
+
+  /**
+   * Транзиентная ли сетевая ошибка теста — стоит ли повторить.
+   * Ловим временные сбои DNS/сети (EAI_AGAIN, таймауты, сброс соединения),
+   * но НЕ устойчивые (CERT_HAS_EXPIRED, ECONNREFUSED, HTTP-ошибки, невалидный конфиг).
+   */
+  private isTransientTestError(result: { success: boolean; error?: { message?: string } }): boolean {
+    if (result.success) return false
+    const msg = result.error?.message || ''
+    return /EAI_AGAIN|EAI_FAIL|ETIMEDOUT|ECONNRESET|ENETUNREACH|ENOTFOUND|timeout/i.test(msg)
+  }
+
+  /**
+   * Тест подключения с ретраем на транзиентных сетевых ошибках. Кратковременный
+   * сбой DNS/сети (частый при доступе к внутренним хостам через VPN) не должен
+   * показываться как красная ошибка — делаем до 3 попыток с короткой паузой.
+   */
+  private async performConnectionTestWithRetry(
+    type: DataSourceType,
+    config: Record<string, unknown>,
+    authConfig?: Record<string, unknown>
+  ): Promise<{
+    success: boolean
+    message: string
+    sampleData?: unknown
+    error?: { code: string; message: string; details?: string }
+  }> {
+    const maxAttempts = 3
+    let result = await this.performConnectionTest(type, config, authConfig)
+    for (let attempt = 2; attempt <= maxAttempts && this.isTransientTestError(result); attempt++) {
+      await new Promise(r => setTimeout(r, 400 * (attempt - 1)))
+      result = await this.performConnectionTest(type, config, authConfig)
+    }
+    return result
   }
 
   /**
@@ -372,13 +423,41 @@ export class DataSourceController {
     sampleData?: unknown
     error?: { code: string; message: string; details?: string }
   }> {
+    // Тест по конкретному методу/endpoint'у. Базовый URL у источника часто
+    // отдаёт ошибку (это origin, а не рабочий endpoint), поэтому пользователь может
+    // задать тестовый путь (config.testEndpoint) и метод (config.testMethod).
+    // Заголовки/queryParams/auth берутся из источника. Если testEndpoint пуст —
+    // тест по базовому URL, как раньше.
+    const baseUrl = config.url as string
+    const testEndpoint = (config.testEndpoint as string | undefined)?.trim()
+    const effectiveUrl = resolveTestUrl(baseUrl, testEndpoint)
+    const effectiveMethod = (testEndpoint
+      ? (config.testMethod as FetchConfig['method'])
+      : (config.method as FetchConfig['method'])) || 'GET'
+
     const fetchConfig: FetchConfig = {
       type: (config.type as FetchConfig['type']) || 'rest-api',
-      url: config.url as string,
-      method: (config.method as FetchConfig['method']) || 'GET',
+      url: effectiveUrl,
+      method: effectiveMethod,
       headers: config.headers as Record<string, string> | undefined,
       queryParams: config.queryParams as Record<string, string> | undefined,
       timeout: (config.timeout as number) || 30000,
+      insecureTLS: config.insecureTLS as boolean | undefined,
+    }
+
+    // Тело тестового запроса (для POST/PUT/PATCH). Парсим как JSON; при невалидном
+    // JSON возвращаем понятную ошибку, а не уходим в fetch с мусором.
+    const testBodyRaw = (config.testBody as string | undefined)?.trim()
+    if (testBodyRaw && ['POST', 'PUT', 'PATCH'].includes(effectiveMethod || '')) {
+      try {
+        fetchConfig.body = JSON.parse(testBodyRaw)
+      } catch {
+        return {
+          success: false,
+          message: 'Некорректный JSON в теле тестового запроса',
+          error: { code: 'INVALID_TEST_BODY', message: 'Тело тестового запроса должно быть валидным JSON' },
+        }
+      }
     }
 
     const result = await secureDataSourceService.fetchData(

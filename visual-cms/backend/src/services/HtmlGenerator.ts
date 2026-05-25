@@ -4,23 +4,7 @@
 import { styleGenerator } from './StyleGenerator'
 import { generateDataBindingRuntime, type PageDataConfig } from './DataBindingGenerator'
 import { generateCarouselRuntime } from './CarouselRuntime'
-
-interface CSSProperties {
-  [key: string]: string | undefined
-}
-
-interface StateStyles {
-  hover?: CSSProperties
-  active?: CSSProperties
-  focus?: CSSProperties
-  disabled?: CSSProperties
-}
-
-interface StateTransition {
-  duration: number
-  easing: string
-  properties: string[]
-}
+import type { BlockNode, CSSProperties } from '../types/blockNode'
 
 export interface AvailableLanguage {
   code: string
@@ -28,56 +12,6 @@ export interface AvailableLanguage {
   flag: string
   isDefault: boolean
   direction: string
-}
-
-interface Animation {
-  id: string
-  preset?: string
-  trigger: 'load' | 'scroll-into-view' | 'click' | 'loop'
-  duration: number
-  delay: number
-  easing: string
-  iterationCount: number | 'infinite'
-  keyframes?: { offset: number; properties: CSSProperties }[]
-}
-
-interface BlockNodeVariation {
-  inheritedOverrides?: {
-    [nodeId: string]: {
-      hidden?: boolean
-      styles?: Record<string, string>
-      attributes?: Record<string, string>
-      content?: string
-    }
-  }
-  specificChildren?: BlockNode[]
-}
-
-interface BlockNode {
-  id: string
-  elementType: string
-  tagName: string
-  content?: string
-  attributes?: Record<string, string>
-  styles: {
-    properties: Record<string, string>
-    states?: StateStyles
-    stateTransition?: StateTransition
-  }
-  children: BlockNode[]
-  metadata: {
-    name?: string
-    /** Raw HTML to inject into <head> (scripts, styles, etc.) — only on root node */
-    customHeadHtml?: string
-    /** Raw HTML to inject before </body> (scripts, etc.) — only on root node */
-    customBodyEndHtml?: string
-    /** Breakpoint definitions for responsive CSS — only on root node */
-    breakpoints?: Array<{ id: string; name: string; width: number; height?: number }>
-  }
-  animations?: Animation[]
-  variations?: {
-    [breakpointId: string]: BlockNodeVariation
-  }
 }
 
 interface PageMetadata {
@@ -100,15 +34,15 @@ export class HtmlGenerator {
    */
   generatePage(structure: BlockNode, metadata: PageMetadata, slug: string, dataConfig?: PageDataConfig, lang?: string, direction?: string, availableLanguages?: AvailableLanguage[], navigation?: ResolvedNavItem[]): string {
     // Собираем ID specificChildren для базового скрытия
-    const specificChildrenIds = styleGenerator.collectSpecificChildrenIds(structure as any)
-    
+    const specificChildrenIds = styleGenerator.collectSpecificChildrenIds(structure)
+
     const bodyContent = this.renderNode(structure)
-    
+
     // Генерируем CSS для hover, анимаций и т.д.
-    const { css: dynamicCSS, keyframes, scripts } = styleGenerator.generateNodeTreeStyles(structure as any)
+    const { css: dynamicCSS, keyframes, scripts } = styleGenerator.generateNodeTreeStyles(structure)
 
     // Генерируем responsive CSS (@media queries) из variations
-    const responsiveCSS = styleGenerator.generateResponsiveCSS(structure as any)
+    const responsiveCSS = styleGenerator.generateResponsiveCSS(structure)
 
     // Базовый CSS для скрытия specificChildren (они показываются только в своём @media)
     let specificHideCSS = ''
@@ -401,7 +335,7 @@ ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
   /**
    * Конвертирует объект стилей в inline style атрибут
    */
-  private renderStyles(properties: Record<string, string>): string {
+  private renderStyles(properties: CSSProperties): string {
     if (!properties || Object.keys(properties).length === 0) {
       return ''
     }
