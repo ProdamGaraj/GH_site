@@ -622,8 +622,8 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         {(() => {
           const ds = dataSources.find(d => d.id === selectedDataSourceId)
           if (!ds || ds.type !== 'feed') return null
-          const cfg = ds.config as any
-          const polling = cfg?.pollingEnabled && cfg?.pollingInterval > 0
+          const cfg = ds.config as { pollingEnabled?: boolean; pollingInterval?: number }
+          const polling = !!cfg?.pollingEnabled && (cfg?.pollingInterval ?? 0) > 0
           return (
             <div className="flex items-center gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded px-2 py-1.5">
               <span className="font-semibold">JSON Feed</span>

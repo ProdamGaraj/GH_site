@@ -92,7 +92,13 @@
       "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\('pg:',p.dependencies.pg\\);console.log\\('mysql2:',p.dependencies.mysql2||'absent'\\)\")",
       "Bash(node -e \"try{require.resolve\\('mysql2/promise'\\);console.log\\('mysql2 resolvable'\\)}catch\\(e\\){console.log\\('mysql2 NOT resolvable'\\)}; try{console.log\\('@types/pg:', require\\('./node_modules/@types/pg/package.json'\\).version\\)}catch\\(e\\){console.log\\('@types/pg MISSING'\\)}; const p=require\\('./package.json'\\); console.log\\('dep mysql2:', p.dependencies.mysql2, '| devDep @types/pg:', \\(p.devDependencies||{}\\)['@types/pg']\\)\")",
       "Bash(node -e \"try{require.resolve\\('pg'\\);console.log\\('pg ok'\\)}catch\\(e\\){console.log\\('pg NO'\\)}; const fs=require\\('fs'\\); const path='./node_modules/@types/pg/index.d.ts'; console.log\\('@types/pg file:', fs.existsSync\\(path\\)\\)\")",
-      "Bash(node -e \"const s=require\\('./package.json'\\).scripts; console.log\\(JSON.stringify\\(s,null,1\\)\\)\")"
+      "Bash(node -e \"const s=require\\('./package.json'\\).scripts; console.log\\(JSON.stringify\\(s,null,1\\)\\)\")",
+      "Bash(npx vite *)",
+      "Bash(npx eslint *)",
+      "Bash(docker --version)",
+      "Bash(docker exec *)",
+      "Bash(npx ts-node *)",
+      "Bash(git check-ignore *)"
     ],
     "additionalDirectories": [
       "\\tmp",
