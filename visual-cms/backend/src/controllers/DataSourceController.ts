@@ -4,6 +4,7 @@ import { DataSource, DataSourceType, DataSourceStatus } from '../models/DataSour
 import { CredentialsManager } from '../services/CredentialsManager'
 import { secureDataSourceService, FetchConfig, AuthConfig } from '../services/SecureDataSourceService'
 import { cachedDataSourceService } from '../services/CachedDataSourceService'
+import { databaseQueryService } from '../services/DatabaseQueryService'
 import { Like, In } from 'typeorm'
 import { asyncHandler, NotFoundError, ValidationError } from '../middleware'
 import { cacheService } from '../services/CacheService'
@@ -44,6 +45,9 @@ export class DataSourceController {
 
     const maskedItems = filteredItems.map(item => ({
       ...item,
+      config: item.type === 'database' && item.config
+        ? CredentialsManager.maskConfigSecrets(item.config)
+        : item.config,
       authConfig: item.authConfig
         ? CredentialsManager.maskAuthConfig(item.authConfig)
         : undefined
@@ -67,6 +71,9 @@ export class DataSourceController {
 
     const maskedDataSource = {
       ...dataSource,
+      config: dataSource.type === 'database' && dataSource.config
+        ? CredentialsManager.maskConfigSecrets(dataSource.config)
+        : dataSource.config,
       authConfig: dataSource.authConfig
         ? CredentialsManager.maskAuthConfig(dataSource.authConfig)
         : undefined
@@ -101,8 +108,13 @@ export class DataSourceController {
       ? CredentialsManager.encryptAuthConfig(authConfig)
       : undefined
 
+    // database: шифруем секреты подключения (password/connectionString) в config.
+    const storedConfig = type === 'database' && config
+      ? CredentialsManager.encryptConfigSecrets(config)
+      : config
+
     const dataSource = dataSourceRepository.create({
-      name, description, type, config,
+      name, description, type, config: storedConfig,
       authConfig: encryptedAuthConfig,
       groupId, tags,
       status: status || 'draft',
@@ -133,7 +145,12 @@ export class DataSourceController {
     if (name !== undefined) dataSource.name = name
     if (description !== undefined) dataSource.description = description
     if (type !== undefined) dataSource.type = type
-    if (config !== undefined) dataSource.config = config
+    if (config !== undefined) {
+      const effectiveType = (type ?? dataSource.type) as DataSourceType
+      dataSource.config = effectiveType === 'database'
+        ? this.mergeDatabaseConfigSecrets(dataSource.config, config)
+        : config
+    }
     if (groupId !== undefined) dataSource.groupId = groupId
     if (tags !== undefined) dataSource.tags = tags
     if (status !== undefined) dataSource.status = status
@@ -297,6 +314,32 @@ export class DataSourceController {
   /**
    * Проверяет, является ли authConfig замаскированным (с frontend)
    */
+  /**
+   * Слияние config для database при обновлении: новый непустой секрет (password/
+   * connectionString) шифруем; пустой/маскированный — сохраняем прежний
+   * зашифрованный (фронт не присылает реальное значение, если его не меняли).
+   */
+  private mergeDatabaseConfigSecrets(
+    existing: Record<string, unknown> | undefined,
+    incoming: Record<string, unknown>
+  ): Record<string, unknown> {
+    const SECRET_FIELDS = ['password', 'connectionString']
+    const result: Record<string, unknown> = { ...incoming }
+    for (const field of SECRET_FIELDS) {
+      const value = incoming[field]
+      const isNewPlaintext = typeof value === 'string' && value.length > 0
+      if (isNewPlaintext) {
+        result[field] = CredentialsManager.encrypt(value as string)
+      } else if (existing && existing[field] !== undefined) {
+        // пусто/маскировано — сохраняем прежнее зашифрованное значение
+        result[field] = existing[field]
+      } else {
+        delete result[field]
+      }
+    }
+    return result
+  }
+
   private isMaskedAuthConfig(authConfig: Record<string, unknown>): boolean {
     const sensitiveFields = ['token', 'key', 'password', 'clientSecret', 'accessToken', 'refreshToken', 'appSecret']
 
@@ -547,14 +590,33 @@ export class DataSourceController {
     sampleData?: unknown
     error?: { code: string; message: string; details?: string }
   }> {
-    // Stub - в будущем реализовать подключение к PostgreSQL/MySQL/SQLite
-    return {
-      success: false,
-      message: 'Database connections are not yet implemented',
-      error: {
-        code: 'NOT_IMPLEMENTED',
-        message: 'Database connection testing will be available in a future release'
+    const fetchConfig = {
+      type: 'database',
+      databaseType: config.databaseType,
+      connectionString: config.connectionString,
+      host: config.host,
+      port: config.port,
+      database: config.database,
+      username: config.username,
+      password: config.password,
+      query: config.query,
+      queryParams: config.queryParams,
+      timeout: (config.timeout as number) || 10000,
+      maxRows: 5, // для теста достаточно нескольких строк
+    } as unknown as FetchConfig
+
+    const result = await databaseQueryService.fetch(fetchConfig)
+    if (!result.success) {
+      return {
+        success: false,
+        message: result.error?.message || 'Database connection failed',
+        error: result.error,
       }
+    }
+    return {
+      success: true,
+      message: 'Connection successful',
+      sampleData: this.truncateSampleData(result.data),
     }
   }
 

@@ -39,7 +39,7 @@ import type {
   CredentialsStorage,
   CreateDataSourceRequest
 } from '@/shared/types/dataSource'
-import { DATA_SOURCE_TYPES, AUTH_TYPES } from '@/shared/types/dataSource'
+import { DATA_SOURCE_TYPES, AUTH_TYPES, getDataSourceMeta } from '@/shared/types/dataSource'
 
 /**
  * DataSourceWizard - Wizard для создания/редактирования Data Source
@@ -102,7 +102,24 @@ interface FormData {
   
   // Connection - Static
   staticData: string
-  
+
+  // Connection - Form Data (client-runtime)
+  formDataType: 'url-params' | 'local-storage' | 'session-storage' | 'cookies'
+  formDataKey: string
+  formDataDefault: string
+
+  // Connection - Database (read-only SQL)
+  databaseType: 'postgresql' | 'mysql'
+  dbConnectionMode: 'fields' | 'connectionString'
+  dbHost: string
+  dbPort: string
+  dbDatabase: string
+  dbUsername: string
+  dbPassword: string
+  dbConnectionString: string
+  dbQuery: string
+  dbQueryParams: string
+
   // Auth
   authType: AuthType
   authStorage: CredentialsStorage
@@ -149,6 +166,19 @@ const initialFormData: FormData = {
   query: '',
   variables: '{}',
   staticData: '{}',
+  formDataType: 'url-params',
+  formDataKey: '',
+  formDataDefault: '',
+  databaseType: 'postgresql',
+  dbConnectionMode: 'fields',
+  dbHost: '',
+  dbPort: '',
+  dbDatabase: '',
+  dbUsername: '',
+  dbPassword: '',
+  dbConnectionString: '',
+  dbQuery: '',
+  dbQueryParams: '{}',
   authType: 'none',
   authStorage: 'inline',
   bearerToken: '',
@@ -204,6 +234,17 @@ export const DataSourceWizard: React.FC = () => {
           } catch {
             return false
           }
+        }
+        if (formData.type === 'form-data') {
+          // url-params без ключа допустимо (вернётся объект всех параметров);
+          // для storage/cookies ключ обязателен.
+          return formData.formDataType === 'url-params' || formData.formDataKey.trim().length > 0
+        }
+        if (formData.type === 'database') {
+          if (formData.dbQuery.trim().length === 0) return false
+          return formData.dbConnectionMode === 'connectionString'
+            ? formData.dbConnectionString.trim().length > 0
+            : formData.dbHost.trim().length > 0 && formData.dbDatabase.trim().length > 0
         }
         return true
       case 'auth':
@@ -314,7 +355,48 @@ export const DataSourceWizard: React.FC = () => {
           data: JSON.parse(formData.staticData),
           dataFormat: 'json'
         }
-      
+
+      case 'form-data': {
+        // defaultValue: пробуем распарсить как JSON, иначе оставляем строкой
+        let defaultValue: unknown = formData.formDataDefault || undefined
+        if (typeof defaultValue === 'string' && defaultValue.trim()) {
+          try { defaultValue = JSON.parse(defaultValue) } catch { /* строка как есть */ }
+        }
+        return {
+          type: 'form-data',
+          dataType: formData.formDataType,
+          key: formData.formDataKey || undefined,
+          defaultValue,
+        }
+      }
+
+      case 'database': {
+        let queryParams: Record<string, unknown> | undefined
+        if (formData.dbQueryParams.trim()) {
+          try {
+            const parsed = JSON.parse(formData.dbQueryParams)
+            if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) queryParams = parsed
+          } catch { /* невалидный JSON — игнорируем */ }
+        }
+        const base = {
+          type: 'database',
+          databaseType: formData.databaseType,
+          query: formData.dbQuery,
+          ...(queryParams ? { queryParams } : {}),
+        }
+        if (formData.dbConnectionMode === 'connectionString') {
+          return { ...base, connectionString: formData.dbConnectionString }
+        }
+        return {
+          ...base,
+          host: formData.dbHost,
+          port: formData.dbPort ? parseInt(formData.dbPort, 10) : undefined,
+          database: formData.dbDatabase,
+          username: formData.dbUsername || undefined,
+          password: formData.dbPassword || undefined,
+        }
+      }
+
       default:
         return { type: formData.type }
     }
@@ -456,21 +538,40 @@ export const DataSourceWizard: React.FC = () => {
       <p className="text-gray-600 mb-6">Select the type of data source you want to create</p>
       
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {DATA_SOURCE_TYPES.map(type => (
-          <button
-            key={type.value}
-            onClick={() => updateForm({ type: type.value })}
-            className={`p-4 rounded-lg border-2 text-left transition-all hover:shadow-md ${
-              formData.type === type.value
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-200 hover:border-gray-300'
-            }`}
-          >
-            <div className="mb-3">{typeIcons[type.value]}</div>
-            <div className="font-medium text-gray-900">{type.label}</div>
-            <div className="text-sm text-gray-500 mt-1">{type.description}</div>
-          </button>
-        ))}
+        {DATA_SOURCE_TYPES.map(type => {
+          const meta = getDataSourceMeta(type.value)
+          const isTechdebt = meta.status === 'techdebt'
+          const isBeta = meta.status === 'beta'
+          return (
+            <button
+              key={type.value}
+              disabled={isTechdebt}
+              title={isTechdebt ? 'Тип в разработке — пока недоступен' : undefined}
+              onClick={() => { if (!isTechdebt) updateForm({ type: type.value }) }}
+              className={`relative p-4 rounded-lg border-2 text-left transition-all ${
+                isTechdebt
+                  ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                  : formData.type === type.value
+                  ? 'border-blue-500 bg-blue-50 hover:shadow-md'
+                  : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+              }`}
+            >
+              {isTechdebt && (
+                <span className="absolute top-2 right-2 px-1.5 py-0.5 text-[10px] font-semibold bg-gray-200 text-gray-600 rounded">
+                  в разработке
+                </span>
+              )}
+              {isBeta && (
+                <span className="absolute top-2 right-2 px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-700 rounded">
+                  beta
+                </span>
+              )}
+              <div className="mb-3">{typeIcons[type.value]}</div>
+              <div className="font-medium text-gray-900">{type.label}</div>
+              <div className="text-sm text-gray-500 mt-1">{type.description}</div>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -533,6 +634,10 @@ export const DataSourceWizard: React.FC = () => {
         return renderGraphQLConnection()
       case 'static':
         return renderStaticDataConnection()
+      case 'form-data':
+        return renderFormDataConnection()
+      case 'database':
+        return renderDatabaseConnection()
       default:
         return (
           <div className="text-center text-gray-500 py-8">
@@ -754,6 +859,222 @@ export const DataSourceWizard: React.FC = () => {
             return <p className="text-sm text-red-600 mt-1">✗ Invalid JSON: {e.message}</p>
           }
         })()}
+      </div>
+    </div>
+  )
+
+  // Form Data подключение (client-runtime: значение читается в браузере)
+  const FORM_DATA_SOURCES: { value: FormData['formDataType']; label: string; hint: string; keyPlaceholder: string }[] = [
+    { value: 'url-params', label: 'URL-параметры (query string)', hint: 'Из ?key=value текущей страницы. Без ключа — объект со всеми параметрами.', keyPlaceholder: 'category' },
+    { value: 'local-storage', label: 'localStorage', hint: 'Из localStorage браузера по ключу (значение JSON.parse, если возможно).', keyPlaceholder: 'user_prefs' },
+    { value: 'session-storage', label: 'sessionStorage', hint: 'Из sessionStorage браузера по ключу.', keyPlaceholder: 'cart_id' },
+    { value: 'cookies', label: 'Cookies', hint: 'Из cookie браузера по имени.', keyPlaceholder: 'session_token' },
+  ]
+
+  const renderFormDataConnection = () => {
+    const selected = FORM_DATA_SOURCES.find(s => s.value === formData.formDataType) || FORM_DATA_SOURCES[0]
+    const keyRequired = formData.formDataType !== 'url-params'
+    return (
+      <div className="max-w-2xl">
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Form Data</h2>
+        <p className="text-gray-600 mb-6">
+          Значение читается в браузере посетителя при загрузке страницы — бэкенд этот источник не запрашивает.
+          Подходит для фильтров из URL, сохранённых настроек и т.п.
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Источник значения</label>
+            <select
+              value={formData.formDataType}
+              onChange={(e) => updateForm({ formDataType: e.target.value as FormData['formDataType'] })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
+            >
+              {FORM_DATA_SOURCES.map(s => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">{selected.hint}</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Ключ {keyRequired && <span className="text-red-500">*</span>}
+              {!keyRequired && <span className="text-gray-400"> (необязательно)</span>}
+            </label>
+            <Input
+              value={formData.formDataKey}
+              onChange={(e) => updateForm({ formDataKey: e.target.value })}
+              placeholder={selected.keyPlaceholder}
+            />
+            {keyRequired && formData.formDataKey.trim().length === 0 && (
+              <p className="mt-1 text-xs text-red-600">Для {selected.label} ключ обязателен</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Значение по умолчанию <span className="text-gray-400">(необязательно)</span>
+            </label>
+            <Input
+              value={formData.formDataDefault}
+              onChange={(e) => updateForm({ formDataDefault: e.target.value })}
+              placeholder="напр. all или {}"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Используется, если ключ отсутствует. Валидный JSON парсится автоматически, иначе — строка.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Database подключение (read-only SQL: PostgreSQL / MySQL)
+  const renderDatabaseConnection = () => (
+    <div className="max-w-2xl">
+      <h2 className="text-xl font-semibold text-gray-900 mb-2">Database (read-only)</h2>
+      <p className="text-gray-600 mb-6">
+        Подключение к PostgreSQL или MySQL. Разрешены только <span className="font-medium">SELECT</span>-запросы:
+        они выполняются в read-only транзакции с таймаутом. Значения подставляются параметрами
+        (<code className="bg-gray-100 px-1 rounded">:имя</code>), не конкатенацией.
+      </p>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">СУБД</label>
+          <select
+            value={formData.databaseType}
+            onChange={(e) => updateForm({ databaseType: e.target.value as 'postgresql' | 'mysql' })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
+          >
+            <option value="postgresql">PostgreSQL</option>
+            <option value="mysql">MySQL</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Способ подключения</label>
+          <div className="flex gap-2">
+            {(['fields', 'connectionString'] as const).map(mode => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => updateForm({ dbConnectionMode: mode })}
+                className={`px-3 py-1.5 text-sm rounded-lg border ${
+                  formData.dbConnectionMode === mode
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                {mode === 'fields' ? 'Поля (host/db/...)' : 'Connection string'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {formData.dbConnectionMode === 'connectionString' ? (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Connection string <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Input
+                type={showPasswords.dbConn ? 'text' : 'password'}
+                value={formData.dbConnectionString}
+                onChange={(e) => updateForm({ dbConnectionString: e.target.value })}
+                placeholder={formData.databaseType === 'postgresql'
+                  ? 'postgresql://user:pass@host:5432/dbname'
+                  : 'mysql://user:pass@host:3306/dbname'}
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => togglePassword('dbConn')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showPasswords.dbConn ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">Шифруется AES-256 перед сохранением.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Host <span className="text-red-500">*</span></label>
+              <Input value={formData.dbHost} onChange={(e) => updateForm({ dbHost: e.target.value })} placeholder="db.example.com" />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
+              <Input value={formData.dbPort} onChange={(e) => updateForm({ dbPort: e.target.value })} placeholder={formData.databaseType === 'postgresql' ? '5432' : '3306'} />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Database <span className="text-red-500">*</span></label>
+              <Input value={formData.dbDatabase} onChange={(e) => updateForm({ dbDatabase: e.target.value })} placeholder="app_production" />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+              <Input value={formData.dbUsername} onChange={(e) => updateForm({ dbUsername: e.target.value })} placeholder="readonly_user" />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <div className="relative">
+                <Input
+                  type={showPasswords.dbPass ? 'text' : 'password'}
+                  value={formData.dbPassword}
+                  onChange={(e) => updateForm({ dbPassword: e.target.value })}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => togglePassword('dbPass')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPasswords.dbPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">Шифруется AES-256.</p>
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            SQL-запрос (только SELECT) <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            value={formData.dbQuery}
+            onChange={(e) => updateForm({ dbQuery: e.target.value })}
+            placeholder={'SELECT id, title, slug FROM projects\nWHERE status = :status\nORDER BY created_at DESC'}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+            rows={6}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Параметры вида <code className="bg-gray-100 px-1 rounded">:имя</code> подставляются из значений ниже.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Значения параметров (JSON)
+          </label>
+          <textarea
+            value={formData.dbQueryParams}
+            onChange={(e) => updateForm({ dbQueryParams: e.target.value })}
+            placeholder={'{\n  "status": "active"\n}'}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+            rows={3}
+          />
+          {(() => {
+            if (!formData.dbQueryParams.trim()) return null
+            try {
+              JSON.parse(formData.dbQueryParams)
+              return <p className="text-xs text-green-600 mt-1">✓ Valid JSON</p>
+            } catch (e: any) {
+              return <p className="text-xs text-red-600 mt-1">✗ Invalid JSON: {e.message}</p>
+            }
+          })()}
+        </div>
       </div>
     </div>
   )

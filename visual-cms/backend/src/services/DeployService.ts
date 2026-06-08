@@ -23,6 +23,7 @@ import { logger } from './Logger'
 import { mapComplexStats, type ProjectStats } from './ProjectStatsAggregator'
 import { CredentialsManager } from './CredentialsManager'
 import { secureDataSourceService, FetchConfig, AuthConfig } from './SecureDataSourceService'
+import { resolveLoadStrategy } from './dataSourceRuntime'
 import { applyCollectionTransforms } from '../utils/collectionTransforms'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
@@ -2151,6 +2152,19 @@ export class DeployService {
               variableName: dsConfig?.variableName || ds.name,
             }
           }
+          // form-data: значение резолвится в браузере из URL/localStorage/cookies, endpoint не нужен
+          if (ds.type === 'form-data') {
+            return {
+              alias: ds.name,
+              dataSourceId: ds.id,
+              loadStrategy: 'pageLoad' as const,
+              cacheEnabled: false,
+              type: 'form-data',
+              formDataType: dsConfig?.dataType,
+              formDataKey: dsConfig?.key,
+              formDataDefault: dsConfig?.defaultValue,
+            }
+          }
           // Конвертируем абсолютный URL бэкенда в относительный путь для nginx proxy
           let dsEndpoint = dsConfig?.url || `/api/data-sources/${ds.id}/data`
           try {
@@ -2159,11 +2173,18 @@ export class DeployService {
               dsEndpoint = parsed.pathname
             }
           } catch { /* уже относительный путь */ }
+          // Feed с включённым polling → клиентский авто-refresh ('interval');
+          // остальные → разовая загрузка ('pageLoad'). Логика в resolveLoadStrategy.
+          const loadCfg = resolveLoadStrategy(ds.type, dsConfig, {
+            pollingEnabled: (ds as any).pollingEnabled,
+            pollingInterval: (ds as any).pollingInterval,
+          })
           return {
             alias: ds.name, // Используем name как alias
             dataSourceId: ds.id,
             endpoint: dsEndpoint,
-            loadStrategy: 'pageLoad' as const, // По умолчанию загружаем при загрузке страницы
+            loadStrategy: loadCfg.loadStrategy,
+            ...(loadCfg.loadInterval ? { loadInterval: loadCfg.loadInterval } : {}),
             cacheEnabled: false,
             type: ds.type,
           }

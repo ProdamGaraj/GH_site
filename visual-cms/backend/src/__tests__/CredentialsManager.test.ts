@@ -10,6 +10,46 @@ beforeAll(() => {
   process.env.NODE_ENV = 'development'
 })
 
+describe('config secrets (database)', () => {
+  it('шифрует password и connectionString, оставляя прочие поля', () => {
+    const enc = CredentialsManager.encryptConfigSecrets({
+      host: 'db.example.com',
+      database: 'app',
+      password: 'super-secret',
+      connectionString: 'postgres://u:p@h/d',
+    })
+    expect(enc.host).toBe('db.example.com')
+    expect(enc.database).toBe('app')
+    expect((enc.password as any).storageType).toBe('inline')
+    expect((enc.connectionString as any).storageType).toBe('inline')
+  })
+
+  it('round-trip: encrypt → decrypt восстанавливает значения', async () => {
+    const enc = CredentialsManager.encryptConfigSecrets({ host: 'h', password: 'p@ss', connectionString: 'cs://x' })
+    const dec = await CredentialsManager.decryptConfigSecrets(enc)
+    expect(dec.password).toBe('p@ss')
+    expect(dec.connectionString).toBe('cs://x')
+  })
+
+  it('decrypt оставляет plaintext-строки как есть (legacy)', async () => {
+    const dec = await CredentialsManager.decryptConfigSecrets({ host: 'h', password: 'plain' })
+    expect(dec.password).toBe('plain')
+  })
+
+  it('идемпотентность: пустые/отсутствующие секреты не ломают encrypt', () => {
+    const enc = CredentialsManager.encryptConfigSecrets({ host: 'h' })
+    expect(enc.password).toBeUndefined()
+    expect(enc.host).toBe('h')
+  })
+
+  it('mask скрывает секреты, не раскрывая значения', () => {
+    const masked = CredentialsManager.maskConfigSecrets({ host: 'h', password: 'secret', connectionString: 'cs' })
+    expect(masked.host).toBe('h')
+    expect(masked.password).toEqual({ _masked: true, hasValue: true })
+    expect(masked.connectionString).toEqual({ _masked: true, hasValue: true })
+  })
+})
+
 describe('encrypt / decrypt', () => {
   it('round-trips a simple string', () => {
     const encrypted = CredentialsManager.encrypt('my-secret-token')

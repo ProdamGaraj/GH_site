@@ -20,6 +20,7 @@ import type { CreateDataBindingRequest, FieldMapping, InputMode, EndpointConfig 
 import type { Block } from '@/shared/types'
 import type { DataTransform, DynamicFilter } from '@/shared/types/transforms'
 import { collectionApi, type Collection } from '@/shared/api/collectionApi'
+import { isClientRuntimeType } from '@/shared/types/dataSource'
 
 interface SmartDataBindingTabProps {
   blockId: string
@@ -79,6 +80,12 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
              || (linkedBlockId ? blocks.find(b => b.id === linkedBlockId) : undefined)
   const templateFields = block?.detectedFields || []
   const isTemplate = block?.isTemplate
+
+  // Выбранный источник client-runtime (form-data) — endpoint/тест по сети не применимы.
+  const selectedDataSource = dataSources.find(ds => ds.id === selectedDataSourceId)
+  const isSelectedClientRuntime = !!selectedDataSource && isClientRuntimeType(selectedDataSource.type)
+  // database — server-fetch, но без HTTP-endpoint (SQL задаётся в источнике).
+  const isSelectedDatabase = selectedDataSource?.type === 'database'
 
   // Нормализуем mapping для editor-состояния:
   // sourceField = поле API, targetProperty = item.<templateField>
@@ -370,6 +377,28 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
 
   // Тест привязки с применением трансформаций
   const handleTest = async () => {
+    // form-data резолвится в браузере посетителя — на бэкенде тестировать нечего.
+    if (isSelectedClientRuntime) {
+      setTestResult({
+        success: true,
+        infoOnly: true,
+        title: 'Источник Form Data',
+        dataSource: { name: selectedDataSource?.name || 'Form Data', type: selectedDataSource?.type || 'form-data' },
+        message: 'Источник Form Data резолвится на стороне браузера при открытии страницы. Проверьте результат на опубликованной/предпросмотренной странице.',
+      })
+      return
+    }
+    // database без сохранённой привязки — SQL выполняется на сервере, нужен binding.
+    if (isSelectedDatabase && !existingBinding) {
+      setTestResult({
+        success: true,
+        infoOnly: true,
+        title: 'Источник Database',
+        dataSource: { name: selectedDataSource?.name || 'Database', type: 'database' },
+        message: 'Сохраните привязку — после этого SQL-запрос выполнится на сервере и здесь появятся данные.',
+      })
+      return
+    }
     console.log('🧪 handleTest вызвана')
     console.log('selectedDataSourceId:', selectedDataSourceId)
     console.log('existingBinding:', existingBinding?.id)
@@ -590,10 +619,46 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
             Нет доступных источников данных. <a href="/data-sources/new" className="text-blue-600 hover:underline">Создать новый</a>
           </p>
         )}
+        {(() => {
+          const ds = dataSources.find(d => d.id === selectedDataSourceId)
+          if (!ds || ds.type !== 'feed') return null
+          const cfg = ds.config as any
+          const polling = cfg?.pollingEnabled && cfg?.pollingInterval > 0
+          return (
+            <div className="flex items-center gap-2 text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded px-2 py-1.5">
+              <span className="font-semibold">JSON Feed</span>
+              {polling
+                ? <span>авто-обновление каждые {cfg.pollingInterval} c на опубликованной странице</span>
+                : <span>авто-обновление выключено (включается в настройках источника)</span>}
+            </div>
+          )
+        })()}
       </div>
 
+      {/* form-data (client-runtime): endpoint не нужен — значение резолвится в браузере */}
+      {selectedDataSourceId && isSelectedClientRuntime && (
+        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+          <p className="font-medium mb-0.5">Источник Form Data</p>
+          <p className="text-xs text-yellow-700">
+            Значение читается в браузере посетителя (URL-параметры / localStorage / cookies) — настройка
+            endpoint не требуется. Источник и ключ задаются при создании источника данных.
+          </p>
+        </div>
+      )}
+
+      {/* database: SQL задаётся в источнике, endpoint не нужен */}
+      {selectedDataSourceId && isSelectedDatabase && (
+        <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800">
+          <p className="font-medium mb-0.5">Источник Database</p>
+          <p className="text-xs text-purple-700">
+            SQL-запрос (read-only) и подключение настроены в самом источнике данных.
+            Здесь достаточно сопоставить поля результата с элементами блока.
+          </p>
+        </div>
+      )}
+
       {/* Endpoint настройка */}
-      {selectedDataSourceId && (
+      {selectedDataSourceId && !isSelectedClientRuntime && !isSelectedDatabase && (
         <div className="space-y-3">
           <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
             <Link size={14} />
@@ -1046,7 +1111,12 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
               <AlertCircle size={20} className="text-red-600 mt-0.5 flex-shrink-0" />
             )}
             <div className="flex-1 min-w-0">
-              {testResult.success ? (
+              {testResult.success && testResult.infoOnly ? (
+                <>
+                  <h4 className="font-medium text-green-900 mb-1">✅ {testResult.title || 'Проверка'}</h4>
+                  <p className="text-sm text-green-800">{testResult.message}</p>
+                </>
+              ) : testResult.success ? (
                 <>
                   <h4 className="font-medium text-green-900 mb-2">✅ Данные успешно загружены</h4>
                   {testResult.configUsed && (

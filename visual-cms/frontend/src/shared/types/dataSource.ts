@@ -510,6 +510,21 @@ export interface AuthTypeOption {
 }
 
 /**
+ * Где и как исполняется тип источника (единый источник правды для UI).
+ *  - 'server-fetch'   — данные получает бэкенд (HTTP/GraphQL/SQL).
+ *  - 'client-runtime' — данные резолвятся в браузере посетителя (form-data).
+ *  - 'inline'         — данные лежат прямо в config (static).
+ */
+export type DataSourceExecution = 'server-fetch' | 'client-runtime' | 'inline'
+
+/**
+ * Зрелость типа.
+ *  - 'stable' / 'beta' — можно создавать и использовать.
+ *  - 'techdebt'        — объявлен, но не доведён; в UI заблокирован.
+ */
+export type DataSourceStability = 'stable' | 'beta' | 'techdebt'
+
+/**
  * Информация о поддерживаемых возможностях типа источника
  */
 export interface DataSourceTypeCapabilities {
@@ -521,6 +536,11 @@ export interface DataSourceTypeCapabilities {
   supportsSorting: boolean
   supportsRealtime: boolean
   requiresAuth: boolean
+  // Где исполняется и доступность в меню (единый дескриптор)
+  execution: DataSourceExecution
+  availableInCollections: boolean
+  availableInBindings: boolean
+  status: DataSourceStability
 }
 
 /**
@@ -630,7 +650,11 @@ export const DATA_SOURCE_CAPABILITIES: Record<DataSourceType, DataSourceTypeCapa
     supportsFiltering: true,
     supportsSorting: true,
     supportsRealtime: false,
-    requiresAuth: false
+    requiresAuth: false,
+    execution: 'server-fetch',
+    availableInCollections: true,
+    availableInBindings: true,
+    status: 'stable'
   },
   'feed': {
     type: 'feed',
@@ -640,7 +664,11 @@ export const DATA_SOURCE_CAPABILITIES: Record<DataSourceType, DataSourceTypeCapa
     supportsFiltering: true,
     supportsSorting: true,
     supportsRealtime: true,
-    requiresAuth: false
+    requiresAuth: false,
+    execution: 'server-fetch',
+    availableInCollections: true,
+    availableInBindings: true,
+    status: 'stable'
   },
   'graphql': {
     type: 'graphql',
@@ -650,7 +678,11 @@ export const DATA_SOURCE_CAPABILITIES: Record<DataSourceType, DataSourceTypeCapa
     supportsFiltering: true,
     supportsSorting: true,
     supportsRealtime: false,
-    requiresAuth: false
+    requiresAuth: false,
+    execution: 'server-fetch',
+    availableInCollections: true,
+    availableInBindings: true,
+    status: 'stable'
   },
   'database': {
     type: 'database',
@@ -660,7 +692,11 @@ export const DATA_SOURCE_CAPABILITIES: Record<DataSourceType, DataSourceTypeCapa
     supportsFiltering: true,
     supportsSorting: true,
     supportsRealtime: false,
-    requiresAuth: true
+    requiresAuth: true,
+    execution: 'server-fetch',
+    availableInCollections: true,
+    availableInBindings: true,
+    status: 'beta'
   },
   'external': {
     type: 'external',
@@ -670,7 +706,11 @@ export const DATA_SOURCE_CAPABILITIES: Record<DataSourceType, DataSourceTypeCapa
     supportsFiltering: true,
     supportsSorting: true,
     supportsRealtime: false,
-    requiresAuth: false
+    requiresAuth: false,
+    execution: 'server-fetch',
+    availableInCollections: true,
+    availableInBindings: true,
+    status: 'techdebt'
   },
   'static': {
     type: 'static',
@@ -680,7 +720,11 @@ export const DATA_SOURCE_CAPABILITIES: Record<DataSourceType, DataSourceTypeCapa
     supportsFiltering: false,
     supportsSorting: false,
     supportsRealtime: false,
-    requiresAuth: false
+    requiresAuth: false,
+    execution: 'inline',
+    availableInCollections: true,
+    availableInBindings: true,
+    status: 'stable'
   },
   'computed': {
     type: 'computed',
@@ -690,7 +734,11 @@ export const DATA_SOURCE_CAPABILITIES: Record<DataSourceType, DataSourceTypeCapa
     supportsFiltering: false,
     supportsSorting: false,
     supportsRealtime: false,
-    requiresAuth: false
+    requiresAuth: false,
+    execution: 'inline',
+    availableInCollections: false,
+    availableInBindings: true,
+    status: 'techdebt'
   },
   'form-data': {
     type: 'form-data',
@@ -700,6 +748,38 @@ export const DATA_SOURCE_CAPABILITIES: Record<DataSourceType, DataSourceTypeCapa
     supportsFiltering: false,
     supportsSorting: false,
     supportsRealtime: true,
-    requiresAuth: false
+    requiresAuth: false,
+    execution: 'client-runtime',
+    availableInCollections: false,
+    availableInBindings: true,
+    status: 'beta'
   }
+}
+
+/**
+ * Метаданные типа источника (с fail-safe для неизвестных типов из API,
+ * например 'page-variable'/'mock', которых нет в визарде).
+ */
+export function getDataSourceMeta(type: DataSourceType | string): DataSourceTypeCapabilities {
+  return (
+    DATA_SOURCE_CAPABILITIES[type as DataSourceType] ?? {
+      type: type as DataSourceType,
+      supportsRead: true,
+      supportsWrite: false,
+      supportsPagination: false,
+      supportsFiltering: false,
+      supportsSorting: false,
+      supportsRealtime: false,
+      requiresAuth: false,
+      execution: 'server-fetch',
+      availableInCollections: true,
+      availableInBindings: true,
+      status: 'techdebt',
+    }
+  )
+}
+
+/** Тип резолвится в браузере (form-data) — не фетчится бэкендом. */
+export function isClientRuntimeType(type: DataSourceType | string): boolean {
+  return getDataSourceMeta(type).execution === 'client-runtime'
 }

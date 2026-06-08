@@ -1,6 +1,7 @@
 /**
  * Генератор runtime скрипта для Data Binding на опубликованных страницах
  */
+import { FORM_DATA_RESOLVER_JS } from './runtime/formDataResolver'
 
 export interface FieldOverrideConfig {
   joinField: string
@@ -82,6 +83,12 @@ export interface PageDataSourceConfig {
   type?: string
   /** Имя page-переменной (только для type='page-variable'). */
   variableName?: string
+  /** form-data: откуда брать значение в браузере (только type='form-data'). */
+  formDataType?: 'url-params' | 'local-storage' | 'session-storage' | 'cookies'
+  /** form-data: имя параметра/ключа. */
+  formDataKey?: string
+  /** form-data: значение по умолчанию, если ключ отсутствует. */
+  formDataDefault?: unknown
 }
 
 export interface PageDataConfig {
@@ -145,6 +152,14 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
   window.$data = function(alias) {
     return _dataStore[alias] || null;
   };
+
+  // Client-runtime источник (form-data / page-variable) не фетчится бэкендом.
+  function _isClientRuntimeSource(s) {
+    return s && (s.type === 'page-variable' || s.type === 'form-data');
+  }
+
+  // Резолвер form-data: значение из URL-параметров / localStorage / sessionStorage / cookies.
+  ${FORM_DATA_RESOLVER_JS}
   
   // Собрать значение из DOM элемента по его ID
   function getElementValue(elementId) {
@@ -1422,11 +1437,15 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
   document.addEventListener('DOMContentLoaded', function() {
     console.log('[DataBinding] Initializing with', _bindings.length, 'bindings');
 
-    // Pre-fill _dataStore for page-variable sources — эти данные не фетчатся, берутся из _variables.
+    // Pre-fill _dataStore для client-runtime источников — данные не фетчатся:
+    // page-variable берётся из _variables, form-data резолвится из браузера.
     _dataSources.forEach(function(source) {
       if (source.type === 'page-variable' && source.variableName) {
         _dataStore[source.alias] = _variables[source.variableName];
         console.log('[DataBinding] Initialized page-variable source:', source.alias, '<-', source.variableName);
+      } else if (source.type === 'form-data') {
+        _dataStore[source.alias] = resolveFormData(source);
+        console.log('[DataBinding] Resolved form-data source:', source.alias, '(' + source.formDataType + ':' + source.formDataKey + ') =', _dataStore[source.alias]);
       }
     });
 
@@ -1436,11 +1455,13 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     _bindings.forEach(function(binding) {
       if (binding.type === 'input' || binding.type === 'repeater') {
         const source = _dataSources.find(s => s.alias === binding.sourceAlias);
-        // page-variable источники не нуждаются в fetch — данные уже в _dataStore.
-        if (source && source.type === 'page-variable') {
+        // client-runtime источники (page-variable/form-data) не фетчатся — данные уже в _dataStore.
+        if (_isClientRuntimeSource(source)) {
           return;
         }
-        if (source && source.loadStrategy === 'pageLoad') {
+        // pageLoad и interval оба грузятся при загрузке страницы (feed-polling —
+        // это interval: начальная загрузка + периодический рефреш ниже).
+        if (source && (source.loadStrategy === 'pageLoad' || source.loadStrategy === 'interval')) {
           // Используем bindingId если есть, иначе только sourceAlias
           const key = binding.bindingId || binding.sourceAlias;
           if (!sourcesToLoad.has(key)) {
@@ -1456,10 +1477,10 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       fetchData(config.source, config.bindingId, config.binding).then(updateBindings);
     }
 
-    // Если есть page-variable bindings — применяем их немедленно (без fetch)
-    var hasPageVarSources = _dataSources.some(function(s) { return s.type === 'page-variable'; });
-    if (hasPageVarSources) {
-      console.log('[DataBinding] Applying page-variable bindings immediately');
+    // Если есть client-runtime источники (page-variable/form-data) — применяем сразу (без fetch)
+    var hasClientRuntimeSources = _dataSources.some(_isClientRuntimeSource);
+    if (hasClientRuntimeSources) {
+      console.log('[DataBinding] Applying client-runtime bindings immediately');
       updateBindings();
     }
     

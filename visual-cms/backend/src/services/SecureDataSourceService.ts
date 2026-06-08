@@ -3,6 +3,8 @@ import { Agent } from 'undici'
 import { CredentialsManager } from './CredentialsManager'
 import { safeFetch } from '../utils/ssrfGuard'
 import { logger } from './Logger'
+import { isClientRuntimeType } from './dataSourceRuntime'
+import { databaseQueryService } from './DatabaseQueryService'
 
 /**
  * Ленивый undici-Agent с отключённой проверкой TLS-сертификата.
@@ -29,7 +31,7 @@ function getInsecureAgent(): Agent {
 
 // Типы
 export interface FetchConfig {
-  type: 'rest-api' | 'feed' | 'graphql' | 'static' | 'page-variable'
+  type: 'rest-api' | 'feed' | 'graphql' | 'static' | 'page-variable' | 'database' | 'form-data'
   url?: string
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
   headers?: Record<string, string>
@@ -48,6 +50,15 @@ export interface FetchConfig {
   variables?: Record<string, unknown>
   // Static
   data?: unknown
+  // Database (SQL через DatabaseQueryService)
+  databaseType?: 'postgresql' | 'mysql'
+  connectionString?: string
+  host?: string
+  port?: number
+  database?: string
+  username?: string
+  password?: string
+  maxRows?: number
 }
 
 export interface AuthConfig {
@@ -115,6 +126,21 @@ class SecureDataSourceService {
   ): Promise<FetchResult> {
     const retry = { ...this.defaultRetryConfig, ...retryConfig }
 
+    // Client-runtime типы (form-data, page-variable) не фетчатся бэкендом —
+    // данные резолвятся в браузере посетителя из URL/localStorage/cookies или
+    // page-переменных. Возвращаем пустой маркер, чтобы preview/редактор не падали.
+    if (isClientRuntimeType(config.type)) {
+      return {
+        success: true,
+        data: [],
+        metadata: {
+          statusCode: 200,
+          headers: { 'x-data-source-type': config.type },
+          responseTime: 0
+        }
+      }
+    }
+
     // Static data - возвращаем сразу
     if (config.type === 'static') {
       return {
@@ -179,19 +205,11 @@ class SecureDataSourceService {
           return await this.fetchRestApi(config, authConfig, startTime)
         case 'graphql':
           return await this.fetchGraphQL(config, authConfig, startTime)
-        case 'page-variable':
-          // Данные page-variable не фетчатся с бэкенда — они инжектятся в HTML из page.variables
-          // и читаются runtime'ом DataBindingGenerator. Возвращаем пустой результат, чтобы
-          // редактор/preview не падал с 502.
-          return {
-            success: true,
-            data: [],
-            metadata: {
-              statusCode: 200,
-              headers: { 'x-data-source-type': 'page-variable' },
-              responseTime: Date.now() - startTime,
-            },
-          }
+        case 'database':
+          // SQL-запрос (read-only) к PostgreSQL/MySQL через DatabaseQueryService.
+          return await databaseQueryService.fetch(config)
+        // Примечание: client-runtime типы (form-data, page-variable) перехватываются
+        // в fetchData() и сюда не доходят.
         default:
           throw new Error(`Unsupported data source type: ${config.type}`)
       }

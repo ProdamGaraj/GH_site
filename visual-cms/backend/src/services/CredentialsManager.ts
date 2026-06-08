@@ -231,6 +231,55 @@ export class CredentialsManager {
   }
 
   /**
+   * Поля config, которые являются секретами (для database-источников).
+   */
+  private static readonly CONFIG_SECRET_FIELDS = ['password', 'connectionString']
+
+  /**
+   * Шифрует секреты внутри config (password, connectionString) для database-источников.
+   * Идемпотентна: уже зашифрованные значения (объект с storageType) пропускаются.
+   */
+  static encryptConfigSecrets(config: Record<string, unknown>): Record<string, unknown> {
+    const result = { ...config }
+    for (const field of this.CONFIG_SECRET_FIELDS) {
+      const value = result[field]
+      if (typeof value === 'string' && value.length > 0) {
+        result[field] = this.encrypt(value)
+      }
+    }
+    return result
+  }
+
+  /**
+   * Расшифровывает секреты внутри config (password, connectionString).
+   * Незашифрованные строки (legacy/plaintext) возвращаются как есть.
+   */
+  static async decryptConfigSecrets(config: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const result = { ...config }
+    for (const field of this.CONFIG_SECRET_FIELDS) {
+      const value = result[field]
+      if (value && typeof value === 'object' && 'storageType' in (value as object)) {
+        result[field] = await this.getValue(value as StoredCredentials)
+      }
+    }
+    return result
+  }
+
+  /**
+   * Маскирует секреты config для отдачи на фронт (не раскрываем значения).
+   */
+  static maskConfigSecrets(config: Record<string, unknown>): Record<string, unknown> {
+    const result = { ...config }
+    for (const field of this.CONFIG_SECRET_FIELDS) {
+      const value = result[field]
+      if (value !== undefined && value !== null && value !== '') {
+        result[field] = { _masked: true, hasValue: true }
+      }
+    }
+    return result
+  }
+
+  /**
    * Расшифровывает все sensitive поля в объекте authConfig
    */
   static async decryptAuthConfig(authConfig: Record<string, unknown>): Promise<Record<string, unknown>> {

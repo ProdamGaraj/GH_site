@@ -86,7 +86,13 @@
       "Bash(cd /d/CodeRepository/GH_site/visual-cms/public-site; echo \"=== data binding runtime present? ===\"; grep -c \"Visual CMS Data Binding Runtime\\\\|_dataSources\\\\|fetch-with-transforms\\\\|_bindings\" index.html; echo \"=== _dataSources content \\(if any\\) ===\"; grep -o '_dataSources = \\\\[[^;]*' index.html | head -c 300; echo; echo \"=== any data-element-id with gh-1776249962431-22 \\(hero block\\) ===\"; grep -c \"gh-1776249962431-22\\\\|gh-premium-1771840286937-100\" index.html; echo \"=== file mtime vs now ===\"; date; stat -c '%y' index.html 2>/dev/null || ls -la index.html)",
       "Read(//d/CodeRepository/GH_site/visual-cms/public-site/**)",
       "Bash(curl -s -m 60 -X POST \"http://localhost:3000/api/deploy/page/5f597235-130e-4f57-a0ac-1eb1f77af920\")",
-      "Bash(curl -s -m 90 -X POST \"http://localhost:3000/api/deploy/5f597235-130e-4f57-a0ac-1eb1f77af920\")"
+      "Bash(curl -s -m 90 -X POST \"http://localhost:3000/api/deploy/5f597235-130e-4f57-a0ac-1eb1f77af920\")",
+      "Bash(node -e \"try{console.log\\('@types/pg:', require\\('./node_modules/@types/pg/package.json'\\).version\\)}catch\\(e\\){console.log\\('@types/pg: MISSING'\\)}; try{console.log\\('pg:', require\\('./node_modules/pg/package.json'\\).version\\)}catch\\(e\\){console.log\\('pg: MISSING'\\)}; try{console.log\\('mysql2:', require\\('./node_modules/mysql2/package.json'\\).version\\)}catch\\(e\\){console.log\\('mysql2: MISSING'\\)}\")",
+      "Bash(node -e \"try{require.resolve\\('pg'\\);console.log\\('pg resolvable'\\)}catch\\(e\\){console.log\\('pg NOT resolvable'\\)}; try{require.resolve\\('mysql2/promise'\\);console.log\\('mysql2 resolvable'\\)}catch\\(e\\){console.log\\('mysql2 NOT resolvable'\\)}\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\('pg:',p.dependencies.pg\\);console.log\\('mysql2:',p.dependencies.mysql2||'absent'\\)\")",
+      "Bash(node -e \"try{require.resolve\\('mysql2/promise'\\);console.log\\('mysql2 resolvable'\\)}catch\\(e\\){console.log\\('mysql2 NOT resolvable'\\)}; try{console.log\\('@types/pg:', require\\('./node_modules/@types/pg/package.json'\\).version\\)}catch\\(e\\){console.log\\('@types/pg MISSING'\\)}; const p=require\\('./package.json'\\); console.log\\('dep mysql2:', p.dependencies.mysql2, '| devDep @types/pg:', \\(p.devDependencies||{}\\)['@types/pg']\\)\")",
+      "Bash(node -e \"try{require.resolve\\('pg'\\);console.log\\('pg ok'\\)}catch\\(e\\){console.log\\('pg NO'\\)}; const fs=require\\('fs'\\); const path='./node_modules/@types/pg/index.d.ts'; console.log\\('@types/pg file:', fs.existsSync\\(path\\)\\)\")",
+      "Bash(node -e \"const s=require\\('./package.json'\\).scripts; console.log\\(JSON.stringify\\(s,null,1\\)\\)\")"
     ],
     "additionalDirectories": [
       "\\tmp",

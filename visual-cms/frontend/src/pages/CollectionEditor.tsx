@@ -32,6 +32,7 @@ import { TransformsEditor } from '@/features/dataBindings/components/TransformsE
 import { EndpointConfigEditor, DEFAULT_ENDPOINT_CONFIG } from '@/features/dataBindings/components/EndpointConfigEditor'
 import type { DataTransform } from '@/shared/types/transforms'
 import type { EndpointConfig } from '@/shared/types/dataBinding'
+import { getDataSourceMeta } from '@/shared/types/dataSource'
 
 // Inline data source fetch (пока нет отдельного thunk для всех DS по сайту)
 import { api } from '@/shared/api/index'
@@ -232,11 +233,15 @@ export const CollectionEditor: React.FC = () => {
         api.get<PageOption[]>(`/pages?siteId=${siteId}`),
       ])
       const rawDs: any[] = Array.isArray(dsResponse) ? dsResponse : dsResponse.items || []
-      setDataSources(rawDs.map(ds => ({
-        id: ds.id,
-        name: ds.name,
-        url: ds.config?.url || ds.config?.baseUrl || '',
-      })))
+      setDataSources(rawDs
+        // Коллекции генерируются на сервере заранее — client-runtime источники
+        // (form-data) и прочие, не предназначенные для коллекций, скрываем.
+        .filter(ds => getDataSourceMeta(ds.type).availableInCollections)
+        .map(ds => ({
+          id: ds.id,
+          name: ds.name,
+          url: ds.config?.url || ds.config?.baseUrl || '',
+        })))
       setPages(Array.isArray(pg) ? pg : [])
     } catch (err) {
       console.error('Failed to load site data:', err)
