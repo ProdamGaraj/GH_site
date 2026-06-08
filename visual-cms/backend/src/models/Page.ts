@@ -83,6 +83,28 @@ export class Page {
     }>
   }
 
+  // --- Дополнительные источники данных страницы ---
+  // На деплое фетчатся (с extract-цепочкой) и вшиваются в целевую привязку (targetBindingId)
+  // как page-variable — привязка читает данные без браузерного fetch.
+  @Column('jsonb', { nullable: true })
+  additionalSources?: Array<{
+    // ID привязки (DataBinding) на странице, в которую вшиваются данные.
+    targetBindingId: string
+    // DataSource, из которого выполняется запрос (URL, авторизация).
+    dataSourceId: string
+    arrayPath?: string
+    endpointConfig?: {
+      path?: string
+      method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+      headers?: Record<string, string>
+      queryParams?: Record<string, string>
+      body?: string
+      bodyFormat?: 'json' | 'form-data' | 'form-urlencoded' | 'raw'
+    }
+    // dot-notation пути для извлечения значений из ответа → {{extract.name}} в следующих источниках.
+    extract?: Record<string, string>
+  }>
+
   @CreateDateColumn()
   createdAt!: Date
 

@@ -108,7 +108,10 @@ class DataTransformService {
     for (const mapping of mappings) {
       try {
         const value = this.resolveMapping(mapping, fullContext)
-        this.setNestedValue(result, mapping.targetProperty, value)
+        // null/undefined — treated as absent; don't write the field to result
+        if (value !== null && value !== undefined) {
+          this.setNestedValue(result, mapping.targetProperty, value)
+        }
       } catch (error) {
         logger.error(`Error applying mapping for ${mapping.targetProperty}`, error instanceof Error ? error : undefined)
         // Используем fallback при ошибке

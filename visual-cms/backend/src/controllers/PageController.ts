@@ -212,7 +212,7 @@ export class PageController {
 
     const page = await pageRepository.findOne({
       where: { id },
-      select: ['id', 'dataSources', 'variables']
+      select: ['id', 'dataSources', 'variables', 'additionalSources']
     })
 
     if (!page) {
@@ -225,13 +225,14 @@ export class PageController {
         variables: {},
         cachePolicy: 'cache-first'
       },
-      variables: page.variables || { variables: [] }
+      variables: page.variables || { variables: [] },
+      additionalSources: page.additionalSources || []
     })
   })
 
   updateDataSettings = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params
-    const { dataSources, variables } = req.body
+    const { dataSources, variables, additionalSources } = req.body
 
     const page = await pageRepository.findOne({ where: { id } })
 
@@ -245,13 +246,33 @@ export class PageController {
     if (variables !== undefined) {
       page.variables = variables
     }
+    if (additionalSources !== undefined) {
+      page.additionalSources = additionalSources
+    }
 
     await pageRepository.save(page)
 
     res.json({
       success: true,
       dataSources: page.dataSources,
-      variables: page.variables
+      variables: page.variables,
+      additionalSources: page.additionalSources
     })
+  })
+
+  // GET /api/pages/:id/input-bindings — input-привязки страницы для пикера доп.источников
+  getInputBindings = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const { deployService } = await import('../services/DeployService')
+    const bindings = await deployService.getPageInputBindings(id)
+    res.json(bindings)
+  })
+
+  // GET /api/pages/:id/request-preview — превью цепочки доп.запросов страницы
+  previewRequest = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const { deployService } = await import('../services/DeployService')
+    const preview = await deployService.previewPageRequest(id)
+    res.json(preview)
   })
 }

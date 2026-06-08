@@ -5,6 +5,21 @@
 
 import { api } from './index'
 import type { DataTransform } from '@/shared/types/transforms'
+import type { EndpointConfig } from '@/shared/types/dataBinding'
+
+export type { EndpointConfig }
+
+export interface AdditionalSource {
+  /** Ключ, под которым данные прикрепляются к элементу: {{item.<itemKey>.*}}. */
+  itemKey: string
+  /** DataSource, из которого выполняется запрос. */
+  dataSourceId: string
+  arrayPath?: string
+  endpointConfig?: EndpointConfig
+  extract?: Record<string, string>
+  /** JOIN: прикрепить только элемент ответа, где source[sourceField] === item[itemField]. */
+  join?: { itemField: string; sourceField: string }
+}
 
 export interface Collection {
   id: string
@@ -26,6 +41,9 @@ export interface Collection {
   indexPageId: string | null
   statsDataSourceId: string | null
   transforms?: DataTransform[]
+  endpointConfig?: EndpointConfig
+  mainExtract?: Record<string, string>
+  additionalSources?: AdditionalSource[]
   cachedApiData: unknown[] | null
   lastCachedAt: string | null
   overrides: CollectionOverride[]
@@ -61,6 +79,9 @@ export interface CreateCollectionDto {
   pollInterval?: number
   statsDataSourceId?: string | null
   transforms?: DataTransform[]
+  endpointConfig?: EndpointConfig
+  mainExtract?: Record<string, string>
+  additionalSources?: AdditionalSource[]
 }
 
 export interface UpdateCollectionDto {
@@ -80,6 +101,9 @@ export interface UpdateCollectionDto {
   pollInterval?: number
   statsDataSourceId?: string | null
   transforms?: DataTransform[]
+  endpointConfig?: EndpointConfig
+  mainExtract?: Record<string, string>
+  additionalSources?: AdditionalSource[]
 }
 
 export interface CreateOverrideDto {
@@ -100,6 +124,28 @@ export interface CollectionItemsResult {
   fromCache?: boolean
 }
 
+export interface CollectionRequestPreviewStep {
+  kind: 'main' | 'source'
+  label: string
+  request: {
+    method: string
+    url: string
+    body?: unknown
+    queryParams?: Record<string, string>
+  }
+  response?: unknown
+  extract?: Record<string, unknown>
+  error?: string
+}
+
+export interface CollectionRequestPreview {
+  itemCount: number
+  sampleItem: unknown
+  steps: CollectionRequestPreviewStep[]
+  finalDataStore: Record<string, unknown>
+  warnings: string[]
+}
+
 export const collectionApi = {
   getAll: (siteId?: string) => {
     const qs = siteId ? `?siteId=${siteId}` : ''
@@ -116,6 +162,10 @@ export const collectionApi = {
 
   /** Получить элементы коллекции (из API источника данных, с кешем) */
   getItems: (id: string) => api.get<CollectionItemsResult>(`/collections/${id}/items`),
+
+  /** Превью цепочки запросов (основной + доп.источники на образце-элементе) */
+  previewRequest: (id: string) =>
+    api.get<CollectionRequestPreview>(`/collections/${id}/preview-request`),
 
   /** Деплой конкретной коллекции */
   deploy: (id: string) => api.post<{ success: boolean; deployedPages: string[]; errors: string[] }>(

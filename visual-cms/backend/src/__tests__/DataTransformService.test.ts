@@ -81,6 +81,28 @@ describe('DataTransformService', () => {
       expect(result.userAge).toBe(30)
       expect(result.isActive).toBe(true)
     })
+
+    it('null source value is not written to result', () => {
+      const item = { firstName: 'Jane', nullField: null, age: 25 }
+      const mappings: FieldMapping[] = [
+        createMapping('nullField', 'target'),
+        createMapping('firstName', 'name'),
+        createMapping('age', 'userAge')
+      ]
+      const result = dataTransformService.applyMapping(item, mappings)
+      expect('target' in result).toBe(false)
+      expect(result.name).toBe('Jane')
+      expect(result.userAge).toBe(25)
+    })
+
+    it('null source value uses fallbackValue when configured', () => {
+      const item = { nullField: null }
+      const mappings: FieldMapping[] = [
+        createMapping('nullField', 'target', { fallbackValue: 'fallback' })
+      ]
+      const result = dataTransformService.applyMapping(item, mappings)
+      expect(result.target).toBe('fallback')
+    })
   })
 
   describe('transforms', () => {

@@ -10,6 +10,20 @@ import { BlockNodeWithViewport } from '../../utils/variationUtils'
 import { getRepeatTemplate } from '../../utils/repeatTemplateHelper'
 import { getStaticBefore, getStaticAfter, prepareHybridStaticNode } from '../../utils/hybridStaticHelper'
 import { deepCloneNode } from '../../utils/carouselHelpers'
+import { resolveStyleTarget, wrapBackgroundValue } from '../../utils/repeaterMappingHelper'
+import { collectionApi, type Collection } from '@/shared/api/collectionApi'
+
+// Идентично slugify на бэкенде (CollectionController / DataBindingGenerator)
+const slugify = (str: string): string => {
+  const cyrillic: Record<string, string> = {
+    а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'yo', ж: 'zh',
+    з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o',
+    п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'kh', ц: 'ts',
+    ч: 'ch', ш: 'sh', щ: 'shch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
+  }
+  return str.toLowerCase().split('').map(ch => cyrillic[ch] ?? ch).join('')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 100)
+}
 
 interface RepeaterRendererProps {
   node: BlockNodeWithViewport
@@ -91,6 +105,7 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
   const blocks = useAppSelector(selectBlocks)
   const [repeaterItems, setRepeaterItems] = useState<BlockNodeWithViewport[]>([])
   const [activeSlideIndex, setActiveSlideIndex] = useState(0)
+  const [linkedCollection, setLinkedCollection] = useState<Collection | null>(null)
   const containerRef = useRef<HTMLElement | null>(null)
   const isCarouselTrack = node.attributes?.['data-carousel-track'] === 'true'
   const computedContainerStyles = useComputedStyles(node)
@@ -252,6 +267,16 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     if (containerRef.current) containerRef.current.scrollLeft = 0
   }, [isCarouselTrack, node.id, totalSlides])
 
+  // Загружаем коллекцию, связанную с DataSource этой привязки
+  useEffect(() => {
+    const dataSourceId = binding?.dataSourceId
+    if (!dataSourceId) { setLinkedCollection(null); return }
+    collectionApi.getAll().then(collections => {
+      const found = collections.find(c => c.dataSourceId === dataSourceId && c.isActive) || null
+      setLinkedCollection(found)
+    }).catch(() => setLinkedCollection(null))
+  }, [binding?.dataSourceId])
+
   const clampSlideIndex = (nextIndex: number) => {
     if (totalSlides <= 0) return 0
     return Math.min(Math.max(nextIndex, 0), totalSlides - 1)
@@ -353,13 +378,24 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     // Клонируем template для каждого элемента данных
     const clonedItems = items.map((item, index) => {
       console.log(`Cloning item ${index}:`, item)
-      // Создаем копию template с уникальным id и применяем данные
-      const clonedNode = cloneBlockNode(template as BlockNodeWithViewport, index, item, fieldMappings)
+      const clonedNode = cloneBlockNode(template as BlockNodeWithViewport, index, item, fieldMappings, true)
       return clonedNode
     })
 
-    console.log('Created repeater items:', clonedItems.length, clonedItems)
-    setRepeaterItems(clonedItems)
+    // Post-pass: если привязка связана с коллекцией — проставляем href на <a> каждой карточки
+    const finalItems = linkedCollection
+      ? clonedItems.map((clonedNode, index) => {
+          const item = items[index]
+          const rawSlug = item[linkedCollection.slugField]
+          const rawTitle = linkedCollection.titleField ? item[linkedCollection.titleField] : ''
+          const slug = slugify(String(rawSlug || rawTitle || '')) || String(item.id || item._id || index)
+          const href = `${linkedCollection.basePath.replace(/\/+$/, '')}/${slug}.html`
+          return applyCollectionHref(clonedNode, href)
+        })
+      : clonedItems
+
+    console.log('Created repeater items:', finalItems.length, finalItems)
+    setRepeaterItems(finalItems)
 
     // ДИАГНОСТИКА: проверяем, не приходят ли из data source дубликаты image URLs.
     // Это частая причина "залипшего фона" на разных слайдах — корень обычно в JOIN/transform на бэкенде.
@@ -383,25 +419,42 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     // node.children намеренно не в deps — массив ссылочно нестабилен и заставлял useEffect перезапускаться на каждый рендер.
     // Нужный нам derived state — resolvedTrackTemplate, который сам мемоизирован и реагирует на изменение детей.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, node.id, templateBlock, resolvedTrackTemplate, fieldMappings, arrayPath, binding?.id])
+  }, [data, node.id, templateBlock, resolvedTrackTemplate, fieldMappings, arrayPath, binding?.id, linkedCollection])
+
+  // Рекурсивно находит первый <a> в дереве и проставляет href
+  const applyCollectionHref = (blockNode: BlockNodeWithViewport, href: string): BlockNodeWithViewport => {
+    if (blockNode.tagName === 'a') {
+      return { ...blockNode, attributes: { ...(blockNode.attributes || {}), href } }
+    }
+    if (!blockNode.children?.length) return blockNode
+    let patched = false
+    const children = blockNode.children.map(child => {
+      if (patched) return child
+      const result = applyCollectionHref(child as BlockNodeWithViewport, href)
+      if (result !== child) patched = true
+      return result
+    })
+    return patched ? { ...blockNode, children } : blockNode
+  }
 
   // Функция клонирования блока с применением field mappings
   const cloneBlockNode = (
-    template: BlockNodeWithViewport, 
-    index: number, 
+    template: BlockNodeWithViewport,
+    index: number,
     dataItem: any,
-    mappings: Array<{ sourceField: string; targetProperty: string; elementId?: string; id?: string }>
+    mappings: Array<{ sourceField: string; targetProperty: string; elementId?: string; id?: string }>,
+    isRoot = false
   ): BlockNodeWithViewport => {
     const newId = `${template.id}-clone-${index}`
-    
-    // Рекурсивно клонируем детей с применением маппингов
-    const clonedChildren = template.children.map((child, childIndex) => 
-      cloneBlockNode(child as BlockNodeWithViewport, index * 1000 + childIndex, dataItem, mappings)
+
+    // Рекурсивно клонируем детей с применением маппингов (дети — не корень шаблона)
+    const clonedChildren = template.children.map((child, childIndex) =>
+      cloneBlockNode(child as BlockNodeWithViewport, index * 1000 + childIndex, dataItem, mappings, false)
     )
 
     // Применяем field mappings из data binding
     const updatedContent = applyFieldMappings(template, dataItem, mappings)
-    const updatedStyles = applyStyleMappings(template, dataItem, mappings)
+    const updatedStyles = applyStyleMappings(template, dataItem, mappings, isRoot)
     
     // Применяем атрибутные маппинги (src для img, href для a)
     const updatedAttributes = applyAttributeMappings(template, dataItem, mappings)
@@ -438,7 +491,9 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     if (!obj || !path) return undefined
     // Разбиваем путь: "houses[0].files[0].file_url" → ["houses", "0", "files", "0", "file_url"]
     const keys = path.replace(/\[(\d+)\]/g, '.$1').split('.')
-    return keys.reduce((acc, key) => acc?.[key], obj)
+    const result = keys.reduce((acc, key) => acc?.[key], obj)
+    // null terminal value treated as absent — consistent with backend getValueByPath
+    return result === null ? undefined : result
   }
 
   // Нормализуем targetProperty: "item.project.-image" → "project-image"
@@ -620,9 +675,51 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     return block.content
   }
 
-  // Применяем field mappings к стилям блока (например, backgroundImage)
+  // Применяем field mappings к стилям блока (например, backgroundImage).
+  //
+  // Variant B: целевой элемент находится по ИДЕНТИЧНОСТИ (data-bind / data-field /
+  // metadata.name + синонимы / self / [data-bind=…]) — так же, как public-site
+  // runtime (DataBindingGenerator). Раньше Canvas цеплялся за факт наличия
+  // непустого backgroundImage, поэтому очистка фона у элемента шаблона рвала
+  // привязку и фото пропадали у всех слайдов. Runner-aligned резолвинг работает
+  // даже когда у элемента сейчас фон пустой.
+  //
+  // Легаси-эвристики (legacyApplyStyleMappings) оставлены как fallback, чтобы не
+  // регрессировать другие репитеры; runner-aligned значения накладываются поверх.
   const applyStyleMappings = (
-    block: BlockNodeWithViewport, 
+    block: BlockNodeWithViewport,
+    dataItem: any,
+    mappings: Array<{ sourceField: string; targetProperty: string; elementId?: string; id?: string }>,
+    isRoot = false
+  ): typeof block.styles => {
+    const legacy = legacyApplyStyleMappings(block, dataItem, mappings)
+
+    let overrides: Record<string, unknown> | null = null
+    for (const mapping of mappings) {
+      const target = resolveStyleTarget(block, mapping, isRoot)
+      if (!target) continue
+      const overrideVal = resolveOverride(mapping.targetProperty, dataItem)
+      const raw = overrideVal !== undefined ? overrideVal : getMappingValue(dataItem, mapping)
+      if (raw === undefined) continue
+      if (!overrides) overrides = {}
+      overrides[target.cssKey] = target.isBackground ? wrapBackgroundValue(String(raw)) : String(raw)
+    }
+
+    if (!overrides) return legacy
+
+    const base = legacy || ({ properties: {} as CSSProperties } as typeof block.styles)
+    return {
+      ...base,
+      properties: {
+        ...((base?.properties as Record<string, unknown>) || {}),
+        ...overrides,
+      } as CSSProperties,
+    }
+  }
+
+  // Старая (эвристическая) логика стилевых маппингов. Оставлена как fallback.
+  const legacyApplyStyleMappings = (
+    block: BlockNodeWithViewport,
     dataItem: any,
     mappings: Array<{ sourceField: string; targetProperty: string; elementId?: string; id?: string }>
   ): typeof block.styles => {
@@ -630,18 +727,18 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
 
     // Проверяем data-field для изображений
     const dataField = block.attributes?.['data-field']
-    
+
     if (dataField) {
-      const mapping = mappings.find(m => 
-        m.targetProperty.endsWith(dataField) || 
+      const mapping = mappings.find(m =>
+        m.targetProperty.endsWith(dataField) ||
         m.targetProperty === `item.${dataField}`
       )
-      
+
       if (mapping && dataField.includes('image')) {
         const value = getMappingValue(dataItem, mapping)
         if (value !== undefined) {
           const updatedProperties = { ...block.styles.properties } as Record<string, unknown>
-          updatedProperties.backgroundImage = `url(${value})`
+          updatedProperties.backgroundImage = wrapBackgroundValue(String(value))
           return {
             ...block.styles,
             properties: updatedProperties as CSSProperties
@@ -652,16 +749,16 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
 
     // Новый подход: если блок имеет backgroundImage, применяем маппинг для image
     if (block.styles.properties?.backgroundImage) {
-      const imageMapping = mappings.find(m => 
+      const imageMapping = mappings.find(m =>
         m.targetProperty.toLowerCase().includes('image') ||
         m.sourceField.toLowerCase().includes('image')
       )
-      
+
       if (imageMapping) {
         const value = getMappingValue(dataItem, imageMapping)
         if (value !== undefined) {
           const updatedProperties = { ...block.styles.properties } as Record<string, unknown>
-          updatedProperties.backgroundImage = `url(${value})`
+          updatedProperties.backgroundImage = wrapBackgroundValue(String(value))
           console.log(`[applyStyleMappings] Applied image mapping:`, {
             sourceField: imageMapping.sourceField,
             value,
@@ -676,7 +773,7 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     }
 
     // Fallback: старая логика
-    const styleMappings = mappings.filter(m => 
+    const styleMappings = mappings.filter(m =>
       (m.elementId === block.id || !m.elementId) &&
       (m.targetProperty.startsWith('style.') || m.targetProperty === 'src' || m.targetProperty === 'href')
     )
@@ -690,7 +787,7 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
       if (value !== undefined) {
         if (mapping.targetProperty === 'src' || mapping.targetProperty === 'style.backgroundImage') {
           // Для изображений применяем как backgroundImage
-          updatedProperties.backgroundImage = `url(${value})`
+          updatedProperties.backgroundImage = wrapBackgroundValue(String(value))
         } else if (mapping.targetProperty.startsWith('style.')) {
           const styleKey = mapping.targetProperty.replace('style.', '')
           updatedProperties[styleKey] = value

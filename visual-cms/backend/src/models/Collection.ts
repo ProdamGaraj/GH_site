@@ -113,6 +113,54 @@ export class Collection {
   @Column({ type: 'timestamptz', nullable: true })
   lastCachedAt?: Date
 
+  // --- Конфигурация запроса (endpoint override для fetchCollectionItems) ---
+  // Позволяет задать конкретный path/method/headers/queryParams поверх базового DataSource.
+  @Column('jsonb', { nullable: true })
+  endpointConfig?: {
+    path?: string
+    method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+    headers?: Record<string, string>
+    queryParams?: Record<string, string>
+    body?: string
+    bodyFormat?: 'json' | 'form-data' | 'form-urlencoded' | 'raw'
+  }
+
+  // --- Извлечение значений из основного ответа коллекции ---
+  // { name: "dot.notation.path" } — применяется к полному ответу fetchCollectionApiData.
+  // Результаты доступны в additionalSources как {{extract.name}}.
+  @Column('jsonb', { nullable: true })
+  mainExtract?: Record<string, string>
+
+  // --- Дополнительные источники данных на страницу элемента ---
+  // Каждый источник фетчится на deploy-время за каждый item, плейсхолдеры {{item.field}}
+  // подставляются из текущего элемента. Результат прикрепляется к item под itemKey и
+  // становится доступен в шаблоне как {{item.<itemKey>.field}} (как встроенный __stats).
+  @Column('jsonb', { nullable: true })
+  additionalSources?: Array<{
+    // Ключ, под которым данные прикрепляются к элементу: {{item.<itemKey>.*}}.
+    itemKey: string
+    // DataSource, из которого выполняется запрос (URL, авторизация).
+    dataSourceId: string
+    arrayPath?: string
+    endpointConfig?: {
+      path?: string
+      method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+      headers?: Record<string, string>
+      queryParams?: Record<string, string>
+      body?: string
+      bodyFormat?: 'json' | 'form-data' | 'form-urlencoded' | 'raw'
+    }
+    // Именованные dot-notation пути для извлечения значений из ответа.
+    // Доступны в последующих источниках через {{extract.name}}.
+    extract?: Record<string, string>
+    // JOIN: если ответ — массив, прикрепить только элемент, где
+    // source[sourceField] === item[itemField] (вместо всего массива).
+    join?: {
+      itemField: string
+      sourceField: string
+    }
+  }>
+
   // --- Stats источник (Macro v2: estateSell/list по houseIds) ---
   // Опциональный второй data source. Если задан — DeployService подтягивает квартиры
   // и агрегирует диапазоны площадей/цен/комнатности в item.__stats.

@@ -252,7 +252,10 @@ class SecureDataSourceService {
         fetchOptions.body = formData.toString()
         ;(headers as Record<string, string>)['Content-Type'] = 'application/x-www-form-urlencoded'
       } else {
-        fetchOptions.body = JSON.stringify(config.body)
+        // String bodies (raw format) are sent as-is; objects are JSON-serialised.
+        fetchOptions.body = typeof config.body === 'string'
+          ? config.body
+          : JSON.stringify(config.body)
         if (!(headers as Record<string, string>)['Content-Type']) {
           ;(headers as Record<string, string>)['Content-Type'] = 'application/json'
         }

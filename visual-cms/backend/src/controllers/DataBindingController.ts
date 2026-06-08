@@ -8,6 +8,7 @@ import { cachedDataSourceService } from '../services/CachedDataSourceService'
 import { dataFilterService } from '../services/DataFilterService'
 import { dataTransformService } from '../services/DataTransformService'
 import { CredentialsManager } from '../services/CredentialsManager'
+import { subRequestEnricher } from '../services/SubRequestEnricher'
 import { asyncHandler, NotFoundError, ValidationError, AppError } from '../middleware'
 
 const dataBindingRepository = AppDataSource.getRepository(DataBinding)
@@ -475,13 +476,28 @@ class DataBindingController {
       const path = (inputConfig.endpoint.path || '').replace(/^\//, '')
       const fullUrl = path ? `${baseUrl}/${path}` : baseUrl
 
+      // Parse body string from endpoint config.
+      // 'raw' → keep as-is; 'json'/'form-data' → parse to object so
+      // SecureDataSourceService can re-serialize correctly.
+      const bodyStr = (inputConfig.endpoint.body as string | undefined)?.trim()
+      let endpointBody: unknown = undefined
+      if (bodyStr) {
+        if (inputConfig.endpoint.bodyFormat === 'raw') {
+          endpointBody = bodyStr
+        } else {
+          try { endpointBody = JSON.parse(bodyStr) } catch { endpointBody = bodyStr }
+        }
+      }
+
       finalFetchConfig = {
         type: binding.dataSource.type,
         ...dsConfig,
         url: fullUrl,
         method: inputConfig.endpoint.method || dsConfig.method || 'GET',
         headers: { ...dsConfig.headers, ...inputConfig.endpoint.headers },
-        queryParams: { ...dsConfig.queryParams, ...inputConfig.endpoint.queryParams }
+        queryParams: { ...dsConfig.queryParams, ...inputConfig.endpoint.queryParams },
+        body: endpointBody,
+        bodyFormat: inputConfig.endpoint.bodyFormat,
       } as unknown as FetchConfig
     }
 
@@ -533,9 +549,22 @@ class DataBindingController {
       throw new AppError(transformResult.error || 'Transform failed', 500, 'TRANSFORM_FAILED')
     }
 
+    // Обогащение элементов под-запросами (цепочка, как в коллекциях): mainExtract → доп.источники.
+    let outData = transformResult.data
+    const subSources = inputConfig.additionalSources
+    if (subSources?.length && outData) {
+      if (Array.isArray(outData)) {
+        const { items } = await subRequestEnricher.enrichItems(outData, subSources, inputConfig.mainExtract)
+        outData = items
+      } else if (typeof outData === 'object') {
+        const { items } = await subRequestEnricher.enrichItems([outData], subSources, inputConfig.mainExtract)
+        outData = items[0]
+      }
+    }
+
     res.json({
       success: true,
-      data: transformResult.data,
+      data: outData,
       meta: transformResult.meta
     })
   })

@@ -22,6 +22,7 @@ import { MacroV2Client } from './MacroV2Client'
 import { logger } from './Logger'
 import { mapComplexStats, type ProjectStats } from './ProjectStatsAggregator'
 import { CredentialsManager } from './CredentialsManager'
+import { secureDataSourceService, FetchConfig, AuthConfig } from './SecureDataSourceService'
 import { applyCollectionTransforms } from '../utils/collectionTransforms'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
@@ -34,6 +35,73 @@ export interface DeployResult {
   deployedPages: string[]
   errors: string[]
   publicUrl?: string
+}
+
+// Определение дополнительного источника коллекции (как в Collection.additionalSources).
+type AdditionalSourceDef = NonNullable<Collection['additionalSources']>[number]
+// Определение дополнительного источника страницы (как в Page.additionalSources).
+type PageAdditionalSourceDef = NonNullable<Page['additionalSources']>[number]
+
+// Структурный тип «как выполнить запрос» — общий для источников коллекций и страниц.
+// Содержит только поля, нужные для построения fetchConfig (без itemKey/targetBindingId).
+interface AdditionalSourceRequestDef {
+  dataSourceId: string
+  arrayPath?: string
+  endpointConfig?: {
+    path?: string
+    method?: string
+    headers?: Record<string, string>
+    queryParams?: Record<string, string>
+    body?: string
+    bodyFormat?: string
+  }
+}
+
+// --- Превью цепочки запросов коллекции ---
+export interface CollectionRequestPreviewStep {
+  kind: 'main' | 'source'
+  label: string
+  request: {
+    method: string
+    url: string
+    body?: unknown
+    queryParams?: Record<string, string>
+  }
+  /** Для основного запроса — сырой ответ; для источника — данные после arrayPath. */
+  response?: unknown
+  /** Извлечённые значения (mainExtract / source.extract). */
+  extract?: Record<string, unknown>
+  error?: string
+}
+
+export interface CollectionRequestPreview {
+  itemCount: number
+  /** Образец элемента (первый), на котором резолвятся {{item.field}}. */
+  sampleItem: unknown
+  steps: CollectionRequestPreviewStep[]
+  /** Итоговый объект данных страницы образца: alias → данные источника (основной + доп.). */
+  finalDataStore: Record<string, unknown>
+  /** Предупреждения о конфигурации (например, коллизия alias). */
+  warnings: string[]
+}
+
+// --- Превью цепочки запросов страницы ---
+export interface PageRequestPreview {
+  steps: CollectionRequestPreviewStep[]
+  /** Данные, вшиваемые в целевые привязки: подпись привязки → данные. */
+  finalDataStore: Record<string, unknown>
+  warnings: string[]
+}
+
+// Input-привязка страницы для UI-пикера.
+export interface PageInputBinding {
+  id: string
+  blockId: string
+  dataSourceId: string
+  dataSourceName?: string
+  method?: string
+  path?: string
+  mode?: string
 }
 
 export class DeployService {
@@ -91,6 +159,12 @@ export class DeployService {
           relations: ['dataSource'],
         })
         this.injectCollectionLinks(dataConfig, siteCollections)
+      }
+
+      // Доп.источники страницы: фетчим на деплое и вшиваем в целевые привязки как page-variable.
+      if (dataConfig && page.additionalSources?.length) {
+        const addErrors = await this.applyPageAdditionalSources(dataConfig, page.additionalSources)
+        errors.push(...addErrors)
       }
 
       // Проверяем наличие переводов для переключателя языков на основной странице
@@ -419,8 +493,17 @@ export class DeployService {
 
       // 2. Загрузить элементы из API
       let items: any[] = []
+      // Начальный контекст extract из основного ответа (mainExtract)
+      const mainExtractedValues: Record<string, unknown> = {}
       try {
-        items = await this.fetchCollectionApiData(collection)
+        const { items: fetchedItems, raw } = await this.fetchCollectionApiData(collection)
+        items = fetchedItems
+        // Применяем mainExtract — значения доступны в additionalSources как {{extract.name}}
+        if (collection.mainExtract) {
+          for (const [name, dotPath] of Object.entries(collection.mainExtract)) {
+            mainExtractedValues[name] = this.resolveExtractPath(raw, dotPath)
+          }
+        }
         // Обновляем кеш
         collection.cachedApiData = items
         collection.lastCachedAt = new Date()
@@ -553,6 +636,30 @@ export class DeployService {
             pageDataConfig = await this.preparePageDataConfig(customPage.id, customStructure)
             pageMetadata = customPage.metadata || { title: itemTitle, description: '', keywords: [] }
           } else {
+            // Дополнительные источники: фетчим и прикрепляем к item ДО подстановки,
+            // чтобы данные были доступны как {{item.<itemKey>.field}} в шаблоне.
+            // Источники выполняются по порядку; extract-значения предыдущих доступны
+            // в последующих через {{extract.name}}.
+            if (collection.additionalSources?.length) {
+              const extractedValues: Record<string, unknown> = { ...mainExtractedValues }
+              for (const source of collection.additionalSources) {
+                try {
+                  const data = await this.fetchAdditionalSourceForItem(source, item, extractedValues)
+                  // extract считаем по полному ответу (для цепочки {{extract.name}})
+                  if (source.extract) {
+                    for (const [name, dotPath] of Object.entries(source.extract)) {
+                      extractedValues[name] = this.resolveExtractPath(data, dotPath)
+                    }
+                  }
+                  // JOIN: при необходимости берём только совпадающий по ключу элемент
+                  if (source.itemKey) (item as any)[source.itemKey] = this.applyAdditionalSourceJoin(data, source, item)
+                } catch (srcErr: any) {
+                  errors.push(`Additional source "${source.itemKey}" failed for "${itemTitle}": ${srcErr.message}`)
+                  if (source.itemKey) (item as any)[source.itemKey] = null
+                }
+              }
+            }
+
             // Авто-шаблон с контекстом элемента — подставляем данные в структуру
             pageStructure = this.substituteItemData(templateStructure, item)
             pageDataConfig = this.injectCollectionContext(templateDataConfig, collection, item, itemId)
@@ -601,31 +708,203 @@ export class DeployService {
   }
 
   /**
-   * Загружает данные из data source коллекции
+   * Строит FetchConfig + AuthConfig для основного запроса коллекции (с учётом endpointConfig).
+   * Вынесено отдельно, чтобы переиспользовать в fetchCollectionApiData и previewCollectionRequest.
    */
-  private async fetchCollectionApiData(collection: Collection): Promise<any[]> {
+  private async buildCollectionFetchConfig(
+    collection: Collection
+  ): Promise<{ fetchConfig: FetchConfig; authConfig?: AuthConfig }> {
     const ds = collection.dataSource
     if (!ds) throw new Error('Data source not loaded')
 
     const config = ds.config as any
-    const url = config.url
-    if (!url) throw new Error('Data source has no URL')
+    if (!config?.url) throw new Error('Data source has no URL')
 
-    const response = await fetch(url, {
-      headers: config.headers || {},
-    })
-    if (!response.ok) {
-      throw new Error(`API returned ${response.status}: ${response.statusText}`)
+    let authConfig: AuthConfig | undefined
+    if (ds.authConfig) {
+      authConfig = (await CredentialsManager.decryptAuthConfig(
+        ds.authConfig as Record<string, unknown>
+      )) as unknown as AuthConfig
     }
 
-    const json = await response.json()
-    const items = this.getNestedValue(json, collection.arrayPath)
+    const fetchConfig: FetchConfig = { type: ds.type as FetchConfig['type'], ...config }
+
+    const ec = collection.endpointConfig
+    if (ec) {
+      if (ec.path) {
+        const base = (config.url as string).replace(/\/+$/, '')
+        const suffix = ec.path.startsWith('/') ? ec.path : `/${ec.path}`
+        fetchConfig.url = `${base}${suffix}`
+      }
+      if (ec.method) fetchConfig.method = ec.method as FetchConfig['method']
+      if (ec.headers) fetchConfig.headers = { ...(fetchConfig.headers || {}), ...ec.headers }
+      if (ec.queryParams) fetchConfig.queryParams = { ...(fetchConfig.queryParams || {}), ...ec.queryParams }
+      if (ec.body !== undefined) {
+        fetchConfig.body = ec.body
+        if (ec.bodyFormat) fetchConfig.bodyFormat = ec.bodyFormat as FetchConfig['bodyFormat']
+      }
+    }
+
+    return { fetchConfig, authConfig }
+  }
+
+  /**
+   * Загружает данные из data source коллекции с учётом endpointConfig.
+   * Возвращает items (по arrayPath) и raw-ответ (для mainExtract).
+   */
+  private async fetchCollectionApiData(
+    collection: Collection
+  ): Promise<{ items: any[]; raw: unknown }> {
+    const { fetchConfig, authConfig } = await this.buildCollectionFetchConfig(collection)
+
+    const result = await secureDataSourceService.fetchData(fetchConfig, authConfig)
+    if (!result.success) {
+      throw new Error(result.error?.message || 'Failed to fetch collection data')
+    }
+
+    const raw = result.data
+    const items = this.getNestedValue(raw, collection.arrayPath)
 
     if (!Array.isArray(items)) {
       throw new Error(`Expected array at "${collection.arrayPath}", got ${typeof items}`)
     }
 
-    return items
+    return { items, raw }
+  }
+
+  /**
+   * Превью полной цепочки запросов коллекции на ОДНОМ образце-элементе (первом).
+   * Выполняет реальные запросы: основной → mainExtract → каждый additionalSource
+   * (с накоплением extract). Возвращает по-шаговую раскладку и итоговый объект данных.
+   *
+   * Используется панелью «Просмотр запроса» в редакторе коллекции — не пишет файлов,
+   * не трогает кеш и не деплоит.
+   */
+  async previewCollectionRequest(collectionId: string): Promise<CollectionRequestPreview> {
+    const collection = await this.collectionRepository.findOne({
+      where: { id: collectionId },
+      relations: ['dataSource'],
+    })
+    if (!collection) throw new Error('Collection not found')
+
+    const steps: CollectionRequestPreviewStep[] = []
+    const finalDataStore: Record<string, unknown> = {}
+    const warnings: string[] = []
+
+    // --- Шаг 1: основной запрос ---
+    const { fetchConfig: mainConfig, authConfig: mainAuth } =
+      await this.buildCollectionFetchConfig(collection)
+    const mainStep: CollectionRequestPreviewStep = {
+      kind: 'main',
+      label: 'Основной запрос',
+      request: {
+        method: mainConfig.method || 'GET',
+        url: mainConfig.url || '',
+        body: mainConfig.body,
+        queryParams: mainConfig.queryParams,
+      },
+    }
+
+    let items: any[] = []
+    const extractedValues: Record<string, unknown> = {}
+
+    const mainResult = await secureDataSourceService.fetchData(mainConfig, mainAuth)
+    if (!mainResult.success) {
+      mainStep.error = mainResult.error?.message || 'Failed to fetch collection data'
+      steps.push(mainStep)
+      return { itemCount: 0, sampleItem: null, steps, finalDataStore, warnings }
+    }
+
+    const raw = mainResult.data
+    mainStep.response = raw
+
+    const rawItems = this.getNestedValue(raw, collection.arrayPath)
+    items = Array.isArray(rawItems) ? applyCollectionTransforms(rawItems, collection.transforms) : []
+
+    // mainExtract
+    if (collection.mainExtract) {
+      const extract: Record<string, unknown> = {}
+      for (const [name, dotPath] of Object.entries(collection.mainExtract)) {
+        const val = this.resolveExtractPath(raw, dotPath)
+        extract[name] = val
+        extractedValues[name] = val
+      }
+      mainStep.extract = extract
+    }
+    steps.push(mainStep)
+
+    const sampleItem = items[0] ?? null
+    // Клон образца, к которому прикрепляются данные доп.источников — так же, как на деплое.
+    // Этот объект и есть `item`, доступный в шаблоне через {{item.*}}.
+    const enrichedItem: any = sampleItem ? JSON.parse(JSON.stringify(sampleItem)) : {}
+
+    // --- Шаг 2..N: дополнительные источники (на образце-элементе) ---
+    if (collection.additionalSources?.length) {
+      for (const source of collection.additionalSources) {
+        const stepLabel = source.itemKey ? `item.${source.itemKey}` : '(ключ не задан)'
+        const step: CollectionRequestPreviewStep = {
+          kind: 'source',
+          label: stepLabel,
+          request: { method: 'GET', url: '' },
+        }
+
+        if (!source.itemKey) {
+          warnings.push('Один из доп.источников: не задан ключ (itemKey).')
+        }
+
+        try {
+          const { fetchConfig, authConfig } = await this.buildAdditionalSourceFetchConfig(
+            source,
+            enrichedItem,
+            extractedValues
+          )
+          step.request = {
+            method: fetchConfig.method || 'GET',
+            url: fetchConfig.url || '',
+            body: fetchConfig.body,
+            queryParams: fetchConfig.queryParams,
+          }
+
+          const result = await secureDataSourceService.fetchData(fetchConfig, authConfig)
+          if (!result.success) {
+            step.error = result.error?.message || 'Failed to fetch additional source data'
+            steps.push(step)
+            continue
+          }
+
+          const data = source.arrayPath
+            ? this.getNestedValue(result.data, source.arrayPath)
+            : result.data
+          step.response = data
+
+          // source.extract → накапливаем в общий контекст (по полному ответу)
+          if (source.extract) {
+            const extract: Record<string, unknown> = {}
+            for (const [name, dotPath] of Object.entries(source.extract)) {
+              const val = this.resolveExtractPath(data, dotPath)
+              extract[name] = val
+              extractedValues[name] = val
+            }
+            step.extract = extract
+          }
+
+          // Прикрепляем к образцу под ключом (с JOIN, если задан) — как увидит шаблон.
+          if (source.itemKey) enrichedItem[source.itemKey] = this.applyAdditionalSourceJoin(data, source, enrichedItem)
+        } catch (err: any) {
+          step.error = err.message
+        }
+        steps.push(step)
+      }
+    }
+
+    return {
+      itemCount: items.length,
+      sampleItem,
+      steps,
+      // Итоговый объект = образец-элемент с прикреплёнными доп.данными (это и есть `item` в шаблоне).
+      finalDataStore: Object.keys(enrichedItem).length ? enrichedItem : finalDataStore,
+      warnings,
+    }
   }
 
   /**
@@ -770,6 +1049,143 @@ export class DeployService {
     }
 
     return config
+  }
+
+  /**
+   * Строит FetchConfig + AuthConfig для дополнительного источника, резолвя плейсхолдеры
+   * {{item.field}} и {{extract.name}} в path/body/queryParams. Вынесено для переиспользования
+   * в fetchAdditionalSourceForItem и previewCollectionRequest.
+   */
+  private async buildAdditionalSourceFetchConfig(
+    source: AdditionalSourceRequestDef,
+    item: any,
+    extractedValues: Record<string, unknown>
+  ): Promise<{ fetchConfig: FetchConfig; authConfig?: AuthConfig }> {
+    const ds = await this.dataSourceRepository.findOne({ where: { id: source.dataSourceId } })
+    if (!ds) throw new Error(`DataSource not found: ${source.dataSourceId}`)
+
+    const config = ds.config as any
+    if (!config?.url) throw new Error(`DataSource has no URL: ${source.dataSourceId}`)
+
+    let authConfig: AuthConfig | undefined
+    if (ds.authConfig) {
+      authConfig = (await CredentialsManager.decryptAuthConfig(
+        ds.authConfig as Record<string, unknown>
+      )) as unknown as AuthConfig
+    }
+
+    const fetchConfig: FetchConfig = {
+      type: ds.type as FetchConfig['type'],
+      ...config,
+    }
+
+    const ec = source.endpointConfig
+    if (ec) {
+      if (ec.path) {
+        const resolvedPath = this.resolvePlaceholders(ec.path, item, extractedValues)
+        const base = (config.url as string).replace(/\/+$/, '')
+        const suffix = resolvedPath.startsWith('/') ? resolvedPath : `/${resolvedPath}`
+        fetchConfig.url = `${base}${suffix}`
+      }
+      if (ec.method) fetchConfig.method = ec.method as FetchConfig['method']
+      if (ec.headers) fetchConfig.headers = { ...(fetchConfig.headers || {}), ...ec.headers }
+      if (ec.queryParams) {
+        const resolved: Record<string, string> = {}
+        for (const [k, v] of Object.entries(ec.queryParams as Record<string, string>)) {
+          resolved[k] = this.resolvePlaceholders(v, item, extractedValues)
+        }
+        fetchConfig.queryParams = { ...(fetchConfig.queryParams || {}), ...resolved }
+      }
+      if (ec.body !== undefined) {
+        fetchConfig.body = this.resolvePlaceholders(ec.body, item, extractedValues)
+        if (ec.bodyFormat) fetchConfig.bodyFormat = ec.bodyFormat as FetchConfig['bodyFormat']
+      }
+    }
+
+    return { fetchConfig, authConfig }
+  }
+
+  /**
+   * Фетчит данные одного дополнительного источника для конкретного элемента коллекции.
+   * Плейсхолдеры {{item.field}} в path/body/queryParams подставляются значениями из item.
+   */
+  private async fetchAdditionalSourceForItem(
+    source: AdditionalSourceRequestDef,
+    item: any,
+    extractedValues: Record<string, unknown> = {}
+  ): Promise<unknown> {
+    const { fetchConfig, authConfig } = await this.buildAdditionalSourceFetchConfig(
+      source,
+      item,
+      extractedValues
+    )
+
+    const result = await secureDataSourceService.fetchData(fetchConfig, authConfig)
+    if (!result.success) {
+      throw new Error(result.error?.message || 'Failed to fetch additional source data')
+    }
+
+    const data = result.data
+    if (source.arrayPath) {
+      return this.getNestedValue(data, source.arrayPath)
+    }
+    return data
+  }
+
+  /**
+   * Подставляет плейсхолдеры в строке:
+   *   {{item.field}}    — значение из текущего элемента коллекции
+   *   {{extract.name}}  — значение, извлечённое из предыдущего additionalSource / mainExtract
+   *
+   * Если значение — массив или объект, подставляется как JSON (без кавычек вокруг плейсхолдера).
+   * Это позволяет писать в body: {"ids": {{extract.complexIds}}}
+   */
+  private resolvePlaceholders(
+    template: string,
+    item: any,
+    extractedValues: Record<string, unknown> = {}
+  ): string {
+    return template.replace(/\{\{(item|extract)\.([^}]+)\}\}/g, (_, prefix, path) => {
+      const val = prefix === 'extract'
+        ? extractedValues[path]
+        : this.getNestedValue(item, path)
+      if (val === undefined || val === null) return ''
+      if (typeof val === 'object') return JSON.stringify(val)
+      return String(val)
+    })
+  }
+
+  /**
+   * Извлекает значение по пути с поддержкой синтаксиса array mapping:
+   *   "data[].id"   → собирает поле id из каждого элемента массива data → [id1, id2, ...]
+   *   "[].id"       → использует корень как массив
+   *   "data"        → обычная dot-notation (делегирует getNestedValue)
+   */
+  private resolveExtractPath(obj: any, path: string): unknown {
+    const arrayMapMatch = path.match(/^([^[]*)\[\]\.?(.*)$/)
+    if (arrayMapMatch) {
+      const [, arrayPath, fieldPath] = arrayMapMatch
+      const arr = arrayPath ? this.getNestedValue(obj, arrayPath) : obj
+      if (!Array.isArray(arr)) return undefined
+      return fieldPath
+        ? arr.map(item => this.getNestedValue(item, fieldPath))
+        : arr
+    }
+    return this.getNestedValue(obj, path)
+  }
+
+  /**
+   * JOIN ответа доп.источника с текущим элементом коллекции.
+   * Если задан source.join и data — массив, возвращает единственный элемент, где
+   * data[i][sourceField] === item[itemField] (строковое сравнение), иначе null.
+   * Без join или для не-массива возвращает data без изменений.
+   */
+  private applyAdditionalSourceJoin(data: unknown, source: AdditionalSourceDef, item: any): unknown {
+    if (!source.join || !Array.isArray(data)) return data
+    const { itemField, sourceField } = source.join
+    const itemVal = this.getNestedValue(item, itemField)
+    const match = data.find(el => String(this.getNestedValue(el, sourceField)) === String(itemVal))
+    return match ?? null
   }
 
   /**
@@ -1000,11 +1416,14 @@ export class DeployService {
       if (!collection) continue
 
       // Инжектируем collectionLink
+      const linkSelector = (binding.repeaterConfig as any)._collectionLinkSelector || undefined
       ;(binding.repeaterConfig as any).collectionLink = {
         basePath: collection.basePath.replace(/\/+$/, ''),
         slugField: collection.slugField,
         titleField: collection.titleField,
+        ...(linkSelector && { linkSelector }),
       }
+      delete (binding.repeaterConfig as any)._collectionLinkSelector
     }
   }
 
@@ -1131,6 +1550,229 @@ export class DeployService {
     
     collect(structure)
     return { blockIds, linkedBlockIds }
+  }
+
+  /**
+   * Загружает активные привязки для набора blockId/linkedBlockId страницы.
+   * Матчит и привязки с pageId, и привязки без pageId (legacy / library-block).
+   * При дублях blockId приоритет у привязки с заданным pageId.
+   *
+   * Единый источник правды для поиска активных привязок страницы.
+   */
+  private async queryActiveBindings(
+    blockIds: string[],
+    linkedBlockIds: string[],
+    pageId: string
+  ): Promise<DataBinding[]> {
+    if (!blockIds.length) return []
+
+    const hasLinked = linkedBlockIds.length > 0
+    const whereClause =
+      'binding.isActive = :isActive AND (' +
+      '(binding.pageId = :pageId AND binding.blockId IN (:...blockIds))' +
+      ' OR (binding.blockId IN (:...blockIds) AND binding.pageId IS NULL)' +
+      (hasLinked
+        ? ' OR (binding.blockId IN (:...linkedBlockIds) AND binding.pageId IS NULL)' +
+          ' OR (binding.pageId = :pageId AND binding.blockId IN (:...linkedBlockIds))'
+        : '') +
+      ')'
+    const queryParams: Record<string, unknown> = { pageId, blockIds, isActive: true }
+    if (hasLinked) queryParams.linkedBlockIds = linkedBlockIds
+
+    const bindings = await this.dataBindingRepository
+      .createQueryBuilder('binding')
+      .leftJoinAndSelect('binding.dataSource', 'dataSource')
+      .where(whereClause, queryParams)
+      .orderBy('binding.priority', 'ASC')
+      .getMany()
+
+    // Дедуп по blockId: привязка с pageId имеет приоритет над привязкой без pageId.
+    const byBlockId = new Map<string, DataBinding>()
+    for (const binding of bindings) {
+      const existing = byBlockId.get(binding.blockId)
+      if (!existing || (binding.pageId && !existing.pageId)) {
+        byBlockId.set(binding.blockId, binding)
+      }
+    }
+    return Array.from(byBlockId.values())
+  }
+
+  /**
+   * Возвращает input-привязки страницы с читаемыми метаданными — для пикера в редакторе.
+   * Использует ту же логику разрешения структуры и поиска привязок, что и деплой.
+   */
+  async getPageInputBindings(pageId: string): Promise<PageInputBinding[]> {
+    if (!pageId) return []
+    const page = await this.pageRepository.findOne({ where: { id: pageId } })
+    if (!page?.structure) return []
+
+    let structure = await linkedBlocksService.updateLinkedBlocks(page.structure)
+    structure = await this.injectLibraryTemplates(structure, page.id)
+
+    const { blockIds, linkedBlockIds } = this.collectBlockIdsWithLinks(structure)
+    const bindings = await this.queryActiveBindings(blockIds, linkedBlockIds, pageId)
+
+    return bindings
+      .filter(b => b.bindingType === 'input')
+      .map(b => {
+        const cfg = b.config as any
+        const ep = cfg?.inputConfig?.endpoint
+        return {
+          id: b.id,
+          blockId: b.blockId,
+          dataSourceId: b.dataSourceId,
+          dataSourceName: b.dataSource?.name,
+          method: ep?.method,
+          path: ep?.path,
+          mode: cfg?.inputConfig?.mode,
+        }
+      })
+  }
+
+  /**
+   * Вшивает данные в КОНКРЕТНУЮ привязку (по bindingId) как page-variable.
+   * Целевой привязке назначается уникальный alias `__add_<bindingId>`, чтобы не конфликтовать
+   * с другими привязками к тому же DataSource. Runtime ищет `_dataStore[bindingId] || [alias]`,
+   * поэтому привязка подхватит вшитые данные без изменений рантайма.
+   */
+  private injectAdditionalSourcesByBinding(
+    config: PageDataConfig,
+    additionalData: Array<{ targetBindingId: string; dataSourceId: string; data: unknown }>
+  ): void {
+    for (const { targetBindingId, dataSourceId, data } of additionalData) {
+      const binding = config.bindings.find(b => (b as any).bindingId === targetBindingId)
+      if (!binding) {
+        logger.warn(`injectAdditionalSourcesByBinding: target binding ${targetBindingId} not found — skipped`)
+        continue
+      }
+      const uniqueAlias = `__add_${targetBindingId}`
+      ;(binding as any).sourceAlias = uniqueAlias
+
+      const existingVarIdx = config.variables.findIndex(v => v.name === uniqueAlias)
+      if (existingVarIdx >= 0) {
+        config.variables[existingVarIdx].defaultValue = data
+      } else {
+        config.variables.push({ name: uniqueAlias, type: 'object', defaultValue: data })
+      }
+
+      const existingDsIdx = config.dataSources.findIndex(ds => ds.alias === uniqueAlias)
+      if (existingDsIdx >= 0) {
+        config.dataSources[existingDsIdx].type = 'page-variable'
+        config.dataSources[existingDsIdx].variableName = uniqueAlias
+        config.dataSources[existingDsIdx].dataSourceId = dataSourceId
+      } else {
+        config.dataSources.push({
+          alias: uniqueAlias,
+          dataSourceId,
+          loadStrategy: 'pageLoad',
+          cacheEnabled: false,
+          type: 'page-variable',
+          variableName: uniqueAlias,
+        })
+      }
+    }
+  }
+
+  /**
+   * Фетчит доп.источники страницы (с extract-цепочкой) и вшивает их в целевые привязки.
+   * Мутирует переданный dataConfig. Возвращает ошибки (не бросает).
+   */
+  private async applyPageAdditionalSources(
+    config: PageDataConfig,
+    sources: PageAdditionalSourceDef[]
+  ): Promise<string[]> {
+    const errors: string[] = []
+    const additionalData: Array<{ targetBindingId: string; dataSourceId: string; data: unknown }> = []
+    const extractedValues: Record<string, unknown> = {}
+
+    for (const source of sources) {
+      try {
+        // У страницы нет «item» — плейсхолдеры {{item.*}} резолвятся в пусто, доступны {{extract.*}}.
+        const data = await this.fetchAdditionalSourceForItem(source, {}, extractedValues)
+        if (source.extract) {
+          for (const [name, dotPath] of Object.entries(source.extract)) {
+            extractedValues[name] = this.resolveExtractPath(data, dotPath)
+          }
+        }
+        additionalData.push({ targetBindingId: source.targetBindingId, dataSourceId: source.dataSourceId, data })
+      } catch (err: any) {
+        errors.push(`Page additional source (binding ${source.targetBindingId}) failed: ${err.message}`)
+        additionalData.push({ targetBindingId: source.targetBindingId, dataSourceId: source.dataSourceId, data: null })
+      }
+    }
+
+    this.injectAdditionalSourcesByBinding(config, additionalData)
+    return errors
+  }
+
+  /**
+   * Превью цепочки доп.запросов страницы (реальные вызовы). Не пишет файлов, не деплоит.
+   */
+  async previewPageRequest(pageId: string): Promise<PageRequestPreview> {
+    const page = await this.pageRepository.findOne({ where: { id: pageId } })
+    if (!page) throw new Error('Page not found')
+
+    const steps: CollectionRequestPreviewStep[] = []
+    const finalDataStore: Record<string, unknown> = {}
+    const warnings: string[] = []
+    const sources = page.additionalSources || []
+    if (!sources.length) return { steps, finalDataStore, warnings }
+
+    const bindings = await this.getPageInputBindings(pageId)
+    const bindingLabel = (id: string): string | null => {
+      const b = bindings.find(x => x.id === id)
+      if (!b) return null
+      const ep = [b.method, b.path].filter(Boolean).join(' ')
+      return `${b.dataSourceName || 'DataSource'}${ep ? ' · ' + ep : ''}`
+    }
+
+    const extractedValues: Record<string, unknown> = {}
+    for (const source of sources) {
+      const label = source.targetBindingId ? bindingLabel(source.targetBindingId) : null
+      const stepLabel = label || '(привязка не выбрана)'
+      const step: CollectionRequestPreviewStep = { kind: 'source', label: stepLabel, request: { method: 'GET', url: '' } }
+
+      if (!source.targetBindingId) {
+        warnings.push('Один из доп.источников: не выбрана целевая привязка.')
+      } else if (!label) {
+        warnings.push(`Целевая привязка ${source.targetBindingId.slice(0, 8)}… не найдена на странице (возможно, удалена).`)
+      }
+
+      try {
+        const { fetchConfig, authConfig } = await this.buildAdditionalSourceFetchConfig(source, {}, extractedValues)
+        step.request = {
+          method: fetchConfig.method || 'GET',
+          url: fetchConfig.url || '',
+          body: fetchConfig.body,
+          queryParams: fetchConfig.queryParams,
+        }
+        const result = await secureDataSourceService.fetchData(fetchConfig, authConfig)
+        if (!result.success) {
+          step.error = result.error?.message || 'Failed to fetch additional source data'
+          steps.push(step)
+          continue
+        }
+        const data = source.arrayPath ? this.getNestedValue(result.data, source.arrayPath) : result.data
+        step.response = data
+        if (source.extract) {
+          const extract: Record<string, unknown> = {}
+          for (const [name, dotPath] of Object.entries(source.extract)) {
+            const val = this.resolveExtractPath(data, dotPath)
+            extract[name] = val
+            extractedValues[name] = val
+          }
+          step.extract = extract
+        }
+        let key = stepLabel
+        if (key in finalDataStore) key = `${key} (${source.targetBindingId.slice(0, 8)})`
+        finalDataStore[key] = data
+      } catch (err: any) {
+        step.error = err.message
+      }
+      steps.push(step)
+    }
+
+    return { steps, finalDataStore, warnings }
   }
 
   /**
@@ -1475,42 +2117,8 @@ export class DeployService {
       logger.debug('Block IDs on page', { blockIds: blockIds.slice(0, 5) })
       logger.debug('Linked block IDs on page', { linkedBlockIds })
 
-      // Загружаем активные bindings для этих блоков
-      // ВАЖНО: Берем ТОЛЬКО привязки для этой страницы (pageId = pageId)
-      // ИЛИ привязки где blockId напрямую присутствует на странице
-      // НЕ берем привязки библиотечных блоков (pageId = null, blockId = libraryBlockId)
-      const bindings = await this.dataBindingRepository
-        .createQueryBuilder('binding')
-        .leftJoinAndSelect('binding.dataSource', 'dataSource')
-        .where(
-          // Обязательно isActive = true И одно из условий
-          'binding.isActive = :isActive AND (' +
-          // Привязки для этой конкретной страницы
-          '(binding.pageId = :pageId AND binding.blockId IN (:...blockIds))' +
-          // ИЛИ привязки где blockId напрямую есть на странице (не через linked)
-          ' OR (binding.blockId IN (:...blockIds) AND binding.pageId IS NULL)' +
-          ')',
-          { 
-            pageId,
-            blockIds,
-            isActive: true
-          }
-        )
-        .orderBy('binding.priority', 'ASC')
-        .getMany()
-      
-      logger.debug('Raw bindings from DB', { bindings: bindings.map(b => ({ id: b.id, blockId: b.blockId, pageId: b.pageId })) })
-      
-      // Фильтруем: если есть привязка с pageId, она имеет приоритет над привязкой без pageId
-      const bindingsByBlockId = new Map<string, any>()
-      for (const binding of bindings) {
-        const existingBinding = bindingsByBlockId.get(binding.blockId)
-        // Привязка с pageId имеет приоритет
-        if (!existingBinding || (binding.pageId && !existingBinding.pageId)) {
-          bindingsByBlockId.set(binding.blockId, binding)
-        }
-      }
-      const filteredBindings = Array.from(bindingsByBlockId.values())
+      // Загружаем активные bindings для этих блоков (единая логика queryActiveBindings).
+      const filteredBindings = await this.queryActiveBindings(blockIds, linkedBlockIds, pageId)
 
       if (!filteredBindings.length) {
         logger.warn('No active bindings found for blocks', { blockIds: blockIds.slice(0, 5) })
@@ -1624,11 +2232,12 @@ export class DeployService {
               repeaterConfig: inputConfig.mode === 'repeater' ? {
                 itemTemplate: templateId,
                 containerSelector: `[data-element-id="${actualBlockId}"]`,
-                arrayPath: inputConfig.arrayPath, // Путь к массиву данных в ответе
+                arrayPath: inputConfig.arrayPath,
                 pagination: inputConfig.pagination?.enabled ? {
                   enabled: true,
                   pageSize: inputConfig.pagination.itemsPerPage
-                } : undefined
+                } : undefined,
+                ...(inputConfig.collectionLinkSelector && { _collectionLinkSelector: inputConfig.collectionLinkSelector }),
               } : undefined
             }
           } else if (binding.bindingType === 'output' && outputConfig) {

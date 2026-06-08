@@ -54,8 +54,25 @@ export const updatePageVariablesSchema = z.object({
   variables: z.record(z.unknown()),
 })
 
+// Доп.источники данных страницы (вшиваются в привязку как page-variable на деплое)
+const pageAdditionalSourceSchema = z.object({
+  targetBindingId: z.string().uuid('Invalid target binding ID'),
+  dataSourceId: z.string().uuid('Invalid data source ID'),
+  arrayPath: z.string().max(255).optional(),
+  endpointConfig: z.object({
+    path: z.string().max(2048).optional(),
+    method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional(),
+    headers: z.record(z.string()).optional(),
+    queryParams: z.record(z.string()).optional(),
+    body: z.string().optional(),
+    bodyFormat: z.enum(['json', 'form-data', 'form-urlencoded', 'raw']).optional(),
+  }).optional(),
+  extract: z.record(z.string().max(512)).optional(),
+})
+
 // PUT /api/pages/:id/data-settings
 export const updateDataSettingsSchema = z.object({
   dataSources: z.record(z.unknown()).optional(),
   variables: z.record(z.unknown()).optional(),
+  additionalSources: z.array(pageAdditionalSourceSchema).optional(),
 })

@@ -7,6 +7,7 @@ import {
   type VariableDefinition 
 } from '../../dataBindings'
 import { pageDataSettingsApi } from '@/shared/api'
+import { PageAdditionalSources } from './PageAdditionalSources'
 
 /**
  * Объединённая конфигурация данных страницы
@@ -40,7 +41,7 @@ interface PageSettingsDataTabProps {
   useApi?: boolean
 }
 
-type TabId = 'sources' | 'variables' | 'cache'
+type TabId = 'sources' | 'variables' | 'cache' | 'additional'
 
 /**
  * Вкладка "Data" в настройках страницы
@@ -202,6 +203,15 @@ export const PageSettingsDataTab: React.FC<PageSettingsDataTabProps> = ({
       icon: (
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    },
+    {
+      id: 'additional',
+      label: 'Доп.источники',
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
       )
     }
@@ -429,6 +439,14 @@ export const PageSettingsDataTab: React.FC<PageSettingsDataTabProps> = ({
               </>
             )}
           </div>
+        )}
+
+        {/* Additional sources Tab */}
+        {activeTab === 'additional' && pageId && pageId !== 'current' && (
+          <PageAdditionalSources pageId={pageId} />
+        )}
+        {activeTab === 'additional' && (!pageId || pageId === 'current') && (
+          <p className="text-sm text-gray-400 italic">Сохраните страницу, чтобы настроить доп.источники.</p>
         )}
       </div>
 

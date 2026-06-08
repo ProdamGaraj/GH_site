@@ -535,6 +535,7 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         console.log('[DataBinding] Applying input binding for:', binding.blockId);
         binding.fieldMappings.forEach(function(mapping) {
           const value = getNestedValue(data, mapping.sourceField);
+          if (value === undefined || value === null) return;
           applyValue(element, mapping.targetProperty, value);
         });
       }
@@ -811,7 +812,7 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         }
       }
       
-      if (value === undefined) {
+      if (value === undefined || value === null) {
         console.warn('[FieldMapping] ⚠️ No value for field:', mapping.sourceField, 'in data:', data);
         return;
       }

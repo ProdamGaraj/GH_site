@@ -12,6 +12,7 @@ import { cacheService } from '../services/CacheService'
 import { cachedDataSourceService } from '../services/CachedDataSourceService'
 import { FetchConfig, AuthConfig } from '../services/SecureDataSourceService'
 import { CredentialsManager } from '../services/CredentialsManager'
+import { deployService } from '../services/DeployService'
 import { applyCollectionTransforms } from '../utils/collectionTransforms'
 
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
@@ -226,6 +227,22 @@ export class CollectionController {
     })
   })
 
+  // ─── Превью цепочки запросов ──────────────────────────────────
+
+  /**
+   * GET /api/collections/:id/preview-request
+   * Выполняет реальную цепочку запросов (основной + доп.источники на первом элементе)
+   * и возвращает по-шаговую раскладку. Не пишет файлов, не трогает кеш.
+   */
+  previewRequest = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const collection = await this.getRepository().findOne({ where: { id } })
+    if (!collection) throw new NotFoundError('Collection', id)
+
+    const preview = await deployService.previewCollectionRequest(id)
+    res.json(preview)
+  })
+
   // ─── CRUD overrides ───────────────────────────────────────────
 
   createOverride = asyncHandler(async (req: Request, res: Response) => {
@@ -306,7 +323,27 @@ export class CollectionController {
       authConfig = (await CredentialsManager.decryptAuthConfig(ds.authConfig)) as unknown as AuthConfig
     }
 
-    const fetchConfig = { type: ds.type, ...config } as unknown as FetchConfig
+    const ec = collection.endpointConfig
+
+    // Строим базовый fetchConfig из DataSource, затем применяем override из endpointConfig
+    const fetchConfig: FetchConfig = { type: ds.type, ...config }
+
+    if (ec) {
+      // Путь: если указан — строим полный URL как baseUrl + path
+      if (ec.path) {
+        const base = (config.url as string).replace(/\/+$/, '')
+        const suffix = ec.path.startsWith('/') ? ec.path : `/${ec.path}`
+        fetchConfig.url = `${base}${suffix}`
+      }
+      if (ec.method) fetchConfig.method = ec.method
+      if (ec.headers) fetchConfig.headers = { ...(fetchConfig.headers || {}), ...ec.headers }
+      if (ec.queryParams) fetchConfig.queryParams = { ...(fetchConfig.queryParams || {}), ...ec.queryParams }
+      if (ec.body !== undefined) {
+        fetchConfig.body = ec.body
+        if (ec.bodyFormat) fetchConfig.bodyFormat = ec.bodyFormat as FetchConfig['bodyFormat']
+      }
+    }
+
     const result = await cachedDataSourceService.fetchData(ds.id, fetchConfig, authConfig)
 
     if (!result.success) {

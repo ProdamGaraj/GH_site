@@ -14,10 +14,12 @@ import { TransformsEditor } from './TransformsEditor'
 import { TemplateFieldsEditor } from './TemplateFieldsEditor'
 import { Database, Link, CheckCircle, AlertCircle, ArrowRight, Loader2, ChevronDown, ChevronUp, Settings2 } from 'lucide-react'
 import { EndpointConfigEditor, DEFAULT_ENDPOINT_CONFIG } from './EndpointConfigEditor'
+import { BlockSubRequestsEditor, type BlockSubSource } from './BlockSubRequestsEditor'
 import type { DetectedField } from '@/shared/types/template'
 import type { CreateDataBindingRequest, FieldMapping, InputMode, EndpointConfig } from '@/shared/types/dataBinding'
 import type { Block } from '@/shared/types'
 import type { DataTransform, DynamicFilter } from '@/shared/types/transforms'
+import { collectionApi, type Collection } from '@/shared/api/collectionApi'
 
 interface SmartDataBindingTabProps {
   blockId: string
@@ -52,7 +54,11 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
   const [fieldOverrides, setFieldOverrides] = useState<Record<string, { joinField: string; values: Record<string, string | number>; displayTemplate?: string }>>({})
   const [overrideOpenFor, setOverrideOpenFor] = useState<string | null>(null) // targetProperty поля с открытой редакцией
   const [overrideJsonDraft, setOverrideJsonDraft] = useState<string>('') // raw-текст JSON textarea
-  
+  const [linkedCollection, setLinkedCollection] = useState<Collection | null>(null)
+  const [collectionLinkSelector, setCollectionLinkSelector] = useState<string>('')
+  const [subSources, setSubSources] = useState<BlockSubSource[]>([])
+  const [mainExtract, setMainExtract] = useState<Record<string, string>>({})
+
   // Отслеживание сохранения страницы для авто-сохранения привязки
   const isDirty = useAppSelector(selectIsDirty)
   const prevIsDirtyRef = useRef(isDirty)
@@ -154,10 +160,28 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
       } else {
         setFieldOverrides({})
       }
+      // Восстанавливаем collectionLinkSelector
+      setCollectionLinkSelector((existingBinding.config.inputConfig as any).collectionLinkSelector || '')
+
+      // Восстанавливаем под-запросы (обогащение элементов)
+      setSubSources(((existingBinding.config.inputConfig as any).additionalSources as BlockSubSource[]) || [])
+      setMainExtract((existingBinding.config.inputConfig as any).mainExtract || {})
       // Сброс флага изменений после восстановления из существующей привязки
       setHasChanges(false)
     }
   }, [existingBinding])
+
+  // При смене DataSource — ищем связанную коллекцию
+  useEffect(() => {
+    if (!selectedDataSourceId) {
+      setLinkedCollection(null)
+      return
+    }
+    collectionApi.getAll().then(collections => {
+      const found = collections.find(c => c.dataSourceId === selectedDataSourceId && c.isActive) || null
+      setLinkedCollection(found)
+    }).catch(() => setLinkedCollection(null))
+  }, [selectedDataSourceId])
 
   // Debug: отслеживаем изменения testResult
   useEffect(() => {
@@ -238,6 +262,16 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
 
     setLoading(true)
     try {
+      // Очищаем под-запросы: только заполненные, без пустых extract/join
+      const cleanedSubSources = subSources
+        .filter(s => s.itemKey && s.dataSourceId)
+        .map(s => ({
+          ...s,
+          extract: s.extract ? Object.fromEntries(Object.entries(s.extract).filter(([k, v]) => k && v)) : undefined,
+          join: s.join?.itemField && s.join?.sourceField ? s.join : undefined,
+        }))
+      const cleanedMainExtract = Object.fromEntries(Object.entries(mainExtract).filter(([k, v]) => k && v))
+
       // Формируем inputConfig
       const inputConfig = {
         mode,
@@ -248,6 +282,9 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         ...(mode === 'repeater' && selectedTemplateBlockId && { templateId: selectedTemplateBlockId }),
         ...(mode === 'repeater' && arrayPath && { arrayPath }),
         ...(Object.keys(fieldOverrides).length > 0 && { fieldOverrides }),
+        ...(mode === 'repeater' && collectionLinkSelector && { collectionLinkSelector }),
+        ...(cleanedSubSources.length > 0 && { additionalSources: cleanedSubSources }),
+        ...(Object.keys(cleanedMainExtract).length > 0 && { mainExtract: cleanedMainExtract }),
       }
 
       console.log('💾 Saving binding with inputConfig:', inputConfig)
@@ -320,7 +357,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
     } finally {
       setLoading(false)
     }
-  }, [selectedDataSourceId, mode, selectedTemplateBlockId, endpointConfig, mappings, transforms, dynamicFilters, arrayPath, fieldOverrides, existingBinding, blockId, pageId, dispatch])
+  }, [selectedDataSourceId, mode, selectedTemplateBlockId, endpointConfig, mappings, transforms, dynamicFilters, arrayPath, fieldOverrides, collectionLinkSelector, subSources, mainExtract, existingBinding, blockId, pageId, dispatch])
 
   // Авто-сохранение привязки при сохранении страницы (isDirty: true → false)
   useEffect(() => {
@@ -571,6 +608,13 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
             showBody={true}
             baseUrl={(dataSources.find(ds => ds.id === selectedDataSourceId)?.config as any)?.url}
           />
+          <BlockSubRequestsEditor
+            dataSources={dataSources.map(ds => ({ id: ds.id, name: ds.name, url: (ds.config as any)?.url }))}
+            mainExtract={mainExtract}
+            sources={subSources}
+            onMainExtractChange={(next) => { setMainExtract(next); markChanged() }}
+            onSourcesChange={(next) => { setSubSources(next); markChanged() }}
+          />
         </div>
       )}
 
@@ -643,6 +687,41 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
             </p>
           </div>
         </>
+      )}
+
+      {/* Collection Link — индикатор и linkSelector */}
+      {selectedDataSourceId && mode === 'repeater' && linkedCollection && (
+        <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg space-y-3">
+          <div className="flex items-start gap-2">
+            <Link size={16} className="text-indigo-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-indigo-900">
+                Связано с коллекцией «{linkedCollection.name}»
+              </p>
+              <p className="text-xs text-indigo-700 mt-0.5">
+                Ссылки добавятся автоматически при деплое: <code className="bg-indigo-100 px-1 rounded">{linkedCollection.basePath.replace(/\/+$/, '')}/{'{'}slug{'}'}.html</code>
+              </p>
+              <p className="text-xs text-indigo-600 mt-1">
+                Поле slug: <code className="bg-indigo-100 px-1 rounded">{linkedCollection.slugField}</code>
+              </p>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-indigo-800 mb-1">
+              CSS-селектор ссылки (необязательно)
+            </label>
+            <input
+              type="text"
+              value={collectionLinkSelector}
+              onChange={e => { setCollectionLinkSelector(e.target.value); markChanged() }}
+              placeholder="Авто: первый <a> внутри карточки"
+              className="w-full px-2 py-1.5 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 bg-white"
+            />
+            <p className="text-xs text-indigo-600 mt-1">
+              Укажите CSS-селектор, если в карточке несколько ссылок. Например: <code className="bg-indigo-100 px-1 rounded">.card-link</code>
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Field Mappings */}

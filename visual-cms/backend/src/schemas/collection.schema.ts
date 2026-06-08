@@ -3,6 +3,29 @@ import { z } from 'zod'
 const linkModeEnum = z.enum(['auto', 'manual', 'disabled'])
 const itemsOrderEnum = z.enum(['api', 'alphabetical', 'custom'])
 
+const endpointConfigBodySchema = z.object({
+  path: z.string().max(2048).optional(),
+  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).optional(),
+  headers: z.record(z.string()).optional(),
+  queryParams: z.record(z.string()).optional(),
+  body: z.string().optional(),
+  bodyFormat: z.enum(['json', 'form-data', 'form-urlencoded', 'raw']).optional(),
+})
+
+const additionalSourceSchema = z.object({
+  itemKey: z.string().min(1, 'itemKey is required').max(255),
+  dataSourceId: z.string().uuid('Invalid additional source DataSource ID'),
+  arrayPath: z.string().max(255).optional(),
+  endpointConfig: endpointConfigBodySchema.optional(),
+  extract: z.record(z.string().max(512)).optional(),
+  join: z.object({
+    itemField: z.string().min(1).max(255),
+    sourceField: z.string().min(1).max(255),
+  }).optional(),
+})
+
+const endpointConfigSchema = endpointConfigBodySchema.optional()
+
 // Серверная трансформация элементов коллекции (как у дата-биндингов).
 // Совпадает с DataTransform фронтенда / DataTransformConfig бэкенда.
 const transformFilterOperatorEnum = z.enum([
@@ -62,6 +85,9 @@ export const createCollectionSchema = z.object({
   indexPageId: z.string().uuid().nullable().optional(),
 
   transforms: z.array(collectionTransformSchema).optional(),
+  endpointConfig: endpointConfigSchema,
+  mainExtract: z.record(z.string().max(512)).optional(),
+  additionalSources: z.array(additionalSourceSchema).optional(),
 })
 
 // PUT /api/collections/:id
@@ -98,6 +124,9 @@ export const updateCollectionSchema = z.object({
   indexPageId: z.string().uuid().nullable().optional(),
 
   transforms: z.array(collectionTransformSchema).optional(),
+  endpointConfig: endpointConfigSchema,
+  mainExtract: z.record(z.string().max(512)).optional(),
+  additionalSources: z.array(additionalSourceSchema).optional(),
 })
 
 // POST /api/collections/:id/overrides

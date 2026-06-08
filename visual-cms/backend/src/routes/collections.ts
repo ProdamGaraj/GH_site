@@ -20,6 +20,9 @@ router.delete('/:id', CollectionController.delete)
 // Элементы коллекции (из API data source)
 router.get('/:id/items', CollectionController.getItems)
 
+// Превью цепочки запросов (основной + доп.источники на образце-элементе)
+router.get('/:id/preview-request', CollectionController.previewRequest)
+
 // CRUD overrides
 router.post('/:id/overrides', validate(createOverrideSchema), CollectionController.createOverride)
 router.put('/:id/overrides/:overrideId', validate(updateOverrideSchema), CollectionController.updateOverride)

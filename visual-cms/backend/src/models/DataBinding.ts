@@ -197,6 +197,20 @@ export interface InputBindingConfig {
   // Server-side transforms
   transforms?: DataTransformConfig[]
   dynamicFilters?: DynamicFilterConfig[]
+
+  // --- Под-запросы (обогащение элементов основного массива, как в коллекциях) ---
+  // Извлечение значений из всего массива → {{extract.name}} в под-запросах.
+  mainExtract?: Record<string, string>
+  // Цепочка под-запросов: каждый прикрепляет данные к элементу под itemKey
+  // ({{item.<itemKey>.*}}), с поддержкой {{item.field}}/{{extract.name}}, arrayPath, extract, join.
+  additionalSources?: Array<{
+    itemKey: string
+    dataSourceId: string
+    arrayPath?: string
+    endpoint?: EndpointConfig
+    extract?: Record<string, string>
+    join?: { itemField: string; sourceField: string }
+  }>
 }
 
 /**

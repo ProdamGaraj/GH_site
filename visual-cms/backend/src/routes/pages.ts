@@ -28,4 +28,8 @@ router.put('/:id/data-settings', validate(updateDataSettingsSchema), pageControl
 router.put('/:id/data-sources', validate(updatePageDataSourcesSchema), pageController.updateDataSources)
 router.put('/:id/variables', validate(updatePageVariablesSchema), pageController.updateVariables)
 
+// Доп.источники данных страницы (пикер привязок + превью)
+router.get('/:id/input-bindings', pageController.getInputBindings)
+router.get('/:id/request-preview', pageController.previewRequest)
+
 export default router

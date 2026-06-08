@@ -320,7 +320,8 @@ class DataFilterService {
       }
     }
 
-    return current
+    // null terminal value is treated as absent — consistent with "field doesn't exist"
+    return current === null ? undefined : current
   }
 
   /**

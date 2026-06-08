@@ -507,3 +507,53 @@ export const pageDataSettingsApi = {
     api.put<{ variables: PageVariable[] }>(`/pages/${pageId}/variables`, { variables }),
 }
 
+// --- Доп.источники данных страницы ---
+import type { EndpointConfig } from '@/shared/types/dataBinding'
+
+export interface PageAdditionalSource {
+  targetBindingId: string
+  dataSourceId: string
+  arrayPath?: string
+  endpointConfig?: EndpointConfig
+  extract?: Record<string, string>
+}
+
+export interface PageInputBinding {
+  id: string
+  blockId: string
+  dataSourceId: string
+  dataSourceName?: string
+  method?: string
+  path?: string
+  mode?: string
+}
+
+export interface PageRequestPreviewStep {
+  kind: 'main' | 'source'
+  label: string
+  request: { method: string; url: string; body?: unknown; queryParams?: Record<string, string> }
+  response?: unknown
+  extract?: Record<string, unknown>
+  error?: string
+}
+
+export interface PageRequestPreview {
+  steps: PageRequestPreviewStep[]
+  finalDataStore: Record<string, unknown>
+  warnings: string[]
+}
+
+export const pageAdditionalSourcesApi = {
+  get: (pageId: string) =>
+    api.get<{ additionalSources?: PageAdditionalSource[] }>(`/pages/${pageId}/data-settings`),
+
+  update: (pageId: string, additionalSources: PageAdditionalSource[]) =>
+    api.put<{ additionalSources: PageAdditionalSource[] }>(`/pages/${pageId}/data-settings`, { additionalSources }),
+
+  inputBindings: (pageId: string) =>
+    api.get<PageInputBinding[]>(`/pages/${pageId}/input-bindings`),
+
+  previewRequest: (pageId: string) =>
+    api.get<PageRequestPreview>(`/pages/${pageId}/request-preview`),
+}
+

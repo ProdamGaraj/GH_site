@@ -335,5 +335,16 @@ describe('DataFilterService', () => {
       const result = dataFilterService.getValueByPath(obj, 'missing.path')
       expect(result).toBeUndefined()
     })
+
+    it('null terminal value is treated as absent (returns undefined)', () => {
+      const obj = { name: null, nested: { value: null } }
+      expect(dataFilterService.getValueByPath(obj, 'name')).toBeUndefined()
+      expect(dataFilterService.getValueByPath(obj, 'nested.value')).toBeUndefined()
+    })
+
+    it('null mid-path returns undefined without throwing', () => {
+      const obj = { user: null }
+      expect(dataFilterService.getValueByPath(obj, 'user.profile.name')).toBeUndefined()
+    })
   })
 })
