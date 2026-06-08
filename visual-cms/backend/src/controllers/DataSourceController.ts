@@ -5,6 +5,8 @@ import { CredentialsManager } from '../services/CredentialsManager'
 import { secureDataSourceService, FetchConfig, AuthConfig } from '../services/SecureDataSourceService'
 import { cachedDataSourceService } from '../services/CachedDataSourceService'
 import { databaseQueryService } from '../services/DatabaseQueryService'
+import { resolveExternalRequest } from '../services/externalServicePresets'
+import { computedDataSourceService, ComputedConfig } from '../services/ComputedDataSourceService'
 import { Like, In } from 'typeorm'
 import { asyncHandler, NotFoundError, ValidationError } from '../middleware'
 import { cacheService } from '../services/CacheService'
@@ -419,11 +421,17 @@ export class DataSourceController {
         case 'static':
           return this.testStaticData(config)
 
-        case 'computed':
+        case 'computed': {
+          const result = await computedDataSourceService.resolve(config as unknown as ComputedConfig)
+          if (!result.success) {
+            return { success: false, message: result.error?.message || 'Computed source failed', error: result.error }
+          }
           return {
             success: true,
-            message: 'Computed data source configuration is valid'
+            message: 'Connection successful',
+            sampleData: this.truncateSampleData(result.data),
           }
+        }
 
         case 'form-data':
           return {
@@ -632,20 +640,17 @@ export class DataSourceController {
     sampleData?: unknown
     error?: { code: string; message: string; details?: string }
   }> {
-    // Используем REST API тест с предопределёнными настройками для сервиса
-    const serviceType = config.serviceType as string
-    let url = config.url as string
-
-    // Модифицируем URL для разных сервисов
-    if (serviceType === 'wordpress' && config.wordpress) {
-      const wp = config.wordpress as Record<string, unknown>
-      url = `${url}${wp.endpoint || '/wp-json/wp/v2/posts'}`
-    } else if (serviceType === 'strapi' && config.strapi) {
-      const strapi = config.strapi as Record<string, unknown>
-      url = `${url}/api/${strapi.contentType || 'articles'}`
-    }
-
-    return this.testRestApi({ ...config, url, method: 'GET' }, authConfig)
+    // Резолвим пресет в REST-запрос тем же кодом, что и рантайм (DRY).
+    const resolved = resolveExternalRequest(config)
+    return this.testRestApi(
+      {
+        ...config,
+        url: resolved.url,
+        method: 'GET',
+        queryParams: { ...(config.queryParams as Record<string, string> | undefined), ...resolved.queryParams },
+      },
+      authConfig
+    )
   }
 
   /**

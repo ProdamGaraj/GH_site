@@ -1,6 +1,7 @@
 import { AppDataSource } from './config/database'
 import { runSafeMigrations } from './migrations/runner'
 import { logger } from './services/Logger'
+import { feedPollingScheduler } from './services/FeedPollingScheduler'
 import app from './app'
 
 const PORT = process.env.PORT || 5000
@@ -11,6 +12,9 @@ AppDataSource.initialize()
 
     // Применяем идемпотентные миграции (IF NOT EXISTS)
     await runSafeMigrations(AppDataSource)
+
+    // Серверный планировщик обновления feed-источников (раз в минуту).
+    feedPollingScheduler.start()
 
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`, {

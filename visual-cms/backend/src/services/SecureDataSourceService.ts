@@ -5,6 +5,7 @@ import { safeFetch } from '../utils/ssrfGuard'
 import { logger } from './Logger'
 import { isClientRuntimeType } from './dataSourceRuntime'
 import { databaseQueryService } from './DatabaseQueryService'
+import { resolveExternalRequest } from './externalServicePresets'
 
 /**
  * Ленивый undici-Agent с отключённой проверкой TLS-сертификата.
@@ -31,7 +32,7 @@ function getInsecureAgent(): Agent {
 
 // Типы
 export interface FetchConfig {
-  type: 'rest-api' | 'feed' | 'graphql' | 'static' | 'page-variable' | 'database' | 'form-data'
+  type: 'rest-api' | 'rest' | 'feed' | 'graphql' | 'static' | 'page-variable' | 'database' | 'form-data' | 'external' | 'computed'
   url?: string
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
   headers?: Record<string, string>
@@ -51,7 +52,7 @@ export interface FetchConfig {
   // Static
   data?: unknown
   // Database (SQL через DatabaseQueryService)
-  databaseType?: 'postgresql' | 'mysql'
+  databaseType?: 'postgresql' | 'mysql' | 'sqlite'
   connectionString?: string
   host?: string
   port?: number
@@ -59,6 +60,10 @@ export interface FetchConfig {
   username?: string
   password?: string
   maxRows?: number
+  // Computed (объединение источников через ComputedDataSourceService)
+  sources?: Array<{ sourceId: string; arrayPath?: string }>
+  mode?: 'concat' | 'merge'
+  joinKey?: { local: string; foreign: string }
 }
 
 export interface AuthConfig {
@@ -201,13 +206,36 @@ class SecureDataSourceService {
     try {
       switch (config.type) {
         case 'rest-api':
+        case 'rest': // legacy-алиас rest-api
         case 'feed':
           return await this.fetchRestApi(config, authConfig, startTime)
         case 'graphql':
           return await this.fetchGraphQL(config, authConfig, startTime)
         case 'database':
-          // SQL-запрос (read-only) к PostgreSQL/MySQL через DatabaseQueryService.
+          // SQL-запрос (read-only) к PostgreSQL/MySQL/SQLite через DatabaseQueryService.
           return await databaseQueryService.fetch(config)
+        case 'external': {
+          // Пресет (WordPress/Strapi/Shopify) → обычный REST-запрос.
+          const resolved = resolveExternalRequest(config as unknown as Record<string, unknown>)
+          return await this.fetchRestApi(
+            {
+              ...config,
+              type: 'rest-api',
+              url: resolved.url,
+              method: 'GET',
+              queryParams: { ...(config.queryParams || {}), ...resolved.queryParams },
+            },
+            authConfig,
+            startTime
+          )
+        }
+        case 'computed': {
+          // Объединение нескольких источников. Ленивый require — разрыв цикла
+          // импортов (computed → cached → secure).
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          const { computedDataSourceService } = require('./ComputedDataSourceService')
+          return await computedDataSourceService.resolve(config)
+        }
         // Примечание: client-runtime типы (form-data, page-variable) перехватываются
         // в fetchData() и сюда не доходят.
         default:

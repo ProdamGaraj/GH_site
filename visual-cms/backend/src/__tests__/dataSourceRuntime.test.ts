@@ -28,9 +28,14 @@ describe('dataSourceRuntime descriptor', () => {
   })
 
   it('помечает нерабочие типы как techdebt', () => {
-    for (const type of ['external', 'computed', 'websocket', 'mock']) {
+    for (const type of ['websocket', 'mock', 'rest']) {
       expect(getDataSourceDescriptor(type).status).toBe('techdebt')
     }
+  })
+
+  it('external и computed доведены до beta (рабочие)', () => {
+    expect(getDataSourceDescriptor('external').status).toBe('beta')
+    expect(getDataSourceDescriptor('computed').status).toBe('beta')
   })
 
   it('неизвестный тип → fail-safe techdebt дескриптор', () => {

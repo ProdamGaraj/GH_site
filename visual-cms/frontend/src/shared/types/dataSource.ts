@@ -710,7 +710,7 @@ export const DATA_SOURCE_CAPABILITIES: Record<DataSourceType, DataSourceTypeCapa
     execution: 'server-fetch',
     availableInCollections: true,
     availableInBindings: true,
-    status: 'techdebt'
+    status: 'beta'
   },
   'static': {
     type: 'static',
@@ -735,10 +735,10 @@ export const DATA_SOURCE_CAPABILITIES: Record<DataSourceType, DataSourceTypeCapa
     supportsSorting: false,
     supportsRealtime: false,
     requiresAuth: false,
-    execution: 'inline',
-    availableInCollections: false,
+    execution: 'server-fetch',
+    availableInCollections: true,
     availableInBindings: true,
-    status: 'techdebt'
+    status: 'beta'
   },
   'form-data': {
     type: 'form-data',

@@ -102,7 +102,9 @@
       "Bash(docker rm *)",
       "Bash(docker run *)",
       "Bash(echo \"seeded: $\\(docker exec vcms-mysql-e2e mysql -N -u root -prootpw e2e -e 'SELECT COUNT\\(*\\) FROM items;' \\) rows\")",
-      "Bash(grep -vE \"ts-jest|isolatedModules|^\\\\s*$\")"
+      "Bash(grep -vE \"ts-jest|isolatedModules|^\\\\s*$\")",
+      "Bash(node -e \"try{require.resolve\\('better-sqlite3'\\);console.log\\('better-sqlite3 OK'\\)}catch\\(e\\){console.log\\('better-sqlite3 FAIL:', e.message.split\\('\\\\n'\\)[0]\\)}; try{require.resolve\\('node-cron'\\);console.log\\('node-cron OK'\\)}catch\\(e\\){console.log\\('node-cron FAIL'\\)}\")",
+      "Bash(node -e \"const D=require\\('better-sqlite3'\\); const db=new D\\(':memory:'\\); db.exec\\('CREATE TABLE t\\(id int\\); INSERT INTO t VALUES \\(1\\),\\(2\\)'\\); console.log\\('better-sqlite3 works:', db.prepare\\('SELECT count\\(*\\) c FROM t'\\).get\\(\\)\\); const ro=new D\\(':memory:',{readonly:false}\\); console.log\\('node-cron validate:', require\\('node-cron'\\).validate\\('*/5 * * * *'\\)\\)\")"
     ],
     "additionalDirectories": [
       "\\tmp",

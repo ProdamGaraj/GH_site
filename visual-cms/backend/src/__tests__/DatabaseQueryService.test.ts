@@ -1,7 +1,11 @@
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
 import {
   validateReadOnlyQuery,
   compileNamedParams,
   assertDbHostAllowed,
+  assertSqlitePathAllowed,
   DatabaseQueryError,
   databaseQueryService,
 } from '../services/DatabaseQueryService'
@@ -96,6 +100,37 @@ describe('compileNamedParams (параметризация против инъе
     expect(r.sql).toBe('SELECT 1')
     expect(r.values).toEqual([])
   })
+
+  it('НЕ заменяет :name внутри строкового литерала', () => {
+    const r = compileNamedParams("SELECT * FROM t WHERE note = 'смотри :id здесь' AND id = :id", { id: 5 }, 'postgresql')
+    expect(r.sql).toBe("SELECT * FROM t WHERE note = 'смотри :id здесь' AND id = $1")
+    expect(r.values).toEqual([5])
+  })
+
+  it('НЕ заменяет :name внутри комментариев', () => {
+    const r = compileNamedParams('SELECT 1 -- :foo\n WHERE x = :x', { x: 1 }, 'postgresql')
+    expect(r.values).toEqual([1])
+    expect(r.sql).toContain('-- :foo')
+    expect(r.sql).toContain('x = $1')
+  })
+
+  it('не задевает срез массива arr[1:3]', () => {
+    const r = compileNamedParams('SELECT arr[1:3] FROM t WHERE id = :id', { id: 9 }, 'postgresql')
+    expect(r.sql).toBe('SELECT arr[1:3] FROM t WHERE id = $1')
+    expect(r.values).toEqual([9])
+  })
+
+  it('экранированная кавычка внутри литерала не сбивает сканер', () => {
+    const r = compileNamedParams("SELECT 'it''s :x' AS s WHERE id = :id", { id: 2 }, 'mysql')
+    expect(r.sql).toBe("SELECT 'it''s :x' AS s WHERE id = ?")
+    expect(r.values).toEqual([2])
+  })
+
+  it('sqlite использует ? как mysql', () => {
+    const r = compileNamedParams('SELECT * FROM t WHERE a = :a', { a: 1 }, 'sqlite')
+    expect(r.sql).toBe('SELECT * FROM t WHERE a = ?')
+    expect(r.values).toEqual([1])
+  })
 })
 
 describe('assertDbHostAllowed (SSRF-guard для БД)', () => {
@@ -128,6 +163,94 @@ describe('assertDbHostAllowed (SSRF-guard для БД)', () => {
   })
 })
 
+describe('assertSqlitePathAllowed (path-guard)', () => {
+  const ORIG = process.env.SQLITE_ALLOWED_DIR
+  afterEach(() => {
+    if (ORIG === undefined) delete process.env.SQLITE_ALLOWED_DIR
+    else process.env.SQLITE_ALLOWED_DIR = ORIG
+  })
+
+  it('fail-closed: без SQLITE_ALLOWED_DIR → запрещено', () => {
+    delete process.env.SQLITE_ALLOWED_DIR
+    expect(() => assertSqlitePathAllowed('/any/file.sqlite')).toThrow(/не сконфигурирован/i)
+  })
+
+  it('файл внутри разрешённой директории — ок', () => {
+    process.env.SQLITE_ALLOWED_DIR = '/data/db'
+    expect(() => assertSqlitePathAllowed('/data/db/catalog.sqlite')).not.toThrow()
+  })
+
+  it('блокирует path traversal за пределы директории', () => {
+    process.env.SQLITE_ALLOWED_DIR = '/data/db'
+    expect(() => assertSqlitePathAllowed('/data/db/../../etc/passwd')).toThrow(/вне разрешённой/i)
+    expect(() => assertSqlitePathAllowed('/etc/passwd')).toThrow(/вне разрешённой/i)
+  })
+})
+
+describe('SQLite — живой E2E (реальный файл)', () => {
+  let tmpDir: string
+  let dbFile: string
+  const ORIG = process.env.SQLITE_ALLOWED_DIR
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vcms-sqlite-'))
+    dbFile = path.join(tmpDir, 'catalog.sqlite')
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Database = require('better-sqlite3')
+    const db = new Database(dbFile)
+    db.exec('CREATE TABLE items(id INTEGER PRIMARY KEY, name TEXT)')
+    db.prepare('INSERT INTO items (id, name) VALUES (?, ?)').run(1, 'alpha')
+    db.prepare('INSERT INTO items (id, name) VALUES (?, ?)').run(2, 'beta')
+    db.close()
+    process.env.SQLITE_ALLOWED_DIR = tmpDir
+  })
+
+  afterAll(async () => {
+    await databaseQueryService.closeAll()
+    if (ORIG === undefined) delete process.env.SQLITE_ALLOWED_DIR
+    else process.env.SQLITE_ALLOWED_DIR = ORIG
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  const cfg = (extra: Record<string, unknown>) => ({
+    type: 'database', databaseType: 'sqlite', database: dbFile, ...extra,
+  } as unknown as FetchConfig)
+
+  it('реальный SELECT возвращает строки', async () => {
+    const res = await databaseQueryService.fetch(cfg({ query: 'SELECT id, name FROM items ORDER BY id' }))
+    expect(res.success).toBe(true)
+    expect(res.data).toEqual([{ id: 1, name: 'alpha' }, { id: 2, name: 'beta' }])
+    expect(res.metadata?.headers['x-db-dialect']).toBe('sqlite')
+  })
+
+  it('параметризованный запрос (:name → ?)', async () => {
+    const res = await databaseQueryService.fetch(cfg({ query: 'SELECT name FROM items WHERE id = :id', queryParams: { id: 2 } }))
+    expect(res.success).toBe(true)
+    expect(res.data).toEqual([{ name: 'beta' }])
+  })
+
+  it('запись отклонена валидатором', async () => {
+    const res = await databaseQueryService.fetch(cfg({ query: "UPDATE items SET name='x'" }))
+    expect(res.success).toBe(false)
+    expect(res.error?.code).toBe('NOT_READONLY')
+  })
+
+  it('readonly-соединение физически не пишет (минуя валидатор)', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Database = require('better-sqlite3')
+    const rodb = new Database(dbFile, { readonly: true })
+    expect(() => rodb.prepare("INSERT INTO items VALUES (99, 'x')").run()).toThrow(/readonly|read-only/i)
+    rodb.close()
+  })
+
+  it('путь вне SQLITE_ALLOWED_DIR → отказ', async () => {
+    const outside = path.join(os.tmpdir(), 'evil.sqlite')
+    const res = await databaseQueryService.fetch(cfg({ database: outside, query: 'SELECT 1' }))
+    expect(res.success).toBe(false)
+    expect(res.error?.code).toBe('SQLITE_PATH_BLOCKED')
+  })
+})
+
 describe('DatabaseQueryService.fetch — ранний отказ без подключения', () => {
   afterAll(async () => { await databaseQueryService.closeAll() })
 
@@ -146,7 +269,7 @@ describe('DatabaseQueryService.fetch — ранний отказ без подк
   })
 
   it('неподдержанный диалект → success:false', async () => {
-    const config = { type: 'database', databaseType: 'sqlite', host: 'x', database: 'y', query: 'SELECT 1' } as unknown as FetchConfig
+    const config = { type: 'database', databaseType: 'oracle', host: 'x', database: 'y', query: 'SELECT 1' } as unknown as FetchConfig
     const res = await databaseQueryService.fetch(config)
     expect(res.success).toBe(false)
     expect(res.error?.code).toBe('UNSUPPORTED_DIALECT')

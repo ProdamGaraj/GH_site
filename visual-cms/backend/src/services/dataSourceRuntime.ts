@@ -39,9 +39,11 @@ export const DATA_SOURCE_RUNTIME: Record<string, DataSourceRuntimeDescriptor> = 
   // Создаётся не визардом, а через page-variables, но фетчится по той же client-runtime модели.
   'page-variable': { execution: 'client-runtime', availableInCollections: false, availableInBindings: true, status: 'stable' },
 
+  // === Рабочие типы (продолжение) ===
+  'external': { execution: 'server-fetch', availableInCollections: true, availableInBindings: true, status: 'beta' },
+  'computed': { execution: 'server-fetch', availableInCollections: true, availableInBindings: true, status: 'beta' },
+
   // === Техдолг: объявлены, но не доведены до рабочего состояния ===
-  'external': { execution: 'server-fetch', availableInCollections: true, availableInBindings: true, status: 'techdebt' },
-  'computed': { execution: 'inline', availableInCollections: false, availableInBindings: true, status: 'techdebt' },
   'websocket': { execution: 'server-fetch', availableInCollections: false, availableInBindings: true, status: 'techdebt' },
   'mock': { execution: 'inline', availableInCollections: true, availableInBindings: true, status: 'techdebt' },
   'rest': { execution: 'server-fetch', availableInCollections: true, availableInBindings: true, status: 'techdebt' },

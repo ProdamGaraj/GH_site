@@ -17,9 +17,12 @@
  */
 
 import crypto from 'crypto'
+import path from 'path'
 import { CredentialsManager } from './CredentialsManager'
 import { logger } from './Logger'
 import type { FetchConfig, FetchResult } from './SecureDataSourceService'
+
+export type DbDialect = 'postgresql' | 'mysql' | 'sqlite'
 
 export class DatabaseQueryError extends Error {
   code: string
@@ -105,27 +108,89 @@ export interface CompiledQuery {
 /**
  * Компилирует именованные параметры (:name) в плейсхолдеры драйвера.
  *  - postgresql → $1, $2, ... (значение на каждое вхождение)
- *  - mysql      → ?
- * '::cast' в PostgreSQL не задевается (negative lookbehind на ':').
+ *  - mysql / sqlite → ?
  *
- * Ограничение: ':name' внутри строкового литерала будет тоже заменён — не
- * используйте двоеточие-имя внутри кавычек.
+ * Полноценный сканер (не regex): пропускает строковые литералы ('...', "...",
+ * `...`), комментарии (-- и /* *\/), PostgreSQL-касты (::), срезы массивов
+ * (arr[1:3]) и имена, которым предшествует словесный символ. Это исправляет
+ * ложную замену ':name' внутри строкового литерала.
  */
 export function compileNamedParams(
   sql: string,
   params: Record<string, unknown> | undefined,
-  dialect: 'postgresql' | 'mysql'
+  dialect: DbDialect
 ): CompiledQuery {
-  const values: unknown[] = []
   const p = params || {}
-  const compiled = sql.replace(/(?<![:\w]):([a-zA-Z_][a-zA-Z0-9_]*)/g, (_m, name: string) => {
-    if (!Object.prototype.hasOwnProperty.call(p, name)) {
-      throw new DatabaseQueryError(`Не передан параметр запроса: :${name}`, 'MISSING_PARAM')
+  const values: unknown[] = []
+  const placeholder = () => (dialect === 'postgresql' ? `$${values.length}` : '?')
+  const n = sql.length
+  let out = ''
+  let i = 0
+
+  const isWord = (ch: string | undefined) => !!ch && /[A-Za-z0-9_]/.test(ch)
+
+  while (i < n) {
+    const c = sql[i]
+    const next = sql[i + 1]
+
+    // Линейный комментарий -- … \n
+    if (c === '-' && next === '-') {
+      const nl = sql.indexOf('\n', i)
+      const stop = nl === -1 ? n : nl + 1
+      out += sql.slice(i, stop)
+      i = stop
+      continue
     }
-    values.push(p[name])
-    return dialect === 'postgresql' ? `$${values.length}` : '?'
-  })
-  return { sql: compiled, values }
+    // Блочный комментарий /* … */
+    if (c === '/' && next === '*') {
+      const end = sql.indexOf('*/', i + 2)
+      const stop = end === -1 ? n : end + 2
+      out += sql.slice(i, stop)
+      i = stop
+      continue
+    }
+    // Строковые литералы и backtick-идентификаторы (с поддержкой '' / "" / `` экранирования)
+    if (c === "'" || c === '"' || c === '`') {
+      const quote = c
+      out += c
+      i++
+      while (i < n) {
+        out += sql[i]
+        if (sql[i] === quote) {
+          if (sql[i + 1] === quote) { out += sql[i + 1]; i += 2; continue }
+          i++
+          break
+        }
+        i++
+      }
+      continue
+    }
+    // PostgreSQL cast '::' — копируем как есть
+    if (c === ':' && next === ':') {
+      out += '::'
+      i += 2
+      continue
+    }
+    // Именованный параметр :ident — только если перед ':' не словесный символ
+    // (исключает срезы массивов и склейки), а после — буква/подчёркивание.
+    if (c === ':' && next && /[A-Za-z_]/.test(next) && !isWord(out[out.length - 1])) {
+      let j = i + 1
+      let name = ''
+      while (j < n && isWord(sql[j])) { name += sql[j]; j++ }
+      if (!Object.prototype.hasOwnProperty.call(p, name)) {
+        throw new DatabaseQueryError(`Не передан параметр запроса: :${name}`, 'MISSING_PARAM')
+      }
+      values.push(p[name])
+      out += placeholder()
+      i = j
+      continue
+    }
+
+    out += c
+    i++
+  }
+
+  return { sql: out, values }
 }
 
 /**
@@ -155,24 +220,46 @@ export function assertDbHostAllowed(host: string | undefined): void {
   }
 }
 
+/**
+ * Path-guard для sqlite: файл должен лежать внутри SQLITE_ALLOWED_DIR (fail-closed,
+ * без переменной sqlite запрещён) — защита от чтения произвольных файлов сервера.
+ */
+export function assertSqlitePathAllowed(file: string): void {
+  const allowedDir = process.env.SQLITE_ALLOWED_DIR
+  if (!allowedDir) {
+    throw new DatabaseQueryError(
+      'SQLite не сконфигурирован на сервере: задайте SQLITE_ALLOWED_DIR',
+      'SQLITE_NOT_CONFIGURED'
+    )
+  }
+  const base = path.resolve(allowedDir)
+  const resolved = path.resolve(file)
+  const rel = path.relative(base, resolved)
+  if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new DatabaseQueryError(`Путь к sqlite вне разрешённой директории: ${file}`, 'SQLITE_PATH_BLOCKED')
+  }
+}
+
 interface ResolvedConnection {
-  dialect: 'postgresql' | 'mysql'
+  dialect: DbDialect
   connectionString?: string
   host?: string
   port?: number
   database?: string
   username?: string
   password?: string
+  sqliteFile?: string
 }
 
 interface CachedPool {
   pool: any
-  dialect: 'postgresql' | 'mysql'
+  dialect: DbDialect
 }
 
 // Ленивая загрузка драйверов
 let pgLib: any
 let mysqlLib: any
+let sqliteLib: any
 function getPg(): any {
   if (!pgLib) pgLib = require('pg')
   return pgLib
@@ -186,6 +273,16 @@ function getMysql(): any {
     }
   }
   return mysqlLib
+}
+function getSqlite(): any {
+  if (!sqliteLib) {
+    try {
+      sqliteLib = require('better-sqlite3')
+    } catch {
+      throw new DatabaseQueryError('Драйвер SQLite (better-sqlite3) не установлен на сервере', 'DRIVER_MISSING')
+    }
+  }
+  return sqliteLib
 }
 
 class DatabaseQueryService {
@@ -210,8 +307,12 @@ class DatabaseQueryService {
       const decrypted = await CredentialsManager.decryptConfigSecrets(config as any)
       const conn = this.resolveConnection(dialect, decrypted)
 
-      // 3. SSRF-проверка хоста
-      assertDbHostAllowed(conn.host)
+      // 3. Защита хоста/пути
+      if (dialect === 'sqlite') {
+        assertSqlitePathAllowed(conn.sqliteFile!)
+      } else {
+        assertDbHostAllowed(conn.host)
+      }
 
       // 4. Параметризация
       const compiled = compileNamedParams(sql, (config as any).queryParams, dialect)
@@ -221,7 +322,9 @@ class DatabaseQueryService {
 
       const rows = dialect === 'postgresql'
         ? await this.runPostgres(conn, compiled, timeoutMs)
-        : await this.runMysql(conn, compiled, timeoutMs)
+        : dialect === 'mysql'
+          ? await this.runMysql(conn, compiled, timeoutMs)
+          : this.runSqlite(conn, compiled)
 
       const truncated = rows.length > maxRows
       const data = truncated ? rows.slice(0, maxRows) : rows
@@ -255,20 +358,28 @@ class DatabaseQueryService {
     }
   }
 
-  private resolveDialect(databaseType: unknown): 'postgresql' | 'mysql' {
+  private resolveDialect(databaseType: unknown): DbDialect {
     const t = String(databaseType || 'postgresql').toLowerCase()
     if (t === 'postgresql' || t === 'postgres' || t === 'pg') return 'postgresql'
     if (t === 'mysql' || t === 'mariadb') return 'mysql'
+    if (t === 'sqlite' || t === 'sqlite3') return 'sqlite'
     throw new DatabaseQueryError(
-      `Тип БД "${databaseType}" пока не поддержан (доступны PostgreSQL и MySQL)`,
+      `Тип БД "${databaseType}" не поддержан (доступны PostgreSQL, MySQL, SQLite)`,
       'UNSUPPORTED_DIALECT'
     )
   }
 
   private resolveConnection(
-    dialect: 'postgresql' | 'mysql',
+    dialect: DbDialect,
     config: Record<string, unknown>
   ): ResolvedConnection {
+    if (dialect === 'sqlite') {
+      const file = (config.connectionString || config.database) as string | undefined
+      if (!file) {
+        throw new DatabaseQueryError('Не задан путь к файлу SQLite (database)', 'INVALID_CONNECTION')
+      }
+      return { dialect, sqliteFile: file }
+    }
     const connectionString = config.connectionString as string | undefined
     if (connectionString) {
       return { dialect, connectionString }
@@ -375,6 +486,26 @@ class DatabaseQueryService {
     }
   }
 
+  private getSqliteDb(conn: ResolvedConnection): any {
+    const key = this.poolKey(conn)
+    const cached = this.pools.get(key)
+    if (cached) return cached.pool
+
+    const Database = getSqlite()
+    // readonly:true — соединение физически не может писать (сильнейшая гарантия).
+    const db = new Database(conn.sqliteFile, { readonly: true, fileMustExist: true })
+    this.pools.set(key, { pool: db, dialect: 'sqlite' })
+    return db
+  }
+
+  private runSqlite(conn: ResolvedConnection, compiled: CompiledQuery): any[] {
+    // better-sqlite3 синхронный; readonly-соединение уже исключает запись.
+    const db = this.getSqliteDb(conn)
+    const stmt = db.prepare(compiled.sql)
+    const rows = stmt.all(...compiled.values)
+    return Array.isArray(rows) ? rows : []
+  }
+
   private async runMysql(conn: ResolvedConnection, compiled: CompiledQuery, timeoutMs: number): Promise<any[]> {
     const pool = this.getMysqlPool(conn)
     const connection = await pool.getConnection()
@@ -398,7 +529,8 @@ class DatabaseQueryService {
   async closeAll(): Promise<void> {
     for (const { pool, dialect } of this.pools.values()) {
       try {
-        await (dialect === 'postgresql' ? pool.end() : pool.end())
+        if (dialect === 'sqlite') pool.close()
+        else await pool.end()
       } catch (e: any) {
         logger.warn('Failed to close db pool', { message: e?.message })
       }

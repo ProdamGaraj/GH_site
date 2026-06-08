@@ -120,6 +120,12 @@ class CachedDataSourceService {
       body: config.body,
       query: config.query,
       variables: config.variables,
+      // database/computed не имеют url — добавляем их различающие поля,
+      // иначе разные источники одного типа коллидируют в кэше.
+      database: (config as any).database,
+      host: (config as any).host,
+      sources: (config as any).sources,
+      mode: (config as any).mode,
     }
 
     const hash = crypto

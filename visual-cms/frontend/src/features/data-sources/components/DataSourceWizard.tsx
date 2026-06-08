@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
@@ -27,6 +27,8 @@ import {
   createDataSource,
   updateDataSource,
   testNewDataSourceConnection,
+  fetchDataSources,
+  selectDataSources,
   selectDataSourcesSaving,
   selectDataSourcesTesting,
   selectTestResult,
@@ -109,7 +111,7 @@ interface FormData {
   formDataDefault: string
 
   // Connection - Database (read-only SQL)
-  databaseType: 'postgresql' | 'mysql'
+  databaseType: 'postgresql' | 'mysql' | 'sqlite'
   dbConnectionMode: 'fields' | 'connectionString'
   dbHost: string
   dbPort: string
@@ -117,8 +119,25 @@ interface FormData {
   dbUsername: string
   dbPassword: string
   dbConnectionString: string
+  dbSqliteFile: string
   dbQuery: string
   dbQueryParams: string
+
+  // Connection - External (пресеты над REST)
+  externalServiceType: 'wordpress' | 'strapi' | 'shopify' | 'custom'
+  extWpEndpoint: string
+  extWpPerPage: string
+  extStrapiContentType: string
+  extStrapiPopulate: string
+  extShopifyResource: string
+  extShopifyLimit: string
+  extApiVersion: string
+
+  // Connection - Computed (объединение источников)
+  computedSources: { sourceId: string; arrayPath: string }[]
+  computedMode: 'concat' | 'merge'
+  computedJoinLocal: string
+  computedJoinForeign: string
 
   // Auth
   authType: AuthType
@@ -177,8 +196,21 @@ const initialFormData: FormData = {
   dbUsername: '',
   dbPassword: '',
   dbConnectionString: '',
+  dbSqliteFile: '',
   dbQuery: '',
   dbQueryParams: '{}',
+  externalServiceType: 'wordpress',
+  extWpEndpoint: '/wp-json/wp/v2/posts',
+  extWpPerPage: '20',
+  extStrapiContentType: 'articles',
+  extStrapiPopulate: '',
+  extShopifyResource: 'products',
+  extShopifyLimit: '50',
+  extApiVersion: '2024-01',
+  computedSources: [{ sourceId: '', arrayPath: '' }],
+  computedMode: 'concat',
+  computedJoinLocal: 'id',
+  computedJoinForeign: 'id',
   authType: 'none',
   authStorage: 'inline',
   bearerToken: '',
@@ -207,12 +239,20 @@ export const DataSourceWizard: React.FC = () => {
   const saving = useAppSelector(selectDataSourcesSaving)
   const testing = useAppSelector(selectDataSourcesTesting)
   const testResult = useAppSelector(selectTestResult)
-  
+  const allDataSources = useAppSelector(selectDataSources)
+
   const isEditing = id && id !== 'new'
-  
+
   const [currentStep, setCurrentStep] = useState<DataSourceWizardStep>('type')
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({})
+
+  // Для computed нужен список других источников — подгружаем при выборе типа.
+  useEffect(() => {
+    if (formData.type === 'computed' && allDataSources.length === 0) {
+      dispatch(fetchDataSources({}))
+    }
+  }, [formData.type, allDataSources.length, dispatch])
 
   // Навигация по шагам
   const currentStepIndex = STEPS.findIndex(s => s.key === currentStep)
@@ -242,9 +282,21 @@ export const DataSourceWizard: React.FC = () => {
         }
         if (formData.type === 'database') {
           if (formData.dbQuery.trim().length === 0) return false
+          if (formData.databaseType === 'sqlite') return formData.dbSqliteFile.trim().length > 0
           return formData.dbConnectionMode === 'connectionString'
             ? formData.dbConnectionString.trim().length > 0
             : formData.dbHost.trim().length > 0 && formData.dbDatabase.trim().length > 0
+        }
+        if (formData.type === 'external') {
+          return formData.url.trim().length > 0
+        }
+        if (formData.type === 'computed') {
+          const hasSources = formData.computedSources.some(s => s.sourceId)
+          if (!hasSources) return false
+          if (formData.computedMode === 'merge') {
+            return formData.computedJoinLocal.trim().length > 0 && formData.computedJoinForeign.trim().length > 0
+          }
+          return true
         }
         return true
       case 'auth':
@@ -384,6 +436,9 @@ export const DataSourceWizard: React.FC = () => {
           query: formData.dbQuery,
           ...(queryParams ? { queryParams } : {}),
         }
+        if (formData.databaseType === 'sqlite') {
+          return { ...base, database: formData.dbSqliteFile }
+        }
         if (formData.dbConnectionMode === 'connectionString') {
           return { ...base, connectionString: formData.dbConnectionString }
         }
@@ -395,6 +450,49 @@ export const DataSourceWizard: React.FC = () => {
           username: formData.dbUsername || undefined,
           password: formData.dbPassword || undefined,
         }
+      }
+
+      case 'external': {
+        const cfg: Record<string, unknown> = {
+          type: 'external',
+          serviceType: formData.externalServiceType,
+          url: formData.url,
+        }
+        if (formData.externalServiceType === 'wordpress') {
+          cfg.wordpress = {
+            endpoint: formData.extWpEndpoint || undefined,
+            perPage: formData.extWpPerPage ? parseInt(formData.extWpPerPage, 10) : undefined,
+          }
+        } else if (formData.externalServiceType === 'strapi') {
+          cfg.strapi = {
+            contentType: formData.extStrapiContentType || undefined,
+            populate: formData.extStrapiPopulate
+              ? formData.extStrapiPopulate.split(',').map(s => s.trim()).filter(Boolean)
+              : undefined,
+          }
+        } else if (formData.externalServiceType === 'shopify') {
+          cfg.apiVersion = formData.extApiVersion || undefined
+          cfg.shopify = {
+            resource: formData.extShopifyResource || undefined,
+            limit: formData.extShopifyLimit ? parseInt(formData.extShopifyLimit, 10) : undefined,
+          }
+        }
+        return cfg
+      }
+
+      case 'computed': {
+        const sources = formData.computedSources
+          .filter(s => s.sourceId)
+          .map(s => ({ sourceId: s.sourceId, ...(s.arrayPath ? { arrayPath: s.arrayPath } : {}) }))
+        const cfg: Record<string, unknown> = {
+          type: 'computed',
+          sources,
+          mode: formData.computedMode,
+        }
+        if (formData.computedMode === 'merge') {
+          cfg.joinKey = { local: formData.computedJoinLocal, foreign: formData.computedJoinForeign }
+        }
+        return cfg
       }
 
       default:
@@ -638,6 +736,10 @@ export const DataSourceWizard: React.FC = () => {
         return renderFormDataConnection()
       case 'database':
         return renderDatabaseConnection()
+      case 'external':
+        return renderExternalConnection()
+      case 'computed':
+        return renderComputedConnection()
       default:
         return (
           <div className="text-center text-gray-500 py-8">
@@ -945,14 +1047,34 @@ export const DataSourceWizard: React.FC = () => {
           <label className="block text-sm font-medium text-gray-700 mb-1">СУБД</label>
           <select
             value={formData.databaseType}
-            onChange={(e) => updateForm({ databaseType: e.target.value as 'postgresql' | 'mysql' })}
+            onChange={(e) => updateForm({ databaseType: e.target.value as 'postgresql' | 'mysql' | 'sqlite' })}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
           >
             <option value="postgresql">PostgreSQL</option>
             <option value="mysql">MySQL</option>
+            <option value="sqlite">SQLite</option>
           </select>
         </div>
 
+        {formData.databaseType === 'sqlite' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Путь к файлу SQLite <span className="text-red-500">*</span>
+            </label>
+            <Input
+              value={formData.dbSqliteFile}
+              onChange={(e) => updateForm({ dbSqliteFile: e.target.value })}
+              placeholder="data/catalog.sqlite"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Путь относительно <code className="bg-gray-100 px-1 rounded">SQLITE_ALLOWED_DIR</code> на сервере.
+              Открывается только для чтения.
+            </p>
+          </div>
+        )}
+
+        {formData.databaseType !== 'sqlite' && (
+        <>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Способ подключения</label>
           <div className="flex gap-2">
@@ -1037,6 +1159,8 @@ export const DataSourceWizard: React.FC = () => {
             </div>
           </div>
         )}
+        </>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1078,6 +1202,180 @@ export const DataSourceWizard: React.FC = () => {
       </div>
     </div>
   )
+
+  // External подключение (пресеты над REST)
+  const renderExternalConnection = () => (
+    <div className="max-w-2xl">
+      <h2 className="text-xl font-semibold text-gray-900 mb-2">External Service</h2>
+      <p className="text-gray-600 mb-6">
+        Готовые пресеты популярных сервисов — резолвятся в обычный REST-запрос.
+        Авторизация (если нужна) настраивается на следующем шаге.
+      </p>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Сервис</label>
+          <select
+            value={formData.externalServiceType}
+            onChange={(e) => updateForm({ externalServiceType: e.target.value as FormData['externalServiceType'] })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-700"
+          >
+            <option value="wordpress">WordPress (REST API)</option>
+            <option value="strapi">Strapi</option>
+            <option value="shopify">Shopify Admin API</option>
+            <option value="custom">Custom (базовый URL как есть)</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Base URL <span className="text-red-500">*</span>
+          </label>
+          <Input value={formData.url} onChange={(e) => updateForm({ url: e.target.value })} placeholder="https://example.com" />
+        </div>
+
+        {formData.externalServiceType === 'wordpress' && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Endpoint</label>
+              <Input value={formData.extWpEndpoint} onChange={(e) => updateForm({ extWpEndpoint: e.target.value })} placeholder="/wp-json/wp/v2/posts" />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Per page</label>
+              <Input value={formData.extWpPerPage} onChange={(e) => updateForm({ extWpPerPage: e.target.value })} placeholder="20" />
+            </div>
+          </div>
+        )}
+
+        {formData.externalServiceType === 'strapi' && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Content type</label>
+              <Input value={formData.extStrapiContentType} onChange={(e) => updateForm({ extStrapiContentType: e.target.value })} placeholder="articles" />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Populate (через запятую)</label>
+              <Input value={formData.extStrapiPopulate} onChange={(e) => updateForm({ extStrapiPopulate: e.target.value })} placeholder="cover,author" />
+            </div>
+          </div>
+        )}
+
+        {formData.externalServiceType === 'shopify' && (
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Resource</label>
+              <Input value={formData.extShopifyResource} onChange={(e) => updateForm({ extShopifyResource: e.target.value })} placeholder="products" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">API version</label>
+              <Input value={formData.extApiVersion} onChange={(e) => updateForm({ extApiVersion: e.target.value })} placeholder="2024-01" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Limit</label>
+              <Input value={formData.extShopifyLimit} onChange={(e) => updateForm({ extShopifyLimit: e.target.value })} placeholder="50" />
+            </div>
+          </div>
+        )}
+
+        {formData.externalServiceType === 'shopify' && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+            Shopify Admin API требует токен — задайте его на шаге авторизации (обычно API Key в заголовке <code>X-Shopify-Access-Token</code>).
+          </p>
+        )}
+      </div>
+    </div>
+  )
+
+  // Computed подключение (объединение других источников)
+  const updateComputedSource = (idx: number, patch: Partial<{ sourceId: string; arrayPath: string }>) => {
+    setFormData(prev => ({
+      ...prev,
+      computedSources: prev.computedSources.map((s, i) => (i === idx ? { ...s, ...patch } : s)),
+    }))
+  }
+  const renderComputedConnection = () => {
+    // Не предлагаем сам себя и другие computed-источники в качестве вложенных без нужды
+    const options = allDataSources
+    return (
+      <div className="max-w-2xl">
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Computed (объединение источников)</h2>
+        <p className="text-gray-600 mb-6">
+          Собирает данные из нескольких источников на сервере. <b>Concat</b> — склейка записей подряд;
+          <b> Merge</b> — обогащение первого источника полями остальных по ключу.
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Источники</label>
+            <div className="space-y-2">
+              {formData.computedSources.map((s, idx) => (
+                <div key={idx} className="flex gap-2 items-start">
+                  <select
+                    value={s.sourceId}
+                    onChange={(e) => updateComputedSource(idx, { sourceId: e.target.value })}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-700 text-sm"
+                  >
+                    <option value="">Выберите источник…</option>
+                    {options.map(ds => (
+                      <option key={ds.id} value={ds.id}>{ds.name} ({ds.type})</option>
+                    ))}
+                  </select>
+                  <Input
+                    value={s.arrayPath}
+                    onChange={(e) => updateComputedSource(idx, { arrayPath: e.target.value })}
+                    placeholder="arrayPath (напр. data)"
+                    className="w-44"
+                  />
+                  {formData.computedSources.length > 1 && (
+                    <Button variant="ghost" size="sm" onClick={() => setFormData(prev => ({ ...prev, computedSources: prev.computedSources.filter((_, i) => i !== idx) }))}>
+                      <X size={16} />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <Button variant="secondary" size="sm" className="mt-2" onClick={() => setFormData(prev => ({ ...prev, computedSources: [...prev.computedSources, { sourceId: '', arrayPath: '' }] }))}>
+              + Добавить источник
+            </Button>
+            {options.length === 0 && (
+              <p className="text-xs text-gray-500 mt-1">Сначала создайте обычные источники — их можно будет объединить здесь.</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Режим</label>
+            <div className="flex gap-2">
+              {(['concat', 'merge'] as const).map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => updateForm({ computedMode: m })}
+                  className={`px-3 py-1.5 text-sm rounded-lg border ${
+                    formData.computedMode === m ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  {m === 'concat' ? 'Concat (склейка)' : 'Merge (join по ключу)'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {formData.computedMode === 'merge' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ключ базового (local)</label>
+                <Input value={formData.computedJoinLocal} onChange={(e) => updateForm({ computedJoinLocal: e.target.value })} placeholder="id" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ключ остальных (foreign)</label>
+                <Input value={formData.computedJoinForeign} onChange={(e) => updateForm({ computedJoinForeign: e.target.value })} placeholder="project_id" />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   // Шаг 4: Авторизация
   const renderAuthStep = () => (
