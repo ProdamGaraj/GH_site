@@ -98,7 +98,11 @@
       "Bash(docker --version)",
       "Bash(docker exec *)",
       "Bash(npx ts-node *)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(docker rm *)",
+      "Bash(docker run *)",
+      "Bash(echo \"seeded: $\\(docker exec vcms-mysql-e2e mysql -N -u root -prootpw e2e -e 'SELECT COUNT\\(*\\) FROM items;' \\) rows\")",
+      "Bash(grep -vE \"ts-jest|isolatedModules|^\\\\s*$\")"
     ],
     "additionalDirectories": [
       "\\tmp",
