@@ -20,6 +20,9 @@ export const DOCUMENT_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx'
 /**
  * Значение атрибута `accept` для <input type="file"> по виду медиа.
  * Единый источник правды, чтобы не плодить копии строк по компонентам.
+ *
+ * Для 'any' (общая медиатека) ограничений нет — можно загрузить что угодно,
+ * бэкенд сам распределит файл по категории (image/video/document).
  */
 export function mediaAcceptAttr(kind: MediaKind | 'any'): string {
   switch (kind) {
@@ -30,7 +33,7 @@ export function mediaAcceptAttr(kind: MediaKind | 'any'): string {
     case 'document':
       return DOCUMENT_ACCEPT
     default:
-      return `image/*,video/*,${DOCUMENT_ACCEPT}`
+      return '*/*'
   }
 }
 

@@ -108,7 +108,18 @@
       "Bash(grep -iE \"migration|\\\\.sql$\")",
       "Bash(echo \"FRONTEND_TSC_EXIT=$?\")",
       "Bash(echo \"BACKEND_TSC_EXIT=$?\")",
-      "Bash(echo \"FE_ESLINT_EXIT=$?\")"
+      "Bash(echo \"FE_ESLINT_EXIT=$?\")",
+      "Bash(echo \"=== EXIT $? ===\")",
+      "Bash(curl -s -m 10 -w \"\\\\nHTTP_CODE=%{http_code}\\\\n\" \"http://localhost:5000/api/media?limit=5\")",
+      "Bash(docker restart *)",
+      "Bash(curl -s -m 10 -w \"\\\\nHTTP_CODE=%{http_code}\\\\n\" \"http://localhost:5000/api/media?limit=3\")",
+      "Bash(echo \"BE_TSC_EXIT=$?\")",
+      "Bash(echo \"FE_TSC_EXIT=$?\")",
+      "Bash(curl -s -m 8 -o /dev/null -w \"media endpoint HTTP=%{http_code}\\\\n\" \"http://localhost:5000/api/media?limit=1\")",
+      "Bash(grep -iE \"nginx|\\\\.conf$|public-site.*conf\")",
+      "Bash(echo \"ESLINT_EXIT=$?\")",
+      "Bash(ESLINT_USE_FLAT_CONFIG=false npx eslint src/services/mediaMime.ts src/services/MediaService.ts src/services/MinioStorageService.ts src/scripts/backfill-media-disposition.ts)",
+      "Bash(grep -vE \"^query:|AWS SDK|migration|Database|reached end|^\\\\s*$|node --trace\")"
     ],
     "additionalDirectories": [
       "\\tmp",

@@ -69,17 +69,41 @@ export class MinioStorageService {
     key: string,
     body: Buffer,
     contentType: string,
+    contentDisposition?: string,
   ): Promise<void> {
     await this.ensureBucket()
-    await this.s3
-      .putObject({
-        Bucket: this.bucket,
-        Key: key,
-        Body: body,
-        ContentType: contentType,
-        CacheControl: 'public, max-age=2592000, immutable',
-      })
-      .promise()
+    const params: AWS.S3.PutObjectRequest = {
+      Bucket: this.bucket,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      CacheControl: 'public, max-age=2592000, immutable',
+    }
+    if (contentDisposition) params.ContentDisposition = contentDisposition
+    await this.s3.putObject(params).promise()
+  }
+
+  /**
+   * Обновляет метаданные существующего объекта (Content-Type / Content-Disposition)
+   * через copyObject в тот же ключ с MetadataDirective=REPLACE.
+   * Используется backfill-скриптом, чтобы выставить attachment на уже загруженные файлы.
+   */
+  async setObjectMetadata(
+    key: string,
+    contentType: string,
+    contentDisposition?: string,
+  ): Promise<void> {
+    await this.ensureBucket()
+    const params: AWS.S3.CopyObjectRequest = {
+      Bucket: this.bucket,
+      Key: key,
+      CopySource: `/${this.bucket}/${encodeURIComponent(key)}`,
+      MetadataDirective: 'REPLACE',
+      ContentType: contentType,
+      CacheControl: 'public, max-age=2592000, immutable',
+    }
+    if (contentDisposition) params.ContentDisposition = contentDisposition
+    await this.s3.copyObject(params).promise()
   }
 
   async deleteObject(key: string): Promise<void> {

@@ -5,7 +5,7 @@ import { MediaAsset, MediaKind } from '../models/MediaAsset'
 import { minioStorageService } from './MinioStorageService'
 import { ValidationError } from '../middleware'
 import { logger } from './Logger'
-import { detectKind, extFromMime, validateSize } from './mediaMime'
+import { detectKind, extFromMime, validateSize, isInlineSafe, buildContentDisposition } from './mediaMime'
 
 export interface UploadInput {
   file: Express.Multer.File
@@ -43,7 +43,12 @@ export class MediaService {
     const id = uuidv4()
     const storageKey = `${id}.${ext}`
 
-    await minioStorageService.putObject(storageKey, file.buffer, file.mimetype)
+    // Не inline-safe (SVG, PDF, office, любые файлы) отдаём как attachment —
+    // чтобы при открытии по ссылке файл скачивался, а не исполнялся в браузере.
+    const disposition = isInlineSafe(file.mimetype)
+      ? undefined
+      : buildContentDisposition(file.originalname)
+    await minioStorageService.putObject(storageKey, file.buffer, file.mimetype, disposition)
 
     // Generate thumbnail for raster images (skip SVG — vectors don't need it).
     let thumbnailStorageKey: string | null = null
@@ -80,10 +85,15 @@ export class MediaService {
         (poster.originalname.split('.').pop() || 'jpg').toLowerCase(),
       )
       posterStorageKey = `${id}-poster.${posterExt}`
+      // SVG-постер тоже проходит проверку 'image' — отдаём его как attachment.
+      const posterDisposition = isInlineSafe(poster.mimetype)
+        ? undefined
+        : buildContentDisposition(poster.originalname)
       await minioStorageService.putObject(
         posterStorageKey,
         poster.buffer,
         poster.mimetype,
+        posterDisposition,
       )
     }
 
