@@ -1,7 +1,38 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Image as ImageIcon, Film, Loader2, Trash2, Upload, X, Search } from 'lucide-react'
-import { mediaApi, type MediaAsset, type MediaKind, resolveMediaUrl } from '@/shared/api/mediaApi'
+import { Image as ImageIcon, Film, FileText, Loader2, Trash2, Upload, X, Search, Copy, Check } from 'lucide-react'
+import { mediaApi, mediaAcceptAttr, type MediaAsset, type MediaKind, resolveMediaUrl } from '@/shared/api/mediaApi'
 import { cn } from '@/shared/utils'
+
+/** Копирование в буфер с fallback для незащищённого контекста (не https/localhost). */
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    // fall through to legacy path
+  }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}
+
+/** Расширение файла в верхнем регистре для бейджа карточки документа. */
+function fileExt(fileName: string): string {
+  const ext = fileName.split('.').pop()
+  return ext && ext !== fileName ? ext.toUpperCase() : 'DOC'
+}
 
 export interface MediaLibraryProps {
   /** Restrict by kind. 'any' = both. */
@@ -143,7 +174,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
 
         {kind === 'any' && (
           <div className="flex border border-gray-300 rounded overflow-hidden text-sm">
-            {(['any', 'image', 'video'] as const).map((k) => (
+            {(['any', 'image', 'video', 'document'] as const).map((k) => (
               <button
                 key={k}
                 type="button"
@@ -156,7 +187,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
                   activeKind === k ? 'bg-primary-100 text-primary-700' : 'bg-white text-gray-600 hover:bg-gray-50',
                 )}
               >
-                {k === 'any' ? 'Все' : k === 'image' ? 'Фото' : 'Видео'}
+                {k === 'any' ? 'Все' : k === 'image' ? 'Фото' : k === 'video' ? 'Видео' : 'Документы'}
               </button>
             ))}
           </div>
@@ -167,13 +198,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
             <input
               ref={fileInputRef}
               type="file"
-              accept={
-                kind === 'image'
-                  ? 'image/*'
-                  : kind === 'video'
-                  ? 'video/*'
-                  : 'image/*,video/*'
-              }
+              accept={mediaAcceptAttr(kind)}
               multiple
               hidden
               onChange={(e) => e.target.files && handleUploadFiles(e.target.files)}
@@ -284,6 +309,16 @@ const MediaCard: React.FC<MediaCardProps> = ({ asset, selectable, onSelect, onDe
   const thumbUrl = asset.thumbnailUrl ? resolveMediaUrl(asset.thumbnailUrl) : url
   const posterUrl = asset.posterUrl ? resolveMediaUrl(asset.posterUrl) : null
   const isVideo = asset.kind === 'video'
+  const isDocument = asset.kind === 'document'
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback(async () => {
+    const ok = await copyToClipboard(url)
+    if (ok) {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    }
+  }, [url])
 
   return (
     <div
@@ -291,7 +326,12 @@ const MediaCard: React.FC<MediaCardProps> = ({ asset, selectable, onSelect, onDe
       style={{ contentVisibility: 'auto', containIntrinsicSize: '180px 200px' } as React.CSSProperties}
     >
       <div className="aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
-        {isVideo ? (
+        {isDocument ? (
+          <div className="flex flex-col items-center text-gray-400">
+            <FileText size={28} />
+            <span className="text-[10px] mt-1 uppercase">{fileExt(asset.fileName)}</span>
+          </div>
+        ) : isVideo ? (
           posterUrl ? (
             <img
               src={posterUrl}
@@ -314,13 +354,18 @@ const MediaCard: React.FC<MediaCardProps> = ({ asset, selectable, onSelect, onDe
             loading="lazy"
             decoding="async"
             onError={(e) => {
-              ;(e.currentTarget as HTMLImageElement).style.display = 'none'
+              (e.currentTarget as HTMLImageElement).style.display = 'none'
             }}
           />
         )}
         {isVideo && (
           <span className="absolute top-1 left-1 px-1.5 py-0.5 bg-black/70 text-white text-[10px] rounded">
             VIDEO
+          </span>
+        )}
+        {isDocument && (
+          <span className="absolute top-1 left-1 px-1.5 py-0.5 bg-black/70 text-white text-[10px] rounded">
+            {fileExt(asset.fileName)}
           </span>
         )}
       </div>
@@ -345,6 +390,14 @@ const MediaCard: React.FC<MediaCardProps> = ({ asset, selectable, onSelect, onDe
         >
           Открыть
         </a>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="px-3 py-1.5 bg-white/90 text-gray-900 text-xs rounded shadow inline-flex items-center gap-1"
+        >
+          {copied ? <Check size={12} /> : <Copy size={12} />}
+          {copied ? 'Скопировано' : 'Копировать ссылку'}
+        </button>
         {onDelete && (
           <button
             type="button"

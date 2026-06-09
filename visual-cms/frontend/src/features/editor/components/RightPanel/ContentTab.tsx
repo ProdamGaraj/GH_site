@@ -5,7 +5,9 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { updateNode, updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
 import { ImageUpload } from './ImageUpload'
-import { Link as LinkIcon, Image as ImageIcon, Code as CodeIcon } from 'lucide-react'
+import { MediaPicker } from '@/features/media/MediaPicker'
+import { resolveMediaUrl } from '@/shared/api/mediaApi'
+import { Link as LinkIcon, Image as ImageIcon, Code as CodeIcon, FileText } from 'lucide-react'
 import type { BlockNode, Page } from '@/shared/types'
 import { pageApi } from '@/shared/api'
 
@@ -18,6 +20,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
   const viewport = useAppSelector(selectViewport)
   const { id: pageId } = useParams<{ id: string }>()
   const [sitePages, setSitePages] = useState<Page[]>([])
+  const [docPickerOpen, setDocPickerOpen] = useState(false)
 
   // Load sibling pages for the page link picker
   useEffect(() => {
@@ -191,6 +194,22 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
             value={node.attributes?.href || ''}
             onChange={(e) => handleAttributeChange('href', e.target.value)}
             placeholder="https://example.com"
+          />
+          <button
+            type="button"
+            onClick={() => setDocPickerOpen(true)}
+            className="w-full px-2 py-1.5 text-xs flex items-center justify-center gap-1 border border-gray-300 rounded bg-white text-gray-700 hover:bg-gray-50"
+          >
+            <FileText size={12} /> Выбрать документ
+          </button>
+          <MediaPicker
+            open={docPickerOpen}
+            kind="document"
+            onClose={() => setDocPickerOpen(false)}
+            onSelect={(asset) => {
+              handleAttributeChange('href', resolveMediaUrl(asset.url))
+              handleAttributeChange('data-page-id', '')
+            }}
           />
           <div>
             <label className="text-xs text-gray-600 mb-1 block">Открывать в</label>

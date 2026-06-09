@@ -10,12 +10,12 @@ import {
 /**
  * Media Library Asset
  *
- * Хранит метаданные ассетов (image/video), сами файлы лежат в MinIO/S3
+ * Хранит метаданные ассетов (image/video/document), сами файлы лежат в MinIO/S3
  * под ключом `storageKey`. URL вычисляется как `PUBLIC_MEDIA_URL + '/' + storageKey`.
  *
  * siteId nullable: null = глобальный ассет, доступен любому сайту.
  */
-export type MediaKind = 'image' | 'video'
+export type MediaKind = 'image' | 'video' | 'document'
 
 @Entity('media_assets')
 @Index(['siteId'])

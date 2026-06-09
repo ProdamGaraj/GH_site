@@ -12,7 +12,7 @@ export const listMediaQuerySchema = z.object({
     .union([z.boolean(), z.string()])
     .transform((v) => (typeof v === 'string' ? v === 'true' : v))
     .optional(),
-  kind: z.enum(['image', 'video']).optional(),
+  kind: z.enum(['image', 'video', 'document']).optional(),
   search: z.string().max(255).optional(),
   tag: z.string().max(64).optional(),
   page: z.coerce.number().int().min(1).optional(),

@@ -12,7 +12,27 @@
 import { api } from './index'
 import { getApiBaseUrl } from './baseUrl'
 
-export type MediaKind = 'image' | 'video'
+export type MediaKind = 'image' | 'video' | 'document'
+
+/** Расширения документов, принимаемых медиатекой (PDF + офисные форматы). */
+export const DOCUMENT_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx'
+
+/**
+ * Значение атрибута `accept` для <input type="file"> по виду медиа.
+ * Единый источник правды, чтобы не плодить копии строк по компонентам.
+ */
+export function mediaAcceptAttr(kind: MediaKind | 'any'): string {
+  switch (kind) {
+    case 'image':
+      return 'image/*'
+    case 'video':
+      return 'video/*'
+    case 'document':
+      return DOCUMENT_ACCEPT
+    default:
+      return `image/*,video/*,${DOCUMENT_ACCEPT}`
+  }
+}
 
 export interface MediaAsset {
   id: string

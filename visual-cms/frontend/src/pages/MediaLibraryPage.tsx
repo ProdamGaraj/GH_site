@@ -10,7 +10,8 @@ export const MediaLibraryPage: React.FC = () => {
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Медиа-библиотека</h1>
           <p className="text-gray-600 mt-1">
-            Все изображения и видео сайта. Загружайте файлы здесь, а затем выбирайте их в блоках.
+            Все изображения, видео и документы (PDF, Office) сайта. Загружайте файлы здесь,
+            а затем выбирайте их в блоках или вставляйте ссылку для скачивания.
           </p>
         </div>
         <MediaLibrary kind="any" />

@@ -45,6 +45,8 @@ export const MediaPicker: React.FC<MediaPickerProps> = ({
                 ? 'Выбрать изображение'
                 : kind === 'video'
                 ? 'Выбрать видео'
+                : kind === 'document'
+                ? 'Выбрать документ'
                 : 'Выбрать медиа')}
           </h2>
           <MediaCloseBtn onClick={onClose} />

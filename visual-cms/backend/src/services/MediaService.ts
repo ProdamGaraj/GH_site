@@ -5,25 +5,7 @@ import { MediaAsset, MediaKind } from '../models/MediaAsset'
 import { minioStorageService } from './MinioStorageService'
 import { ValidationError } from '../middleware'
 import { logger } from './Logger'
-
-const IMAGE_MIMES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-  'image/svg+xml',
-  'image/avif',
-])
-
-const VIDEO_MIMES = new Set([
-  'video/mp4',
-  'video/webm',
-  'video/quicktime',
-  'video/x-matroska',
-])
-
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024 // 10 MB
-const MAX_VIDEO_BYTES = 200 * 1024 * 1024 // 200 MB
+import { detectKind, extFromMime, validateSize } from './mediaMime'
 
 export interface UploadInput {
   file: Express.Multer.File
@@ -49,46 +31,15 @@ export class MediaService {
     return AppDataSource.getRepository(MediaAsset)
   }
 
-  private detectKind(mime: string): MediaKind {
-    if (IMAGE_MIMES.has(mime)) return 'image'
-    if (VIDEO_MIMES.has(mime)) return 'video'
-    throw new ValidationError(`Unsupported mime type: ${mime}`)
-  }
-
-  private extFromMime(mime: string, fallback: string): string {
-    const map: Record<string, string> = {
-      'image/jpeg': 'jpg',
-      'image/png': 'png',
-      'image/webp': 'webp',
-      'image/gif': 'gif',
-      'image/svg+xml': 'svg',
-      'image/avif': 'avif',
-      'video/mp4': 'mp4',
-      'video/webm': 'webm',
-      'video/quicktime': 'mov',
-      'video/x-matroska': 'mkv',
-    }
-    return map[mime] ?? fallback
-  }
-
-  private validateSize(kind: MediaKind, size: number) {
-    const limit = kind === 'image' ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES
-    if (size > limit) {
-      throw new ValidationError(
-        `File too large: ${size} bytes (max ${limit} for ${kind})`,
-      )
-    }
-  }
-
   async upload(input: UploadInput): Promise<MediaAsset> {
     const { file, poster, siteId, title, alt, tags } = input
     if (!file) throw new ValidationError('file is required')
 
-    const kind = this.detectKind(file.mimetype)
-    this.validateSize(kind, file.size)
+    const kind = detectKind(file.mimetype)
+    validateSize(kind, file.size)
 
     const fallbackExt = (file.originalname.split('.').pop() || '').toLowerCase()
-    const ext = this.extFromMime(file.mimetype, fallbackExt || 'bin')
+    const ext = extFromMime(file.mimetype, fallbackExt || 'bin')
     const id = uuidv4()
     const storageKey = `${id}.${ext}`
 
@@ -119,12 +70,12 @@ export class MediaService {
 
     let posterStorageKey: string | null = null
     if (kind === 'video' && poster) {
-      const posterKind = this.detectKind(poster.mimetype)
+      const posterKind = detectKind(poster.mimetype)
       if (posterKind !== 'image') {
         throw new ValidationError('poster must be an image')
       }
-      this.validateSize('image', poster.size)
-      const posterExt = this.extFromMime(
+      validateSize('image', poster.size)
+      const posterExt = extFromMime(
         poster.mimetype,
         (poster.originalname.split('.').pop() || 'jpg').toLowerCase(),
       )
