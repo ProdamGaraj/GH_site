@@ -112,4 +112,8 @@ export const router = createBrowserRouter([
     path: '/data-sources/:id/edit',
     element: <DataSourceEditor />,
   },
-])
+], {
+  // Must match Vite's `base` so routes resolve when the app is served under the
+  // /visual_cms/ path prefix (import.meta.env.BASE_URL === '/visual_cms/').
+  basename: import.meta.env.BASE_URL,
+})
