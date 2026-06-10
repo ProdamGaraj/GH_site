@@ -134,6 +134,84 @@ export function markAsHybridStatic(node: BlockNode): BlockNode {
   }
 }
 
+/**
+ * Атрибут-якорь позиции hybrid-static-слайда среди шаблонных (data) слайдов:
+ * "после скольких data-слайдов показать этот static". Позволяет вставлять
+ * статик/фото МЕЖДУ сгенерированными слайдами (а не только до/после блока).
+ */
+export const STATIC_AFTER_ATTR = 'data-carousel-after'
+
+/**
+ * Эффективный якорь static-слайда — сколько data-слайдов идёт ПЕРЕД ним:
+ *   - явный data-carousel-after (clamp в [0, dataCount]);
+ *   - иначе backward-compat по физической позиции: ДО template → 0, ПОСЛЕ → dataCount.
+ */
+export function getStaticAfterIndex(
+  node: BlockNode,
+  opts: { isBeforeTemplate: boolean; dataCount: number }
+): number {
+  const raw = node.attributes?.[STATIC_AFTER_ATTR]
+  const n = raw === undefined || raw === '' ? NaN : Number(raw)
+  if (!Number.isNaN(n)) return Math.max(0, Math.min(opts.dataCount, Math.floor(n)))
+  return opts.isBeforeTemplate ? 0 : opts.dataCount
+}
+
+/** Записать якорь позиции в атрибуты узла (immutable). */
+export function withStaticAfter(node: BlockNode, afterIndex: number): BlockNode {
+  return {
+    ...node,
+    attributes: {
+      ...(node.attributes || {}),
+      [STATIC_AFTER_ATTR]: String(Math.max(0, Math.floor(afterIndex))),
+    },
+  }
+}
+
+/** Есть ли среди детей трека хотя бы один static с явным якорем (гейт интерливинга). */
+export function hasAnchoredStatic(track: BlockNode | null | undefined): boolean {
+  if (!track || !Array.isArray(track.children)) return false
+  return track.children.some(
+    c => isHybridStaticSlide(c) && c.attributes?.[STATIC_AFTER_ATTR] !== undefined
+  )
+}
+
+export interface OrderedDataSlide {
+  kind: 'data'
+  index: number
+}
+export interface OrderedStaticSlide {
+  kind: 'static'
+  node: BlockNode
+}
+export type OrderedSlide = OrderedDataSlide | OrderedStaticSlide
+
+/**
+ * Интерливит шаблонные (data) слайды со static-слайдами по их якорям.
+ * Для i в [0..dataCount]: сначала статики с anchor==i (в порядке трека), затем data-слайд i.
+ * При отсутствии якорей даёт прежний порядок: static-before → все data → static-after.
+ */
+export function computeSlideOrder(
+  track: BlockNode | null | undefined,
+  template: BlockNode | null | undefined,
+  dataCount: number
+): OrderedSlide[] {
+  if (!track || !Array.isArray(track.children)) return []
+  const children = track.children
+  const tplIdx = template ? children.findIndex(c => c.id === template.id) : -1
+  const statics: { node: BlockNode; anchor: number }[] = []
+  children.forEach((c, idx) => {
+    if (!isHybridStaticSlide(c)) return
+    const isBeforeTemplate = tplIdx !== -1 && idx < tplIdx
+    statics.push({ node: c, anchor: getStaticAfterIndex(c, { isBeforeTemplate, dataCount }) })
+  })
+  const result: OrderedSlide[] = []
+  for (let i = 0; i <= dataCount; i++) {
+    for (const s of statics) if (s.anchor === i) result.push({ kind: 'static', node: s.node })
+    if (i < dataCount) result.push({ kind: 'data', index: i })
+  }
+  return result
+}
+
 /** Снять hybrid-static маркер (immutable copy). */
 export function unmarkAsHybridStatic(node: BlockNode): BlockNode {
   const attrs = { ...(node.attributes || {}) }

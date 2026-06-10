@@ -8,6 +8,8 @@ import {
   type MapperField,
   readSlideValue,
   writeSlideValue,
+  isSlideFieldVisible,
+  setSlideFieldVisible,
 } from '@/features/editor/utils/bindingMapperHelper'
 
 export type SlideAlignment = 'left' | 'center' | 'right'
@@ -60,6 +62,27 @@ export const GenericSlideRow: React.FC<GenericSlideRowProps> = ({
     onChange(writeSlideValue(slide, sourceField, value))
   }
 
+  // Шапка поля: подпись + чекбокс «Отображать» (по умолчанию ✓).
+  // Снятие галочки скрывает блок на этом слайде (текст/кнопку — display:none,
+  // фон-картинку — очищает). Логика применения — в RepeaterRenderer и public-site runtime.
+  const FieldHeader: React.FC<{ field: MapperField }> = ({ field }) => (
+    <div className="flex items-center justify-between mb-1">
+      <label className="text-xs font-medium text-gray-700">{field.label}</label>
+      <label
+        className="flex items-center gap-1 text-[11px] text-gray-500 cursor-pointer select-none"
+        title="Показывать этот блок на слайде"
+      >
+        <input
+          type="checkbox"
+          className="accent-blue-600"
+          checked={isSlideFieldVisible(slide, field.sourceField)}
+          onChange={e => onChange(setSlideFieldVisible(slide, field.sourceField, e.target.checked))}
+        />
+        Отображать
+      </label>
+    </div>
+  )
+
   const setAlignment = (a: SlideAlignment) => {
     onChange({ ...slide, alignment: a })
   }
@@ -105,8 +128,8 @@ export const GenericSlideRow: React.FC<GenericSlideRowProps> = ({
             const value = readSlideValue(slide, field.sourceField)
             if (field.kind === 'media') {
               return (
-                <div key={field.sourceField}>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">{field.label}</label>
+                <div key={field.sourceField} style={{ opacity: isSlideFieldVisible(slide, field.sourceField) ? 1 : 0.5 }}>
+                  <FieldHeader field={field} />
                   <div className="flex gap-2 items-center">
                     <Input
                       value={value}
@@ -128,8 +151,8 @@ export const GenericSlideRow: React.FC<GenericSlideRowProps> = ({
             }
             if (field.kind === 'url') {
               return (
-                <div key={field.sourceField}>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">{field.label}</label>
+                <div key={field.sourceField} style={{ opacity: isSlideFieldVisible(slide, field.sourceField) ? 1 : 0.5 }}>
+                  <FieldHeader field={field} />
                   <Input
                     value={value}
                     onChange={e => setField(field.sourceField, e.target.value)}
@@ -142,8 +165,8 @@ export const GenericSlideRow: React.FC<GenericSlideRowProps> = ({
             // Для длинных полей (description-style) показываем textarea, иначе input.
             const isMultiline = /description|content|text$/i.test(field.sourceField) && field.sourceField !== 'ctaText'
             return (
-              <div key={field.sourceField}>
-                <label className="block text-xs font-medium text-gray-700 mb-1">{field.label}</label>
+              <div key={field.sourceField} style={{ opacity: isSlideFieldVisible(slide, field.sourceField) ? 1 : 0.5 }}>
+                <FieldHeader field={field} />
                 {isMultiline ? (
                   <textarea
                     value={value}

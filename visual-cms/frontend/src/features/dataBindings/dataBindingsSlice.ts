@@ -215,6 +215,15 @@ const dataBindingsSlice = createSlice({
         }
       }
     },
+
+    // Принудительно инвалидировать данные привязок (триггерит refetch в
+    // useDataBindingWithTransforms через зависимость bindingsVersion).
+    // Нужно, когда меняется НЕ сама привязка, а её источник данных — например
+    // page-переменные repeat-карусели сохранены через pageApi.updateVariables:
+    // тогда канвас должен перезапросить данные и перерисовать слайды.
+    bumpBindingsVersion: (state) => {
+      state.bindingsVersion += 1
+    },
   },
 
   extraReducers: (builder) => {
@@ -444,6 +453,7 @@ export const {
   clearFetchedData,
   clearError,
   updateCurrentBindingConfig,
+  bumpBindingsVersion,
 } = dataBindingsSlice.actions
 
 // ============ Selectors ============

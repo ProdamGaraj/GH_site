@@ -7,8 +7,9 @@ import {
   selectActiveRightPanel,
   selectNode,
   selectSelectedNode,
+  selectRootNode,
 } from '@/features/editor/editorSlice'
-import { selectAllBindings } from '@/features/dataBindings/dataBindingsSlice'
+import { selectAllBindings, bumpBindingsVersion } from '@/features/dataBindings/dataBindingsSlice'
 import {
   DndContext,
   closestCenter,
@@ -22,7 +23,7 @@ import {
   arrayMove,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { Plus } from 'lucide-react'
+import { Plus, Image as ImageIcon } from 'lucide-react'
 import { Button } from '@/shared/components/Button'
 import { pageApi, type PageVariable, type PageVariablesEnvelope } from '@/shared/api'
 import { MediaPicker } from '@/features/media/MediaPicker'
@@ -30,11 +31,13 @@ import {
   createBlockReferenceNode,
   deepCloneNode,
   findTrackNode,
+  findCarouselRootFor,
   getCarouselMode,
 } from '@/features/editor/utils/carouselHelpers'
 import {
   findRepeaterBinding,
   getMapperSchema,
+  isSlideFieldVisible,
   type MapperField,
 } from '@/features/editor/utils/bindingMapperHelper'
 import { getRepeatTemplate } from '@/features/editor/utils/repeatTemplateHelper'
@@ -45,7 +48,7 @@ import {
   prepareHybridStaticNode,
 } from '@/features/editor/utils/hybridStaticHelper'
 import { generateId } from '@/shared/utils'
-import type { Block } from '@/shared/types'
+import type { Block, BlockNode } from '@/shared/types'
 import { BlockPicker, type BlockPickerSelection } from '@/features/editor/components/BlockPicker'
 import { StaticSlidesPanel } from './StaticSlidesPanel'
 import { RepeatTemplatePicker } from './RepeatTemplatePicker'
@@ -118,6 +121,8 @@ const validateRawSlides = (slides: RawSlide[], schema: MapperField[]): string[] 
   slides.forEach((s, i) => {
     const label = `Слайд ${i + 1}`
     schema.forEach(f => {
+      // Скрытый блок (чекбокс «Отображать» снят) не обязателен к заполнению.
+      if (!isSlideFieldVisible(s, f.sourceField)) return
       const v = s[f.sourceField]
       const str = typeof v === 'string' ? v.trim() : ''
       if (f.kind === 'media' && !str) {
@@ -153,8 +158,17 @@ interface SlidesPanelProps {
 export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
   const dispatch = useAppDispatch()
   const activePanel = useAppSelector(selectActiveRightPanel)
-  const node = useAppSelector(selectSelectedNode)
+  const selectedNode = useAppSelector(selectSelectedNode)
+  const rootNode = useAppSelector(selectRootNode)
   const allBindings = useAppSelector(selectAllBindings)
+
+  // Карусель, к которой относится панель: сам выбранный узел, если он карусель,
+  // иначе ближайший предок-карусель. Так выбор слайда-ребёнка (клик по строке
+  // в списке) не закрывает панель, а используется для позиционирования вставки.
+  const node = useMemo(
+    () => findCarouselRootFor(rootNode, selectedNode?.id) || selectedNode,
+    [rootNode, selectedNode]
+  )
 
   const isCarousel = node?.attributes?.['data-carousel'] === 'true'
   const variableName = node?.attributes?.['data-carousel-variable'] || DEFAULT_VARIABLE_NAME
@@ -178,7 +192,8 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
   // Контекст MediaPicker: {slideId, sourceField} — чтобы знать, какое поле какого слайда правим.
   const [pickerCtx, setPickerCtx] = useState<{ slideId: string; sourceField: string } | null>(null)
   const [staticPickerOpen, setStaticPickerOpen] = useState(false)
-  const selectedNode = useAppSelector(selectSelectedNode)
+  // Отдельный MediaPicker для добавления слайда-фотографии (только картинка во весь слайд).
+  const [photoPickerOpen, setPhotoPickerOpen] = useState(false)
 
   // Repeater-binding для track-узла. Источник истины fieldMappings → mapper-схема UI.
   const binding = useMemo(
@@ -377,6 +392,10 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
       const resp = await pageApi.updateVariables(pageId, next)
       setEnvelope(resp.variables)
       setDirty(false)
+      // Источник данных репитера (page-переменная) изменился, но сама привязка — нет.
+      // Бампаем версию привязок, чтобы RepeaterRenderer на канвасе перезапросил данные
+      // и показал свежие слайды без перезагрузки страницы.
+      dispatch(bumpBindingsVersion())
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка сохранения')
     } finally {
@@ -385,16 +404,55 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
   }
 
   // ─── Hybrid-static handlers (работают через editorSlice сразу, без dirty) ──
+
+  // Позиция вставки нового static/photo слайда в трек:
+  //  - если в списке выбран слайд этого трека → вставляем сразу ПОСЛЕ него
+  //    (это и есть «вставка в середину»: кликни слайд → добавь рядом);
+  //  - иначе → после template'а и существующих static-after (в конец группы).
+  const computeStaticInsertPosition = (): number | undefined => {
+    if (!track) return undefined
+    const selId = selectedNode?.id
+    if (selId) {
+      const selIdx = track.children.findIndex(c => c.id === selId)
+      if (selIdx !== -1) return selIdx + 1
+    }
+    const tplIdx = track.children.findIndex(c => c.id === template?.id)
+    return tplIdx === -1 ? undefined : tplIdx + 1 + staticAfter.length
+  }
+
   const handleStaticPick = (selection: BlockPickerSelection) => {
     if (!track) return
     const { block, mode: pickMode } = selection
     const raw = createBlockReferenceNode(block as Block, pickMode, { generateId })
     const node = prepareHybridStaticNode(raw, template)
-    // По умолчанию вставляем СРАЗУ ПОСЛЕ template'а (визуально справа от generated).
-    // Пользователь сможет перетащить на нужную сторону через DnD.
-    const tplIdx = track.children.findIndex(c => c.id === template?.id)
-    const position = tplIdx === -1 ? undefined : tplIdx + 1 + staticAfter.length
-    dispatch(insertPreparedNode({ parentId: track.id, node, position }))
+    dispatch(insertPreparedNode({ parentId: track.id, node, position: computeStaticInsertPosition() }))
+  }
+  // Слайд-фотография: статический слайд, контент которого — только фон-картинка во весь слайд.
+  // Технически это hybrid-static-слайд (рендерится как есть и на канвасе, и в деплое),
+  // поэтому переиспользуем prepareHybridStaticNode + insertPreparedNode, как для «Статический».
+  const handleAddPhotoSlide = (asset: { url: string; id?: string }) => {
+    if (!track) return
+    const raw: BlockNode = {
+      id: generateId(),
+      tag: 'div',
+      tagName: 'div',
+      elementType: 'container',
+      content: '',
+      children: [],
+      attributes: {},
+      metadata: { name: 'Фото-слайд', ...(asset.id ? { mediaAssetId: asset.id } : {}) },
+      styles: {
+        properties: {
+          width: '100%',
+          backgroundImage: `url("${asset.url}")`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        },
+      },
+    }
+    const node = prepareHybridStaticNode(raw, template)
+    dispatch(insertPreparedNode({ parentId: track.id, node, position: computeStaticInsertPosition() }))
   }
   const handleStaticDuplicate = (slide: { id: string }) => {
     if (!track) return
@@ -533,7 +591,7 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
             </SortableContext>
           </DndContext>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="secondary" size="sm" onClick={addSlide} className="flex-1">
               + Слайд по шаблону
             </Button>
@@ -545,6 +603,15 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
               title="Вставить статический блок из библиотеки в карусель"
             >
               <Plus size={13} className="mr-1" /> Статический
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setPhotoPickerOpen(true)}
+              className="flex-1"
+              title="Добавить слайд-фотографию (картинка во весь слайд)"
+            >
+              <ImageIcon size={13} className="mr-1" /> Фото
             </Button>
           </div>
 
@@ -581,6 +648,18 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
             }
           }
           setPickerCtx(null)
+        }}
+      />
+
+      <MediaPicker
+        open={photoPickerOpen}
+        kind="image"
+        siteId={siteId}
+        title="Выберите фото для слайда"
+        onClose={() => setPhotoPickerOpen(false)}
+        onSelect={asset => {
+          handleAddPhotoSlide(asset)
+          setPhotoPickerOpen(false)
         }}
       />
     </div>

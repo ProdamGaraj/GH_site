@@ -6,6 +6,9 @@ import {
   findRepeaterBinding,
   readSlideValue,
   writeSlideValue,
+  isSlideFieldVisible,
+  getHiddenSlideFields,
+  setSlideFieldVisible,
 } from './bindingMapperHelper'
 import type { DataBinding, FieldMapping } from '@/shared/types/dataBinding'
 
@@ -179,5 +182,56 @@ describe('writeSlideValue', () => {
   })
   it('создаёт новый объект из null', () => {
     expect(writeSlideValue(null, 'title', 'x')).toEqual({ title: 'x' })
+  })
+})
+
+describe('видимость блоков слайда', () => {
+  it('isSlideFieldVisible: по умолчанию всё видно (нет _hidden)', () => {
+    expect(isSlideFieldVisible({}, 'title')).toBe(true)
+    expect(isSlideFieldVisible({ title: 'a' }, 'title')).toBe(true)
+    expect(isSlideFieldVisible(null, 'title')).toBe(true)
+  })
+
+  it('isSlideFieldVisible: поле в _hidden → невидимо', () => {
+    expect(isSlideFieldVisible({ _hidden: ['ctaText'] }, 'ctaText')).toBe(false)
+    expect(isSlideFieldVisible({ _hidden: ['ctaText'] }, 'title')).toBe(true)
+  })
+
+  it('getHiddenSlideFields: множество скрытых; мусор отфильтрован', () => {
+    expect(getHiddenSlideFields({ _hidden: ['a', 'b'] })).toEqual(new Set(['a', 'b']))
+    expect(getHiddenSlideFields({})).toEqual(new Set())
+    // устойчивость к не-массиву
+    expect(getHiddenSlideFields({ _hidden: 'x' })).toEqual(new Set())
+    expect(getHiddenSlideFields({ _hidden: ['a', 1, null] as unknown[] })).toEqual(new Set(['a']))
+  })
+
+  it('setSlideFieldVisible: скрыть добавляет в _hidden (иммутабельно)', () => {
+    const orig = { title: 'a' }
+    const next = setSlideFieldVisible(orig, 'title', false)
+    expect(next._hidden).toEqual(['title'])
+    expect(orig).not.toHaveProperty('_hidden') // оригинал не мутирован
+  })
+
+  it('setSlideFieldVisible: показать удаляет из _hidden; пустой список — убирает ключ', () => {
+    const next = setSlideFieldVisible({ _hidden: ['title'] }, 'title', true)
+    expect(next).not.toHaveProperty('_hidden')
+  })
+
+  it('setSlideFieldVisible: показать оставляет другие скрытые', () => {
+    const next = setSlideFieldVisible({ _hidden: ['title', 'image'] }, 'title', true)
+    expect(next._hidden).toEqual(['image'])
+  })
+
+  it('setSlideFieldVisible: скрыть не дублирует уже скрытое', () => {
+    const next = setSlideFieldVisible({ _hidden: ['title'] }, 'title', false)
+    expect(next._hidden).toEqual(['title'])
+  })
+
+  it('setSlideFieldVisible: round-trip через isSlideFieldVisible', () => {
+    let s: Record<string, unknown> = { ctaText: 'go' }
+    s = setSlideFieldVisible(s, 'ctaText', false)
+    expect(isSlideFieldVisible(s, 'ctaText')).toBe(false)
+    s = setSlideFieldVisible(s, 'ctaText', true)
+    expect(isSlideFieldVisible(s, 'ctaText')).toBe(true)
   })
 })

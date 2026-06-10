@@ -8,6 +8,8 @@ import {
   isImageField,
   hasBoundDescendantImg,
   resolveStyleTarget,
+  resolveContentTarget,
+  resolveAttrTarget,
 } from './repeaterMappingHelper'
 
 /** Минимальный фабричный helper для BlockNode в тестах. */
@@ -214,5 +216,62 @@ describe('resolveStyleTarget', () => {
   it('пустой/неизвестный targetProperty → null', () => {
     expect(resolveStyleTarget(node({}), { targetProperty: '' }, true)).toBeNull()
     expect(resolveStyleTarget(node({}), { targetProperty: 'children.0.content' }, true)).toBeNull()
+  })
+})
+
+describe('resolveContentTarget', () => {
+  it('self.textContent → корень клона (isRoot)', () => {
+    const root = node({ tagName: 'div' })
+    expect(resolveContentTarget(root, { targetProperty: 'self.textContent' }, true)).toBe(true)
+    // не корень → false
+    expect(resolveContentTarget(root, { targetProperty: 'self.textContent' }, false)).toBe(false)
+  })
+
+  it('[data-bind=subtitle].textContent → блок с data-bind="subtitle"', () => {
+    const p = node({ tagName: 'p', attributes: { 'data-bind': 'subtitle' } })
+    expect(resolveContentTarget(p, { sourceField: 'subtitle', targetProperty: '[data-bind=subtitle].textContent' }, false)).toBe(true)
+  })
+
+  it('[data-bind=title].textContent на чужом блоке → false', () => {
+    const p = node({ tagName: 'p', attributes: { 'data-bind': 'subtitle' } })
+    expect(resolveContentTarget(p, { targetProperty: '[data-bind=title].textContent' }, false)).toBe(false)
+  })
+
+  it('innerHTML тоже считается текстовым свойством', () => {
+    const el = node({ attributes: { 'data-bind': 'body' } })
+    expect(resolveContentTarget(el, { targetProperty: '[data-bind=body].innerHTML' }, false)).toBe(true)
+  })
+
+  it('style/attr формы и item.* → false (не контент)', () => {
+    const el = node({ attributes: { 'data-bind': 'title' } })
+    expect(resolveContentTarget(el, { targetProperty: '[data-bind=title].style.color' }, false)).toBe(false)
+    expect(resolveContentTarget(el, { targetProperty: '[data-bind=title].attr.href' }, false)).toBe(false)
+    expect(resolveContentTarget(el, { targetProperty: 'item.title' }, false)).toBe(false)
+    expect(resolveContentTarget(el, { targetProperty: '' }, true)).toBe(false)
+  })
+})
+
+describe('resolveAttrTarget', () => {
+  it('[data-bind=cta].attr.href → "href" на блоке с data-bind="cta"', () => {
+    const a = node({ tagName: 'a', attributes: { 'data-bind': 'cta' } })
+    expect(resolveAttrTarget(a, { sourceField: 'ctaHref', targetProperty: '[data-bind=cta].attr.href' }, false)).toBe('href')
+  })
+
+  it('self.attr.href → "href" только на корне', () => {
+    const root = node({ tagName: 'a' })
+    expect(resolveAttrTarget(root, { targetProperty: 'self.attr.href' }, true)).toBe('href')
+    expect(resolveAttrTarget(root, { targetProperty: 'self.attr.href' }, false)).toBeNull()
+  })
+
+  it('сокращённые формы src/href без attr.', () => {
+    const img = node({ tagName: 'img', attributes: { 'data-bind': 'image' } })
+    expect(resolveAttrTarget(img, { targetProperty: '[data-bind=image].src' }, false)).toBe('src')
+  })
+
+  it('чужой data-bind / текст/стиль → null', () => {
+    const a = node({ tagName: 'a', attributes: { 'data-bind': 'cta' } })
+    expect(resolveAttrTarget(a, { targetProperty: '[data-bind=other].attr.href' }, false)).toBeNull()
+    expect(resolveAttrTarget(a, { targetProperty: '[data-bind=cta].textContent' }, false)).toBeNull()
+    expect(resolveAttrTarget(a, { targetProperty: 'item.title' }, false)).toBeNull()
   })
 })

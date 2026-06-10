@@ -10,7 +10,8 @@ import { BlockNodeWithViewport } from '../../utils/variationUtils'
 import { getRepeatTemplate } from '../../utils/repeatTemplateHelper'
 import { getStaticBefore, getStaticAfter, prepareHybridStaticNode } from '../../utils/hybridStaticHelper'
 import { deepCloneNode } from '../../utils/carouselHelpers'
-import { resolveStyleTarget, wrapBackgroundValue } from '../../utils/repeaterMappingHelper'
+import { resolveStyleTarget, resolveContentTarget, resolveAttrTarget, wrapBackgroundValue } from '../../utils/repeaterMappingHelper'
+import { getHiddenSlideFields } from '../../utils/bindingMapperHelper'
 import { collectionApi, type Collection } from '@/shared/api/collectionApi'
 
 // Идентично slugify на бэкенде (CollectionController / DataBindingGenerator)
@@ -378,7 +379,9 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     // Клонируем template для каждого элемента данных
     const clonedItems = items.map((item, index) => {
       console.log(`Cloning item ${index}:`, item)
-      const clonedNode = cloneBlockNode(template as BlockNodeWithViewport, index, item, fieldMappings, true)
+      // Скрытые на этом слайде поля (чекбоксы «Отображать» в форме).
+      const hiddenFields = getHiddenSlideFields(item)
+      const clonedNode = cloneBlockNode(template as BlockNodeWithViewport, index, item, fieldMappings, true, hiddenFields)
       return clonedNode
     })
 
@@ -443,21 +446,40 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     index: number,
     dataItem: any,
     mappings: Array<{ sourceField: string; targetProperty: string; elementId?: string; id?: string }>,
-    isRoot = false
+    isRoot = false,
+    hiddenFields: Set<string> = new Set()
   ): BlockNodeWithViewport => {
     const newId = `${template.id}-clone-${index}`
 
     // Рекурсивно клонируем детей с применением маппингов (дети — не корень шаблона)
     const clonedChildren = template.children.map((child, childIndex) =>
-      cloneBlockNode(child as BlockNodeWithViewport, index * 1000 + childIndex, dataItem, mappings, false)
+      cloneBlockNode(child as BlockNodeWithViewport, index * 1000 + childIndex, dataItem, mappings, false, hiddenFields)
     )
 
     // Применяем field mappings из data binding
-    const updatedContent = applyFieldMappings(template, dataItem, mappings)
-    const updatedStyles = applyStyleMappings(template, dataItem, mappings, isRoot)
-    
+    const updatedContent = applyFieldMappings(template, dataItem, mappings, isRoot)
+    const updatedStyles = applyStyleMappings(template, dataItem, mappings, isRoot, hiddenFields)
+
     // Применяем атрибутные маппинги (src для img, href для a)
-    const updatedAttributes = applyAttributeMappings(template, dataItem, mappings)
+    const updatedAttributes = applyAttributeMappings(template, dataItem, mappings, isRoot)
+
+    // Видимость: если скрытое поле целится в ТЕКСТ или АТРИБУТ этого блока
+    // ([data-bind=X].textContent / .attr.href) — прячем сам элемент. Фон
+    // (self.style.backgroundImage) обрабатывается в applyStyleMappings (очистка),
+    // чтобы не скрывать весь слайд.
+    const hideThisBlock = mappings.some(m =>
+      hiddenFields.has(m.sourceField) &&
+      (resolveContentTarget(template, m, isRoot) || resolveAttrTarget(template, m, isRoot) !== null)
+    )
+    const finalStyles = hideThisBlock
+      ? ({
+          ...(updatedStyles || { properties: {} }),
+          properties: {
+            ...((updatedStyles?.properties as Record<string, unknown>) || {}),
+            display: 'none',
+          },
+        } as BlockNodeWithViewport['styles'])
+      : updatedStyles
 
     console.log(`[cloneBlockNode] Block ${template.id}:`, {
       id: template.id,
@@ -475,7 +497,7 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
       ...template,
       id: newId,
       content: updatedContent,
-      styles: updatedStyles,
+      styles: finalStyles,
       attributes: updatedAttributes,
       children: clonedChildren,
       metadata: {
@@ -566,12 +588,24 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
   const applyAttributeMappings = (
     block: BlockNodeWithViewport,
     dataItem: any,
-    mappings: Array<{ sourceField: string; targetProperty: string; elementId?: string; id?: string }>
+    mappings: Array<{ sourceField: string; targetProperty: string; elementId?: string; id?: string }>,
+    isRoot = false
   ): typeof block.attributes => {
     if (!block.attributes && block.tagName !== 'img') return block.attributes
-    
+
     const attrs = { ...block.attributes }
-    
+
+    // 0. Runner-aligned селекторные формы targetProperty — "self.attr.href",
+    //    "[data-bind=cta].attr.href", "[data-bind=img].src" и т.п. Эвристики ниже
+    //    их не понимают, из-за чего href/src слайдов не обновлялись на Canvas.
+    for (const mapping of mappings) {
+      const attrName = resolveAttrTarget(block, mapping, isRoot)
+      if (!attrName) continue
+      const overrideValue = resolveOverride(mapping.targetProperty, dataItem)
+      const value = overrideValue !== undefined ? overrideValue : getMappingValue(dataItem, mapping)
+      if (value !== undefined) attrs[attrName] = String(value)
+    }
+
     if (block.tagName === 'img') {
       // 1) По data-field
       const dataField = attrs['data-field']
@@ -612,10 +646,23 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
 
   // Применяем field mappings к контенту блока
   const applyFieldMappings = (
-    block: BlockNodeWithViewport, 
+    block: BlockNodeWithViewport,
     dataItem: any,
-    mappings: Array<{ sourceField: string; targetProperty: string; elementId?: string; id?: string }>
+    mappings: Array<{ sourceField: string; targetProperty: string; elementId?: string; id?: string }>,
+    isRoot = false
   ): string | undefined => {
+    // 0. Runner-aligned селекторные формы targetProperty — высший приоритет.
+    //    "self.textContent" / "[data-bind=X].textContent" public-site runtime понимает,
+    //    а эвристики ниже (data-field / metadata.name) — нет. Без этой ветки текстовые
+    //    привязки слайдов не применялись на Canvas (текст шаблона на каждом слайде).
+    for (const mapping of mappings) {
+      if (!resolveContentTarget(block, mapping, isRoot)) continue
+      const overrideValue = resolveOverride(mapping.targetProperty, dataItem)
+      if (overrideValue !== undefined) return overrideValue
+      const value = getMappingValue(dataItem, mapping)
+      if (value !== undefined) return String(value)
+    }
+
     // 1. По data-field атрибуту (приоритет)
     const dataField = block.attributes?.['data-field']
     if (dataField) {
@@ -690,7 +737,8 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     block: BlockNodeWithViewport,
     dataItem: any,
     mappings: Array<{ sourceField: string; targetProperty: string; elementId?: string; id?: string }>,
-    isRoot = false
+    isRoot = false,
+    hiddenFields: Set<string> = new Set()
   ): typeof block.styles => {
     const legacy = legacyApplyStyleMappings(block, dataItem, mappings)
 
@@ -698,6 +746,12 @@ export const RepeaterRenderer: React.FC<RepeaterRendererProps> = ({
     for (const mapping of mappings) {
       const target = resolveStyleTarget(block, mapping, isRoot)
       if (!target) continue
+      // Скрытое style-поле (напр. фон-картинка) — очищаем свойство, а не прячем блок.
+      if (hiddenFields.has(mapping.sourceField)) {
+        if (!overrides) overrides = {}
+        overrides[target.cssKey] = ''
+        continue
+      }
       const overrideVal = resolveOverride(mapping.targetProperty, dataItem)
       const raw = overrideVal !== undefined ? overrideVal : getMappingValue(dataItem, mapping)
       if (raw === undefined) continue

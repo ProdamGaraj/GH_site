@@ -190,3 +190,71 @@ export const resolveStyleTarget = (
 
   return null
 }
+
+/** Разбор `[data-bind=X].<prop>` → { bindKey, prop } или null. */
+const parseDataBindSelector = (tp: string): { bindKey: string; prop: string } | null => {
+  const m = tp.match(/^\[data-bind=(['"]?)([^\]'"]+)\1\]\.(.+)$/)
+  if (!m) return null
+  return { bindKey: lc(m[2]), prop: m[3] }
+}
+
+/**
+ * Должен ли ДАННЫЙ блок получить ТЕКСТ от данного маппинга (runner-aligned).
+ * Зеркалит public-site runtime для форм targetProperty:
+ *   - "self.textContent" / "self.innerHTML"          → корень клона шаблона (isRoot)
+ *   - "[data-bind=X].textContent" / ".innerHTML"     → блок с data-bind="X"
+ *
+ * item.<field>/data-field/metadata.name резолвятся отдельной (эвристической)
+ * веткой в RepeaterRenderer — здесь только селекторные формы, которые та ветка
+ * не понимает (корень бага «текст шаблона на каждом слайде»).
+ */
+export const resolveContentTarget = (
+  block: BlockNode,
+  mapping: { sourceField?: string; targetProperty?: string },
+  isRoot: boolean
+): boolean => {
+  const tp = mapping.targetProperty || ''
+  if (!tp) return false
+  const isTextProp = (p: string): boolean => p === 'textContent' || p === 'innerHTML'
+
+  if (tp.startsWith('self.')) {
+    return isRoot && isTextProp(tp.slice(5))
+  }
+  const sel = parseDataBindSelector(tp)
+  if (sel) {
+    return dataBindOf(block) === sel.bindKey && isTextProp(sel.prop)
+  }
+  return false
+}
+
+/**
+ * Возвращает имя АТРИБУТА, который должен получить ДАННЫЙ блок от маппинга
+ * (runner-aligned), либо null. Зеркалит public-site runtime:
+ *   - "self.attr.href" / "self.src" / "self.href"        → корень клона (isRoot)
+ *   - "[data-bind=X].attr.Y" / "[data-bind=X].src|href"  → блок с data-bind="X"
+ *
+ * Прямые формы src/href (без "attr.") нормализуем к именам атрибутов, как это
+ * делает applyValue на public-site.
+ */
+export const resolveAttrTarget = (
+  block: BlockNode,
+  mapping: { sourceField?: string; targetProperty?: string },
+  isRoot: boolean
+): string | null => {
+  const tp = mapping.targetProperty || ''
+  if (!tp) return null
+  const propToAttr = (p: string): string | null => {
+    if (p.startsWith('attr.')) return p.slice(5)
+    if (p === 'src' || p === 'href' || p === 'alt' || p === 'title') return p
+    return null
+  }
+
+  if (tp.startsWith('self.')) {
+    return isRoot ? propToAttr(tp.slice(5)) : null
+  }
+  const sel = parseDataBindSelector(tp)
+  if (sel) {
+    return dataBindOf(block) === sel.bindKey ? propToAttr(sel.prop) : null
+  }
+  return null
+}

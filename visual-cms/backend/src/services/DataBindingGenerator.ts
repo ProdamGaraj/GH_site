@@ -761,6 +761,10 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         // Иначе пытаемся автоопределить через data-bind и {{template}}
         updateElementContent(clone, item);
       }
+
+      // Видимость блоков слайда (чекбоксы «Отображать»): item._hidden = ['ctaText', ...].
+      // Текст/ссылку прячем (display:none), фон — очищаем. Зеркалит Canvas RepeaterRenderer.
+      applyHiddenFields(clone, item, fieldMappings);
       
       // Auto-link: если repeater привязан к коллекции, проставляем href
       if (config.collectionLink) {
@@ -999,6 +1003,44 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     });
   }
   
+  // Применяет видимость блоков слайда из item._hidden = [<sourceField>, ...].
+  // Резолвит целевой элемент по targetProperty (self.* / [data-bind=X].*) и:
+  //   - текст (textContent/innerHTML) → display:none (прячем элемент);
+  //   - фон (style.*)                 → очищаем свойство (слайд остаётся);
+  //   - атрибут (attr.*/src/href)     → display:none (прячем элемент).
+  // Зеркалит Canvas RepeaterRenderer (resolveContentTarget/resolveAttrTarget/applyStyleMappings).
+  function applyHiddenFields(clone, item, mappings) {
+    var hidden = item && item._hidden;
+    if (!Array.isArray(hidden) || hidden.length === 0 || !mappings) return;
+    mappings.forEach(function(m) {
+      if (hidden.indexOf(m.sourceField) === -1) return;
+      var tp = m.targetProperty || '';
+      var el = null;
+      var prop = '';
+      if (tp.indexOf('self.') === 0) {
+        el = clone;
+        prop = tp.slice(5);
+      } else {
+        var sel = tp.match(/^\\[data-bind=([^\\]]+)\\]\\.(.+)$/);
+        if (sel) {
+          var key = sel[1].replace(/^['"]|['"]$/g, '');
+          el = (clone.getAttribute && clone.getAttribute('data-bind') === key)
+            ? clone
+            : clone.querySelector('[data-bind="' + key + '"]');
+          prop = sel[2];
+        }
+      }
+      if (!el) return;
+      if (prop === 'textContent' || prop === 'innerHTML') {
+        el.style.display = 'none';
+      } else if (prop.indexOf('style.') === 0) {
+        try { el.style[prop.slice(6)] = ''; } catch (e) {}
+      } else if (prop.indexOf('attr.') === 0 || prop === 'src' || prop === 'href') {
+        el.style.display = 'none';
+      }
+    });
+  }
+
   // Обновить содержимое элемента данными (fallback для авто-обнаружения)
   function updateElementContent(element, data) {
     // Проходим по всем вложенным элементам

@@ -115,6 +115,58 @@ export const findRepeaterBinding = (
   return null
 }
 
+/**
+ * Видимость блоков слайда.
+ *
+ * Каждое поле слайда (sourceField из схемы) можно скрыть на конкретном слайде.
+ * Скрытые поля хранятся в служебном массиве slide._hidden = ['ctaText', ...].
+ * Отсутствие поля в списке (или отсутствие самого массива) = блок ВИДЕН — поэтому
+ * дефолт для всех (в т.ч. старых) слайдов = «отображать» (checked), без миграции.
+ *
+ * Применение скрытия (Canvas + public-site runtime) зависит от типа targetProperty:
+ *   - текст ([data-bind=X].textContent) / ссылка (.attr.href) → прячем сам элемент;
+ *   - фон (self.style.backgroundImage)                        → очищаем фон, слайд остаётся.
+ */
+const HIDDEN_FIELDS_KEY = '_hidden'
+
+/** Виден ли блок поля sourceField на этом слайде (дефолт — да). */
+export const isSlideFieldVisible = (
+  slide: Record<string, unknown> | null | undefined,
+  sourceField: string
+): boolean => {
+  const h = slide?.[HIDDEN_FIELDS_KEY]
+  return !(Array.isArray(h) && h.includes(sourceField))
+}
+
+/** Множество скрытых полей слайда (для применения при рендере). */
+export const getHiddenSlideFields = (
+  slide: Record<string, unknown> | null | undefined
+): Set<string> => {
+  const h = slide?.[HIDDEN_FIELDS_KEY]
+  return new Set(Array.isArray(h) ? h.filter((x): x is string => typeof x === 'string') : [])
+}
+
+/**
+ * Иммутабельно меняем видимость поля. Возвращает новый объект слайда.
+ * Когда список скрытых пуст — удаляем сам ключ, чтобы не плодить мусор в данных.
+ */
+export const setSlideFieldVisible = (
+  slide: Record<string, unknown> | null | undefined,
+  sourceField: string,
+  visible: boolean
+): Record<string, unknown> => {
+  const base = slide && typeof slide === 'object' ? { ...(slide as Record<string, unknown>) } : {}
+  const cur = Array.isArray(base[HIDDEN_FIELDS_KEY])
+    ? (base[HIDDEN_FIELDS_KEY] as unknown[]).filter((x): x is string => typeof x === 'string')
+    : []
+  const next = visible
+    ? cur.filter(x => x !== sourceField)
+    : cur.includes(sourceField) ? cur : [...cur, sourceField]
+  if (next.length === 0) delete base[HIDDEN_FIELDS_KEY]
+  else base[HIDDEN_FIELDS_KEY] = next
+  return base
+}
+
 /** Безопасно читаем строковое значение поля slide; missing → ''. */
 export const readSlideValue = (
   slide: Record<string, unknown> | null | undefined,

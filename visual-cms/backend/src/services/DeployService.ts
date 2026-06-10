@@ -146,12 +146,9 @@ export class DeployService {
       const siteDir = this.resolveSiteDir(page.site)
       this.ensureDirectoryExists(siteDir)
 
-      // Сначала инжектируем library templates (нужно до preparePageDataConfig)
-      let updatedStructure = await linkedBlocksService.updateLinkedBlocks(page.structure)
-      updatedStructure = await this.injectLibraryTemplates(updatedStructure, pageId)
-
-      // Загружаем data bindings для страницы, используя обновлённую структуру с templates
-      const dataConfig = await this.preparePageDataConfig(pageId, updatedStructure)
+      // Разворачиваем linked-блоки + library-templates и строим data-config на той же
+      // структуре (единый источник правды — см. resolveStructureAndConfig).
+      const { structure: updatedStructure, dataConfig } = await this.resolveStructureAndConfig(page)
 
       // Auto-links: для repeater'ов, чей dataSource совпадает с коллекцией, добавляем collectionLink
       if (dataConfig) {
@@ -281,11 +278,9 @@ export class DeployService {
           const siteDir = this.resolveSiteDir(page.site)
           this.ensureDirectoryExists(siteDir)
 
-          // Обновляем структуру, подставляя актуальные блоки из библиотеки
-          const updatedStructure = await linkedBlocksService.updateLinkedBlocks(page.structure)
-          
-          // Загружаем data bindings для страницы
-          const dataConfig = await this.preparePageDataConfig(page.id)
+          // Обновляем структуру (linked-блоки + library-templates) и строим data-config
+          // на той же структуре — иначе repeater-привязки внутри linked-блоков теряются.
+          const { structure: updatedStructure, dataConfig } = await this.resolveStructureAndConfig(page)
 
           // Проверяем переводы для переключателя
           const pageLangs = await translationService.getPageLocales(page.id)
@@ -395,8 +390,9 @@ export class DeployService {
           continue
         }
         try {
-          const updatedStructure = await linkedBlocksService.updateLinkedBlocks(page.structure)
-          const dataConfig = await this.preparePageDataConfig(page.id)
+          // Разворачиваем linked-блоки + library-templates и строим data-config на той же
+          // структуре — иначе repeater-привязки внутри linked-блоков теряются (см. deployPage).
+          const { structure: updatedStructure, dataConfig } = await this.resolveStructureAndConfig(page)
 
           // Auto-links: для repeater'ов, чей dataSource совпадает с коллекцией, добавляем collectionLink
           if (dataConfig) {
@@ -2087,6 +2083,30 @@ export class DeployService {
     } catch (err: any) {
       errors.push(`Ошибка при генерации переводов для "${page.name}": ${err.message}`)
     }
+  }
+
+  /**
+   * Разворачивает структуру страницы (linked-блоки + library-templates) и строит
+   * data-config на её основе. Единый источник правды для всех путей деплоя
+   * (deployPage / deploySite / deployAll).
+   *
+   * Почему это важно: repeater-привязки могут висеть на блоках, которые физически
+   * лежат ВНУТРИ linked-блока (например, трек hero-карусели). В сырой page.structure
+   * у linked-блока children пустые, поэтому preparePageDataConfig не увидит такой
+   * blockId и потеряет привязку → на опубликованной странице не будет Data Binding
+   * Runtime. Раньше эту экспансию делал только deployPage; deploySite/deployAll
+   * вызывали preparePageDataConfig по сырой структуре и роняли привязку.
+   *
+   * Возвращает развёрнутую структуру (её же надо отдавать в htmlGenerator, чтобы
+   * HTML и config были согласованы) и dataConfig.
+   */
+  private async resolveStructureAndConfig(
+    page: Page
+  ): Promise<{ structure: any; dataConfig: PageDataConfig | undefined }> {
+    let structure = await linkedBlocksService.updateLinkedBlocks(page.structure)
+    structure = await this.injectLibraryTemplates(structure, page.id)
+    const dataConfig = await this.preparePageDataConfig(page.id, structure)
+    return { structure, dataConfig }
   }
 
   /**

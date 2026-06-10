@@ -348,8 +348,13 @@ ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
         return `${cssKey}: ${value}`
       })
       .join('; ')
-    
-    return cssString ? ` style="${cssString}"` : ''
+
+    if (!cssString) return ''
+    // Экранируем двойные кавычки: значение вроде background-image: url("...") иначе
+    // закрывает style="..." раньше времени и ломает разметку соседних элементов.
+    // &quot; в атрибуте корректно декодируется браузером обратно в ".
+    const safeCss = cssString.replace(/"/g, '&quot;')
+    return ` style="${safeCss}"`
   }
 
   /**

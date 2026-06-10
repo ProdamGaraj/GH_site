@@ -48,6 +48,38 @@ export function findTrackNode(carouselRoot: BlockNode | null | undefined): Block
 }
 
 /**
+ * Находит карусель-корень, к которому относится узел targetId:
+ *   - сам узел, если он карусель (data-carousel="true");
+ *   - иначе ближайший ПРЕДОК с data-carousel="true";
+ *   - null, если узел не внутри карусели (или не найден).
+ *
+ * Нужно, чтобы SlidesPanel не закрывался при выборе слайда-ребёнка: панель
+ * резолвит карусель-предка и продолжает работать с ней, а сам выбранный узел
+ * (слайд) используется для позиционирования вставки.
+ */
+export function findCarouselRootFor(
+  root: BlockNode | null | undefined,
+  targetId: string | null | undefined
+): BlockNode | null {
+  if (!root || !targetId) return null
+  let found: BlockNode | null = null
+  const walk = (node: BlockNode, ancestorCarousel: BlockNode | null): boolean => {
+    const isCar = node.attributes?.['data-carousel'] === 'true'
+    const nearest = isCar ? node : ancestorCarousel
+    if (node.id === targetId) {
+      found = nearest
+      return true
+    }
+    for (const child of node.children || []) {
+      if (walk(child, nearest)) return true
+    }
+    return false
+  }
+  walk(root, null)
+  return found
+}
+
+/**
  * Определяет режим карусели.
  *
  * Источники истины (по приоритету):

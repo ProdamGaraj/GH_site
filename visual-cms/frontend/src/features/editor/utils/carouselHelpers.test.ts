@@ -4,6 +4,7 @@ import type { Block } from '@/shared/types'
 import type { DataBinding } from '@/shared/types/dataBinding'
 import {
   findTrackNode,
+  findCarouselRootFor,
   getCarouselMode,
   createBlockReferenceNode,
   deepCloneNode,
@@ -395,5 +396,46 @@ describe('deepCloneNode', () => {
     expect(clone.children[0].id).toBe('g-2')
     expect(clone.children[0].children[0].id).toBe('g-3')
     expect(clone.children[1].id).toBe('g-4')
+  })
+})
+
+describe('findCarouselRootFor', () => {
+  const tree = mkNode({
+    id: 'root',
+    children: [
+      mkNode({
+        id: 'carousel',
+        attributes: { 'data-carousel': 'true' },
+        children: [
+          mkNode({
+            id: 'track',
+            attributes: { 'data-carousel-track': 'true' },
+            children: [
+              mkNode({ id: 'slide-1' }),
+              mkNode({ id: 'photo', attributes: { 'data-carousel-static': 'true' } }),
+            ],
+          }),
+        ],
+      }),
+      mkNode({ id: 'unrelated' }),
+    ],
+  })
+
+  it('сам узел, если он карусель', () => {
+    expect(findCarouselRootFor(tree, 'carousel')?.id).toBe('carousel')
+  })
+  it('ближайший предок-карусель для слайда-ребёнка', () => {
+    expect(findCarouselRootFor(tree, 'slide-1')?.id).toBe('carousel')
+    expect(findCarouselRootFor(tree, 'photo')?.id).toBe('carousel')
+    expect(findCarouselRootFor(tree, 'track')?.id).toBe('carousel')
+  })
+  it('null для узла вне карусели', () => {
+    expect(findCarouselRootFor(tree, 'unrelated')).toBeNull()
+    expect(findCarouselRootFor(tree, 'root')).toBeNull()
+  })
+  it('null для отсутствующего id / пустого входа', () => {
+    expect(findCarouselRootFor(tree, 'nope')).toBeNull()
+    expect(findCarouselRootFor(null, 'carousel')).toBeNull()
+    expect(findCarouselRootFor(tree, undefined)).toBeNull()
   })
 })
