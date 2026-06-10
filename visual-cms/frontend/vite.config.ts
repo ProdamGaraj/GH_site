@@ -13,6 +13,10 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
+    // Hosts allowed past Vite's host-check (DNS-rebinding protection).
+    // localhost / *.localhost / IPs are always allowed; real domains are not,
+    // so the CMS subdomain served via nginx must be listed explicitly.
+    allowedHosts: ['cms.test_analytics.gh.uz'],
     watch: {
       usePolling: true,
     },
