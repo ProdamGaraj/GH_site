@@ -286,6 +286,10 @@ export interface BlockNode {
     hidden?: boolean
     name?: string
     linkedBlockId?: string
+    /** Исходный tagName блока до превращения его в ссылку (tagName='a'); нужен для отката */
+    originalTagName?: string
+    /** Узел-обёртка <a>, созданная редактором вокруг void-элемента (img, input…); разворачивается при выключении ссылки */
+    isLinkWrapper?: boolean
     /** Raw HTML to inject into <head> (scripts, styles, etc.) — only used on root node */
     customHeadHtml?: string
     /** Raw HTML to inject before </body> (scripts, etc.) — only used on root node */

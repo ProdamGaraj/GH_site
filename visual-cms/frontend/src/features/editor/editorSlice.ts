@@ -1408,6 +1408,71 @@ const editorSlice = createSlice({
       state.isDirty = true
       pushToHistory(state)
     },
+
+    // ─── Блок-ссылка для void-элементов (img, input…) ────────────────
+    /**
+     * Оборачивает элемент в ссылку: создаёт узел <a> с metadata.isLinkWrapper
+     * и переносит элемент внутрь. Для не-void блоков ссылка делается сменой
+     * тега через updateNode (см. linkUtils.makeNodeLink) — обёртка не нужна.
+     */
+    wrapNodeInLink: (state, action: PayloadAction<string>) => {
+      if (!state.rootNode) return
+      const nodeId = action.payload
+      if (nodeId === state.rootNode.id) return
+      const parent = findParentNode(state.rootNode, nodeId)
+      if (!parent) return
+      // Уже обёрнут — no-op
+      if (parent.tagName === 'a' && parent.metadata?.isLinkWrapper) return
+      const index = parent.children.findIndex(c => c.id === nodeId)
+      if (index < 0) return
+
+      const wrapper: BlockNode = {
+        id: generateId(),
+        elementType: 'container',
+        tagName: 'a',
+        styles: { properties: {} },
+        children: [parent.children[index]],
+        attributes: {},
+        metadata: { name: 'Ссылка', isLinkWrapper: true },
+      }
+
+      const replaceInParent = (current: BlockNode): BlockNode => {
+        if (current.id === parent.id) {
+          const children = [...current.children]
+          children[index] = wrapper
+          return { ...current, children }
+        }
+        return { ...current, children: current.children.map(replaceInParent) }
+      }
+      state.rootNode = replaceInParent(state.rootNode)
+      state.isDirty = true
+      pushToHistory(state)
+    },
+
+    /**
+     * Разворачивает обёртку-ссылку вокруг узла: дети обёртки встают на её
+     * место. Действует только на обёртки, созданные wrapNodeInLink.
+     */
+    unwrapNodeFromLink: (state, action: PayloadAction<string>) => {
+      if (!state.rootNode) return
+      const nodeId = action.payload
+      const wrapper = findParentNode(state.rootNode, nodeId)
+      if (!wrapper || wrapper.tagName !== 'a' || !wrapper.metadata?.isLinkWrapper) return
+      const grandParent = findParentNode(state.rootNode, wrapper.id)
+      if (!grandParent) return
+
+      const replaceWrapper = (current: BlockNode): BlockNode => {
+        if (current.id === grandParent.id) {
+          const children = current.children.flatMap(c => (c.id === wrapper.id ? c.children : [c]))
+          return { ...current, children }
+        }
+        return { ...current, children: current.children.map(replaceWrapper) }
+      }
+      state.rootNode = replaceWrapper(state.rootNode)
+      state.selectedNodeId = nodeId
+      state.isDirty = true
+      pushToHistory(state)
+    },
   },
 })
 
@@ -1464,6 +1529,8 @@ export const {
   duplicateNode,
   copyNode,
   pasteFromClipboard,
+  wrapNodeInLink,
+  unwrapNodeFromLink,
 } = editorSlice.actions
 
 export const selectClipboard = (state: RootState) => state.editor.clipboard

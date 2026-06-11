@@ -185,6 +185,10 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
+    // Клик по <a> (или элементу внутри <a>) не должен уводить из редактора
+    if ((e.target as HTMLElement).closest?.('a')) {
+      e.preventDefault()
+    }
     if (!isDragging && !isInlineEditing) {
       dispatch(selectNode(node.id))
     }

@@ -149,7 +149,8 @@
       "Bash(MSYS_NO_PATHCONV=1 docker exec visual-cms-backend-1 sh -c \"grep -o 'data-carousel-track' /app/public-site/index.html | wc -l\")",
       "Bash(ls package-lock.json)",
       "Bash(grep -m1 -A2 '\"node_modules/vite\"' package-lock.json)",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(ssh -o BatchMode=yes gh_test \"cd ~/GH_site && git fetch 2>&1 | tail -2; echo '--- origin/master ---' && git log origin/master --oneline -3 && echo '--- files in new commit ---' && git diff --name-only HEAD origin/master | head -20\")"
     ],
     "additionalDirectories": [
       "\\tmp",

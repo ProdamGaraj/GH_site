@@ -16,6 +16,8 @@ import editorReducer, {
   copyNode,
   pasteFromClipboard,
   selectNode,
+  wrapNodeInLink,
+  unwrapNodeFromLink,
 } from './editorSlice'
 import type { BlockNode } from '@/shared/types'
 
@@ -223,5 +225,75 @@ describe('editorSlice — C1: duplicate / copy / paste', () => {
     // root изначально имел [track, sibling]; теперь должен иметь третьего ребёнка
     expect(s.rootNode!.children).toHaveLength(3)
     expect(s.rootNode!.children[2].id).not.toBe('sibling') // новый id
+  })
+})
+
+describe('editorSlice — блок-ссылка для void-элементов (wrap/unwrap)', () => {
+  /** root → container → img + sibling */
+  const buildImgTree = (): BlockNode =>
+    mk({
+      id: 'root',
+      children: [
+        mk({
+          id: 'container',
+          children: [
+            mk({ id: 'img-1', elementType: 'image', tagName: 'img', attributes: { src: '/logo.png' } }),
+            mk({ id: 'img-sibling' }),
+          ],
+        }),
+      ],
+    })
+
+  it('wrapNodeInLink: оборачивает img в <a> с isLinkWrapper на той же позиции', () => {
+    const s = editorReducer(initState(buildImgTree()), wrapNodeInLink('img-1'))
+    const container = s.rootNode!.children[0]
+    expect(container.children).toHaveLength(2)
+    const wrapper = container.children[0]
+    expect(wrapper.tagName).toBe('a')
+    expect(wrapper.metadata?.isLinkWrapper).toBe(true)
+    expect(wrapper.children).toHaveLength(1)
+    expect(wrapper.children[0].id).toBe('img-1')
+    // Sibling остался на месте
+    expect(container.children[1].id).toBe('img-sibling')
+    expect(s.isDirty).toBe(true)
+  })
+
+  it('wrapNodeInLink: повторный вызов на уже обёрнутом — no-op', () => {
+    const wrapped = editorReducer(initState(buildImgTree()), wrapNodeInLink('img-1'))
+    const next = editorReducer(wrapped, wrapNodeInLink('img-1'))
+    expect(next.rootNode).toBe(wrapped.rootNode)
+  })
+
+  it('wrapNodeInLink: root и несуществующий узел — no-op', () => {
+    const s = initState(buildImgTree())
+    expect(editorReducer(s, wrapNodeInLink('root')).rootNode).toBe(s.rootNode)
+    expect(editorReducer(s, wrapNodeInLink('no-such')).rootNode).toBe(s.rootNode)
+  })
+
+  it('unwrapNodeFromLink: возвращает img на место обёртки и выделяет его', () => {
+    const wrapped = editorReducer(initState(buildImgTree()), wrapNodeInLink('img-1'))
+    const s = editorReducer(wrapped, unwrapNodeFromLink('img-1'))
+    const container = s.rootNode!.children[0]
+    expect(container.children).toHaveLength(2)
+    expect(container.children[0].id).toBe('img-1')
+    expect(container.children[1].id).toBe('img-sibling')
+    expect(s.selectedNodeId).toBe('img-1')
+  })
+
+  it('unwrapNodeFromLink: не трогает обычный <a>-родитель без isLinkWrapper', () => {
+    const tree = mk({
+      id: 'root',
+      children: [mk({ id: 'manual-a', tagName: 'a', children: [mk({ id: 'img-1', tagName: 'img' })] })],
+    })
+    const s = initState(tree)
+    expect(editorReducer(s, unwrapNodeFromLink('img-1')).rootNode).toBe(s.rootNode)
+  })
+
+  it('wrap + unwrap: каждый шаг пушит history-step', () => {
+    const s0 = initState(buildImgTree())
+    const s1 = editorReducer(s0, wrapNodeInLink('img-1'))
+    expect(s1.history.length).toBe(s0.history.length + 1)
+    const s2 = editorReducer(s1, unwrapNodeFromLink('img-1'))
+    expect(s2.history.length).toBe(s1.history.length + 1)
   })
 })

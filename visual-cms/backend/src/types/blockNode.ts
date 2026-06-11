@@ -208,6 +208,10 @@ export interface BlockNode {
     hidden?: boolean
     name?: string
     linkedBlockId?: string
+    /** Исходный tagName блока до превращения его в ссылку (tagName='a'); нужен для отката */
+    originalTagName?: string
+    /** Узел-обёртка <a>, созданная редактором вокруг void-элемента (img, input…); разворачивается при выключении ссылки */
+    isLinkWrapper?: boolean
     customHeadHtml?: string
     customBodyEndHtml?: string
     breakpoints?: BreakpointDef[]
