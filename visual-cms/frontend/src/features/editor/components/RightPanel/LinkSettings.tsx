@@ -36,16 +36,22 @@ export const LinkSettings: React.FC<LinkSettingsProps> = ({ node, pageId }) => {
     return () => { cancelled = true }
   }, [pageId])
 
-  const handleAttributeChange = (attr: string, value: string) => {
+  // Все атрибуты пишутся одним dispatch: два последовательных вызова с одним
+  // атрибутом затирали бы друг друга — оба читают устаревший node.attributes из замыкания.
+  const setAttributes = (updates: Record<string, string>) => {
     dispatch(updateNode({
       id: node.id,
       updates: {
         attributes: {
           ...node.attributes,
-          [attr]: value,
+          ...updates,
         },
       },
     }))
+  }
+
+  const handleAttributeChange = (attr: string, value: string) => {
+    setAttributes({ [attr]: value })
   }
 
   return (
@@ -62,11 +68,10 @@ export const LinkSettings: React.FC<LinkSettingsProps> = ({ node, pageId }) => {
                 const page = sitePages.find(p => p.id === selectedPageId)
                 if (page) {
                   const href = page.slug === 'home' || page.slug === 'index' ? '/' : `/${page.slug}`
-                  handleAttributeChange('href', href)
-                  handleAttributeChange('data-page-id', selectedPageId)
+                  setAttributes({ href, 'data-page-id': selectedPageId })
                 }
               } else {
-                handleAttributeChange('data-page-id', '')
+                setAttributes({ 'data-page-id': '' })
               }
             }}
             className="w-full px-3 py-1.5 border border-gray-300 bg-white rounded text-sm text-gray-900"
@@ -99,8 +104,7 @@ export const LinkSettings: React.FC<LinkSettingsProps> = ({ node, pageId }) => {
         kind="document"
         onClose={() => setDocPickerOpen(false)}
         onSelect={(asset) => {
-          handleAttributeChange('href', resolveMediaUrl(asset.url))
-          handleAttributeChange('data-page-id', '')
+          setAttributes({ href: resolveMediaUrl(asset.url), 'data-page-id': '' })
         }}
       />
       <div>
