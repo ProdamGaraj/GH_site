@@ -16,6 +16,7 @@ import { LinkedChangesModal } from './LinkedChangesModal'
 import { blockApi, pageApi } from '@/shared/api'
 import type { ChangedLinkedInstance, LinkedDecision } from '@/shared/api'
 import { generateNodeTreeCSS, generateResponsiveCSS, collectSpecificChildrenIds, generateFullHTML } from '../utils/styleGenerator'
+import { cleanForLibrary, isLinkedPlaceholder, stripViewportIds } from '../utils/libraryClean'
 import type { BlockNode } from '@/shared/types'
 
 
@@ -350,24 +351,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       // Placeholder создаётся через createBlockReferenceNode('linked') с children=[] и означает
       // "сюда подставить структуру из библиотеки", а не "вот моя структура для библиотеки".
       // Без этого guard'а в библиотеку записывалась пустая структура, что ломало все ссылки на этот блок.
-      // Аналогичный guard есть на бэкенде в LinkedBlocksService._collectLinkedNodes.
-      const hasContent = Array.isArray(node.children) && node.children.length > 0
-      if (!hasContent) {
+      if (isLinkedPlaceholder(node)) {
         console.log(`[Sync] Пропускаем placeholder без children: ${linkedBlockId}`)
         continue
       }
 
       try {
-        // Создаём копию структуры для библиотеки (без linkedBlockId)
-        const structureForLibrary = JSON.parse(JSON.stringify(node))
-        if (structureForLibrary.metadata) {
-          delete structureForLibrary.metadata.linkedBlockId
-          delete structureForLibrary.metadata.styleOverrides
-        }
-
-        // Обновляем блок в библиотеке
+        // Обновляем блок в библиотеке (без linkedBlockId/styleOverrides на корне)
         await blockApi.update(linkedBlockId, {
-          structure: structureForLibrary
+          structure: cleanForLibrary(node)
         })
 
         console.log(`[Sync] Обновлён linked блок в библиотеке: ${linkedBlockId}`)
@@ -471,15 +463,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     dispatch(setZoom(100))
   }
 
-  // Вспомогательные функции для сохранения блоков
-  const cleanNode = (n: BlockNode): BlockNode => {
-    const { _viewportId, ...rest } = n as any
-    return {
-      ...rest,
-      children: n.children?.map(cleanNode) || []
-    }
-  }
-
   const findNodeById = (node: BlockNode, id: string): BlockNode | null => {
     if (node.id === id) return node
     for (const child of node.children) {
@@ -528,15 +511,26 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       
       let updatedCount = 0
       let createdCount = 0
+      let skippedCount = 0
       let updatedRootNode = rootNode
-      
+
       for (const { blockId, structure } of linkedBlocks) {
+        // КРИТИЧНЫЙ GUARD: схлопнутый placeholder (children: []) означает «подставь
+        // структуру из библиотеки», а не «вот моя структура». Запись его в библиотеку
+        // затирала блок пустышкой на всех страницах. Тот же guard — в
+        // syncNestedLinkedBlocksToLibrary и на бэкенде.
+        if (isLinkedPlaceholder(structure)) {
+          console.log(`[Library] Пропускаем placeholder без children: ${blockId}`)
+          skippedCount++
+          continue
+        }
+
         try {
           // Проверяем существует ли блок
           try {
             await blockApi.getById(blockId)
-            // Блок существует - обновляем
-            await blockApi.update(blockId, { structure: cleanNode(structure) })
+            // Блок существует — обновляем (без linkedBlockId/styleOverrides на корне)
+            await blockApi.update(blockId, { structure: cleanForLibrary(structure) })
             updatedCount++
             console.log(`Блок ${blockId} обновлён`)
           } catch (err: any) {
@@ -548,7 +542,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               const newBlock = await blockApi.create({
                 name: blockName,
                 type: structure.elementType || 'container',
-                structure: cleanNode(structure),
+                structure: cleanForLibrary(structure),
                 isReusable: true
               })
               console.log(`Создан блок с ID: ${newBlock.id}`)
@@ -591,7 +585,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           const newBlock = await blockApi.create({
             name: blockName,
             type: topLevelBlock.elementType || 'container',
-            structure: cleanNode(topLevelBlock),
+            structure: cleanForLibrary(topLevelBlock),
             isReusable: true
           })
           
@@ -623,7 +617,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       // Сохраняем страницу с обновлёнными linkedBlockId
       if (id && pageSettings) {
         await pageApi.update(id, {
-          structure: cleanNode(updatedRootNode),
+          structure: stripViewportIds(updatedRootNode),
           name: pageSettings.name,
           slug: pageSettings.slug,
         })
@@ -635,7 +629,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       let message = ''
       if (updatedCount > 0) message += `Обновлено ${updatedCount} блок(ов)`
       if (createdCount > 0) message += (message ? ', ' : '') + `создано ${createdCount} новых`
-      if (updatedCount === 0 && createdCount === 0) message = 'Нет блоков для сохранения в библиотеку'
+      if (skippedCount > 0) message += (message ? ', ' : '') + `пропущено ${skippedCount} пустых (placeholder)`
+      if (updatedCount === 0 && createdCount === 0) message = message || 'Нет блоков для сохранения в библиотеку'
       else message += '. Страница сохранена.'
       
       setBlockSaveResult({ success: true, message })

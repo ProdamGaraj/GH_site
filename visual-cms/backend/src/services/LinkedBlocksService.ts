@@ -93,18 +93,22 @@ export class LinkedBlocksService {
     if (structure.metadata?.linkedBlockId) {
       const linkedId = structure.metadata.linkedBlockId
 
-      // ащита от бесконечной рекурсии
+      // Защита от циклов (блок ссылается сам на себя через вложенность) — только по
+      // ветке предков: id снимается после обработки поддерева. Если держать id навсегда,
+      // второй инстанс того же блока на странице не разворачивается и остаётся пустым
+      // placeholder'ом (а клик «В библиотеку» затем затирал библиотеку этой пустышкой).
       if (processingIds.has(linkedId)) {
         return structure
       }
-      processingIds.add(linkedId)
 
       const libraryStructure = blockMap.get(linkedId)
       if (libraryStructure) {
+        processingIds.add(linkedId)
         // Глубокая копия
         let result = JSON.parse(JSON.stringify(libraryStructure))
         // Рекурсивно обрабатываем вложенные linkedBlockId
         result = this._applyLinkedBlocks(result, blockMap, processingIds)
+        processingIds.delete(linkedId)
         // Сохраняем id placeholder'а (стабильность для UI и предотвращение коллизий
         // если один и тот же library блок используется несколько раз на странице) и
         // его attributes — например data-carousel-static / data-carousel-slide для

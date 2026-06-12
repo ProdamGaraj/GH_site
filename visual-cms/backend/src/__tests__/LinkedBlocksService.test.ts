@@ -349,6 +349,77 @@ describe('LinkedBlocksService', () => {
   })
 
   /**
+   * Регресс: один и тот же library-блок несколько раз на странице.
+   *
+   * Историческая ошибка: processingIds в _applyLinkedBlocks никогда не очищался,
+   * поэтому разворачивался только ПЕРВЫЙ инстанс блока — остальные оставались
+   * пустыми placeholder'ами (children: []). На канвасе блок «исчезал», а клик
+   * «В библиотеку» пушил пустышку обратно и затирал библиотечный блок.
+   */
+  describe('updateLinkedBlocks: повторные инстансы и циклы', () => {
+    const repo: any = (AppDataSource as any).getRepository()
+
+    beforeEach(() => {
+      repo.find.mockReset()
+    })
+
+    it('разворачивает ВСЕ инстансы одного блока на странице, не только первый', async () => {
+      const structure = {
+        id: 'root',
+        children: [
+          { id: 'inst-1', metadata: { linkedBlockId: 'lib-X' }, children: [] },
+          { id: 'middle', children: [
+            { id: 'inst-2', metadata: { linkedBlockId: 'lib-X' }, children: [] },
+          ] },
+          { id: 'inst-3', metadata: { linkedBlockId: 'lib-X' }, children: [] },
+        ],
+      }
+      repo.find.mockResolvedValueOnce([
+        {
+          id: 'lib-X',
+          structure: { id: 'lib-root', tagName: 'section', children: [{ id: 'lib-c', content: 'X' }] },
+        },
+      ])
+
+      const result = await service.updateLinkedBlocks(structure)
+
+      const inst1 = result.children[0]
+      const inst2 = result.children[1].children[0]
+      const inst3 = result.children[2]
+      for (const [inst, instId] of [[inst1, 'inst-1'], [inst2, 'inst-2'], [inst3, 'inst-3']] as const) {
+        expect(inst.id).toBe(instId) // id плейсхолдера сохранён
+        expect(inst.metadata.linkedBlockId).toBe('lib-X')
+        expect(inst.children).toEqual([{ id: 'lib-c', content: 'X' }]) // развёрнут
+      }
+    })
+
+    it('настоящий цикл (блок содержит сам себя) не приводит к бесконечной рекурсии', async () => {
+      const structure = {
+        id: 'root',
+        children: [{ id: 'inst', metadata: { linkedBlockId: 'lib-cycle' }, children: [] }],
+      }
+      // Библиотечный блок внутри себя ссылается сам на себя (испорченные данные)
+      repo.find.mockResolvedValueOnce([
+        {
+          id: 'lib-cycle',
+          structure: {
+            id: 'lib-root',
+            children: [{ id: 'self-ref', metadata: { linkedBlockId: 'lib-cycle' }, children: [] }],
+          },
+        },
+      ])
+
+      const result = await service.updateLinkedBlocks(structure)
+
+      const inst = result.children[0]
+      expect(inst.id).toBe('inst')
+      // Вложенная самоссылка осталась placeholder'ом — рекурсия остановлена
+      expect(inst.children[0].id).toBe('self-ref')
+      expect(inst.children[0].children).toEqual([])
+    })
+  })
+
+  /**
    * applyLinkedDecisions — применение решений пользователя к структуре перед сохранением.
    * Чистый метод (без БД); сайд-эффекты в библиотеку возвращаются как libraryWrites.
    */

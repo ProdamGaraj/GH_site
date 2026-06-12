@@ -9,6 +9,20 @@ import { logger } from '../services/Logger'
 
 const blockRepository = AppDataSource.getRepository(Block)
 
+/**
+ * Библиотечный блок по определению не может быть linked-инстансом: linkedBlockId и
+ * styleOverrides на корне структуры — артефакты записи инстанса со страницы (исторически
+ * фронт пушил их как есть, и блок в библиотеке получал ссылку сам на себя). Срезаем на
+ * любом пути записи в библиотеку; вложенные linkedBlockId не трогаем — это легальные
+ * ссылки на другие блоки.
+ */
+function stripInstanceArtifacts(structure: any): void {
+  if (structure?.metadata) {
+    delete structure.metadata.linkedBlockId
+    delete structure.metadata.styleOverrides
+  }
+}
+
 export class BlockController {
   getAll = asyncHandler(async (req: Request, res: Response) => {
     const blocks = await blockRepository.find({
@@ -42,6 +56,7 @@ export class BlockController {
   })
 
   create = asyncHandler(async (req: Request, res: Response) => {
+    stripInstanceArtifacts(req.body.structure)
     const block = blockRepository.create(req.body)
     await blockRepository.save(block)
     await cacheService.invalidateByTag('blocks')
@@ -61,6 +76,7 @@ export class BlockController {
     // Запоминаем, были ли detectedFields явно переданы в запросе
     const explicitFields = Object.prototype.hasOwnProperty.call(req.body, 'detectedFields')
 
+    stripInstanceArtifacts(req.body.structure)
     Object.assign(block, req.body)
 
     // Если block является Template и структура изменилась — пересчитываем поля,
@@ -257,6 +273,7 @@ export class BlockController {
 
   createFromElement = asyncHandler(async (req: Request, res: Response) => {
     const { name, structure, enableTemplate = false, templateCategory = 'custom' } = req.body
+    stripInstanceArtifacts(structure)
 
     const block = blockRepository.create({
       name: name || 'New Block',
