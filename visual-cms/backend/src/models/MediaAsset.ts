@@ -17,10 +17,26 @@ import {
  */
 export type MediaKind = 'image' | 'video' | 'document'
 
+/**
+ * Адаптивный вариант изображения (один размер для srcset).
+ * Хранится в jsonb-колонке `variants`. URL вычисляется так же, как у storageKey.
+ */
+export interface MediaVariant {
+  /** Реальная ширина варианта в px (после ресайза). */
+  width: number
+  /** Реальная высота варианта в px. */
+  height: number
+  /** Ключ файла варианта в MinIO (например `<uuid>.w1280.webp`). */
+  storageKey: string
+  /** Размер файла варианта в байтах. */
+  sizeBytes: number
+}
+
 @Entity('media_assets')
 @Index(['siteId'])
 @Index(['kind'])
 @Index(['createdAt'])
+@Index(['folderId'])
 export class MediaAsset {
   @PrimaryGeneratedColumn('uuid')
   id!: string
@@ -51,6 +67,28 @@ export class MediaAsset {
   /** Ключ миниатюры (webp, max 400px). Генерируется при загрузке изображений (кроме SVG). */
   @Column({ type: 'varchar', length: 512, nullable: true })
   thumbnailStorageKey?: string | null
+
+  /**
+   * Ключ оптимизированной (сжатой без заметной потери качества) версии (webp).
+   * Создаётся опционально по галочке при загрузке. Оригинал при этом сохраняется.
+   */
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  optimizedStorageKey?: string | null
+
+  /** Размер оптимизированной версии в байтах (для отображения экономии). */
+  @Column({ type: 'bigint', nullable: true })
+  optimizedSizeBytes?: number | null
+
+  /**
+   * Адаптивные варианты изображения для srcset (разные ширины экранов).
+   * Создаются опционально при загрузке из размеров мониторов/брейкпоинтов проекта.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  variants?: MediaVariant[] | null
+
+  /** Папка медиатеки (null = корень). */
+  @Column({ type: 'uuid', nullable: true })
+  folderId?: string | null
 
   @Column({ type: 'bigint', default: 0 })
   sizeBytes!: number

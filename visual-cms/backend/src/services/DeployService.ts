@@ -5,6 +5,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { htmlGenerator, type ResolvedNavItem } from './HtmlGenerator'
+import { responsiveImageService } from './ResponsiveImageService'
 import { AppDataSource } from '../config/database'
 import { Not, In } from 'typeorm'
 import { Page } from '../models/Page'
@@ -115,6 +116,18 @@ export class DeployService {
   private collectionOverrideRepository = AppDataSource.getRepository(CollectionOverride)
 
   /**
+   * Генерирует HTML страницы и обогащает его адаптивными srcset.
+   * Единая точка вместо прямого вызова htmlGenerator.generatePage — чтобы
+   * srcset-инъекция применялась ко всем путям деплоя (страницы, сайты, переводы).
+   */
+  private async generatePageHtml(
+    ...args: Parameters<typeof htmlGenerator.generatePage>
+  ): Promise<string> {
+    const html = htmlGenerator.generatePage(...args)
+    return responsiveImageService.enrich(html)
+  }
+
+  /**
    * Деплоит одну страницу
    */
   async deployPage(pageId: string): Promise<DeployResult> {
@@ -177,7 +190,7 @@ export class DeployService {
       }
 
       // Генерируем HTML
-      const html = htmlGenerator.generatePage(
+      const html = await this.generatePageHtml(
         updatedStructure,
         page.metadata || { title: page.name, description: '', keywords: [] },
         page.slug,
@@ -293,7 +306,7 @@ export class DeployService {
               .map(l => ({ code: l.code, name: l.nativeName, flag: l.flag || '🌐', isDefault: l.isDefault, direction: l.direction }))
           }
           
-          const html = htmlGenerator.generatePage(
+          const html = await this.generatePageHtml(
             updatedStructure,
             page.metadata || { title: page.name, description: '', keywords: [] },
             page.slug,
@@ -409,7 +422,7 @@ export class DeployService {
               .map(l => ({ code: l.code, name: l.nativeName, flag: l.flag || '🌐', isDefault: l.isDefault, direction: l.direction }))
           }
 
-          const html = htmlGenerator.generatePage(
+          const html = await this.generatePageHtml(
             updatedStructure,
             page.metadata || { title: page.name, description: '', keywords: [] },
             page.slug,
@@ -670,7 +683,7 @@ export class DeployService {
           }
 
           // Генерируем HTML
-          const html = htmlGenerator.generatePage(
+          const html = await this.generatePageHtml(
             pageStructure,
             pageMetadata,
             itemSlug,
@@ -2038,7 +2051,7 @@ export class DeployService {
             )
 
           // Generate localized HTML with lang attribute and language switcher
-          const localizedHtml = htmlGenerator.generatePage(
+          const localizedHtml = await this.generatePageHtml(
             translatedStructure,
             translatedMetadata,
             page.slug,

@@ -62,7 +62,13 @@ class ApiClient {
       throw new Error(message)
     }
 
-    return response.json()
+    // 204 No Content / пустое тело (например, у DELETE) — JSON парсить нечего.
+    // Иначе response.json() бросает «Unexpected end of JSON input» на успешном ответе.
+    if (response.status === 204) {
+      return undefined as T
+    }
+    const text = await response.text()
+    return (text ? JSON.parse(text) : undefined) as T
   }
 
   get<T>(endpoint: string, options?: RequestOptions): Promise<T> {

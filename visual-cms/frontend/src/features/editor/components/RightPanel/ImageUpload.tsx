@@ -2,6 +2,7 @@ import React, { useRef, useState, useCallback } from 'react'
 import { Upload, X, Image as ImageIcon, Link as LinkIcon, Loader2, FolderOpen } from 'lucide-react'
 import { mediaApi, resolveMediaUrl } from '@/shared/api/mediaApi'
 import { MediaPicker } from '@/features/media/MediaPicker'
+import { useProjectVariantWidths } from '@/features/media/useProjectVariantWidths'
 
 interface ImageUploadProps {
   value: string
@@ -25,6 +26,10 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   const [previewError, setPreviewError] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [optimize, setOptimize] = useState(true)
+  const [makeResponsive, setMakeResponsive] = useState(true)
+  const variantWidths = useProjectVariantWidths()
+  const showImageOptions = kind === 'image' || kind === 'any'
 
   const handleFileSelect = useCallback(async (file: File) => {
     const expectImage = kind === 'image'
@@ -41,19 +46,25 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     setIsUploading(true)
     setPreviewError(false)
 
+    // Опции оптимизации/адаптивов применимы только к изображениям; бэкенд игнорирует их для прочего.
+    const isImage = file.type.startsWith('image/')
+
     try {
       const asset = await mediaApi.upload({
         file,
         title: file.name.replace(/\.[^.]+$/, ''),
+        optimize: isImage && showImageOptions ? optimize : false,
+        variantWidths: isImage && showImageOptions && makeResponsive ? variantWidths : undefined,
       })
-      onChange(resolveMediaUrl(asset.url))
+      // Если создана оптимизированная версия — подставляем её (легче, без потери качества).
+      onChange(resolveMediaUrl(asset.optimizedUrl || asset.url))
     } catch (error: any) {
       console.error('Upload error:', error)
       alert(`Ошибка загрузки: ${error?.message || ''}`)
     } finally {
       setIsUploading(false)
     }
-  }, [onChange, kind])
+  }, [onChange, kind, showImageOptions, optimize, makeResponsive, variantWidths])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -188,6 +199,24 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
               </span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Опции оптимизации/адаптивов (для изображений; применяются при загрузке файла) */}
+      {showImageOptions && (
+        <div className="flex flex-col gap-1 text-[11px] text-gray-600 border-t border-gray-100 pt-2">
+          <label className="inline-flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" checked={optimize} onChange={(e) => setOptimize(e.target.checked)} />
+            Оптимизировать (без потери качества)
+          </label>
+          <label className="inline-flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={makeResponsive}
+              onChange={(e) => setMakeResponsive(e.target.checked)}
+            />
+            Адаптивные размеры{variantWidths.length > 0 ? ` (${variantWidths.length})` : ''}
+          </label>
         </div>
       )}
 

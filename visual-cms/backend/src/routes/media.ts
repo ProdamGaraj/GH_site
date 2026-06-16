@@ -10,6 +10,12 @@ const upload = multer({
 
 const router = Router()
 
+// Папки: регистрируем ДО '/:id', иначе '/folders' попадёт в параметр :id.
+router.get('/folders', MediaController.listFolders)
+router.post('/folders', MediaController.createFolder)
+router.patch('/folders/:id', MediaController.updateFolder)
+router.delete('/folders/:id', MediaController.deleteFolder)
+
 router.get('/', MediaController.list)
 router.get('/:id', MediaController.getById)
 router.post(
