@@ -18,8 +18,9 @@ RUN npm ci
 # Copy source code
 COPY src/ ./src/
 
-# Build TypeScript
-RUN npm run build
+# Build TypeScript, затем кладём .sql-миграции в dist (tsc их не переносит) —
+# иначе раннер в проде не найдёт ни одной миграции.
+RUN npm run build && cp src/migrations/*.sql dist/migrations/ 2>/dev/null || true
 
 # Prune dev dependencies
 RUN npm prune --production
