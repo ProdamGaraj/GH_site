@@ -106,6 +106,18 @@ services:
       - backend
 
 volumes:
+  # External volumes (B1): объявлены external, поэтому
+  #   - `docker compose down -v` их НЕ удаляет (защита данных от случайного сноса);
+  #   - volume должен существовать ДО `up` (создаётся `docker volume create`).
+  # name: — точное имя существующего volume. Префикс = имя compose-проекта
+  # (директория `visual-cms`); проверять `docker volume ls`. Если на окружении
+  # другой префикс — поправить name здесь ИЛИ заранее создать volume с этим именем.
   postgres-data:
+    external: true
+    name: visual-cms_postgres-data
   redis-data:
+    external: true
+    name: visual-cms_redis-data
   minio-data:
+    external: true
+    name: visual-cms_minio-data
