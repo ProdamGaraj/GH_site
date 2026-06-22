@@ -9,6 +9,7 @@ import { fetchPages, selectPages } from '@/features/pages/pagesSlice'
 import { siteApi } from '@/shared/api'
 import type { Page } from '@/shared/types'
 import { getSitePublicUrl } from '@/shared/utils'
+import { useOverlayClose } from '@/shared/hooks/useOverlayClose'
 
 export const SitePagesPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -19,6 +20,7 @@ export const SitePagesPage: React.FC = () => {
   const [sitePages, setSitePages] = useState<Page[]>([])
   const [loading, setLoading] = useState(true)
   const [showAssignModal, setShowAssignModal] = useState(false)
+  const assignOverlay = useOverlayClose(() => setShowAssignModal(false))
 
   useEffect(() => {
     if (id) {
@@ -179,8 +181,8 @@ export const SitePagesPage: React.FC = () => {
 
       {/* Assign Modal */}
       {showAssignModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAssignModal(false)}>
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md max-h-[70vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" {...assignOverlay}>
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md max-h-[70vh] flex flex-col">
             <h2 className="text-xl font-semibold mb-4">Добавить страницу в сайт</h2>
             {unassignedPages.length === 0 ? (
               <p className="text-gray-500 py-8 text-center">Все страницы уже привязаны к этому сайту</p>

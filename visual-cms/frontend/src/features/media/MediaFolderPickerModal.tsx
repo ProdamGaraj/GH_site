@@ -3,6 +3,7 @@ import { Folder, FolderOpen, X } from 'lucide-react'
 import type { MediaFolder } from '@/shared/api/mediaApi'
 import { buildFolderTree, flattenTree } from './folderTree'
 import { cn } from '@/shared/utils'
+import { useOverlayClose } from '@/shared/hooks/useOverlayClose'
 
 interface MediaFolderPickerModalProps {
   open: boolean
@@ -23,15 +24,14 @@ export const MediaFolderPickerModal: React.FC<MediaFolderPickerModalProps> = ({
   onClose,
   onPick,
 }) => {
+  const overlay = useOverlayClose(onClose)
   if (!open) return null
   const flat = flattenTree(buildFolderTree(folders))
 
   return (
     <div
       className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
+      {...overlay}
     >
       <div className="bg-white rounded-lg shadow-xl w-[min(460px,92vw)] max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">

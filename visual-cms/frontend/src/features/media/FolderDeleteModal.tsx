@@ -1,6 +1,7 @@
 import React from 'react'
 import { X, Trash2, FolderInput, AlertTriangle } from 'lucide-react'
 import type { MediaFolder } from '@/shared/api/mediaApi'
+import { useOverlayClose } from '@/shared/hooks/useOverlayClose'
 
 interface FolderDeleteModalProps {
   folder: MediaFolder | null
@@ -14,15 +15,14 @@ interface FolderDeleteModalProps {
  *   - переместить содержимое в родительскую папку (или в корень).
  */
 export const FolderDeleteModal: React.FC<FolderDeleteModalProps> = ({ folder, onClose, onConfirm }) => {
+  const overlay = useOverlayClose(onClose)
   if (!folder) return null
   const parentLabel = folder.parentId ? 'родительскую папку' : 'корень'
 
   return (
     <div
       className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
+      {...overlay}
     >
       <div className="bg-white rounded-lg shadow-xl w-[min(460px,92vw)] flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">

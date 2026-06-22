@@ -128,6 +128,26 @@ export class DeployService {
   }
 
   /**
+   * Является ли страница корнем сайта (домашней). Явно выбранная домашняя
+   * (Site.homepageId) важнее legacy-конвенции slug 'index'/'home'.
+   */
+  private isHomePage(
+    page: { id: string; slug: string },
+    site?: { homepageId?: string | null } | null,
+  ): boolean {
+    if (site?.homepageId) return page.id === site.homepageId
+    return page.slug === 'index' || page.slug === 'home'
+  }
+
+  /**
+   * Относительный путь HTML-файла страницы для чистых URL (без .html в адресе):
+   * домашняя → 'index.html' (URL '/'), остальные → '<slug>/index.html' (URL '/<slug>').
+   */
+  private pageRelPath(slug: string, isHome: boolean): string {
+    return isHome ? 'index.html' : path.join(slug, 'index.html')
+  }
+
+  /**
    * Деплоит одну страницу
    */
   async deployPage(pageId: string): Promise<DeployResult> {
@@ -189,29 +209,31 @@ export class DeployService {
           .map(l => ({ code: l.code, name: l.nativeName, flag: l.flag || '🌐', isDefault: l.isDefault, direction: l.direction }))
       }
 
-      // Генерируем HTML
+      const isHome = this.isHomePage(page, page.site)
+
+      // Генерируем HTML (для домашней передаём slug='index', чтобы переключатель
+      // языков и пр. трактовали страницу как корень)
       const html = await this.generatePageHtml(
         updatedStructure,
         page.metadata || { title: page.name, description: '', keywords: [] },
-        page.slug,
+        isHome ? 'index' : page.slug,
         dataConfig,
         defaultLang?.code,
         defaultLang?.direction,
         availableLangsForSwitcher
       )
 
-      // Определяем путь файла
-      const fileName = page.slug === 'index' || page.slug === 'home' 
-        ? 'index.html' 
-        : `${page.slug}.html`
-      const filePath = path.join(siteDir, fileName)
+      // Чистые URL без .html: домашняя → index.html, остальные → <slug>/index.html
+      const relPath = this.pageRelPath(page.slug, isHome)
+      const filePath = path.join(siteDir, relPath)
 
       // Записываем файл
+      this.ensureDirectoryExists(path.dirname(filePath))
       fs.writeFileSync(filePath, html, 'utf-8')
-      deployedPages.push(fileName)
+      deployedPages.push(relPath)
 
       // === Генерация мультиязычных версий ===
-      await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir)
+      await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir, isHome)
 
       // Обновляем статус страницы
       page.status = 'published'
@@ -223,14 +245,14 @@ export class DeployService {
         this.generateRobotsTxt(page.site)
       }
 
-      logger.info(`Deployed: ${fileName} (site: ${page.site?.slug || 'default'})`)
+      logger.info(`Deployed: ${relPath} (site: ${page.site?.slug || 'default'})`)
 
       return {
         success: true,
         message: `Страница "${page.name}" успешно опубликована`,
         deployedPages,
         errors,
-        publicUrl: `${PUBLIC_SITE_URL}/${page.slug === 'index' || page.slug === 'home' ? '' : page.slug}`
+        publicUrl: `${PUBLIC_SITE_URL}/${isHome ? '' : page.slug}`
       }
     } catch (error: any) {
       logger.error('Deploy error', error instanceof Error ? error : undefined)
@@ -306,32 +328,34 @@ export class DeployService {
               .map(l => ({ code: l.code, name: l.nativeName, flag: l.flag || '🌐', isDefault: l.isDefault, direction: l.direction }))
           }
           
+          const isHome = this.isHomePage(page, page.site)
+
           const html = await this.generatePageHtml(
             updatedStructure,
             page.metadata || { title: page.name, description: '', keywords: [] },
-            page.slug,
+            isHome ? 'index' : page.slug,
             dataConfig,
             defLang?.code,
             defLang?.direction,
             pageLangSwitcher
           )
 
-          const fileName = page.slug === 'index' || page.slug === 'home' 
-            ? 'index.html' 
-            : `${page.slug}.html`
-          const filePath = path.join(siteDir, fileName)
+          // Чистые URL без .html: домашняя → index.html, остальные → <slug>/index.html
+          const relPath = this.pageRelPath(page.slug, isHome)
+          const filePath = path.join(siteDir, relPath)
 
+          this.ensureDirectoryExists(path.dirname(filePath))
           fs.writeFileSync(filePath, html, 'utf-8')
-          deployedPages.push(`${page.site?.slug || ''}/${fileName}`.replace(/^\//, ''))
+          deployedPages.push(`${page.site?.slug || ''}/${relPath}`.replace(/^\//, ''))
 
           // Mark page as published
           page.status = 'published'
           await this.pageRepository.save(page)
-          
+
           // Deploy translations for this page
-          await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir)
+          await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir, isHome)
           
-          logger.info(`Deployed: ${fileName} (site: ${page.site?.slug || 'default'})`)
+          logger.info(`Deployed: ${relPath} (site: ${page.site?.slug || 'default'})`)
         } catch (err: any) {
           errors.push(`Ошибка при генерации "${page.name}": ${err.message}`)
         }
@@ -389,7 +413,7 @@ export class DeployService {
 
       // Resolve navigation from site settings
       const allSitePages = await this.pageRepository.find({ where: { siteId } })
-      const resolvedNav = this.resolveNavigation(site.settings?.navigation, allSitePages)
+      const resolvedNav = this.resolveNavigation(site.settings?.navigation, allSitePages, site.homepageId)
 
       // Загружаем коллекции заранее для auto-links в repeater'ах
       const siteCollections = await this.collectionRepository.find({
@@ -422,10 +446,12 @@ export class DeployService {
               .map(l => ({ code: l.code, name: l.nativeName, flag: l.flag || '🌐', isDefault: l.isDefault, direction: l.direction }))
           }
 
+          const isHome = this.isHomePage(page, site)
+
           const html = await this.generatePageHtml(
             updatedStructure,
             page.metadata || { title: page.name, description: '', keywords: [] },
-            page.slug,
+            isHome ? 'index' : page.slug,
             dataConfig,
             defLang?.code,
             defLang?.direction,
@@ -433,16 +459,19 @@ export class DeployService {
             resolvedNav
           )
 
-          const fileName = page.slug === 'index' || page.slug === 'home' ? 'index.html' : `${page.slug}.html`
-          fs.writeFileSync(path.join(siteDir, fileName), html, 'utf-8')
-          deployedPages.push(fileName)
+          // Чистые URL без .html: домашняя → index.html, остальные → <slug>/index.html
+          const relPath = this.pageRelPath(page.slug, isHome)
+          const filePath = path.join(siteDir, relPath)
+          this.ensureDirectoryExists(path.dirname(filePath))
+          fs.writeFileSync(filePath, html, 'utf-8')
+          deployedPages.push(relPath)
 
           // Mark page as published
           page.status = 'published'
           await this.pageRepository.save(page)
 
-          await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir)
-          logger.info(`Site "${site.slug}" deployed: ${fileName}`)
+          await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir, isHome)
+          logger.info(`Site "${site.slug}" deployed: ${relPath}`)
         } catch (err: any) {
           errors.push(`Ошибка "${page.name}": ${err.message}`)
         }
@@ -694,12 +723,13 @@ export class DeployService {
             resolvedNav
           )
 
-          // Записываем файл
-          const filePath = path.join(collectionDir, `${itemSlug}.html`)
+          // Записываем файл (чистый URL без .html: <basePath>/<slug>/index.html → /<basePath>/<slug>)
+          const filePath = path.join(collectionDir, itemSlug, 'index.html')
+          this.ensureDirectoryExists(path.dirname(filePath))
           fs.writeFileSync(filePath, html, 'utf-8')
-          deployedPages.push(`${collection.basePath.replace(/^\/|\/$/g, '')}/${itemSlug}.html`)
+          deployedPages.push(`${collection.basePath.replace(/^\/|\/$/g, '')}/${itemSlug}`)
 
-          logger.info(`Collection "${collection.name}": deployed ${itemSlug}.html (${override ? 'custom' : 'template'})`)
+          logger.info(`Collection "${collection.name}": deployed ${itemSlug} (${override ? 'custom' : 'template'})`)
         } catch (itemErr: any) {
           errors.push(`Error deploying "${itemTitle}" (${itemSlug}): ${itemErr.message}`)
         }
@@ -1460,14 +1490,21 @@ export class DeployService {
    */
   async undeployPage(slug: string, siteSlug?: string): Promise<boolean> {
     const dir = siteSlug ? path.join(PUBLIC_DIR, 'sites', siteSlug) : PUBLIC_DIR
-    const fileName = slug === 'index' || slug === 'home' ? 'index.html' : `${slug}.html`
-    const filePath = path.join(dir, fileName)
-    
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath)
-      return true
+    const isHome = slug === 'index' || slug === 'home'
+    let removed = false
+
+    if (isHome) {
+      const filePath = path.join(dir, 'index.html')
+      if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); removed = true }
+    } else {
+      // Директорный формат: <slug>/index.html
+      const pageDir = path.join(dir, slug)
+      if (fs.existsSync(pageDir)) { fs.rmSync(pageDir, { recursive: true, force: true }); removed = true }
+      // Legacy плоский файл <slug>.html
+      const legacy = path.join(dir, `${slug}.html`)
+      if (fs.existsSync(legacy)) { fs.unlinkSync(legacy); removed = true }
     }
-    return false
+    return removed
   }
 
   /**
@@ -1509,7 +1546,7 @@ export class DeployService {
   /**
    * Разрешает navigation items: pageId → href URL
    */
-  private resolveNavigation(navItems: any[] | undefined, pages: Page[]): ResolvedNavItem[] {
+  private resolveNavigation(navItems: any[] | undefined, pages: Page[], homepageId?: string | null): ResolvedNavItem[] {
     if (!navItems || navItems.length === 0) return []
 
     const pageSlugMap = new Map(pages.map(p => [p.id, p.slug]))
@@ -1520,7 +1557,9 @@ export class DeployService {
         if (item.pageId) {
           const slug = pageSlugMap.get(item.pageId)
           if (slug !== undefined) {
-            href = slug === 'home' || slug === 'index' ? '/' : `/${slug}`
+            // Домашняя страница (выбранная в настройках сайта или legacy index/home) → '/'
+            const isHome = (!!homepageId && item.pageId === homepageId) || slug === 'home' || slug === 'index'
+            href = isHome ? '/' : `/${slug}`
           }
         }
         return {
@@ -2009,12 +2048,13 @@ export class DeployService {
    * Генерирует HTML-страницы для всех языковых версий
    */
   private async deployPageTranslations(
-    page: Page, 
-    structure: any, 
+    page: Page,
+    structure: any,
     dataConfig: PageDataConfig | undefined,
     deployedPages: string[],
     errors: string[],
-    siteDir?: string
+    siteDir?: string,
+    isHome: boolean = page.slug === 'index' || page.slug === 'home',
   ): Promise<void> {
     const deployDir = siteDir || PUBLIC_DIR
     try {
@@ -2054,7 +2094,7 @@ export class DeployService {
           const localizedHtml = await this.generatePageHtml(
             translatedStructure,
             translatedMetadata,
-            page.slug,
+            isHome ? 'index' : page.slug,
             dataConfig,
             lang.code,
             lang.direction,
@@ -2065,14 +2105,14 @@ export class DeployService {
           const langDir = path.join(deployDir, lang.code)
           this.ensureDirectoryExists(langDir)
 
-          const fileName = page.slug === 'index' || page.slug === 'home'
-            ? 'index.html'
-            : `${page.slug}.html`
-          const filePath = path.join(langDir, fileName)
+          // Чистые URL без .html: домашняя → <lang>/index.html, остальные → <lang>/<slug>/index.html
+          const relPath = this.pageRelPath(page.slug, isHome)
+          const filePath = path.join(langDir, relPath)
 
+          this.ensureDirectoryExists(path.dirname(filePath))
           fs.writeFileSync(filePath, localizedHtml, 'utf-8')
-          deployedPages.push(`${lang.code}/${fileName}`)
-          logger.info(`Deployed [${lang.code}]: ${lang.code}/${fileName}`)
+          deployedPages.push(`${lang.code}/${relPath}`)
+          logger.info(`Deployed [${lang.code}]: ${lang.code}/${relPath}`)
         } catch (err: any) {
           errors.push(`Ошибка при генерации "${page.name}" [${lang.code}]: ${err.message}`)
         }

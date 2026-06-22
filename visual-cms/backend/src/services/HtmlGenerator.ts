@@ -184,7 +184,8 @@ ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
     if (!languages || languages.length < 2) return ''
 
     const currentCode = currentLang || languages.find(l => l.isDefault)?.code || 'ru'
-    const fileName = slug === 'index' || slug === 'home' ? 'index.html' : `${slug}.html`
+    // Чистые URL без .html: домашняя → '' (корень), остальные → '<slug>/'
+    const seg = slug === 'index' || slug === 'home' ? '' : `${slug}/`
 
     return `
   <!-- Language Runtime -->
@@ -192,12 +193,12 @@ ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
   (function(){
     var langs = ${JSON.stringify(languages)};
     var current = ${JSON.stringify(currentCode)};
-    var file = ${JSON.stringify(fileName)};
+    var seg = ${JSON.stringify(seg)};
 
     function getLangUrl(code) {
       var lang = langs.find(function(l){ return l.code === code; });
       if (!lang) return null;
-      return lang.isDefault ? '/' + file : '/' + code + '/' + file;
+      return lang.isDefault ? '/' + seg : '/' + code + '/' + seg;
     }
 
     function switchLang(code) {

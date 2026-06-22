@@ -1,6 +1,7 @@
 import React from 'react'
 import { MediaLibrary, MediaCloseBtn } from './MediaLibrary'
 import type { MediaAsset, MediaKind } from '@/shared/api/mediaApi'
+import { useOverlayClose } from '@/shared/hooks/useOverlayClose'
 
 export interface MediaPickerProps {
   open: boolean
@@ -23,6 +24,7 @@ export const MediaPicker: React.FC<MediaPickerProps> = ({
   onClose,
   onSelect,
 }) => {
+  const overlay = useOverlayClose(onClose)
   if (!open) return null
 
   const handleSelect = (asset: MediaAsset) => {
@@ -33,9 +35,7 @@ export const MediaPicker: React.FC<MediaPickerProps> = ({
   return (
     <div
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
+      {...overlay}
     >
       <div className="bg-white rounded-lg shadow-xl w-[min(1100px,95vw)] max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">

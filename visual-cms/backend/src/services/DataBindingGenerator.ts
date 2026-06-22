@@ -772,7 +772,7 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         var titleVal = config.collectionLink.titleField ? getNestedValue(item, config.collectionLink.titleField) : '';
         // Всегда нормализуем slug — единый формат URL
         var slugValue = slugify(String(rawSlug || titleVal || '')) || item.id || item._id || index;
-        var href = config.collectionLink.basePath + '/' + encodeURIComponent(String(slugValue)) + '.html';
+        var href = config.collectionLink.basePath + '/' + encodeURIComponent(String(slugValue));
         var linkEl = config.collectionLink.linkSelector
           ? clone.querySelector(config.collectionLink.linkSelector)
           : (clone.tagName === 'A' ? clone : clone.querySelector('a'));

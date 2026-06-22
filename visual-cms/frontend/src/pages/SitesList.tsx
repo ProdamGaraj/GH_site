@@ -16,6 +16,7 @@ import {
 } from '@/features/sites/sitesSlice'
 import type { Site } from '@/shared/types'
 import { getSitePublicUrl } from '@/shared/utils'
+import { useOverlayClose } from '@/shared/hooks/useOverlayClose'
 
 export const SitesList: React.FC = () => {
   const dispatch = useAppDispatch()
@@ -28,13 +29,15 @@ export const SitesList: React.FC = () => {
   const [newSiteSlug, setNewSiteSlug] = useState('')
   const [newSiteRouting, setNewSiteRouting] = useState<'subdomain' | 'path-prefix' | 'custom-domain'>('subdomain')
   const [deployingId, setDeployingId] = useState<string | null>(null)
+  const createOverlay = useOverlayClose(() => setShowCreateModal(false))
 
   useEffect(() => {
     dispatch(fetchSites())
   }, [dispatch])
 
   const handleCreate = async () => {
-    if (!newSiteName.trim() || !newSiteSlug.trim()) return
+    // slug может быть пустым — это сайт на корневом домене (deploy → public-site/)
+    if (!newSiteName.trim()) return
     try {
       await dispatch(createSite({
         name: newSiteName.trim(),
@@ -235,8 +238,8 @@ export const SitesList: React.FC = () => {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowCreateModal(false)}>
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md text-gray-900" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" {...createOverlay}>
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md text-gray-900">
             <h2 className="text-xl font-semibold mb-4">Новый сайт</h2>
             <div className="space-y-4">
               <div>
@@ -262,8 +265,11 @@ export const SitesList: React.FC = () => {
                   value={newSiteSlug}
                   onChange={(e) => setNewSiteSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-gray-900 bg-white"
-                  placeholder="premium"
+                  placeholder="(пусто = корневой домен)"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Оставьте пустым, чтобы сайт был доступен на корневом домене
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Режим маршрутизации</label>
@@ -280,7 +286,7 @@ export const SitesList: React.FC = () => {
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <Button variant="secondary" onClick={() => setShowCreateModal(false)}>Отмена</Button>
-              <Button onClick={handleCreate} disabled={saving || !newSiteName.trim() || !newSiteSlug.trim()}>
+              <Button onClick={handleCreate} disabled={saving || !newSiteName.trim()}>
                 {saving ? 'Создание...' : 'Создать'}
               </Button>
             </div>
