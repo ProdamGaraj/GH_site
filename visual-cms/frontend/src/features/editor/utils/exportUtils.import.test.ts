@@ -22,6 +22,8 @@ import {
   generateHTMLDocument,
   generateFullExport,
   collectTreeGlobalCss,
+  collectTreeGlobalJs,
+  importFromFiles,
 } from './exportUtils'
 
 const parse = (html: string): Document =>
@@ -247,5 +249,82 @@ describe('collectTreeGlobalCss (живое превью канваса)', () => 
   it('null/пустое дерево → пустая строка', () => {
     expect(collectTreeGlobalCss(null)).toBe('')
     expect(collectTreeGlobalCss(node({ metadata: {} }))).toBe('')
+  })
+})
+
+describe('импорт: устойчивый разбор стилей и атрибутов', () => {
+  it('url(https://…) в значении не обрезается на двоеточии', () => {
+    const html = `<div style="background-image: url('https://cdn.example.com/a/b.png'); color: red"></div>`
+    const props = importFromHTML(html).styles.properties as Record<string, string>
+    expect(props.backgroundImage).toBe("url('https://cdn.example.com/a/b.png')")
+    expect(props.color).toBe('red')
+  })
+
+  it('CSS-переменные (--var) сохраняются, не превращаются в -Var', () => {
+    const html = `<div style="--image: url('https://x/y.png'); background: var(--image) center / cover"></div>`
+    const props = importFromHTML(html).styles.properties as Record<string, string>
+    expect(props['--image']).toBe("url('https://x/y.png')")
+    expect(props['-Image']).toBeUndefined()
+    expect(props.background).toBe('var(--image) center / cover')
+  })
+
+  it('data-URI с `;` внутри url() не рвётся', () => {
+    const html = `<div style="background: url(data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=) no-repeat"></div>`
+    const props = importFromHTML(html).styles.properties as Record<string, string>
+    expect(props.background).toBe('url(data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=) no-repeat')
+  })
+
+  it('class/id/data-* сохраняются на элементах (для globalCss-селекторов)', () => {
+    const html = `<section class="hero main" id="top" data-role="x"><p class="lead">y</p></section>`
+    const root = importFromHTML(html)
+    expect(root.attributes.class).toBe('hero main')
+    expect(root.attributes.id).toBe('top')
+    expect(root.attributes['data-role']).toBe('x')
+    expect(root.children[0].attributes.class).toBe('lead')
+  })
+
+  it('правило класса с url(https://…) инлайнится без обрезки', () => {
+    const html = `<style>.bg{background-image:url(https://x/y.png)}</style><div class="bg"></div>`
+    const props = importFromHTML(html).styles.properties as Record<string, string>
+    expect(props.backgroundImage).toBe('url(https://x/y.png)')
+  })
+})
+
+describe('importFromFiles (html + css + js)', () => {
+  it('CSS-файл → properties/states/globalCss, JS-файл → globalJs', () => {
+    const result = importFromFiles({
+      html: '<section class="hero"><button class="btn">x</button></section>',
+      css: '.hero { padding: 10px; } .btn:hover { color: red; } @media (max-width: 600px) { .hero { padding: 2px; } }',
+      js: 'BUNDLE_JS()',
+    })
+    expect((result.styles.properties as Record<string, string>).padding).toBe('10px')
+    expect(result.children[0].styles.states?.hover?.color).toBe('red')
+    expect(result.metadata.globalCss).toContain('@media')
+    expect(result.metadata.globalJs).toContain('BUNDLE_JS()')
+  })
+
+  it('работает без css/js (только html), сохраняет класс', () => {
+    const result = importFromFiles({ html: '<div class="x">hi</div>' })
+    expect(result.attributes.class).toBe('x')
+  })
+})
+
+describe('collectTreeGlobalJs', () => {
+  it('собирает globalJs страницы и блоков с дедупом по контенту', () => {
+    const tree = node({
+      id: 'root',
+      metadata: { globalJs: 'PAGE_JS()' },
+      children: [
+        node({ id: 'a', metadata: { globalJs: 'BLOCK_JS()' } }),
+        node({ id: 'b', metadata: { globalJs: 'BLOCK_JS()' } }),
+      ],
+    })
+    const js = collectTreeGlobalJs(tree)
+    expect(js).toContain('PAGE_JS()')
+    expect(js.split('BLOCK_JS()').length - 1).toBe(1)
+  })
+
+  it('null → пустая строка', () => {
+    expect(collectTreeGlobalJs(null)).toBe('')
   })
 })

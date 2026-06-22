@@ -1,6 +1,11 @@
 import React from 'react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { updateNode, selectRootNode } from '@/features/editor/editorSlice'
+import {
+  updateNode,
+  selectRootNode,
+  selectRunScriptsInCanvas,
+  setRunScriptsInCanvas,
+} from '@/features/editor/editorSlice'
 import { FileCode } from 'lucide-react'
 
 /**
@@ -14,6 +19,7 @@ import { FileCode } from 'lucide-react'
 export const GlobalAssetEditor: React.FC<{ field: 'globalCss' | 'globalJs' }> = ({ field }) => {
   const dispatch = useAppDispatch()
   const rootNode = useAppSelector(selectRootNode)
+  const runScriptsInCanvas = useAppSelector(selectRunScriptsInCanvas)
 
   if (!rootNode) {
     return <p className="text-gray-500 text-sm p-2">Нет корневого элемента</p>
@@ -52,6 +58,24 @@ export const GlobalAssetEditor: React.FC<{ field: 'globalCss' | 'globalJs' }> = 
         placeholder={isCss ? '.my-class:hover { opacity: .8; }' : "document.querySelectorAll('...')"}
         className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 font-mono bg-gray-50 text-gray-800"
       />
+
+      {!isCss && (
+        <label className="mt-2 flex items-start gap-2 text-xs text-gray-700 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={runScriptsInCanvas}
+            onChange={(e) => dispatch(setRunScriptsInCanvas(e.target.checked))}
+            className="mt-0.5"
+          />
+          <span>
+            Выполнять JS в редакторе
+            <span className="block text-gray-400">
+              Прогоняет общий JS прямо в холсте (нужно для scroll-reveal и т.п.). Чужой код
+              исполняется в редакторе — включайте осознанно.
+            </span>
+          </span>
+        </label>
+      )}
     </div>
   )
 }

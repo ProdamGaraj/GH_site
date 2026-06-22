@@ -522,19 +522,60 @@ function generateUniqueId(): string {
   return `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }
 
+/**
+ * Делит набор деклараций по `;`, игнорируя `;` внутри url()/кавычек/скобок.
+ * Иначе data-URI (`url(data:image/svg+xml;base64,...)`) рвётся на части.
+ */
+function splitDeclarations(css: string): string[] {
+  const out: string[] = []
+  let depth = 0
+  let quote: string | null = null
+  let cur = ''
+  for (let i = 0; i < css.length; i++) {
+    const ch = css[i]
+    if (quote) {
+      if (ch === quote && css[i - 1] !== '\\') quote = null
+      cur += ch
+    } else if (ch === '"' || ch === "'") {
+      quote = ch
+      cur += ch
+    } else if (ch === '(') {
+      depth++
+      cur += ch
+    } else if (ch === ')') {
+      depth = Math.max(0, depth - 1)
+      cur += ch
+    } else if (ch === ';' && depth === 0) {
+      out.push(cur)
+      cur = ''
+    } else {
+      cur += ch
+    }
+  }
+  if (cur.trim()) out.push(cur)
+  return out
+}
+
+/** Имя CSS-свойства для объекта стилей: kebab→camel, но `--custom-props` оставляем как есть. */
+function toStyleKey(property: string): string {
+  if (property.startsWith('--')) return property // CSS-переменные нельзя camelCase'ить
+  return property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())
+}
+
 function parseInlineStyles(styleString: string): Record<string, string> {
   const styles: Record<string, string> = {}
   if (!styleString) return styles
-  
-  styleString.split(';').forEach(rule => {
-    const [property, value] = rule.split(':').map(s => s.trim())
-    if (property && value) {
-      // Конвертируем kebab-case в camelCase
-      const camelProperty = property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())
-      styles[camelProperty] = value
-    }
+
+  splitDeclarations(styleString).forEach(rule => {
+    // Разделяем только по ПЕРВОМУ двоеточию — значение может содержать `:` (url(https://…)).
+    const colonIdx = rule.indexOf(':')
+    if (colonIdx === -1) return
+    const property = rule.slice(0, colonIdx).trim()
+    const value = rule.slice(colonIdx + 1).trim()
+    if (!property || !value) return
+    styles[toStyleKey(property)] = value
   })
-  
+
   return styles
 }
 
@@ -661,31 +702,16 @@ function htmlElementToBlockNode(
     }
   })
   
-  // Собираем attributes
+  // Собираем attributes — все, кроме style (он разобран отдельно в properties).
+  // Важно сохранять class/id: на них держатся сложные правила из globalCss
+  // (`.commerce-form input` и т.п.) — без классов вёрстка ломается.
   const attributes: Record<string, string> = {}
-  
-  // Специфичные атрибуты
-  const src = element.getAttribute('src')
-  if (src) attributes.src = src
-  
-  const href = element.getAttribute('href')
-  if (href) attributes.href = href
-  
-  const alt = element.getAttribute('alt')
-  if (alt) attributes.alt = alt
-  
-  const placeholder = element.getAttribute('placeholder')
-  if (placeholder) attributes.placeholder = placeholder
-  
-  const type = element.getAttribute('type')
-  if (type) attributes.type = type
-  
-  const value = element.getAttribute('value')
-  if (value) attributes.value = value
-  
-  const name = element.getAttribute('name')
-  if (name) attributes.name = name
-  
+  for (let a = 0; a < element.attributes.length; a++) {
+    const attr = element.attributes[a]
+    if (attr.name === 'style') continue
+    attributes[attr.name] = attr.value
+  }
+
   // Определяем layoutMode на основе display стиля
   let layoutMode: BlockNode['layoutMode'] = undefined
   if (stylesObj.display === 'flex') {
@@ -958,6 +984,48 @@ export function collectTreeGlobalCss(root: BlockNode | null | undefined): string
   return Array.from(set).join('\n\n')
 }
 
+/**
+ * Собирает общий JS всего дерева (страница + блоки) с дедупом по контенту.
+ * Используется для опционального выполнения скриптов в холсте редактора.
+ */
+export function collectTreeGlobalJs(root: BlockNode | null | undefined): string {
+  if (!root) return ''
+  const set = new Set<string>()
+  const visit = (node: BlockNode): void => {
+    const js = node.metadata?.globalJs?.trim()
+    if (js) set.add(js)
+    for (const child of node.children || []) visit(child)
+    if (node.variations) {
+      for (const v of Object.values(node.variations)) {
+        for (const sc of v.specificChildren || []) visit(sc)
+      }
+    }
+  }
+  visit(root)
+  return Array.from(set).join('\n\n')
+}
+
+/**
+ * Импорт страницы/блока из набора файлов (html + css + js).
+ * CSS/JS подмешиваются в документ и проходят тот же конвейер importFromHTML:
+ * CSS → properties/states/globalCss, инлайн JS → globalJs, тело → дерево.
+ */
+export function importFromFiles(files: { html?: string; css?: string; js?: string }): BlockNode {
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(files.html || '<body></body>', 'text/html')
+  if (files.css?.trim()) {
+    const styleEl = doc.createElement('style')
+    styleEl.textContent = files.css
+    doc.head.appendChild(styleEl)
+  }
+  if (files.js?.trim()) {
+    const scriptEl = doc.createElement('script')
+    scriptEl.textContent = files.js
+    doc.body.appendChild(scriptEl)
+  }
+  return importFromHTML('<!DOCTYPE html>' + doc.documentElement.outerHTML)
+}
+
 export type ImportFormat = 'json' | 'html'
 
 export function detectImportFormat(content: string): ImportFormat {
@@ -1114,23 +1182,11 @@ function collectNodeMap(node: BlockNode): Map<string, BlockNode> {
 }
 
 /**
- * Parse inline style string into camelCase CSSProperties object
+ * Parse inline style string into a style object.
+ * Делегирует общему parseInlineStyles (устойчивый сплит + сохранение --custom-props).
  */
 function parseInlineStyleToCamelCase(style: string): Record<string, string> {
-  const result: Record<string, string> = {}
-  if (!style) return result
-  
-  style.split(';').forEach(decl => {
-    const colonIdx = decl.indexOf(':')
-    if (colonIdx === -1) return
-    const prop = decl.substring(0, colonIdx).trim()
-    const val = decl.substring(colonIdx + 1).trim()
-    if (!prop || !val) return
-    // Convert kebab-case to camelCase
-    const camelProp = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase())
-    result[camelProp] = val
-  })
-  return result
+  return parseInlineStyles(style)
 }
 
 /**

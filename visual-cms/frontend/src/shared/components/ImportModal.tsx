@@ -4,6 +4,7 @@ import { Button } from './Button'
 import { cn } from '@/shared/utils'
 import {
   importContent,
+  importFromFiles,
   detectImportFormat,
   extractDocumentAssets,
   ImportFormat
@@ -27,20 +28,53 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   const [importFormat, setImportFormat] = useState<ImportFormat>('html')
   const [importError, setImportError] = useState('')
   const [name, setName] = useState('')
+  // Отдельные CSS/JS файлы (для импорта страницы из трёх файлов html+css+js)
+  const [cssText, setCssText] = useState('')
+  const [jsText, setJsText] = useState('')
+  const [cssName, setCssName] = useState('')
+  const [jsName, setJsName] = useState('')
 
   // Предпросмотр кода, который реально выполнится/применится после импорта.
-  // JS из чужого HTML исполняется на деплое — показываем его до сохранения (C2.4).
+  // Учитываем и встроенные в HTML стили/скрипты, и отдельные CSS/JS файлы.
   const capturedAssets = useMemo(() => {
-    if (importFormat !== 'html' || !importText.trim()) return null
-    try {
-      const doc = new DOMParser().parseFromString(importText, 'text/html')
-      return extractDocumentAssets(doc)
-    } catch {
-      return null
+    if (importFormat !== 'html') return null
+    let css = cssText || ''
+    let js = jsText || ''
+    if (importText.trim()) {
+      try {
+        const doc = new DOMParser().parseFromString(importText, 'text/html')
+        const a = extractDocumentAssets(doc)
+        css = [css, a.css].filter(Boolean).join('\n')
+        js = [js, a.js].filter(Boolean).join('\n')
+      } catch {
+        /* ignore */
+      }
     }
-  }, [importText, importFormat])
+    if (!css && !js) return null
+    return { css, js }
+  }, [importText, importFormat, cssText, jsText])
 
   if (!isOpen) return null
+
+  const readFileText = (file: File, onText: (text: string) => void) => {
+    const reader = new FileReader()
+    reader.onload = (event) => onText((event.target?.result as string) || '')
+    reader.readAsText(file)
+  }
+
+  const handleCssUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCssName(file.name)
+    readFileText(file, setCssText)
+  }
+
+  const handleJsUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setJsName(file.name)
+    readFileText(file, setJsText)
+  }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -83,7 +117,10 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     
     try {
       setImportError('')
-      const imported = importContent(importText, importFormat)
+      const useFiles = importFormat === 'html' && (cssText.trim() !== '' || jsText.trim() !== '')
+      const imported = useFiles
+        ? importFromFiles({ html: importText, css: cssText, js: jsText })
+        : importContent(importText, importFormat)
       onImport(imported, name.trim())
       onClose()
     } catch (e) {
@@ -170,10 +207,34 @@ export const ImportModal: React.FC<ImportModalProps> = ({
             <div className="flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50 transition-colors">
               <Upload size={20} className="text-gray-400" />
               <span className="text-sm text-gray-600">
-                Загрузить HTML или JSON файл
+                Загрузить {importFormat === 'json' ? 'JSON' : 'HTML'} файл
               </span>
             </div>
           </label>
+
+          {/* Отдельные CSS и JS файлы (импорт из трёх файлов html + css + js) */}
+          {importFormat === 'html' && (
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <input type="file" accept=".css" onChange={handleCssUpload} className="hidden" />
+                <div className="flex items-center justify-center gap-2 px-3 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50 transition-colors">
+                  <FileCode size={16} className="text-gray-400" />
+                  <span className="text-xs text-gray-600 truncate">
+                    {cssName || 'CSS файл (необязательно)'}
+                  </span>
+                </div>
+              </label>
+              <label className="block">
+                <input type="file" accept=".js,.mjs" onChange={handleJsUpload} className="hidden" />
+                <div className="flex items-center justify-center gap-2 px-3 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50 transition-colors">
+                  <FileCode size={16} className="text-gray-400" />
+                  <span className="text-xs text-gray-600 truncate">
+                    {jsName || 'JS файл (необязательно)'}
+                  </span>
+                </div>
+              </label>
+            </div>
+          )}
 
           {/* Текстовое поле */}
           <textarea

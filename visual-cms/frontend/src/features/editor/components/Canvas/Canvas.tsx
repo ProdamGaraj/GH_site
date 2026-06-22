@@ -1,11 +1,11 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useAppSelector, useAppDispatch } from '@/app/hooks'
-import { selectRootNode, selectDragState, selectViewport, selectBreakpoints, selectZoom, selectPanOffset, selectBlockAlignment, selectEditMode, setZoom, setPanOffset, selectCanvasColor } from '@/features/editor/editorSlice'
+import { selectRootNode, selectDragState, selectViewport, selectBreakpoints, selectZoom, selectPanOffset, selectBlockAlignment, selectEditMode, setZoom, setPanOffset, selectCanvasColor, selectRunScriptsInCanvas } from '@/features/editor/editorSlice'
 import { CanvasRenderer } from './CanvasRenderer'
 import type { DropIndicator } from '../../utils/dndUtils'
 import { DropIndicatorOverlay, DropTargetHighlight } from './DropIndicatorOverlay'
 import { getEffectiveTree } from '../../utils/variationUtils'
-import { collectTreeGlobalCss } from '../../utils/exportUtils'
+import { collectTreeGlobalCss, collectTreeGlobalJs } from '../../utils/exportUtils'
 
 interface CanvasProps {
   dropIndicator?: DropIndicator | null
@@ -32,8 +32,10 @@ export const Canvas: React.FC<CanvasProps> = ({
   const blockAlignment = useAppSelector(selectBlockAlignment)
   const editMode = useAppSelector(selectEditMode)
   const canvasColor = useAppSelector(selectCanvasColor)
+  const runScriptsInCanvas = useAppSelector(selectRunScriptsInCanvas)
   const canvasRef = useRef<HTMLDivElement>(null)
   const panContainerRef = useRef<HTMLDivElement>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
   const [isSpacePressed, setIsSpacePressed] = useState(false)
@@ -55,6 +57,25 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Общий CSS (страница + блоки) для живого превью. Применяется так же, как на деплое,
   // — поэтому правила @media/:hover/@keyframes из globalCss видны прямо в канвасе.
   const globalCss = useMemo(() => collectTreeGlobalCss(rootNode), [rootNode])
+  const globalJs = useMemo(() => collectTreeGlobalJs(rootNode), [rootNode])
+
+  // Опционально выполняем общий JS прямо в холсте (тумблер). Скрипт вставляется живым
+  // <script>-элементом (React не исполняет script из JSX). Чужой JS может конфликтовать
+  // с React-разметкой — поэтому строго по явному выбору пользователя.
+  // Перезапуск при изменении дерева может «наслаивать» побочные эффекты (observers,
+  // intervals) — приемлемо для опционального превью.
+  useEffect(() => {
+    if (!runScriptsInCanvas || !globalJs) return
+    const container = viewportRef.current
+    if (!container) return
+    const script = document.createElement('script')
+    script.setAttribute('data-canvas-user-js', 'true')
+    script.textContent = globalJs
+    container.appendChild(script)
+    return () => {
+      script.remove()
+    }
+  }, [runScriptsInCanvas, globalJs])
 
   // Синхронизируем localPanRef с Redux при внешних изменениях
   useEffect(() => {
@@ -202,9 +223,10 @@ export const Canvas: React.FC<CanvasProps> = ({
           />
         )}
         
-        <div 
+        <div
+          ref={viewportRef}
           className="relative canvas-viewport"
-          style={{ 
+          style={{
             // Фиксированная ширина viewport (как экран)
             width: editMode === 'responsive' && currentBreakpoint 
               ? `${currentBreakpoint.width}px` 

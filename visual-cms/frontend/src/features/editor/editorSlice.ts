@@ -49,6 +49,8 @@ interface EditorState {
   }
   // Режим превью состояния элемента (hover, active, focus, disabled)
   statePreviewMode: 'none' | 'hover' | 'active' | 'focus' | 'disabled'
+  // Выполнять общий JS страницы/блоков прямо в холсте (опасно: чужой JS в редакторе)
+  runScriptsInCanvas: boolean
   // Цвет фона холста
   canvasColor: string
   // Буфер обмена (для Ctrl+C / Ctrl+V): хранит копию узла без перегенерации id.
@@ -115,6 +117,7 @@ const initialState: EditorState = {
     originalStructures: {},
   },
   statePreviewMode: 'none',
+  runScriptsInCanvas: false,
   canvasColor: '#ffffff',
   clipboard: null,
 }
@@ -1281,7 +1284,10 @@ const editorSlice = createSlice({
     setStatePreviewMode: (state, action: PayloadAction<'none' | 'hover' | 'active' | 'focus' | 'disabled'>) => {
       state.statePreviewMode = action.payload
     },
-    
+    setRunScriptsInCanvas: (state, action: PayloadAction<boolean>) => {
+      state.runScriptsInCanvas = action.payload
+    },
+
     // Undo - вернуться к предыдущему состоянию
     undo: (state) => {
       if (state.historyIndex > 0) {
@@ -1521,6 +1527,7 @@ export const {
   cancelInlineBlockEdit,
   finishInlineBlockEdit,
   setStatePreviewMode,
+  setRunScriptsInCanvas,
   undo,
   redo,
   saveToHistory,
@@ -1566,6 +1573,7 @@ export const selectCanvasColor = (state: RootState) => state.editor.canvasColor
 export const selectActiveEditBreakpoint = (state: RootState) => state.editor.activeEditBreakpoint
 export const selectInlineBlockEdit = (state: RootState) => state.editor.inlineBlockEdit
 export const selectStatePreviewMode = (state: RootState) => state.editor.statePreviewMode
+export const selectRunScriptsInCanvas = (state: RootState) => state.editor.runScriptsInCanvas
 
 // Helper selector to find a node by id
 export const selectNodeById = (state: RootState, nodeId: string): BlockNode | null => {
