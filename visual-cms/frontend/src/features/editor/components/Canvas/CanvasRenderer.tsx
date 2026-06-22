@@ -232,7 +232,9 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
       isOver && !isDragged && 'canvas-element--drop-target',
       isDragging && 'canvas-element--dragging',
       isRoot && 'canvas-element--root',
-      isInlineEditing && 'canvas-element--inline-editing'
+      isInlineEditing && 'canvas-element--inline-editing',
+      // Пользовательский class — чтобы class-селекторы globalCss применялись в канвасе
+      node.attributes?.class
     ),
     'data-element-id': node.id,
     'data-element-name': node.metadata.name || node.tagName,

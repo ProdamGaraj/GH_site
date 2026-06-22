@@ -21,6 +21,7 @@ import {
   generateFullPageHTML,
   generateHTMLDocument,
   generateFullExport,
+  collectTreeGlobalCss,
 } from './exportUtils'
 
 const parse = (html: string): Document =>
@@ -84,18 +85,24 @@ describe('extractDocumentAssets', () => {
 })
 
 describe('importFromHTML — захват стилей/скриптов', () => {
-  it('@media/:hover/@keyframes целиком в globalCss (не теряются)', () => {
+  it('@media/@keyframes → globalCss, а :hover → states (правая панель)', () => {
     const html = `
       <style>
+        .box { color: black; }
         .box:hover { color: blue; }
         @media (max-width: 600px) { .box { display: none; } }
         @keyframes spin { from { transform: rotate(0) } to { transform: rotate(360deg) } }
       </style>
       <div class="box">hi</div>`
     const root = importFromHTML(html)
-    expect(root.metadata.globalCss).toContain(':hover')
+    // нераспознанное остаётся в globalCss
     expect(root.metadata.globalCss).toContain('@media')
     expect(root.metadata.globalCss).toContain('@keyframes')
+    // hover распознан → в states, не дублируется в globalCss
+    expect(root.metadata.globalCss).not.toContain(':hover')
+    expect(root.styles.states?.hover?.color).toBe('blue')
+    // базовый .box → properties
+    expect((root.styles.properties as Record<string, string>).color).toBe('black')
   })
 
   it('инлайн <script>→globalJs, внешние <link>/<script src>→customHeadHtml', () => {
@@ -112,13 +119,45 @@ describe('importFromHTML — захват стилей/скриптов', () => 
     expect(root.metadata.globalJs || '').not.toContain('cdn/x.js')
   })
 
-  it('простые .class{} по-прежнему инлайнятся в styles.properties (канвас)', () => {
+  it('простые .class{} инлайнятся в properties и НЕ дублируются в globalCss', () => {
     const html = `<style>.box{color:red}</style><div class="box"></div>`
     const root = importFromHTML(html)
-    // styles.properties.color приходит из cssRules (kebab→camel при необходимости)
     expect((root.styles.properties as Record<string, string>).color).toBe('red')
-    // и одновременно сырой CSS сохранён в globalCss
-    expect(root.metadata.globalCss).toContain('.box{color:red}')
+    // распознанное правило не оседает в globalCss (одна точка правды)
+    expect(root.metadata.globalCss || '').not.toContain('.box')
+  })
+
+  it('маппит :hover/:focus/:active/:disabled в states по классу элемента', () => {
+    const html = `
+      <style>
+        .btn:hover { background-color: red; }
+        .btn:focus { outline-color: blue; }
+        .btn:active { transform: scale(0.95); }
+        .btn:disabled { opacity: 0.5; }
+      </style>
+      <section><button class="btn">x</button></section>`
+    const root = importFromHTML(html)
+    const btn = root.children[0]
+    expect(btn.styles.states?.hover?.backgroundColor).toBe('red')
+    expect(btn.styles.states?.focus?.outlineColor).toBe('blue')
+    expect(btn.styles.states?.active?.transform).toBe('scale(0.95)')
+    expect(btn.styles.states?.disabled?.opacity).toBe('0.5')
+  })
+
+  it('сложные селекторы (вложенные, группы, id, тег) остаются в globalCss', () => {
+    const html = `
+      <style>
+        .a .b { color: red; }
+        .a, .b { margin: 0; }
+        #x { padding: 1px; }
+        div { gap: 2px; }
+      </style>
+      <div class="a"><span class="b">y</span></div>`
+    const css = importFromHTML(html).metadata.globalCss || ''
+    expect(css).toContain('.a .b')
+    expect(css).toContain('.a, .b')
+    expect(css).toContain('#x')
+    expect(css).toContain('div {')
   })
 
   it('пустой/битый HTML не падает и возвращает валидный контейнер', () => {
@@ -186,5 +225,27 @@ describe('экспорт включает общие стили/скрипты �
     const result = generateFullExport(root, { name: 'Page', type: 'page', format: 'html' })
     const scriptFile = result.files.find(f => f.path.endsWith('script.js'))
     expect(scriptFile?.content).toContain('EXPORTED_JS()')
+  })
+})
+
+describe('collectTreeGlobalCss (живое превью канваса)', () => {
+  it('собирает globalCss страницы и блоков с дедупом по контенту', () => {
+    const tree = node({
+      id: 'root',
+      metadata: { globalCss: '.page{gap:1px}' },
+      children: [
+        node({ id: 'a', metadata: { globalCss: '.block{gap:2px}' } }),
+        node({ id: 'b', metadata: { globalCss: '.block{gap:2px}' } }),
+      ],
+    })
+    const css = collectTreeGlobalCss(tree)
+    expect(css).toContain('.page{gap:1px}')
+    expect(css).toContain('.block{gap:2px}')
+    expect(css.split('.block{gap:2px}').length - 1).toBe(1)
+  })
+
+  it('null/пустое дерево → пустая строка', () => {
+    expect(collectTreeGlobalCss(null)).toBe('')
+    expect(collectTreeGlobalCss(node({ metadata: {} }))).toBe('')
   })
 })

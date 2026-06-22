@@ -5,6 +5,7 @@ import { CanvasRenderer } from './CanvasRenderer'
 import type { DropIndicator } from '../../utils/dndUtils'
 import { DropIndicatorOverlay, DropTargetHighlight } from './DropIndicatorOverlay'
 import { getEffectiveTree } from '../../utils/variationUtils'
+import { collectTreeGlobalCss } from '../../utils/exportUtils'
 
 interface CanvasProps {
   dropIndicator?: DropIndicator | null
@@ -45,11 +46,15 @@ export const Canvas: React.FC<CanvasProps> = ({
   const effectiveTree = useMemo(() => {
     if (!rootNode) return null
     return getEffectiveTree(
-      rootNode, 
-      viewport === 'base' ? null : viewport, 
+      rootNode,
+      viewport === 'base' ? null : viewport,
       editMode
     )
   }, [rootNode, viewport, editMode])
+
+  // Общий CSS (страница + блоки) для живого превью. Применяется так же, как на деплое,
+  // — поэтому правила @media/:hover/@keyframes из globalCss видны прямо в канвасе.
+  const globalCss = useMemo(() => collectTreeGlobalCss(rootNode), [rootNode])
 
   // Синхронизируем localPanRef с Redux при внешних изменениях
   useEffect(() => {
@@ -230,10 +235,12 @@ export const Canvas: React.FC<CanvasProps> = ({
               </div>
             </div>
           )}
-          <CanvasRenderer 
-            node={effectiveTree || rootNode} 
-            isRoot 
-            editorType={editorType} 
+          {/* Общие стили страницы/блоков — живое превью (@media, :hover, @keyframes) */}
+          {globalCss && <style>{globalCss}</style>}
+          <CanvasRenderer
+            node={effectiveTree || rootNode}
+            isRoot
+            editorType={editorType}
             blockAlignment={blockAlignment}
             rootNode={rootNode || undefined}
             libraryBlockId={libraryBlockId}

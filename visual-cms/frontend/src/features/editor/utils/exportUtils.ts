@@ -538,9 +538,13 @@ function parseInlineStyles(styleString: string): Record<string, string> {
   return styles
 }
 
-function htmlElementToBlockNode(element: Element, cssRules: Map<string, Record<string, string>>): BlockNode | null {
+function htmlElementToBlockNode(
+  element: Element,
+  base: Map<string, Record<string, string>>,
+  statesRules: Map<string, Partial<Record<StateType, Record<string, string>>>>,
+): BlockNode | null {
   const tagName = element.tagName.toLowerCase()
-  
+
   // Пропускаем script, style, meta и другие служебные теги
   if (['script', 'style', 'meta', 'link', 'head', 'title', 'noscript'].includes(tagName)) {
     return null
@@ -596,16 +600,24 @@ function htmlElementToBlockNode(element: Element, cssRules: Map<string, Record<s
   
   // Собираем стили из классов и inline
   let stylesObj: Record<string, string> = {}
-  
+  // Состояния (:hover/:active/:focus/:disabled) из правил классов — в правую панель.
+  const collectedStates: Partial<Record<StateType, Record<string, string>>> = {}
+
   // Стили из классов
   const classList = element.classList
   classList.forEach(className => {
-    const classStyles = cssRules.get(`.${className}`)
+    const classStyles = base.get(className)
     if (classStyles) {
       stylesObj = { ...stylesObj, ...classStyles }
     }
+    const classStates = statesRules.get(className)
+    if (classStates) {
+      for (const st of Object.keys(classStates) as StateType[]) {
+        collectedStates[st] = { ...(collectedStates[st] || {}), ...classStates[st] }
+      }
+    }
   })
-  
+
   // Inline стили (переопределяют классовые)
   const inlineStyle = element.getAttribute('style')
   if (inlineStyle) {
@@ -627,7 +639,7 @@ function htmlElementToBlockNode(element: Element, cssRules: Map<string, Record<s
   const children: BlockNode[] = []
   element.childNodes.forEach(child => {
     if (child.nodeType === Node.ELEMENT_NODE) {
-      const childNode = htmlElementToBlockNode(child as Element, cssRules)
+      const childNode = htmlElementToBlockNode(child as Element, base, statesRules)
       if (childNode) {
         children.push(childNode)
       }
@@ -682,11 +694,16 @@ function htmlElementToBlockNode(element: Element, cssRules: Map<string, Record<s
     layoutMode = 'grid'
   }
   
+  const hasStates = Object.keys(collectedStates).length > 0
+
   return {
     id: generateUniqueId(),
     elementType,
     tagName,
-    styles: { properties: stylesObj as CSSProperties },
+    styles: {
+      properties: stylesObj as CSSProperties,
+      ...(hasStates ? { states: collectedStates as BlockNode['styles']['states'] } : {}),
+    },
     layoutMode,
     children,
     attributes,
@@ -695,24 +712,85 @@ function htmlElementToBlockNode(element: Element, cssRules: Map<string, Record<s
   }
 }
 
-function parseCSSFromStyle(styleContent: string): Map<string, Record<string, string>> {
-  const cssRules = new Map<string, Record<string, string>>()
-  
-  // Простой парсер CSS правил
-  const ruleRegex = /([^{]+)\{([^}]+)\}/g
-  let match
-  
-  while ((match = ruleRegex.exec(styleContent)) !== null) {
-    const selector = match[1].trim()
-    const declarations = match[2].trim()
-    
-    // Парсим только простые селекторы классов
-    if (selector.startsWith('.') && !selector.includes(' ') && !selector.includes(':')) {
-      cssRules.set(selector, parseInlineStyles(declarations))
+type StateType = 'hover' | 'active' | 'focus' | 'disabled'
+
+/** Результат разбора таблицы стилей при импорте. */
+interface ParsedStylesheet {
+  /** className → базовые свойства (инлайнятся в styles.properties). */
+  base: Map<string, Record<string, string>>
+  /** className → состояния (:hover/:active/:focus/:disabled → styles.states). */
+  states: Map<string, Partial<Record<StateType, Record<string, string>>>>
+  /** Нераспознанное (вложенные селекторы, @media, @keyframes, id/тег, группы) → globalCss. */
+  leftover: string
+}
+
+/**
+ * Разбирает CSS, раскладывая то, что умеет показать правая панель, по структурным
+ * полям (простой `.class` → properties; `.class:hover|:active|:focus|:disabled` →
+ * states), а всё остальное оставляя как сырой CSS (→ globalCss).
+ *
+ * Сканер сопоставляет фигурные скобки (чтобы корректно пропускать вложенные блоки
+ * @media/@keyframes целиком в leftover). Это не полноценный CSS-парсер: фигурные
+ * скобки внутри строк/комментариев — редкий кейс и не поддерживаются осознанно.
+ */
+function parseStylesheet(cssText: string): ParsedStylesheet {
+  const base = new Map<string, Record<string, string>>()
+  const states = new Map<string, Partial<Record<StateType, Record<string, string>>>>()
+  const leftover: string[] = []
+
+  let i = 0
+  const n = cssText.length
+  while (i < n) {
+    const braceIdx = cssText.indexOf('{', i)
+    if (braceIdx === -1) break
+
+    const prelude = cssText.slice(i, braceIdx).trim()
+
+    // Читаем блок с учётом вложенности скобок (для @media и т.п.)
+    let depth = 1
+    let j = braceIdx + 1
+    for (; j < n; j++) {
+      const ch = cssText[j]
+      if (ch === '{') depth++
+      else if (ch === '}' && --depth === 0) break
+    }
+    const block = cssText.slice(braceIdx + 1, j)
+    i = j + 1
+
+    if (!prelude) continue
+
+    // At-rule (@media/@keyframes/@supports/@font-face) — целиком в leftover.
+    if (prelude.startsWith('@')) {
+      leftover.push(`${prelude} {${block}}`)
+      continue
+    }
+
+    // Поддерживаем только одиночный простой селектор класса (опц. с одним состоянием).
+    const selectors = prelude.split(',').map(s => s.trim()).filter(Boolean)
+    if (selectors.length !== 1) {
+      leftover.push(`${prelude} {${block}}`)
+      continue
+    }
+
+    const sel = selectors[0]
+    const baseMatch = sel.match(/^\.([A-Za-z0-9_-]+)$/)
+    const stateMatch = sel.match(/^\.([A-Za-z0-9_-]+):(hover|active|focus|disabled)$/)
+
+    if (baseMatch) {
+      const cls = baseMatch[1]
+      base.set(cls, { ...(base.get(cls) || {}), ...parseInlineStyles(block) })
+    } else if (stateMatch) {
+      const cls = stateMatch[1]
+      const st = stateMatch[2] as StateType
+      const entry = states.get(cls) || {}
+      entry[st] = { ...(entry[st] || {}), ...parseInlineStyles(block) }
+      states.set(cls, entry)
+    } else {
+      leftover.push(`${sel} {${block}}`)
     }
   }
-  
-  return cssRules
+
+  return { base, states, leftover: leftover.join('\n\n').trim() }
 }
 
 /**
@@ -801,16 +879,15 @@ export function importFromHTML(htmlString: string): BlockNode {
   const parser = new DOMParser()
   const doc = parser.parseFromString(htmlString, 'text/html')
 
-  // Простые .class{} правила инлайним в styles.properties — нужно, чтобы стили
-  // отображались в визуальном канвасе (он не применяет globalCss как таблицу).
-  const cssRules = new Map<string, Record<string, string>>()
-  doc.querySelectorAll('style').forEach(styleEl => {
-    const parsed = parseCSSFromStyle(styleEl.textContent || '')
-    parsed.forEach((value, key) => cssRules.set(key, value))
-  })
+  // Разбираем CSS: простые .class → properties, .class:hover/:active/:focus/:disabled
+  // → states (правая панель), остальное (@media, вложенные селекторы, keyframes) → leftover.
+  const combinedCss = Array.from(doc.querySelectorAll('style'))
+    .map(s => s.textContent || '')
+    .join('\n')
+  const sheet = parseStylesheet(combinedCss)
 
-  // Полные ассеты документа: <style>→globalCss, инлайн <script>→globalJs,
-  // внешние <link>/<script src>→customHeadHtml (заинлайнить нельзя).
+  // Ассеты документа: инлайн <script>→globalJs, внешние <link>/<script src>→customHeadHtml.
+  // CSS из extractDocumentAssets игнорируем — globalCss берём из leftover (без дублей со states).
   const assets = extractDocumentAssets(doc)
 
   // Ищем основной контент
@@ -835,7 +912,7 @@ export function importFromHTML(htmlString: string): BlockNode {
   }
   
   // Парсим в BlockNode
-  const result = htmlElementToBlockNode(rootElement, cssRules) ?? {
+  const result = htmlElementToBlockNode(rootElement, sheet.base, sheet.states) ?? {
     // Если не удалось спарсить, возвращаем пустой контейнер
     id: generateUniqueId(),
     elementType: 'container' as BlockNode['elementType'],
@@ -847,15 +924,38 @@ export function importFromHTML(htmlString: string): BlockNode {
   }
 
   // Прикрепляем общие стили/скрипты документа к корню (страница/блок).
+  // globalCss — только нераспознанный остаток (recognized → properties/states).
   return {
     ...result,
     metadata: {
       ...result.metadata,
-      globalCss: assets.css || undefined,
+      globalCss: sheet.leftover || undefined,
       globalJs: assets.js || undefined,
       customHeadHtml: assets.rawHead || undefined,
     },
   }
+}
+
+/**
+ * Собирает общий CSS всего дерева (страница + блоки) для живого превью в канвасе.
+ * Дедуп по контенту — как на деплое. Site-уровень редактор не знает (он в Site.settings),
+ * поэтому в канвасе не отображается.
+ */
+export function collectTreeGlobalCss(root: BlockNode | null | undefined): string {
+  if (!root) return ''
+  const set = new Set<string>()
+  const visit = (node: BlockNode): void => {
+    const css = node.metadata?.globalCss?.trim()
+    if (css) set.add(css)
+    for (const child of node.children || []) visit(child)
+    if (node.variations) {
+      for (const v of Object.values(node.variations)) {
+        for (const sc of v.specificChildren || []) visit(sc)
+      }
+    }
+  }
+  visit(root)
+  return Array.from(set).join('\n\n')
 }
 
 export type ImportFormat = 'json' | 'html'
