@@ -2,6 +2,7 @@ import React from 'react'
 import { useAppSelector } from '@/app/hooks'
 import { selectSelectedNode } from '@/features/editor/editorSlice'
 import { CustomCSSTab } from './CustomCSSTab'
+import { GlobalAssetEditor } from './GlobalAssetEditor'
 
 export const CSSPanel: React.FC = () => {
   const selectedNode = useAppSelector(selectSelectedNode)
@@ -21,6 +22,7 @@ export const CSSPanel: React.FC = () => {
       </div>
       <div className="flex-1 overflow-y-auto pl-2 pr-2">
         <CustomCSSTab node={selectedNode} />
+        <GlobalAssetEditor field="globalCss" />
       </div>
     </div>
   )

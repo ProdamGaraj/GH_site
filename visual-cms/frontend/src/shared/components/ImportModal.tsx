@@ -1,11 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Upload, FileCode, FileJson, X, AlertCircle } from 'lucide-react'
 import { Button } from './Button'
 import { cn } from '@/shared/utils'
-import { 
-  importContent, 
+import {
+  importContent,
   detectImportFormat,
-  ImportFormat 
+  extractDocumentAssets,
+  ImportFormat
 } from '@/features/editor/utils/exportUtils'
 import type { BlockNode } from '@/shared/types'
 
@@ -26,6 +27,18 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   const [importFormat, setImportFormat] = useState<ImportFormat>('html')
   const [importError, setImportError] = useState('')
   const [name, setName] = useState('')
+
+  // Предпросмотр кода, который реально выполнится/применится после импорта.
+  // JS из чужого HTML исполняется на деплое — показываем его до сохранения (C2.4).
+  const capturedAssets = useMemo(() => {
+    if (importFormat !== 'html' || !importText.trim()) return null
+    try {
+      const doc = new DOMParser().parseFromString(importText, 'text/html')
+      return extractDocumentAssets(doc)
+    } catch {
+      return null
+    }
+  }, [importText, importFormat])
 
   if (!isOpen) return null
 
@@ -185,6 +198,26 @@ export const ImportModal: React.FC<ImportModalProps> = ({
           {importText.trim() && (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
               Формат определён как: <strong>{importFormat === 'json' ? 'JSON' : 'HTML'}</strong>
+            </div>
+          )}
+
+          {/* Предпросмотр захваченных стилей/скриптов */}
+          {capturedAssets?.css && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
+              Будут перенесены общие стили (<strong>{capturedAssets.css.length}</strong> символов CSS).
+            </div>
+          )}
+          {capturedAssets?.js && (
+            <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 text-sm space-y-2">
+              <div className="flex items-center gap-2 font-medium">
+                <AlertCircle size={16} />
+                Импортируемый HTML содержит JavaScript — он будет выполняться на странице.
+              </div>
+              <pre className="max-h-40 overflow-auto bg-white/70 border border-amber-200 rounded p-2 text-xs font-mono whitespace-pre-wrap">
+                {capturedAssets.js.length > 4000
+                  ? capturedAssets.js.slice(0, 4000) + '\n… (обрезано)'
+                  : capturedAssets.js}
+              </pre>
             </div>
           )}
         </div>

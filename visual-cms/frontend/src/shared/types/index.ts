@@ -169,6 +169,10 @@ export interface AnimationKeyframe {
 }
 
 // Script types
+/**
+ * @deprecated Заменено на единый `BlockNode.metadata.globalJs` корня страницы.
+ * Поле не доезжало до деплоя; данные мигрируются скриптом PageScript→globalJs.
+ */
 export interface PageScript {
   id: string
   name: string
@@ -294,6 +298,14 @@ export interface BlockNode {
     customHeadHtml?: string
     /** Raw HTML to inject before </body> (scripts, etc.) — only used on root node */
     customBodyEndHtml?: string
+    /**
+     * Общий CSS (инлайнится на деплое). Уровень определяется позицией узла:
+     * корень страницы → стили страницы; корень вложенного блока → стили блока
+     * (собираются и дедупятся на деплое). Храним «сырой» CSS — генератор сам обернёт в <style>.
+     */
+    globalCss?: string
+    /** Общий JS, те же правила уровня, что и globalCss. На деплое оборачивается в <script>. */
+    globalJs?: string
     /** Breakpoint definitions for responsive CSS generation — only used on root node */
     breakpoints?: Array<{ id: string; name: string; width: number; height?: number }>
   }
@@ -356,6 +368,10 @@ export interface SiteSettings {
   yandexMetrikaId?: string
   customHeadHtml?: string
   customBodyEndHtml?: string
+  /** Общий CSS для всех страниц сайта (инлайнится на деплое; храним сырой CSS). */
+  globalCss?: string
+  /** Общий JS для всех страниц сайта (инлайнится на деплое; храним сырой JS). */
+  globalJs?: string
   companyName?: string
   phone?: string
   email?: string

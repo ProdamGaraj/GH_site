@@ -545,6 +545,36 @@ export const SiteSettingsPage: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Общий CSS сайта
+                </label>
+                <p className="text-xs text-gray-500 mb-1">
+                  Применяется ко всем страницам сайта. Оборачивается в &lt;style&gt; на деплое (пишите чистый CSS).
+                </p>
+                <textarea
+                  value={settings.globalCss || ''}
+                  onChange={(e) => updateField('globalCss', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                  rows={8}
+                  placeholder=".btn { border-radius: 8px; }"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Общий JS сайта
+                </label>
+                <p className="text-xs text-gray-500 mb-1">
+                  Выполняется на всех страницах сайта. Оборачивается в &lt;script&gt; на деплое (пишите чистый JS).
+                </p>
+                <textarea
+                  value={settings.globalJs || ''}
+                  onChange={(e) => updateField('globalJs', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                  rows={8}
+                  placeholder="console.log('site loaded')"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Код в &lt;head&gt; (перед закрывающим &lt;/head&gt;)
                 </label>
                 <textarea

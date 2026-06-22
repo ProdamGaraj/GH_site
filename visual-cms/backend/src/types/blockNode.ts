@@ -214,6 +214,15 @@ export interface BlockNode {
     isLinkWrapper?: boolean
     customHeadHtml?: string
     customBodyEndHtml?: string
+    /**
+     * Shared CSS injected inline on deploy. Scope is determined by the node's
+     * position in the tree: on the page root → page-level styles; on a nested
+     * block-instance root → block-level styles (collected & deduped at deploy).
+     * Store raw CSS — HtmlGenerator wraps it into a <style> block.
+     */
+    globalCss?: string
+    /** Shared JS, same scoping rules as globalCss. Wrapped into a <script> block on deploy. */
+    globalJs?: string
     breakpoints?: BreakpointDef[]
   }
 

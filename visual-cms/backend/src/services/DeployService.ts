@@ -4,7 +4,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
-import { htmlGenerator, type ResolvedNavItem } from './HtmlGenerator'
+import { htmlGenerator, type ResolvedNavItem, type GeneratePageOptions } from './HtmlGenerator'
 import { responsiveImageService } from './ResponsiveImageService'
 import { AppDataSource } from '../config/database'
 import { Not, In } from 'typeorm'
@@ -128,6 +128,23 @@ export class DeployService {
   }
 
   /**
+   * Опции уровня сайта для generatePage: общие CSS/JS и сырые HTML-инжекты.
+   * Берутся из уже загруженной сущности Site (settings — jsonb той же строки),
+   * поэтому новых запросов к БД не порождают (P4.4).
+   */
+  private siteAssetOptions(
+    site?: Site | null,
+  ): Pick<GeneratePageOptions, 'siteCss' | 'siteJs' | 'siteCustomHead' | 'siteCustomBodyEnd'> {
+    const s = site?.settings
+    return {
+      siteCss: s?.globalCss || undefined,
+      siteJs: s?.globalJs || undefined,
+      siteCustomHead: s?.customHeadHtml || undefined,
+      siteCustomBodyEnd: s?.customBodyEndHtml || undefined,
+    }
+  }
+
+  /**
    * Является ли страница корнем сайта (домашней). Явно выбранная домашняя
    * (Site.homepageId) важнее legacy-конвенции slug 'index'/'home'.
    */
@@ -213,15 +230,15 @@ export class DeployService {
 
       // Генерируем HTML (для домашней передаём slug='index', чтобы переключатель
       // языков и пр. трактовали страницу как корень)
-      const html = await this.generatePageHtml(
-        updatedStructure,
-        page.metadata || { title: page.name, description: '', keywords: [] },
-        isHome ? 'index' : page.slug,
+      const html = await this.generatePageHtml(updatedStructure, {
+        metadata: page.metadata || { title: page.name, description: '', keywords: [] },
+        slug: isHome ? 'index' : page.slug,
         dataConfig,
-        defaultLang?.code,
-        defaultLang?.direction,
-        availableLangsForSwitcher
-      )
+        lang: defaultLang?.code,
+        direction: defaultLang?.direction,
+        availableLanguages: availableLangsForSwitcher,
+        ...this.siteAssetOptions(page.site),
+      })
 
       // Чистые URL без .html: домашняя → index.html, остальные → <slug>/index.html
       const relPath = this.pageRelPath(page.slug, isHome)
@@ -330,15 +347,15 @@ export class DeployService {
           
           const isHome = this.isHomePage(page, page.site)
 
-          const html = await this.generatePageHtml(
-            updatedStructure,
-            page.metadata || { title: page.name, description: '', keywords: [] },
-            isHome ? 'index' : page.slug,
+          const html = await this.generatePageHtml(updatedStructure, {
+            metadata: page.metadata || { title: page.name, description: '', keywords: [] },
+            slug: isHome ? 'index' : page.slug,
             dataConfig,
-            defLang?.code,
-            defLang?.direction,
-            pageLangSwitcher
-          )
+            lang: defLang?.code,
+            direction: defLang?.direction,
+            availableLanguages: pageLangSwitcher,
+            ...this.siteAssetOptions(page.site),
+          })
 
           // Чистые URL без .html: домашняя → index.html, остальные → <slug>/index.html
           const relPath = this.pageRelPath(page.slug, isHome)
@@ -448,16 +465,16 @@ export class DeployService {
 
           const isHome = this.isHomePage(page, site)
 
-          const html = await this.generatePageHtml(
-            updatedStructure,
-            page.metadata || { title: page.name, description: '', keywords: [] },
-            isHome ? 'index' : page.slug,
+          const html = await this.generatePageHtml(updatedStructure, {
+            metadata: page.metadata || { title: page.name, description: '', keywords: [] },
+            slug: isHome ? 'index' : page.slug,
             dataConfig,
-            defLang?.code,
-            defLang?.direction,
-            pageLangSwitcher,
-            resolvedNav
-          )
+            lang: defLang?.code,
+            direction: defLang?.direction,
+            availableLanguages: pageLangSwitcher,
+            navigation: resolvedNav,
+            ...this.siteAssetOptions(site),
+          })
 
           // Чистые URL без .html: домашняя → index.html, остальные → <slug>/index.html
           const relPath = this.pageRelPath(page.slug, isHome)
@@ -712,16 +729,13 @@ export class DeployService {
           }
 
           // Генерируем HTML
-          const html = await this.generatePageHtml(
-            pageStructure,
-            pageMetadata,
-            itemSlug,
-            pageDataConfig,
-            undefined,
-            undefined,
-            undefined,
-            resolvedNav
-          )
+          const html = await this.generatePageHtml(pageStructure, {
+            metadata: pageMetadata,
+            slug: itemSlug,
+            dataConfig: pageDataConfig,
+            navigation: resolvedNav,
+            ...this.siteAssetOptions(collection.site),
+          })
 
           // Записываем файл (чистый URL без .html: <basePath>/<slug>/index.html → /<basePath>/<slug>)
           const filePath = path.join(collectionDir, itemSlug, 'index.html')
@@ -2091,15 +2105,15 @@ export class DeployService {
             )
 
           // Generate localized HTML with lang attribute and language switcher
-          const localizedHtml = await this.generatePageHtml(
-            translatedStructure,
-            translatedMetadata,
-            isHome ? 'index' : page.slug,
+          const localizedHtml = await this.generatePageHtml(translatedStructure, {
+            metadata: translatedMetadata,
+            slug: isHome ? 'index' : page.slug,
             dataConfig,
-            lang.code,
-            lang.direction,
-            availableLanguages
-          )
+            lang: lang.code,
+            direction: lang.direction,
+            availableLanguages,
+            ...this.siteAssetOptions(page.site),
+          })
 
           // Create language directory: /en/, /kz/, etc.
           const langDir = path.join(deployDir, lang.code)

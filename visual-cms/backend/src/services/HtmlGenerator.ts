@@ -28,11 +28,40 @@ export interface ResolvedNavItem {
   children?: ResolvedNavItem[]
 }
 
+/**
+ * Параметры генерации страницы. Перешли на options-объект (вместо длинного
+ * позиционного списка), чтобы безопасно прокидывать ассеты уровня сайта.
+ *
+ * Уровни общих стилей/скриптов:
+ *  - сайт   → siteCss/siteJs (из Site.settings, общие для всех страниц);
+ *  - страница → structure.metadata.globalCss/globalJs (корень дерева);
+ *  - блок   → metadata.globalCss/globalJs вложенных узлов (собираются и дедупятся здесь).
+ */
+export interface GeneratePageOptions {
+  metadata: PageMetadata
+  slug: string
+  dataConfig?: PageDataConfig
+  lang?: string
+  direction?: string
+  availableLanguages?: AvailableLanguage[]
+  navigation?: ResolvedNavItem[]
+  /** Общий CSS сайта (сырой) — инлайнится в <head> до стилей страницы. */
+  siteCss?: string
+  /** Общий JS сайта (сырой) — инлайнится перед скриптами страницы. */
+  siteJs?: string
+  /** Сырой HTML сайта в <head> (Site.settings.customHeadHtml). */
+  siteCustomHead?: string
+  /** Сырой HTML сайта перед </body> (Site.settings.customBodyEndHtml). */
+  siteCustomBodyEnd?: string
+}
+
 export class HtmlGenerator {
   /**
    * Генерирует полный HTML документ из структуры страницы
    */
-  generatePage(structure: BlockNode, metadata: PageMetadata, slug: string, dataConfig?: PageDataConfig, lang?: string, direction?: string, availableLanguages?: AvailableLanguage[], navigation?: ResolvedNavItem[]): string {
+  generatePage(structure: BlockNode, options: GeneratePageOptions): string {
+    const { metadata, slug, dataConfig, lang, direction, availableLanguages, navigation } = options
+
     // Собираем ID specificChildren для базового скрытия
     const specificChildrenIds = styleGenerator.collectSpecificChildrenIds(structure)
 
@@ -54,7 +83,27 @@ export class HtmlGenerator {
     // Custom HTML injected by user via source code editor
     const customHeadHtml = structure.metadata?.customHeadHtml || ''
     const customBodyEndHtml = structure.metadata?.customBodyEndHtml || ''
-    
+
+    // --- Общие стили/скрипты по уровням (сайт → страница → блок) ---
+    // Страница — на корне дерева; блок — на вложенных узлах (дедуп по контенту).
+    const blockAssets = this.collectBlockAssets(structure)
+    // CSS-чанки встраиваются внутрь основного <style> после reset, до dynamic,
+    // чтобы element-specific dynamic/responsive перебивали общий авторский CSS.
+    const authoredCss = [
+      this.cssChunk(options.siteCss, 'Site CSS'),
+      this.cssChunk(structure.metadata?.globalCss, 'Page CSS'),
+      this.cssChunk(blockAssets.css, 'Block CSS'),
+    ].filter(Boolean).join('\n')
+    // JS — отдельными <script> в конце <body>, после рантаймов, до element-скриптов.
+    const authoredJs = [
+      this.scriptTag(options.siteJs, 'Site JS'),
+      this.scriptTag(structure.metadata?.globalJs, 'Page JS'),
+      ...blockAssets.jsList.map(js => this.scriptTag(js, 'Block JS')),
+    ].join('')
+    // Сырые HTML-инжекты уровня сайта (как у страницы, но общие).
+    const siteCustomHead = options.siteCustomHead || ''
+    const siteCustomBodyEnd = options.siteCustomBodyEnd || ''
+
     return `<!DOCTYPE html>
 <html lang="${lang || 'ru'}"${direction === 'rtl' ? ' dir="rtl"' : ''}>
 <head>
@@ -137,7 +186,7 @@ export class HtmlGenerator {
     input, textarea {
       font-family: inherit;
     }
-    
+${authoredCss}
     /* Keyframes for animations */
     ${keyframes}
     
@@ -148,15 +197,15 @@ export class HtmlGenerator {
     ${styleGenerator.generateFormStyles()}
 ${specificHideCSS}${responsiveCSS}
   </style>
-${customHeadHtml ? '  ' + customHeadHtml.split('\n').join('\n  ') + '\n' : ''}</head>
+${siteCustomHead ? '  ' + siteCustomHead.split('\n').join('\n  ') + '\n' : ''}${customHeadHtml ? '  ' + customHeadHtml.split('\n').join('\n  ') + '\n' : ''}</head>
 <body>
 ${bodyContent}
 ${this.generateLanguageSwitcher(slug, lang, availableLanguages)}
 ${navigation && navigation.length > 0 ? this.generateNavRuntime(navigation) : ''}
 ${dataConfig ? generateDataBindingRuntime(dataConfig) : ''}
 ${generateCarouselRuntime()}
-${scripts ? `<script>\n${scripts}\n</script>` : ''}
-${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
+${authoredJs}${scripts ? `<script>\n${scripts}\n</script>` : ''}
+${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
 </html>`
   }
 
@@ -383,6 +432,67 @@ ${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;')
+  }
+
+  /**
+   * Экранирует закрывающий тег внутри сырого CSS/JS, чтобы он не завершил
+   * инлайновый <style>/<script> раньше времени. `</style>`/`</script>` (любой
+   * регистр) → `<\/style>`/`<\/script>`. В CSS/JS-строке `\/` эквивалентно `/`,
+   * поэтому семантика сохраняется, а HTML-парсер тег не закрывает.
+   */
+  private escapeClosingTag(code: string, tag: 'style' | 'script'): string {
+    return code.replace(new RegExp(`</(${tag})`, 'gi'), '<\\/$1')
+  }
+
+  /**
+   * Готовит чанк авторского CSS для встраивания в основной <style>.
+   * Пустые/пробельные значения дают пустую строку (нет лишних комментариев).
+   */
+  private cssChunk(rawCss: string | undefined, label: string): string {
+    const css = rawCss?.trim()
+    if (!css) return ''
+    return `    /* ${label} */\n${this.escapeClosingTag(css, 'style')}\n`
+  }
+
+  /**
+   * Оборачивает сырой JS в отдельный <script>. Пустой JS → пустая строка.
+   */
+  private scriptTag(rawJs: string | undefined, label: string): string {
+    const js = rawJs?.trim()
+    if (!js) return ''
+    return `<script>\n/* ${label} */\n${this.escapeClosingTag(js, 'script')}\n</script>\n`
+  }
+
+  /**
+   * Собирает общие CSS/JS уровня блока из вложенных узлов дерева, дедуп по
+   * контенту. Корень исключён — это уровень страницы. Один и тот же блок,
+   * встречающийся N раз (linked/repeater), эмитится один раз.
+   */
+  private collectBlockAssets(root: BlockNode): { css: string; jsList: string[] } {
+    const cssSet = new Set<string>()
+    const jsSet = new Set<string>()
+
+    const visit = (node: BlockNode, isRoot: boolean): void => {
+      if (!isRoot) {
+        const css = node.metadata?.globalCss?.trim()
+        const js = node.metadata?.globalJs?.trim()
+        if (css) cssSet.add(css)
+        if (js) jsSet.add(js)
+      }
+      for (const child of node.children || []) visit(child, false)
+      // specificChildren из variations тоже попадают в HTML — учитываем их ассеты.
+      if (node.variations) {
+        for (const variation of Object.values(node.variations)) {
+          for (const sc of variation.specificChildren || []) visit(sc, false)
+        }
+      }
+    }
+
+    visit(root, true)
+    return {
+      css: Array.from(cssSet).join('\n\n'),
+      jsList: Array.from(jsSet),
+    }
   }
 
   /**

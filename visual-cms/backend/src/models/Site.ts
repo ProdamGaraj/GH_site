@@ -35,6 +35,11 @@ export interface SiteSettings {
   customHeadHtml?: string
   customBodyEndHtml?: string
 
+  // Shared CSS/JS for the whole site (injected inline on every page).
+  // Wrapped into <style>/<script> by HtmlGenerator — store raw CSS/JS, not tags.
+  globalCss?: string
+  globalJs?: string
+
   // Company info (reusable across pages)
   companyName?: string
   phone?: string

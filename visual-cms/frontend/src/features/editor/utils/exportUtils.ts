@@ -160,10 +160,13 @@ export function generateHTMLDocument(
   options: { title?: string; classPrefix?: string } = {}
 ): { html: string; css: string } {
   const { title = 'Exported Page', classPrefix = '' } = options
-  
+
   const bodyHTML = nodeToHTML(node, { classPrefix, includeComments: true })
-  const css = nodeToCSS(node, { classPrefix })
-  
+  // Общий CSS страницы (root.metadata.globalCss) дописываем к сгенерированному —
+  // экспорт минимальный (без дедупа блоков); канонический рендер — на деплое.
+  const globalCss = node.metadata?.globalCss
+  const css = nodeToCSS(node, { classPrefix }) + (globalCss ? `\n/* Page CSS */\n${globalCss}\n` : '')
+
   const html = `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -389,9 +392,12 @@ export function generateFullExport(
     const { html, css } = generateHTMLDocument(node, { title: name })
     files.push({ path: `${safeName}/index.html`, content: html })
     files.push({ path: `${safeName}/styles.css`, content: css })
-    files.push({ 
-      path: `${safeName}/script.js`, 
-      content: `// ${name} Scripts\ndocument.addEventListener('DOMContentLoaded', () => {\n  console.log('${name} loaded')\n})\n` 
+    const globalJs = node.metadata?.globalJs
+    files.push({
+      path: `${safeName}/script.js`,
+      content:
+        `// ${name} Scripts\ndocument.addEventListener('DOMContentLoaded', () => {\n  console.log('${name} loaded')\n})\n` +
+        (globalJs ? `\n// Page JS\n${globalJs}\n` : ''),
     })
     
     // Export blocks as separate HTML partials
@@ -709,17 +715,104 @@ function parseCSSFromStyle(styleContent: string): Map<string, Record<string, str
   return cssRules
 }
 
+/**
+ * Ассеты документа, извлечённые при импорте/слиянии HTML.
+ * - css / js — содержимое инлайновых <style>/<script> (→ globalCss/globalJs);
+ * - rawHead / rawBodyEnd — внешние/прочие теги (<link rel=stylesheet>, <script src>),
+ *   которые нельзя заинлайнить → сохраняются как сырой HTML (customHeadHtml/customBodyEndHtml).
+ */
+export interface DocumentAssets {
+  css: string
+  js: string
+  rawHead: string
+  rawBodyEnd: string
+}
+
+const ASSET_TAGS = new Set(['STYLE', 'SCRIPT', 'LINK'])
+
+function isAssetTag(el: Element): boolean {
+  const tag = el.tagName.toUpperCase()
+  if (tag === 'LINK') return el.getAttribute('rel') === 'stylesheet'
+  return ASSET_TAGS.has(tag)
+}
+
+/** Классифицирует ассет-элемент: инлайновый CSS/JS либо «сырой» (внешний/прочий). */
+function classifyAsset(el: Element): { kind: 'css' | 'js' | 'raw'; value: string } {
+  const tag = el.tagName.toUpperCase()
+  if (tag === 'STYLE') {
+    const content = el.textContent?.trim() || ''
+    return content ? { kind: 'css', value: content } : { kind: 'raw', value: '' }
+  }
+  if (tag === 'SCRIPT') {
+    if (el.getAttribute('src')) return { kind: 'raw', value: el.outerHTML }
+    const content = el.textContent?.trim() || ''
+    return content ? { kind: 'js', value: content } : { kind: 'raw', value: '' }
+  }
+  // <link rel="stylesheet"> и прочее
+  return { kind: 'raw', value: el.outerHTML }
+}
+
+/**
+ * Извлекает CSS/JS/сырой HTML из документа.
+ * - topLevelOnly=false (импорт «с нуля»): берём все <style>/<script>/<link> документа —
+ *   дерево их всё равно отбрасывает, иначе код был бы потерян;
+ * - topLevelOnly=true (слияние из редактора исходника): только прямые дети <head>/<body>,
+ *   чтобы не задвоить <script>, лежащий внутри html-code блока (он остаётся в его контенте).
+ */
+export function extractDocumentAssets(
+  doc: Document,
+  options: { topLevelOnly?: boolean } = {},
+): DocumentAssets {
+  const css: string[] = []
+  const js: string[] = []
+  const rawHead: string[] = []
+  const rawBodyEnd: string[] = []
+
+  const collect = (el: Element, rawBucket: string[]): void => {
+    const { kind, value } = classifyAsset(el)
+    if (!value) return
+    if (kind === 'css') css.push(value)
+    else if (kind === 'js') js.push(value)
+    else rawBucket.push(value)
+  }
+
+  if (options.topLevelOnly) {
+    Array.from(doc.head?.children || []).forEach(el => {
+      if (isAssetTag(el)) collect(el, rawHead)
+    })
+    Array.from(doc.body?.children || []).forEach(el => {
+      if (isAssetTag(el)) collect(el, rawBodyEnd)
+    })
+  } else {
+    doc.querySelectorAll('style, script, link[rel="stylesheet"]').forEach(el => {
+      collect(el, rawHead)
+    })
+  }
+
+  return {
+    css: css.join('\n\n'),
+    js: js.join('\n\n'),
+    rawHead: rawHead.join('\n'),
+    rawBodyEnd: rawBodyEnd.join('\n'),
+  }
+}
+
 export function importFromHTML(htmlString: string): BlockNode {
   const parser = new DOMParser()
   const doc = parser.parseFromString(htmlString, 'text/html')
-  
-  // Собираем CSS правила из всех style тегов
+
+  // Простые .class{} правила инлайним в styles.properties — нужно, чтобы стили
+  // отображались в визуальном канвасе (он не применяет globalCss как таблицу).
   const cssRules = new Map<string, Record<string, string>>()
   doc.querySelectorAll('style').forEach(styleEl => {
     const parsed = parseCSSFromStyle(styleEl.textContent || '')
     parsed.forEach((value, key) => cssRules.set(key, value))
   })
-  
+
+  // Полные ассеты документа: <style>→globalCss, инлайн <script>→globalJs,
+  // внешние <link>/<script src>→customHeadHtml (заинлайнить нельзя).
+  const assets = extractDocumentAssets(doc)
+
   // Ищем основной контент
   let rootElement: Element | null = doc.body
   
@@ -742,22 +835,27 @@ export function importFromHTML(htmlString: string): BlockNode {
   }
   
   // Парсим в BlockNode
-  const result = htmlElementToBlockNode(rootElement, cssRules)
-  
-  if (!result) {
+  const result = htmlElementToBlockNode(rootElement, cssRules) ?? {
     // Если не удалось спарсить, возвращаем пустой контейнер
-    return {
-      id: generateUniqueId(),
-      elementType: 'container',
-      tagName: 'div',
-      styles: { properties: {} },
-      children: [],
-      attributes: {},
-      metadata: {}
-    }
+    id: generateUniqueId(),
+    elementType: 'container' as BlockNode['elementType'],
+    tagName: 'div',
+    styles: { properties: {} },
+    children: [],
+    attributes: {},
+    metadata: {},
   }
-  
-  return result
+
+  // Прикрепляем общие стили/скрипты документа к корню (страница/блок).
+  return {
+    ...result,
+    metadata: {
+      ...result.metadata,
+      globalCss: assets.css || undefined,
+      globalJs: assets.js || undefined,
+      customHeadHtml: assets.rawHead || undefined,
+    },
+  }
 }
 
 export type ImportFormat = 'json' | 'html'
@@ -876,6 +974,12 @@ export function generateFullPageHTML(
   // Include custom head/body HTML stored in root node metadata
   const customHead = node.metadata?.customHeadHtml || ''
   const customBodyEnd = node.metadata?.customBodyEndHtml || ''
+  // Общие стили/скрипты страницы — рендерим как <style>/<script>, чтобы редактор
+  // исходника их показывал и round-trip через mergeHtmlIntoTree был стабилен.
+  const globalCss = node.metadata?.globalCss || ''
+  const globalJs = node.metadata?.globalJs || ''
+  const headStyle = globalCss ? `  <style>\n${globalCss}\n  </style>\n` : ''
+  const bodyScript = globalJs ? `  <script>\n${globalJs}\n  </script>\n` : ''
 
   return `<!DOCTYPE html>
 <html lang="ru">
@@ -883,10 +987,10 @@ export function generateFullPageHTML(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title}</title>
-${customHead ? '  ' + customHead.split('\n').join('\n  ') + '\n' : ''}</head>
+${headStyle}${customHead ? '  ' + customHead.split('\n').join('\n  ') + '\n' : ''}</head>
 <body>
 ${bodyHTML}
-${customBodyEnd ? '\n' + customBodyEnd + '\n' : ''}</body>
+${bodyScript}${customBodyEnd ? '\n' + customBodyEnd + '\n' : ''}</body>
 </html>`
 }
 
@@ -1067,35 +1171,15 @@ export function mergeHtmlIntoTree(htmlString: string, existingRoot: BlockNode): 
   // Build map of all existing nodes by id
   const oldNodeMap = collectNodeMap(existingRoot)
 
-  // --- Extract custom <script>/<style>/<link> tags from <head> and <body> ---
-  const headHtmlParts: string[] = []
-  const bodyEndHtmlParts: string[] = []
-
-  // Collect custom tags from <head> (skip meta charset, viewport, title — those are generated)
-  doc.head.childNodes.forEach(child => {
-    if (child.nodeType === Node.ELEMENT_NODE) {
-      const el = child as Element
-      const tag = el.tagName.toUpperCase()
-      // Keep user-added script, style, link tags
-      if (['SCRIPT', 'STYLE', 'LINK'].includes(tag)) {
-        headHtmlParts.push(el.outerHTML)
-      }
-    }
-  })
-
-  // Collect <script>/<style> tags from <body>
-  doc.body.childNodes.forEach(child => {
-    if (child.nodeType === Node.ELEMENT_NODE) {
-      const el = child as Element
-      const tag = el.tagName.toUpperCase()
-      if (['SCRIPT', 'STYLE'].includes(tag)) {
-        bodyEndHtmlParts.push(el.outerHTML)
-      }
-    }
-  })
-
-  const customHeadHtml = headHtmlParts.join('\n') || undefined
-  const customBodyEndHtml = bodyEndHtmlParts.join('\n') || undefined
+  // --- Извлекаем ассеты только верхнеуровневых тегов <head>/<body> ---
+  // Инлайновые <style>/<script> → globalCss/globalJs; внешние <link>/<script src>
+  // остаются сырыми (customHeadHtml/customBodyEndHtml). topLevelOnly не даёт
+  // задвоить <script> внутри html-code блока (он остаётся в его контенте).
+  const assets = extractDocumentAssets(doc, { topLevelOnly: true })
+  const globalCss = assets.css || undefined
+  const globalJs = assets.js || undefined
+  const customHeadHtml = assets.rawHead || undefined
+  const customBodyEndHtml = assets.rawBodyEnd || undefined
 
   // Find root content element in new HTML (excluding script/style)
   let rootElement: Element | null = doc.body
@@ -1113,11 +1197,13 @@ export function mergeHtmlIntoTree(htmlString: string, existingRoot: BlockNode): 
   const merged = mergeElement(rootElement, oldNodeMap)
   if (!merged) return existingRoot
 
-  // Store extracted custom HTML on root node metadata
+  // Сохраняем извлечённые ассеты на metadata корня
   return {
     ...merged,
     metadata: {
       ...merged.metadata,
+      globalCss,
+      globalJs,
       customHeadHtml,
       customBodyEndHtml,
     },
