@@ -12,6 +12,7 @@ import {
   assignControlRole,
   findControlHolderId,
   flattenForPicker,
+  getOverlayChildren,
   CAROUSEL_MODE_ATTR,
 } from './carouselHelpers'
 
@@ -548,6 +549,25 @@ describe('пикер управляющих элементов карусели'
     it('no-op, если роль уже на нужном узле', () => {
       const changes = assignControlRole(tree(), 'data-carousel-prev', 'arrowOld')
       expect(changes).toHaveLength(0)
+    })
+  })
+
+  describe('getOverlayChildren', () => {
+    it('возвращает детей корня, кроме трека', () => {
+      const root = mkNode({
+        id: 'root',
+        attributes: { 'data-carousel': 'true' },
+        children: [
+          mkNode({ id: 'track', attributes: { 'data-carousel-track': 'true' } }),
+          mkNode({ id: 'card', metadata: { name: 'Карточка' } }),
+          mkNode({ id: 'controls', metadata: { name: 'Контролы' } }),
+        ],
+      })
+      expect(getOverlayChildren(root).map((c) => c.id)).toEqual(['card', 'controls'])
+    })
+
+    it('пустой вход → []', () => {
+      expect(getOverlayChildren(null)).toEqual([])
     })
   })
 })

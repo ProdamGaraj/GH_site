@@ -252,6 +252,17 @@ export function assignControlRole(
   return changes
 }
 
+/**
+ * Дочерние узлы карусель-корня, которые НЕ являются треком — кандидаты в оверлеи
+ * (карточка, контролы, текст), которые надо класть поверх слайдов, а не под ними.
+ */
+export function getOverlayChildren(carouselRoot: BlockNode | null | undefined): BlockNode[] {
+  if (!carouselRoot) return []
+  return (carouselRoot.children || []).filter(
+    (c) => c.attributes?.['data-carousel-track'] !== 'true'
+  )
+}
+
 export interface CarouselConversionOptions {
   /** Добавить стрелки prev/next и контейнер точек. По умолчанию true. */
   withControls?: boolean

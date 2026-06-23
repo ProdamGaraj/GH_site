@@ -54,6 +54,7 @@ import type { Block, BlockNode } from '@/shared/types'
 import { BlockPicker, type BlockPickerSelection } from '@/features/editor/components/BlockPicker'
 import { StaticSlidesPanel } from './StaticSlidesPanel'
 import { CarouselControlsPicker } from './CarouselControlsPicker'
+import { CarouselOverlaysSection } from './CarouselOverlaysSection'
 import { RepeatTemplatePicker } from './RepeatTemplatePicker'
 import { RepeatSourcePicker } from './RepeatSourcePicker'
 import { GenericSlideRow } from './GenericSlideRow'
@@ -240,10 +241,17 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
   const errors = useMemo(() => validateRawSlides(slides, schema), [slides, schema])
 
   // Превращает выбранный контейнер в карусель (static-режим): дети → слайды в треке,
-  // плюс стрелки и точки. После этого панель сразу покажет редактор слайдов.
+  // плюс стрелки и точки. Корню ставим position:relative — якорь для оверлеев
+  // (карточка/контролы поверх слайдера). После этого панель покажет редактор слайдов.
   const handleMakeCarousel = () => {
     if (!node) return
-    dispatch(updateNode({ id: node.id, updates: buildCarouselConversion(node, generateId) }))
+    const conv = buildCarouselConversion(node, generateId)
+    const pos = node.styles?.properties?.position
+    const styles =
+      pos && ['relative', 'absolute', 'fixed', 'sticky'].includes(pos)
+        ? node.styles
+        : { ...node.styles, properties: { ...(node.styles?.properties || {}), position: 'relative' } }
+    dispatch(updateNode({ id: node.id, updates: { ...conv, styles } }))
     dispatch(selectNode(node.id))
   }
 
@@ -299,6 +307,7 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
         </div>
         <StaticSlidesPanel track={track} />
         <CarouselControlsPicker carouselRoot={node} />
+        <CarouselOverlaysSection carouselRoot={node} />
       </div>
     )
   }
@@ -511,6 +520,7 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
       </div>
 
       <CarouselControlsPicker carouselRoot={node} />
+      <CarouselOverlaysSection carouselRoot={node} />
 
       <div className="rounded border border-purple-200 bg-purple-50 p-2 text-xs text-purple-900">
         <div className="font-medium mb-0.5">Режим: повторение по данным</div>
