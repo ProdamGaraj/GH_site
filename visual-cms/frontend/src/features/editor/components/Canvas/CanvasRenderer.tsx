@@ -233,7 +233,17 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
         transition: `${node.styles.stateTransition.properties.join(', ')} ${node.styles.stateTransition.duration}ms ${node.styles.stateTransition.easing}`,
       } : {}),
       // Static-карусель: трек становится «окном» для превью одного слайда.
-      ...(isStaticCarouselTrack ? { overflow: 'hidden', position: 'relative' as const } : {}),
+      // Позицию уважаем пользовательскую (например absolute для «слайдер фоном»),
+      // иначе ставим relative как якорь.
+      ...(isStaticCarouselTrack
+        ? {
+            overflow: 'hidden',
+            position:
+              computedStyles.position && computedStyles.position !== 'static'
+                ? computedStyles.position
+                : ('relative' as const),
+          }
+        : {}),
     },
     className: cn(
       'canvas-element',
