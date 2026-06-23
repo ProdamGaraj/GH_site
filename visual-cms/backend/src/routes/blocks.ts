@@ -12,8 +12,11 @@ import { responseCache } from '../middleware'
 const router = Router()
 const blockController = new BlockController()
 
-router.get('/', responseCache({ ttl: 30, tags: ['blocks'] }), blockController.getAll)
-router.get('/reusable', responseCache({ ttl: 30, tags: ['blocks'] }), blockController.getReusable)
+// Списки блоков НЕ кэшируем: библиотека маленькая и должна сразу отражать
+// созданные/изменённые блоки. 30-секундный кэш здесь давал «новый блок не виден»
+// (плюс мог наслаиваться на браузер/nginx — см. no-store в контроллере).
+router.get('/', blockController.getAll)
+router.get('/reusable', blockController.getReusable)
 router.get('/with-usages', blockController.getAllWithUsages)
 router.get('/:id', responseCache({ ttl: 30, tags: ['blocks'] }), blockController.getById)
 router.get('/:id/usages', blockController.getUsages)

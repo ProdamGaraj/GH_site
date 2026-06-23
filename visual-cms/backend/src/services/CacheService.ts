@@ -303,8 +303,10 @@ class CacheService {
     if (this.useRedis) {
       const redisResult = await this.redisCache.get<T>(key)
       if (redisResult !== null) {
-        // Populate memory cache
-        this.memoryCache.set(key, redisResult, { ttl: 60 })
+        // НЕ прогреваем memory-кэш здесь: теги записи в Redis недоступны, а запись
+        // в memory без тегов стала бы неуязвимой для invalidateByTag (протухший
+        // список «жил» бы дольше срока). Memory-слой наполняется только через set()
+        // с корректными тегами.
         return redisResult
       }
     }

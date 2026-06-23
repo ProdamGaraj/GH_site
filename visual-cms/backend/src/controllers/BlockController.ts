@@ -25,6 +25,9 @@ function stripInstanceArtifacts(structure: any): void {
 
 export class BlockController {
   getAll = asyncHandler(async (req: Request, res: Response) => {
+    // no-store: список библиотеки должен быть всегда свежим (нельзя кэшировать ни
+    // в браузере, ни в прокси) — иначе новый блок «не появляется» после создания.
+    res.setHeader('Cache-Control', 'no-store')
     const blocks = await blockRepository.find({
       relations: ['group'],
       order: { updatedAt: 'DESC' },
@@ -33,6 +36,7 @@ export class BlockController {
   })
 
   getReusable = asyncHandler(async (req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store')
     const blocks = await blockRepository.find({
       where: { isReusable: true },
       relations: ['group'],
@@ -139,6 +143,7 @@ export class BlockController {
   })
 
   getAllWithUsages = asyncHandler(async (req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store')
     const blocks = await blockRepository.find({
       relations: ['group'],
       order: { updatedAt: 'DESC' },
