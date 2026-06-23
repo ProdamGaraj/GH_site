@@ -217,10 +217,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         try {
           // 1. Сохраняем блок в библиотеке
           const currentBlock = allBlocks.find(b => b.id === id)
+          // Имя библиотечного блока синхронизируем с именем корневого элемента
+          // («Имя элемента» в редакторе). Иначе блок навсегда остаётся под именем
+          // из конверта (tagName: «div»/«section») и его не отличить в библиотеке.
+          const rootName = rootNode.metadata?.name?.trim()
           await dispatch(updateBlock({
             id: id!,
             data: {
               structure: rootNode,
+              ...(rootName ? { name: rootName } : {}),
               // Передаём detectedFields явно, чтобы бэкенд не перезаписал их авто-детектом
               ...(currentBlock?.detectedFields ? { detectedFields: currentBlock.detectedFields } : {}),
             }
