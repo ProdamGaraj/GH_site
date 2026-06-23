@@ -9,6 +9,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { BlockNodeWithViewport } from '../../utils/variationUtils'
 import { DataBindingIndicator, useBlockDataPreview } from '@/features/dataBindings'
 import { RepeaterRenderer } from './RepeaterRenderer'
+import { StaticCarouselTrack } from './StaticCarouselTrack'
 
 // Text elements that support inline editing
 const TEXT_ELEMENTS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'a', 'button', 'label', 'li']
@@ -198,6 +199,12 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
   const voidElements = ['input', 'img', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr']
   const isVoidElement = voidElements.includes(node.tagName?.toLowerCase() || '')
 
+  // Static-карусель: трек без repeater-привязки. Рантайм карусели на деплое, а в
+  // холсте показываем превью (один слайд + редакторские стрелки/счётчик), иначе
+  // слайды накладываются стопкой.
+  const isStaticCarouselTrack =
+    !isRepeater && node.attributes?.['data-carousel-track'] === 'true'
+
   // Style for dragging
   const dragStyle: React.CSSProperties = transform ? {
     transform: CSS.Translate.toString(transform),
@@ -225,6 +232,8 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
       ...(statePreviewMode !== 'none' && node.styles?.stateTransition ? {
         transition: `${node.styles.stateTransition.properties.join(', ')} ${node.styles.stateTransition.duration}ms ${node.styles.stateTransition.easing}`,
       } : {}),
+      // Static-карусель: трек становится «окном» для превью одного слайда.
+      ...(isStaticCarouselTrack ? { overflow: 'hidden', position: 'relative' as const } : {}),
     },
     className: cn(
       'canvas-element',
@@ -319,16 +328,32 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
       {/* Data Binding Indicator */}
       {!isRoot && <DataBindingIndicator blockId={node.id} />}
       {node.content}
-      {node.children.map((child) => (
-        <CanvasRenderer 
-          key={child.id} 
-          node={child} 
-          editorType={editorType} 
-          blockAlignment={blockAlignment}
-          rootNode={actualRootNode || undefined}
-          libraryBlockId={libraryBlockId}
+      {isStaticCarouselTrack ? (
+        <StaticCarouselTrack
+          slides={node.children}
+          renderSlide={(child) => (
+            <CanvasRenderer
+              key={child.id}
+              node={child}
+              editorType={editorType}
+              blockAlignment={blockAlignment}
+              rootNode={actualRootNode || undefined}
+              libraryBlockId={libraryBlockId}
+            />
+          )}
         />
-      ))}
+      ) : (
+        node.children.map((child) => (
+          <CanvasRenderer
+            key={child.id}
+            node={child}
+            editorType={editorType}
+            blockAlignment={blockAlignment}
+            rootNode={actualRootNode || undefined}
+            libraryBlockId={libraryBlockId}
+          />
+        ))
+      )}
       {/* Empty state indicator for containers - показываем только при редактировании */}
       {isContainer && node.children.length === 0 && !node.content && !isRoot && (
         <div className={cn(
