@@ -6,6 +6,7 @@ import { updateNode, updateNodeStyles, selectViewport } from '@/features/editor/
 import { Input } from '@/shared/components/Input'
 import { ImageUpload } from './ImageUpload'
 import { LinkSettings } from './LinkSettings'
+import { AttributesEditor } from './AttributesEditor'
 import { Link as LinkIcon, Image as ImageIcon, Code as CodeIcon } from 'lucide-react'
 import type { BlockNode } from '@/shared/types'
 
@@ -448,6 +449,8 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
           onChange={(e) => handleAttributeChange('title', e.target.value)}
           placeholder="Текст при наведении"
         />
+
+        <AttributesEditor node={node} />
       </div>
 
       {/* Typography */}

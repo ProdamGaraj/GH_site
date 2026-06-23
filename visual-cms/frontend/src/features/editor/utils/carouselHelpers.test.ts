@@ -8,6 +8,7 @@ import {
   getCarouselMode,
   createBlockReferenceNode,
   deepCloneNode,
+  buildCarouselConversion,
   CAROUSEL_MODE_ATTR,
 } from './carouselHelpers'
 
@@ -437,5 +438,55 @@ describe('findCarouselRootFor', () => {
     expect(findCarouselRootFor(tree, 'nope')).toBeNull()
     expect(findCarouselRootFor(null, 'carousel')).toBeNull()
     expect(findCarouselRootFor(tree, undefined)).toBeNull()
+  })
+})
+
+describe('buildCarouselConversion', () => {
+  let counter = 0
+  const genId = () => `gen-${++counter}`
+  beforeEach(() => {
+    counter = 0
+  })
+
+  const container = (children: BlockNode[]): BlockNode =>
+    mkNode({ id: 'root', attributes: { class: 'box' }, children })
+
+  it('ставит data-carousel/-mode и сохраняет прежние атрибуты', () => {
+    const res = buildCarouselConversion(container([]), genId)
+    expect(res.attributes['data-carousel']).toBe('true')
+    expect(res.attributes['data-carousel-mode']).toBe('static')
+    expect(res.attributes.class).toBe('box')
+  })
+
+  it('оборачивает существующих детей в трек как слайды (порядок сохранён)', () => {
+    const res = buildCarouselConversion(
+      container([mkNode({ id: 'a' }), mkNode({ id: 'b' })]),
+      genId
+    )
+    const track = res.children[0]
+    expect(track.attributes['data-carousel-track']).toBe('true')
+    expect(track.children.map(c => c.id)).toEqual(['a', 'b'])
+    expect(track.children[0].attributes['data-carousel-slide']).toBe('true')
+    expect(track.children[1].attributes['data-carousel-slide']).toBe('true')
+  })
+
+  it('по умолчанию добавляет стрелки prev/next и точки', () => {
+    const res = buildCarouselConversion(container([]), genId)
+    expect(res.children.some(c => 'data-carousel-prev' in c.attributes)).toBe(true)
+    expect(res.children.some(c => 'data-carousel-next' in c.attributes)).toBe(true)
+    expect(res.children.some(c => 'data-carousel-dots' in c.attributes)).toBe(true)
+  })
+
+  it('withControls=false — только трек', () => {
+    const res = buildCarouselConversion(container([]), genId, { withControls: false })
+    expect(res.children).toHaveLength(1)
+    expect(res.children[0].attributes['data-carousel-track']).toBe('true')
+  })
+
+  it('не мутирует исходный узел', () => {
+    const node = container([mkNode({ id: 'a' })])
+    const before = JSON.stringify(node)
+    buildCarouselConversion(node, genId)
+    expect(JSON.stringify(node)).toBe(before)
   })
 })

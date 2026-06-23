@@ -4,6 +4,7 @@ import {
   deleteNode,
   insertPreparedNode,
   reorderNode,
+  updateNode,
   selectActiveRightPanel,
   selectNode,
   selectSelectedNode,
@@ -33,6 +34,7 @@ import {
   findTrackNode,
   findCarouselRootFor,
   getCarouselMode,
+  buildCarouselConversion,
 } from '@/features/editor/utils/carouselHelpers'
 import {
   findRepeaterBinding,
@@ -236,17 +238,37 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
   const errors = useMemo(() => validateRawSlides(slides, schema), [slides, schema])
 
+  // Превращает выбранный контейнер в карусель (static-режим): дети → слайды в треке,
+  // плюс стрелки и точки. После этого панель сразу покажет редактор слайдов.
+  const handleMakeCarousel = () => {
+    if (!node) return
+    dispatch(updateNode({ id: node.id, updates: buildCarouselConversion(node, generateId) }))
+    dispatch(selectNode(node.id))
+  }
+
   if (!node) {
     return <div className="p-4 text-sm text-gray-500">Выберите элемент карусели в дереве слоёв.</div>
   }
   if (!isCarousel) {
+    const canConvert = node.elementType === 'container'
     return (
-      <div className="p-4 text-sm text-gray-500 space-y-2">
-        <p className="font-medium text-gray-700">Это не карусель</p>
-        <p>
-          Чтобы редактировать слайды, выделите элемент с атрибутом{' '}
-          <code className="bg-gray-100 px-1 rounded">data-carousel="true"</code>.
-        </p>
+      <div className="p-4 text-sm text-gray-500 space-y-3">
+        <div className="space-y-1">
+          <p className="font-medium text-gray-700">Это не карусель</p>
+          <p>
+            Превратите выбранный контейнер в карусель — его дочерние элементы станут слайдами,
+            добавятся трек, стрелки и точки.
+          </p>
+        </div>
+        {canConvert ? (
+          <Button variant="primary" size="sm" onClick={handleMakeCarousel} className="w-full">
+            Сделать каруселью
+          </Button>
+        ) : (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 p-2 rounded">
+            Выберите элемент-контейнер (div/section), чтобы сделать его каруселью.
+          </p>
+        )}
       </div>
     )
   }

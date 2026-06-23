@@ -184,6 +184,87 @@ export function createBlockReferenceNode(
   return copy
 }
 
+export interface CarouselConversionOptions {
+  /** Добавить стрелки prev/next и контейнер точек. По умолчанию true. */
+  withControls?: boolean
+}
+
+/** Кнопка управления каруселью (prev/next). */
+function makeControlButton(genId: () => string, dir: 'prev' | 'next', label: string): BlockNode {
+  return {
+    id: genId(),
+    tag: 'button',
+    tagName: 'button',
+    elementType: 'button',
+    styles: { properties: {} },
+    children: [],
+    attributes: { [`data-carousel-${dir}`]: 'true' },
+    content: label,
+    metadata: { name: dir === 'prev' ? 'Стрелка назад' : 'Стрелка вперёд' },
+  }
+}
+
+/**
+ * Превращает контейнер в карусель (static-режим): его дети оборачиваются в трек
+ * и помечаются как слайды, на корень вешаются data-carousel/-mode, добавляются
+ * (опц.) стрелки и контейнер точек.
+ *
+ * Возвращает только { attributes, children } для dispatch(updateNode) — чистая,
+ * без мутаций исходного узла. Layout трека на деплое выставляет CarouselRuntime.
+ */
+export function buildCarouselConversion(
+  node: BlockNode,
+  genId: () => string = defaultId,
+  options: CarouselConversionOptions = {}
+): Pick<BlockNode, 'attributes' | 'children'> {
+  const withControls = options.withControls !== false
+
+  // Существующие дети становятся слайдами (новые объекты, без мутации).
+  const slides: BlockNode[] = (node.children || []).map((child) => ({
+    ...child,
+    attributes: { ...(child.attributes || {}), 'data-carousel-slide': 'true' },
+  }))
+
+  const track: BlockNode = {
+    id: genId(),
+    tag: 'div',
+    tagName: 'div',
+    elementType: 'container',
+    styles: { properties: {} },
+    children: slides,
+    attributes: { 'data-carousel-track': 'true' },
+    metadata: { name: 'Трек слайдов' },
+  }
+
+  const children: BlockNode[] = [track]
+
+  if (withControls) {
+    children.push(
+      makeControlButton(genId, 'prev', '‹'),
+      makeControlButton(genId, 'next', '›'),
+      {
+        id: genId(),
+        tag: 'div',
+        tagName: 'div',
+        elementType: 'container',
+        styles: { properties: { display: 'flex', gap: '8px', justifyContent: 'center' } },
+        children: [],
+        attributes: { 'data-carousel-dots': 'true' },
+        metadata: { name: 'Точки' },
+      }
+    )
+  }
+
+  return {
+    attributes: {
+      ...(node.attributes || {}),
+      'data-carousel': 'true',
+      'data-carousel-mode': 'static',
+    },
+    children,
+  }
+}
+
 /**
  * Глубокая копия BlockNode с remap'ом всех id (включая children рекурсивно).
  * Сохраняет всю остальную структуру (styles/attributes/metadata/content/animations).

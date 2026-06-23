@@ -24,3 +24,4 @@ visual-cms/backend/fix_rce.js
 visual-cms/backend/fix_rce2.js
 visual-cms/backend/fix_rce3.js
 visual-cms/backend/jest.config.js
+test.html
