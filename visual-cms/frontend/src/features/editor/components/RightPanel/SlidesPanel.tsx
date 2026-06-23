@@ -53,6 +53,7 @@ import { generateId } from '@/shared/utils'
 import type { Block, BlockNode } from '@/shared/types'
 import { BlockPicker, type BlockPickerSelection } from '@/features/editor/components/BlockPicker'
 import { StaticSlidesPanel } from './StaticSlidesPanel'
+import { CarouselControlsPicker } from './CarouselControlsPicker'
 import { RepeatTemplatePicker } from './RepeatTemplatePicker'
 import { RepeatSourcePicker } from './RepeatSourcePicker'
 import { GenericSlideRow } from './GenericSlideRow'
@@ -297,6 +298,7 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
           <p className="text-xs text-gray-500">Управляются как обычные блоки в треке.</p>
         </div>
         <StaticSlidesPanel track={track} />
+        <CarouselControlsPicker carouselRoot={node} />
       </div>
     )
   }
@@ -507,6 +509,8 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
           {saving ? 'Сохранение…' : 'Сохранить'}
         </Button>
       </div>
+
+      <CarouselControlsPicker carouselRoot={node} />
 
       <div className="rounded border border-purple-200 bg-purple-50 p-2 text-xs text-purple-900">
         <div className="font-medium mb-0.5">Режим: повторение по данным</div>

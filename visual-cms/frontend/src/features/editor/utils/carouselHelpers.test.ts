@@ -9,6 +9,9 @@ import {
   createBlockReferenceNode,
   deepCloneNode,
   buildCarouselConversion,
+  assignControlRole,
+  findControlHolderId,
+  flattenForPicker,
   CAROUSEL_MODE_ATTR,
 } from './carouselHelpers'
 
@@ -488,5 +491,63 @@ describe('buildCarouselConversion', () => {
     const before = JSON.stringify(node)
     buildCarouselConversion(node, genId)
     expect(JSON.stringify(node)).toBe(before)
+  })
+})
+
+describe('пикер управляющих элементов карусели', () => {
+  const tree = (): BlockNode =>
+    mkNode({
+      id: 'root',
+      attributes: { 'data-carousel': 'true' },
+      children: [
+        mkNode({ id: 'arrowOld', attributes: { 'data-carousel-prev': 'true' } }),
+        mkNode({ id: 'arrowNew', metadata: { name: 'Моя стрелка' } }),
+        mkNode({ id: 'counter', metadata: { name: 'Счётчик' } }),
+      ],
+    })
+
+  describe('findControlHolderId', () => {
+    it('находит текущего держателя роли', () => {
+      expect(findControlHolderId(tree(), 'data-carousel-prev')).toBe('arrowOld')
+    })
+    it('пусто, если роль никому не назначена', () => {
+      expect(findControlHolderId(tree(), 'data-carousel-counter')).toBe('')
+    })
+  })
+
+  describe('flattenForPicker', () => {
+    it('плоский список всех узлов с подписями', () => {
+      const list = flattenForPicker(tree())
+      expect(list.map(x => x.id)).toEqual(['root', 'arrowOld', 'arrowNew', 'counter'])
+      expect(list.find(x => x.id === 'arrowNew')?.label).toContain('Моя стрелка')
+    })
+  })
+
+  describe('assignControlRole', () => {
+    it('переносит роль с прежнего держателя на нового', () => {
+      const changes = assignControlRole(tree(), 'data-carousel-prev', 'arrowNew')
+      const byId = Object.fromEntries(changes.map(c => [c.id, c.attributes]))
+      // снято со старого
+      expect(byId.arrowOld?.['data-carousel-prev']).toBeUndefined()
+      // поставлено на новый
+      expect(byId.arrowNew?.['data-carousel-prev']).toBe('true')
+    })
+
+    it('targetId="" — снимает роль со всех', () => {
+      const changes = assignControlRole(tree(), 'data-carousel-prev', '')
+      const byId = Object.fromEntries(changes.map(c => [c.id, c.attributes]))
+      expect(byId.arrowOld?.['data-carousel-prev']).toBeUndefined()
+    })
+
+    it('назначение на нового держателя счётчика ставит data-carousel-counter', () => {
+      const changes = assignControlRole(tree(), 'data-carousel-counter', 'counter')
+      const byId = Object.fromEntries(changes.map(c => [c.id, c.attributes]))
+      expect(byId.counter?.['data-carousel-counter']).toBe('true')
+    })
+
+    it('no-op, если роль уже на нужном узле', () => {
+      const changes = assignControlRole(tree(), 'data-carousel-prev', 'arrowOld')
+      expect(changes).toHaveLength(0)
+    })
   })
 })

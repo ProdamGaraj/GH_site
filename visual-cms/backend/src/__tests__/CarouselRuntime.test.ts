@@ -124,6 +124,55 @@ describe('CarouselRuntime', () => {
     })
   })
 
+  describe('counter (data-carousel-counter)', () => {
+    it('обновляет "01 / 04" на старте и при смене слайда', async () => {
+      await boot(`
+        <div data-carousel="true" data-carousel-autoplay="0" data-carousel-loop="true">
+          <div data-carousel-track="true">
+            <div data-carousel-slide="true">A</div>
+            <div data-carousel-slide="true">B</div>
+            <div data-carousel-slide="true">C</div>
+            <div data-carousel-slide="true">D</div>
+          </div>
+          <span data-carousel-counter="true"></span>
+          <button data-carousel-next="true">next</button>
+        </div>
+      `)
+      const counter = document.querySelector<HTMLElement>('[data-carousel-counter]')!
+      expect(counter.textContent).toBe('01 / 04')
+      document.querySelector<HTMLElement>('[data-carousel-next]')!.click()
+      expect(counter.textContent).toBe('02 / 04')
+    })
+  })
+
+  describe('video backgrounds (data-slide-video)', () => {
+    it('лениво создаёт <video> на активном слайде, не трогает неактивный', async () => {
+      await boot(`
+        <div data-carousel="true" data-carousel-autoplay="0" data-carousel-loop="true">
+          <div data-carousel-track="true">
+            <div data-carousel-slide="true" data-slide-video="https://cdn/a.mp4" data-element-id="s0"></div>
+            <div data-carousel-slide="true" data-slide-video="https://cdn/b.mp4" data-element-id="s1"></div>
+          </div>
+          <button data-carousel-next="true">next</button>
+        </div>
+      `)
+      const s0 = document.querySelector('[data-element-id="s0"]')!
+      const s1 = document.querySelector('[data-element-id="s1"]')!
+
+      const v0 = s0.querySelector<HTMLVideoElement>('video[data-carousel-video="true"]')
+      expect(v0).toBeTruthy()
+      expect(v0!.querySelector('source')!.getAttribute('src')).toBe('https://cdn/a.mp4')
+      expect(v0!.loop).toBe(true)
+      expect(v0!.hasAttribute('muted')).toBe(true)
+      expect(v0!.hasAttribute('playsinline')).toBe(true)
+      // неактивный слайд — видео ещё не создано (ленивость)
+      expect(s1.querySelector('video[data-carousel-video="true"]')).toBeNull()
+
+      document.querySelector<HTMLElement>('[data-carousel-next]')!.click()
+      expect(s1.querySelector('video[data-carousel-video="true"]')).toBeTruthy()
+    })
+  })
+
   describe('MutationObserver', () => {
     it('перерисовывается при добавлении нового слайда в track', async () => {
       await boot(buildBody(2))

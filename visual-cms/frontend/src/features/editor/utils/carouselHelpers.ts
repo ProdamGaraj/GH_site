@@ -184,6 +184,74 @@ export function createBlockReferenceNode(
   return copy
 }
 
+/** Роль управляющего элемента карусели → её data-атрибут. */
+export interface CarouselControlRole {
+  key: 'prev' | 'next' | 'dots' | 'counter'
+  attr: string
+  label: string
+}
+
+export const CAROUSEL_CONTROL_ROLES: CarouselControlRole[] = [
+  { key: 'prev', attr: 'data-carousel-prev', label: 'Стрелка «назад»' },
+  { key: 'next', attr: 'data-carousel-next', label: 'Стрелка «вперёд»' },
+  { key: 'dots', attr: 'data-carousel-dots', label: 'Контейнер точек' },
+  { key: 'counter', attr: 'data-carousel-counter', label: 'Счётчик (01 / 04)' },
+]
+
+/** Плоский список узлов поддерева для пикера: id + отступ-подпись по глубине. */
+export function flattenForPicker(root: BlockNode): Array<{ id: string; label: string }> {
+  const out: Array<{ id: string; label: string }> = []
+  const walk = (n: BlockNode, depth: number): void => {
+    const name = n.metadata?.name || n.tagName || 'элемент'
+    out.push({ id: n.id, label: `${'  '.repeat(depth)}${name}` })
+    for (const c of n.children || []) walk(c, depth + 1)
+  }
+  walk(root, 0)
+  return out
+}
+
+/** id первого узла-держателя роли (с данным data-атрибутом), либо ''. */
+export function findControlHolderId(root: BlockNode, attr: string): string {
+  let found = ''
+  const walk = (n: BlockNode): boolean => {
+    if (n.attributes?.[attr]) {
+      found = n.id
+      return true
+    }
+    for (const c of n.children || []) if (walk(c)) return true
+    return false
+  }
+  walk(root)
+  return found
+}
+
+/**
+ * Назначает роль управления (attr) узлу targetId: снимает атрибут со всех текущих
+ * держателей и ставит на target. targetId='' — снять со всех (вернуть в «не задано»).
+ * Возвращает минимальный список изменений { id, attributes } для dispatch(updateNode).
+ * Чистая функция — без мутаций исходного дерева.
+ */
+export function assignControlRole(
+  root: BlockNode,
+  attr: string,
+  targetId: string
+): Array<{ id: string; attributes: Record<string, string> }> {
+  const changes: Array<{ id: string; attributes: Record<string, string> }> = []
+  const walk = (n: BlockNode): void => {
+    const has = !!n.attributes?.[attr]
+    if (n.id === targetId && !has) {
+      changes.push({ id: n.id, attributes: { ...(n.attributes || {}), [attr]: 'true' } })
+    } else if (n.id !== targetId && has) {
+      const next = { ...(n.attributes || {}) }
+      delete next[attr]
+      changes.push({ id: n.id, attributes: next })
+    }
+    for (const c of n.children || []) walk(c)
+  }
+  walk(root)
+  return changes
+}
+
 export interface CarouselConversionOptions {
   /** Добавить стрелки prev/next и контейнер точек. По умолчанию true. */
   withControls?: boolean

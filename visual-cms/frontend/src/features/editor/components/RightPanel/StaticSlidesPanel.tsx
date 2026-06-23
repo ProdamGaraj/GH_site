@@ -4,6 +4,7 @@ import {
   deleteNode,
   insertPreparedNode,
   reorderNode,
+  updateNode,
   selectNode,
   selectSelectedNode,
 } from '@/features/editor/editorSlice'
@@ -22,7 +23,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Link2, Trash2, Copy, Plus, MousePointerClick } from 'lucide-react'
+import { GripVertical, Link2, Trash2, Copy, Plus, MousePointerClick, Film } from 'lucide-react'
 import { Button } from '@/shared/components/Button'
 import type { BlockNode, Block } from '@/shared/types'
 import { generateId } from '@/shared/utils'
@@ -83,6 +84,16 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) =
     dispatch(selectNode(slide.id))
   }
 
+  // Видео-фон слайда: ставим/снимаем data-slide-video. Постером служит
+  // background-image слайда (его задают в стилях/через «Фото»).
+  const handleSetVideo = (slide: BlockNode, url: string) => {
+    const attrs = { ...(slide.attributes || {}) }
+    const trimmed = url.trim()
+    if (trimmed) attrs['data-slide-video'] = trimmed
+    else delete attrs['data-slide-video']
+    dispatch(updateNode({ id: slide.id, updates: { attributes: attrs } }))
+  }
+
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e
     if (!over || active.id === over.id) return
@@ -119,9 +130,11 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) =
                 slide={slide}
                 index={i}
                 selected={slide.id === selected?.id}
+                videoUrl={slide.attributes?.['data-slide-video'] || ''}
                 onSelect={() => handleSelect(slide)}
                 onDelete={() => handleDelete(slide)}
                 onDuplicate={() => handleDuplicate(slide, i)}
+                onSetVideo={(url) => handleSetVideo(slide, url)}
               />
             ))}
           </div>
@@ -151,18 +164,22 @@ interface SlideRowProps {
   slide: BlockNode
   index: number
   selected: boolean
+  videoUrl: string
   onSelect: () => void
   onDelete: () => void
   onDuplicate: () => void
+  onSetVideo: (url: string) => void
 }
 
 const SlideRow: React.FC<SlideRowProps> = ({
   slide,
   index,
   selected,
+  videoUrl,
   onSelect,
   onDelete,
   onDuplicate,
+  onSetVideo,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: slide.id,
@@ -175,48 +192,99 @@ const SlideRow: React.FC<SlideRowProps> = ({
   const linked = isLinkedSlide(slide)
   const name = getSlideDisplayName(slide, index)
   const childCount = slide.children?.length ?? 0
+  const hasVideo = !!videoUrl
+  const [showVideo, setShowVideo] = useState(hasVideo)
+  const [videoDraft, setVideoDraft] = useState(videoUrl)
+
+  // Синхронизируем черновик при внешней смене значения (дубликат/переключение).
+  React.useEffect(() => setVideoDraft(videoUrl), [videoUrl])
+
+  const commitVideo = () => {
+    if (videoDraft.trim() !== videoUrl) onSetVideo(videoDraft)
+  }
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={
-        'flex items-center gap-1.5 rounded border bg-white px-2 py-1.5 ' +
+        'rounded border bg-white ' +
         (selected ? 'border-blue-500 ring-1 ring-blue-200' : 'border-gray-200 hover:border-gray-300')
       }
     >
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        className="cursor-grab text-gray-400 hover:text-gray-600 touch-none"
-        aria-label="Перетащить"
-      >
-        <GripVertical size={14} />
-      </button>
-      <span className="text-xs font-mono text-gray-400 w-5 text-right">{index + 1}</span>
-      <button
-        type="button"
-        onClick={onSelect}
-        className="flex-1 flex items-center gap-1.5 text-left text-sm min-w-0"
-        title={linked ? `Linked → library block` : 'Открыть в редакторе'}
-      >
-        {linked ? (
-          <Link2 size={13} className="shrink-0 text-blue-600" />
-        ) : (
-          <MousePointerClick size={13} className="shrink-0 text-gray-400" />
-        )}
-        <span className="truncate text-gray-800">{name}</span>
-        {!linked && childCount > 0 && (
-          <span className="text-[10px] text-gray-400 shrink-0">({childCount})</span>
-        )}
-      </button>
-      <Button variant="ghost" size="sm" onClick={onDuplicate} title="Дублировать">
-        <Copy size={13} />
-      </Button>
-      <Button variant="ghost" size="sm" onClick={onDelete} title="Удалить">
-        <Trash2 size={13} className="text-red-600" />
-      </Button>
+      <div className="flex items-center gap-1.5 px-2 py-1.5">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="cursor-grab text-gray-400 hover:text-gray-600 touch-none"
+          aria-label="Перетащить"
+        >
+          <GripVertical size={14} />
+        </button>
+        <span className="text-xs font-mono text-gray-400 w-5 text-right">{index + 1}</span>
+        <button
+          type="button"
+          onClick={onSelect}
+          className="flex-1 flex items-center gap-1.5 text-left text-sm min-w-0"
+          title={linked ? `Linked → library block` : 'Открыть в редакторе'}
+        >
+          {linked ? (
+            <Link2 size={13} className="shrink-0 text-blue-600" />
+          ) : (
+            <MousePointerClick size={13} className="shrink-0 text-gray-400" />
+          )}
+          <span className="truncate text-gray-800">{name}</span>
+          {!linked && childCount > 0 && (
+            <span className="text-[10px] text-gray-400 shrink-0">({childCount})</span>
+          )}
+        </button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowVideo((v) => !v)}
+          title="Видео-фон слайда"
+        >
+          <Film size={13} className={hasVideo ? 'text-purple-600' : 'text-gray-400'} />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onDuplicate} title="Дублировать">
+          <Copy size={13} />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onDelete} title="Удалить">
+          <Trash2 size={13} className="text-red-600" />
+        </Button>
+      </div>
+
+      {showVideo && (
+        <div className="px-2 pb-2 flex items-center gap-1.5">
+          <input
+            value={videoDraft}
+            onChange={(e) => setVideoDraft(e.target.value)}
+            onBlur={commitVideo}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                commitVideo()
+                ;(e.target as HTMLInputElement).blur()
+              }
+            }}
+            placeholder="URL видео (mp4/webm) — постером служит фон слайда"
+            className="flex-1 min-w-0 px-2 py-1 text-xs border border-gray-300 rounded font-mono focus:outline-none focus:ring-1 focus:ring-primary-500"
+          />
+          {hasVideo && (
+            <button
+              type="button"
+              onClick={() => {
+                setVideoDraft('')
+                onSetVideo('')
+              }}
+              className="p-1 hover:bg-red-50 rounded"
+              title="Убрать видео"
+            >
+              <Trash2 size={12} className="text-red-500" />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

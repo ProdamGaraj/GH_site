@@ -9,8 +9,11 @@
  *   [data-carousel-loop="true"]       — зацикленность (по умолчанию true)
  *   [data-carousel-track="true"]      — контейнер с слайдами (прямые дети = слайды)
  *   [data-carousel-slide="true"]      — атрибут на каждом слайде (для надёжной фильтрации)
+ *   [data-slide-video="<url>"]        — видео-фон слайда; постер = его background-image.
+ *                                       Видео muted+loop+playsinline, играет только активный слайд.
  *   [data-carousel-prev]              — клик: prev
  *   [data-carousel-next]              — клик: next
+ *   [data-carousel-counter]           — элемент-счётчик; textContent = "01 / 04"
  *   [data-carousel-dots]              — контейнер пагинации
  *   [data-carousel-dot]               — точка-шаблон (внутри dots);
  *                                       если найдена — клонируется по числу слайдов;
@@ -42,6 +45,7 @@ export function generateCarouselRuntime(): string {
     var prevBtn = root.querySelector('[data-carousel-prev]');
     var nextBtn = root.querySelector('[data-carousel-next]');
     var dotsContainer = root.querySelector('[data-carousel-dots]');
+    var counterEl = root.querySelector('[data-carousel-counter]');
 
     var state = { index: 0, slides: [], dots: [], timer: null, interacting: false, dotActiveStyle: '', dotInactiveStyle: '' };
 
@@ -149,6 +153,37 @@ export function generateCarouselRuntime(): string {
       state.dots = [];
     }
 
+    // --- Видео-фоны слайдов: data-slide-video="<url>" ---
+    // Постером служит background-image слайда (виден, пока видео не проиграется).
+    // Видео создаётся лениво при первом показе слайда; muted+loop+playsinline —
+    // браузеры разрешают autoplay только без звука.
+    function ensureSlideVideo(slide) {
+      var url = slide.getAttribute && slide.getAttribute('data-slide-video');
+      if (!url) return null;
+      var v = slide.querySelector('video[data-carousel-video="true"]');
+      if (!v) {
+        if (window.getComputedStyle(slide).position === 'static') slide.style.position = 'relative';
+        v = document.createElement('video');
+        v.setAttribute('data-carousel-video', 'true');
+        v.muted = true; v.defaultMuted = true; v.loop = true; v.autoplay = true;
+        v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
+        v.playsInline = true; v.preload = 'none';
+        v.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;z-index:0;';
+        var s = document.createElement('source');
+        s.src = url; v.appendChild(s);
+        slide.insertBefore(v, slide.firstChild);
+      }
+      return v;
+    }
+    function playSlideVideo(slide) {
+      var v = ensureSlideVideo(slide);
+      if (v) { try { v.currentTime = 0; var p = v.play(); if (p && p.catch) p.catch(function(){}); } catch(e){} }
+    }
+    function pauseSlideVideo(slide) {
+      var v = slide.querySelector && slide.querySelector('video[data-carousel-video="true"]');
+      if (v) { try { v.pause(); } catch(e){} }
+    }
+
     function update() {
       var n = state.slides.length;
       if (n === 0) return;
@@ -164,6 +199,16 @@ export function generateCarouselRuntime(): string {
           dot.classList.remove(activeClass);
           if (state.dotInactiveStyle) dot.style.cssText = state.dotInactiveStyle;
         }
+      }
+      // Счётчик "01 / 04" (zero-pad), если задан data-carousel-counter
+      if (counterEl) {
+        var pad = function(x){ return (x < 10 ? '0' : '') + x; };
+        counterEl.textContent = pad(state.index + 1) + ' / ' + pad(n);
+      }
+      // Видео-фоны: проигрываем активный слайд, остальные ставим на паузу.
+      for (var vi = 0; vi < state.slides.length; vi++) {
+        if (vi === state.index) playSlideVideo(state.slides[vi]);
+        else pauseSlideVideo(state.slides[vi]);
       }
     }
 
