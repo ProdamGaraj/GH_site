@@ -23,8 +23,9 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Link2, Trash2, Copy, Plus, MousePointerClick, Film } from 'lucide-react'
+import { GripVertical, Link2, Trash2, Copy, Plus, MousePointerClick, Film, Image as ImageIcon } from 'lucide-react'
 import { Button } from '@/shared/components/Button'
+import { MediaPicker } from '@/features/media/MediaPicker'
 import type { BlockNode, Block } from '@/shared/types'
 import { generateId } from '@/shared/utils'
 import { BlockPicker, type BlockPickerSelection } from '@/features/editor/components/BlockPicker'
@@ -55,9 +56,52 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) =
   const dispatch = useAppDispatch()
   const selected = useAppSelector(selectSelectedNode)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [photoPickerOpen, setPhotoPickerOpen] = useState(false)
 
   const slides = useMemo(() => getSlideChildren(track), [track])
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+
+  // Пустой слайд-контейнер (его потом стилизуют / задают фон / видео).
+  const handleAddEmpty = () => {
+    const node: BlockNode = {
+      id: generateId(),
+      tag: 'div',
+      tagName: 'div',
+      elementType: 'container',
+      content: '',
+      children: [],
+      attributes: { 'data-carousel-slide': 'true' },
+      metadata: { name: 'Слайд' },
+      styles: { properties: { width: '100%', minHeight: '240px' } },
+    }
+    dispatch(insertPreparedNode({ parentId: track.id, node }))
+  }
+
+  // Фото-слайд: контейнер с фоном-картинкой (он же постер для видео-фона).
+  const handleAddPhoto = (asset: { url: string; id?: string }) => {
+    const node: BlockNode = {
+      id: generateId(),
+      tag: 'div',
+      tagName: 'div',
+      elementType: 'container',
+      content: '',
+      children: [],
+      attributes: { 'data-carousel-slide': 'true' },
+      metadata: { name: 'Фото-слайд', ...(asset.id ? { mediaAssetId: asset.id } : {}) },
+      styles: {
+        properties: {
+          width: '100%',
+          minHeight: '240px',
+          backgroundImage: `url("${asset.url}")`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        },
+      },
+    }
+    dispatch(insertPreparedNode({ parentId: track.id, node }))
+    setPhotoPickerOpen(false)
+  }
 
   const handlePick = (selection: BlockPickerSelection) => {
     const { block, mode } = selection
@@ -141,20 +185,32 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) =
         </SortableContext>
       </DndContext>
 
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={() => setPickerOpen(true)}
-        className="w-full"
-      >
-        <Plus size={14} className="mr-1" /> Добавить из библиотеки
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" size="sm" onClick={handleAddEmpty} className="flex-1">
+          <Plus size={13} className="mr-1" /> Пустой слайд
+        </Button>
+        <Button variant="secondary" size="sm" onClick={() => setPhotoPickerOpen(true)} className="flex-1">
+          <ImageIcon size={13} className="mr-1" /> Фото
+        </Button>
+        <Button variant="secondary" size="sm" onClick={() => setPickerOpen(true)} className="flex-1">
+          <Plus size={13} className="mr-1" /> Из библиотеки
+        </Button>
+      </div>
 
       <BlockPicker
         isOpen={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onPick={handlePick}
         title="Добавить слайд из библиотеки"
+      />
+
+      <MediaPicker
+        open={photoPickerOpen}
+        kind="image"
+        siteId={null}
+        title="Выберите фото для слайда"
+        onClose={() => setPhotoPickerOpen(false)}
+        onSelect={(asset) => handleAddPhoto(asset)}
       />
     </div>
   )
