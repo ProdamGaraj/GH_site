@@ -55,7 +55,18 @@ export const CarouselOverlaysSection: React.FC<{ carouselRoot: BlockNode }> = ({
   const sliderAsBackground = track?.styles?.properties?.position === 'absolute'
 
   const setSliderBackground = (on: boolean) => {
-    ensureRootAnchor()
+    // Корень: якорь + ВЫСОТА. Без высоты при всех absolute-детях корень схлопывается
+    // (нет контента в потоке) → блок «режется» и контент пропадает. Как в оригинале
+    // (min-height: 100svh у геро). Не трогаем, если высота уже задана пользователем.
+    const rp = carouselRoot.styles?.properties
+    if (on) {
+      const rootProps: Record<string, string> = { position: rp?.position && POSITIONED.has(rp.position) ? rp.position : 'relative' }
+      if (!rp?.height && !rp?.minHeight) rootProps.minHeight = '100vh'
+      mergeProps(carouselRoot, rootProps)
+    } else if (rp?.minHeight === '100vh') {
+      mergeProps(carouselRoot, { minHeight: undefined })
+    }
+
     if (track) {
       mergeProps(
         track,
@@ -68,8 +79,17 @@ export const CarouselOverlaysSection: React.FC<{ carouselRoot: BlockNode }> = ({
       }
     }
     for (const ov of overlays) {
-      if (on) mergeProps(ov, { position: ov.styles?.properties?.position || 'relative', zIndex: '1' })
-      else mergeProps(ov, { zIndex: undefined })
+      if (on) {
+        // Каждый оверлей — полнослойный absolute поверх слайдера; контент внутри
+        // позиционируется его собственным flex (как твой div с inset:0; flex-end).
+        mergeProps(ov, {
+          position: 'absolute',
+          inset: '0',
+          zIndex: ov.styles?.properties?.zIndex || '1',
+        })
+      } else {
+        mergeProps(ov, { position: undefined, inset: undefined, zIndex: undefined })
+      }
     }
   }
 
