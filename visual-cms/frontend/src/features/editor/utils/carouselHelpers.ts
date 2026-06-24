@@ -335,9 +335,11 @@ export function buildControlElement(
       attributes: { 'data-carousel-dot': 'true' },
       metadata: { name: active ? 'Точка (активная)' : 'Точка' },
       styles: {
+        // transition на обоих шаблонах — рантайм меняет инлайн-стиль активной/
+        // неактивной точки, и переход анимируется плавно (размер/цвет).
         properties: active
-          ? { width: '24px', height: '8px', borderRadius: '4px', background: '#ffffff', border: 'none', cursor: 'pointer', padding: '0' }
-          : { width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer', padding: '0' },
+          ? { width: '24px', height: '8px', borderRadius: '4px', background: '#ffffff', border: 'none', cursor: 'pointer', padding: '0', transition: 'all 0.3s ease' }
+          : { width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer', padding: '0', transition: 'all 0.3s ease' },
       },
     })
 
