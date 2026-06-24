@@ -168,7 +168,9 @@ export function generateCarouselRuntime(): string {
         v.muted = true; v.defaultMuted = true; v.loop = true; v.autoplay = true;
         v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
         v.playsInline = true; v.preload = 'none';
-        v.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none;z-index:0;';
+        // Вписывание видео = вписыванию постера слайда: data-slide-fit (cover|contain).
+        var fit = slide.getAttribute('data-slide-fit') || 'cover';
+        v.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:' + fit + ';pointer-events:none;z-index:0;';
         var s = document.createElement('source');
         s.src = url; v.appendChild(s);
         slide.insertBefore(v, slide.firstChild);

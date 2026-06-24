@@ -138,6 +138,32 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) =
     dispatch(updateNode({ id: slide.id, updates: { attributes: attrs } }))
   }
 
+  // Вписывание слайдов: cover (обрезать, заполнить) или contain (целиком, с полосами).
+  // Применяем ко всем слайдам: background-size (для фото) + data-slide-fit (для видео).
+  const slideFit =
+    (slides[0]?.styles?.properties as Record<string, string> | undefined)?.backgroundSize || 'cover'
+  const handleSetFit = (fit: string) => {
+    for (const slide of slides) {
+      dispatch(
+        updateNode({
+          id: slide.id,
+          updates: {
+            styles: {
+              ...slide.styles,
+              properties: {
+                ...(slide.styles?.properties || {}),
+                backgroundSize: fit,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'center',
+              } as BlockNode['styles']['properties'],
+            },
+            attributes: { ...(slide.attributes || {}), 'data-slide-fit': fit },
+          },
+        })
+      )
+    }
+  }
+
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e
     if (!over || active.id === over.id) return
@@ -196,6 +222,21 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) =
           <Plus size={13} className="mr-1" /> Из библиотеки
         </Button>
       </div>
+
+      {slides.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-600 shrink-0">Вписывание слайдов</span>
+          <select
+            value={slideFit}
+            onChange={(e) => handleSetFit(e.target.value)}
+            className="flex-1 min-w-0 px-2 py-1 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+            title="Как фото/видео вписываются в слайд"
+          >
+            <option value="cover">Обрезать (заполнить блок)</option>
+            <option value="contain">Целиком (с полосами)</option>
+          </select>
+        </div>
+      )}
 
       <BlockPicker
         isOpen={pickerOpen}

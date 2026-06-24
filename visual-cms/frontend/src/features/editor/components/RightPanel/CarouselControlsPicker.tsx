@@ -1,19 +1,21 @@
 import React, { useMemo } from 'react'
 import { useAppDispatch } from '@/app/hooks'
-import { updateNode } from '@/features/editor/editorSlice'
+import { updateNode, insertPreparedNode } from '@/features/editor/editorSlice'
+import { generateId } from '@/shared/utils'
+import { Plus } from 'lucide-react'
 import type { BlockNode } from '@/shared/types'
 import {
   CAROUSEL_CONTROL_ROLES,
   flattenForPicker,
   findControlHolderId,
   assignControlRole,
+  buildControlElement,
 } from '@/features/editor/utils/carouselHelpers'
 
 /**
  * Пикер управляющих элементов карусели: на каждую роль (стрелки/точки/счётчик)
- * можно назначить ЛЮБОЙ элемент из дерева карусели, а не только авто-добавленные.
- * Назначение проставляет соответствующий data-carousel-* на выбранный узел и
- * снимает его с прежнего держателя (через dispatch updateNode).
+ * можно назначить ЛЮБОЙ элемент дерева карусели, либо создать готовый кнопкой «+».
+ * Назначение проставляет data-carousel-* на узел и снимает с прежнего держателя.
  */
 export const CarouselControlsPicker: React.FC<{ carouselRoot: BlockNode }> = ({ carouselRoot }) => {
   const dispatch = useAppDispatch()
@@ -26,12 +28,20 @@ export const CarouselControlsPicker: React.FC<{ carouselRoot: BlockNode }> = ({ 
     }
   }
 
+  // Создаёт готовый контрол для роли и кладёт его в корень карусели (сосед трека).
+  // Узел уже несёт нужный data-carousel-* → роль сразу «занята» им.
+  const create = (roleKey: (typeof CAROUSEL_CONTROL_ROLES)[number]['key']) => {
+    const node = buildControlElement(roleKey, generateId)
+    dispatch(insertPreparedNode({ parentId: carouselRoot.id, node }))
+  }
+
   return (
     <div className="space-y-2 rounded border border-gray-200 p-3">
       <div>
         <h4 className="text-sm font-medium text-gray-900">Элементы управления</h4>
         <p className="text-xs text-gray-500">
-          Назначь любой элемент дерева на роль — не только кнопки по умолчанию.
+          Назначь любой элемент на роль или создай готовый кнопкой «+» (точки создаются с
+          рабочими активной/неактивной точками).
         </p>
       </div>
 
@@ -52,6 +62,14 @@ export const CarouselControlsPicker: React.FC<{ carouselRoot: BlockNode }> = ({ 
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              onClick={() => create(role.key)}
+              title={`Создать: ${role.label}`}
+              className="shrink-0 p-1 rounded border border-gray-300 hover:bg-gray-100"
+            >
+              <Plus size={14} className="text-gray-600" />
+            </button>
           </div>
         )
       })}

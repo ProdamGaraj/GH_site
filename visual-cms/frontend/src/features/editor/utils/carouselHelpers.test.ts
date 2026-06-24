@@ -13,6 +13,7 @@ import {
   findControlHolderId,
   flattenForPicker,
   getOverlayChildren,
+  buildControlElement,
   CAROUSEL_MODE_ATTR,
 } from './carouselHelpers'
 
@@ -568,6 +569,40 @@ describe('пикер управляющих элементов карусели'
 
     it('пустой вход → []', () => {
       expect(getOverlayChildren(null)).toEqual([])
+    })
+  })
+
+  describe('buildControlElement', () => {
+    let c = 0
+    const genId = () => `g-${++c}`
+    beforeEach(() => {
+      c = 0
+    })
+
+    it('prev/next — кнопки с нужным атрибутом и стрелкой', () => {
+      const prev = buildControlElement('prev', genId)
+      expect(prev.tagName).toBe('button')
+      expect(prev.attributes['data-carousel-prev']).toBe('true')
+      expect(prev.content).toBe('‹')
+      const next = buildControlElement('next', genId)
+      expect(next.attributes['data-carousel-next']).toBe('true')
+    })
+
+    it('counter — span с data-carousel-counter и текстом', () => {
+      const counter = buildControlElement('counter', genId)
+      expect(counter.tagName).toBe('span')
+      expect(counter.attributes['data-carousel-counter']).toBe('true')
+      expect(counter.content).toBe('01 / 04')
+    })
+
+    it('dots — контейнер с 2 точками-шаблонами (active/inactive)', () => {
+      const dots = buildControlElement('dots', genId)
+      expect(dots.attributes['data-carousel-dots']).toBe('true')
+      expect(dots.children).toHaveLength(2)
+      expect(dots.children.every((d) => d.attributes['data-carousel-dot'] === 'true')).toBe(true)
+      // активная точка-шаблон шире неактивной
+      expect((dots.children[0].styles.properties as Record<string, string>).width).toBe('24px')
+      expect((dots.children[1].styles.properties as Record<string, string>).width).toBe('8px')
     })
   })
 })

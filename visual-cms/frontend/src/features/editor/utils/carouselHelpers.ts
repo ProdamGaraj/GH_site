@@ -263,6 +263,92 @@ export function getOverlayChildren(carouselRoot: BlockNode | null | undefined): 
   )
 }
 
+/**
+ * Создаёт готовый управляющий элемент карусели для роли:
+ *  - prev/next → <button> со стрелкой;
+ *  - counter   → <span> "01 / 04";
+ *  - dots      → контейнер с двумя точками-шаблонами (активная + неактивная),
+ *                рантайм клонирует их по числу слайдов с корректным active/inactive.
+ * Стили — нейтральные «по белому» (хорошо видно на тёмном слайдере); пользователь
+ * дальше двигает/стилизует. Узел уже несёт нужный data-carousel-* атрибут.
+ */
+export function buildControlElement(
+  roleKey: CarouselControlRole['key'],
+  genId: () => string = defaultId
+): BlockNode {
+  const base = (over: Partial<BlockNode>): BlockNode => ({
+    id: genId(),
+    tag: 'div',
+    tagName: 'div',
+    elementType: 'container',
+    styles: { properties: {} },
+    children: [],
+    attributes: {},
+    metadata: {},
+    ...over,
+  })
+
+  if (roleKey === 'prev' || roleKey === 'next') {
+    return base({
+      tag: 'button',
+      tagName: 'button',
+      elementType: 'button',
+      attributes: { [`data-carousel-${roleKey}`]: 'true' },
+      content: roleKey === 'prev' ? '‹' : '›',
+      metadata: { name: roleKey === 'prev' ? 'Стрелка назад' : 'Стрелка вперёд' },
+      styles: {
+        properties: {
+          width: '44px',
+          height: '44px',
+          borderRadius: '50%',
+          border: '1px solid rgba(255,255,255,0.5)',
+          background: 'rgba(0,0,0,0.4)',
+          color: '#ffffff',
+          cursor: 'pointer',
+          fontSize: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+      },
+    })
+  }
+
+  if (roleKey === 'counter') {
+    return base({
+      tag: 'span',
+      tagName: 'span',
+      elementType: 'text',
+      attributes: { 'data-carousel-counter': 'true' },
+      content: '01 / 04',
+      metadata: { name: 'Счётчик' },
+      styles: { properties: { color: '#ffffff', fontSize: '14px' } },
+    })
+  }
+
+  // dots: контейнер + 2 точки-шаблона (active/inactive)
+  const dot = (active: boolean): BlockNode =>
+    base({
+      tag: 'button',
+      tagName: 'button',
+      elementType: 'button',
+      attributes: { 'data-carousel-dot': 'true' },
+      metadata: { name: active ? 'Точка (активная)' : 'Точка' },
+      styles: {
+        properties: active
+          ? { width: '24px', height: '8px', borderRadius: '4px', background: '#ffffff', border: 'none', cursor: 'pointer', padding: '0' }
+          : { width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer', padding: '0' },
+      },
+    })
+
+  return base({
+    attributes: { 'data-carousel-dots': 'true' },
+    metadata: { name: 'Точки' },
+    styles: { properties: { display: 'flex', gap: '8px', alignItems: 'center' } },
+    children: [dot(true), dot(false)],
+  })
+}
+
 export interface CarouselConversionOptions {
   /** Добавить стрелки prev/next и контейнер точек. По умолчанию true. */
   withControls?: boolean

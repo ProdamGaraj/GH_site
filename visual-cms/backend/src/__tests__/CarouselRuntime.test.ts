@@ -162,6 +162,7 @@ describe('CarouselRuntime', () => {
       const v0 = s0.querySelector<HTMLVideoElement>('video[data-carousel-video="true"]')
       expect(v0).toBeTruthy()
       expect(v0!.querySelector('source')!.getAttribute('src')).toBe('https://cdn/a.mp4')
+      expect(v0!.style.objectFit).toBe('cover') // дефолт
       expect(v0!.loop).toBe(true)
       expect(v0!.hasAttribute('muted')).toBe(true)
       expect(v0!.hasAttribute('playsinline')).toBe(true)
@@ -170,6 +171,20 @@ describe('CarouselRuntime', () => {
 
       document.querySelector<HTMLElement>('[data-carousel-next]')!.click()
       expect(s1.querySelector('video[data-carousel-video="true"]')).toBeTruthy()
+    })
+
+    it('object-fit видео берётся из data-slide-fit', async () => {
+      await boot(`
+        <div data-carousel="true" data-carousel-autoplay="0">
+          <div data-carousel-track="true">
+            <div data-carousel-slide="true" data-slide-video="https://cdn/a.mp4" data-slide-fit="contain" data-element-id="s0"></div>
+          </div>
+        </div>
+      `)
+      const v = document
+        .querySelector('[data-element-id="s0"]')!
+        .querySelector<HTMLVideoElement>('video[data-carousel-video="true"]')!
+      expect(v.style.objectFit).toBe('contain')
     })
   })
 
