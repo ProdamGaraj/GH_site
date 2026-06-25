@@ -95,6 +95,34 @@ export function generateCarouselRuntime(): string {
       }
     }
 
+    function readProp(cssText, prop) {
+      if (!cssText) return '';
+      var t = document.createElement('div');
+      t.style.cssText = cssText;
+      return t.style.getPropertyValue(prop);
+    }
+
+    // Постоянный transition точек: из снимка стиля (если дизайнер задал) либо дефолт.
+    function dotTransition() {
+      return readProp(state.dotActiveStyle, 'transition')
+          || readProp(state.dotInactiveStyle, 'transition')
+          || 'all 0.35s ease';
+    }
+
+    // Применяет снимок стиля точки ПО-СВОЙСТВАМ (не через cssText) и БЕЗ transition.
+    // Так смена значений (width/background/…) надёжно запускает переход, а постоянный
+    // transition не сбрасывается заменой cssText (это и давало «рваный» своп).
+    function applyDotStyle(dot, snapshot) {
+      if (!snapshot) return;
+      var t = document.createElement('div');
+      t.style.cssText = snapshot;
+      for (var k = 0; k < t.style.length; k++) {
+        var prop = t.style[k];
+        if (prop.indexOf('transition') === 0) continue;
+        dot.style.setProperty(prop, t.style.getPropertyValue(prop), t.style.getPropertyPriority(prop));
+      }
+    }
+
     function rebuildDots() {
       if (!dotsContainer) return;
       var existing = Array.prototype.slice.call(dotsContainer.children);
@@ -119,6 +147,7 @@ export function generateCarouselRuntime(): string {
         snapshotDotStyles();
         for (var k = 0; k < existing.length; k++) {
           existing[k].classList.remove(activeClass);
+          if (!existing[k].style.transition) existing[k].style.transition = dotTransition();
           (function(idx, el){
             el.addEventListener('click', function(){ goTo(idx, true); });
           })(k, existing[k]);
@@ -137,9 +166,13 @@ export function generateCarouselRuntime(): string {
           dot.removeAttribute('data-carousel-dot');
           dot.classList.remove(activeClass);
           dot.setAttribute('data-carousel-dot-index', String(i));
-          // Если у нас уже есть запомненный inactive-стиль — применяем его
-          // СРАЗУ ко всем клонам. update() потом перепишет активный.
-          if (state.dotInactiveStyle) dot.style.cssText = state.dotInactiveStyle;
+          // Начальное (неактивное) состояние без анимации: transition:none + reflow,
+          // затем включаем постоянный transition — чтобы стартовая раскладка не «прыгала»,
+          // а последующие свопы активной/неактивной анимировались плавно.
+          dot.style.transition = 'none';
+          applyDotStyle(dot, state.dotInactiveStyle);
+          void dot.offsetWidth;
+          dot.style.transition = dotTransition();
           (function(idx){
             dot.addEventListener('click', function(){ goTo(idx, true); });
           })(i);
@@ -196,10 +229,10 @@ export function generateCarouselRuntime(): string {
         var dot = state.dots[i];
         if (i === state.index) {
           dot.classList.add(activeClass);
-          if (state.dotActiveStyle) dot.style.cssText = state.dotActiveStyle;
+          applyDotStyle(dot, state.dotActiveStyle);
         } else {
           dot.classList.remove(activeClass);
-          if (state.dotInactiveStyle) dot.style.cssText = state.dotInactiveStyle;
+          applyDotStyle(dot, state.dotInactiveStyle);
         }
       }
       // Счётчик "01 / 04" (zero-pad), если задан data-carousel-counter
