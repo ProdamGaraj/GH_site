@@ -24,10 +24,12 @@ import {
   arrayMove,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { Plus, Image as ImageIcon } from 'lucide-react'
+import { Plus, Upload } from 'lucide-react'
 import { Button } from '@/shared/components/Button'
 import { pageApi, type PageVariable, type PageVariablesEnvelope } from '@/shared/api'
 import { MediaPicker } from '@/features/media/MediaPicker'
+import type { MediaAsset } from '@/shared/api/mediaApi'
+import { buildMediaSlideNode } from '@/features/editor/utils/slideMediaHelper'
 import {
   createBlockReferenceNode,
   deepCloneNode,
@@ -50,7 +52,7 @@ import {
   prepareHybridStaticNode,
 } from '@/features/editor/utils/hybridStaticHelper'
 import { generateId } from '@/shared/utils'
-import type { Block, BlockNode } from '@/shared/types'
+import type { Block } from '@/shared/types'
 import { BlockPicker, type BlockPickerSelection } from '@/features/editor/components/BlockPicker'
 import { StaticSlidesPanel } from './StaticSlidesPanel'
 import { CarouselControlsPicker } from './CarouselControlsPicker'
@@ -460,29 +462,16 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
     const node = prepareHybridStaticNode(raw, template)
     dispatch(insertPreparedNode({ parentId: track.id, node, position: computeStaticInsertPosition() }))
   }
-  // Слайд-фотография: статический слайд, контент которого — только фон-картинка во весь слайд.
+  // Слайд из файла: фото/GIF (фон-картинка во весь слайд) или видео (data-slide-video + постер).
   // Технически это hybrid-static-слайд (рендерится как есть и на канвасе, и в деплое),
   // поэтому переиспользуем prepareHybridStaticNode + insertPreparedNode, как для «Статический».
-  const handleAddPhotoSlide = (asset: { url: string; id?: string }) => {
+  // Документы каруселью не поддерживаются — мягко отклоняем.
+  const handleAddMediaSlide = (asset: MediaAsset) => {
     if (!track) return
-    const raw: BlockNode = {
-      id: generateId(),
-      tag: 'div',
-      tagName: 'div',
-      elementType: 'container',
-      content: '',
-      children: [],
-      attributes: {},
-      metadata: { name: 'Фото-слайд', ...(asset.id ? { mediaAssetId: asset.id } : {}) },
-      styles: {
-        properties: {
-          width: '100%',
-          backgroundImage: `url("${asset.url}")`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-        },
-      },
+    const raw = buildMediaSlideNode(asset, { generateId })
+    if (!raw) {
+      alert('Документы нельзя добавить как слайд. Выберите фото, GIF или видео.')
+      return
     }
     const node = prepareHybridStaticNode(raw, template)
     dispatch(insertPreparedNode({ parentId: track.id, node, position: computeStaticInsertPosition() }))
@@ -645,9 +634,9 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
               size="sm"
               onClick={() => setPhotoPickerOpen(true)}
               className="flex-1"
-              title="Добавить слайд-фотографию (картинка во весь слайд)"
+              title="Добавить слайд из файла (фото, GIF или видео во весь слайд)"
             >
-              <ImageIcon size={13} className="mr-1" /> Фото
+              <Upload size={13} className="mr-1" /> Из файлов
             </Button>
           </div>
 
@@ -689,12 +678,12 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
 
       <MediaPicker
         open={photoPickerOpen}
-        kind="image"
+        kind="any"
         siteId={siteId}
-        title="Выберите фото для слайда"
+        title="Выберите файл для слайда (фото, GIF или видео)"
         onClose={() => setPhotoPickerOpen(false)}
         onSelect={asset => {
-          handleAddPhotoSlide(asset)
+          handleAddMediaSlide(asset)
           setPhotoPickerOpen(false)
         }}
       />

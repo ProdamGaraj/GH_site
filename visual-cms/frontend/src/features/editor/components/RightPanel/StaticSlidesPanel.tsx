@@ -23,9 +23,10 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Link2, Trash2, Copy, Plus, MousePointerClick, Film, Image as ImageIcon } from 'lucide-react'
+import { GripVertical, Link2, Trash2, Copy, Plus, MousePointerClick, Film, Upload } from 'lucide-react'
 import { Button } from '@/shared/components/Button'
 import { MediaPicker } from '@/features/media/MediaPicker'
+import type { MediaAsset } from '@/shared/api/mediaApi'
 import type { BlockNode, Block } from '@/shared/types'
 import { generateId } from '@/shared/utils'
 import { BlockPicker, type BlockPickerSelection } from '@/features/editor/components/BlockPicker'
@@ -33,6 +34,7 @@ import {
   createBlockReferenceNode,
   deepCloneNode,
 } from '@/features/editor/utils/carouselHelpers'
+import { buildMediaSlideNode } from '@/features/editor/utils/slideMediaHelper'
 import {
   getSlideChildren,
   getSlideDisplayName,
@@ -77,30 +79,20 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) =
     dispatch(insertPreparedNode({ parentId: track.id, node }))
   }
 
-  // Фото-слайд: контейнер с фоном-картинкой (он же постер для видео-фона).
-  const handleAddPhoto = (asset: { url: string; id?: string }) => {
-    const node: BlockNode = {
-      id: generateId(),
-      tag: 'div',
-      tagName: 'div',
-      elementType: 'container',
-      content: '',
-      children: [],
-      attributes: { 'data-carousel-slide': 'true' },
-      metadata: { name: 'Фото-слайд', ...(asset.id ? { mediaAssetId: asset.id } : {}) },
-      styles: {
-        properties: {
-          width: '100%',
-          minHeight: '240px',
-          backgroundImage: `url("${asset.url}")`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-        },
-      },
+  // Медиа-слайд из файла: фото/GIF → контейнер с фоном-картинкой;
+  // видео → контейнер с data-slide-video (+ постер из posterUrl). Документ отклоняем.
+  const handleAddMedia = (asset: MediaAsset) => {
+    setPhotoPickerOpen(false)
+    const node = buildMediaSlideNode(asset, {
+      generateId,
+      extraAttributes: { 'data-carousel-slide': 'true' },
+      minHeight: '240px',
+    })
+    if (!node) {
+      alert('Документы нельзя добавить как слайд. Выберите фото, GIF или видео.')
+      return
     }
     dispatch(insertPreparedNode({ parentId: track.id, node }))
-    setPhotoPickerOpen(false)
   }
 
   const handlePick = (selection: BlockPickerSelection) => {
@@ -181,8 +173,8 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) =
       <div className="rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">
         <div className="font-medium mb-0.5">Режим: статические слайды</div>
         <div className="text-blue-800/80">
-          Каждый слайд — отдельный блок. Можно вставить из библиотеки (как ссылку или копию)
-          или вложить любой существующий блок прямо в трек.
+          Каждый слайд — отдельный блок. Можно создать пустой, добавить фото/GIF/видео из файлов
+          или вставить из блоков (как ссылку или копию).
         </div>
       </div>
 
@@ -191,7 +183,7 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) =
           <div className="space-y-1.5">
             {slides.length === 0 && (
               <div className="rounded border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500">
-                Пока нет слайдов. Добавьте первый из библиотеки.
+                Пока нет слайдов. Добавьте первый — пустой, из файлов или из блоков.
               </div>
             )}
             {slides.map((slide, i) => (
@@ -216,10 +208,10 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) =
           <Plus size={13} className="mr-1" /> Пустой слайд
         </Button>
         <Button variant="secondary" size="sm" onClick={() => setPhotoPickerOpen(true)} className="flex-1">
-          <ImageIcon size={13} className="mr-1" /> Фото
+          <Upload size={13} className="mr-1" /> Из файлов
         </Button>
         <Button variant="secondary" size="sm" onClick={() => setPickerOpen(true)} className="flex-1">
-          <Plus size={13} className="mr-1" /> Из библиотеки
+          <Plus size={13} className="mr-1" /> Из блоков
         </Button>
       </div>
 
@@ -242,16 +234,16 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) =
         isOpen={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onPick={handlePick}
-        title="Добавить слайд из библиотеки"
+        title="Добавить слайд из блоков"
       />
 
       <MediaPicker
         open={photoPickerOpen}
-        kind="image"
+        kind="any"
         siteId={null}
-        title="Выберите фото для слайда"
+        title="Выберите файл для слайда (фото, GIF или видео)"
         onClose={() => setPhotoPickerOpen(false)}
-        onSelect={(asset) => handleAddPhoto(asset)}
+        onSelect={(asset) => handleAddMedia(asset)}
       />
     </div>
   )
