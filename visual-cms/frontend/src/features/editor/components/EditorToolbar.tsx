@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
@@ -13,9 +13,8 @@ import { BreakpointManager } from './BreakpointManager'
 import { ExportImportModal } from './ExportImportModal'
 import { FullPageHtmlEditor } from './FullPageHtmlEditor'
 import { LinkedChangesModal } from './LinkedChangesModal'
-import { blockApi, pageApi } from '@/shared/api'
+import { blockApi, pageApi, previewApi } from '@/shared/api'
 import type { ChangedLinkedInstance, LinkedDecision } from '@/shared/api'
-import { generateNodeTreeCSS, generateResponsiveCSS, collectSpecificChildrenIds, generateFullHTML } from '../utils/styleGenerator'
 import { cleanForLibrary, isLinkedPlaceholder, stripViewportIds } from '../utils/libraryClean'
 import type { BlockNode } from '@/shared/types'
 
@@ -1124,11 +1123,12 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
       {/* Preview Modal */}
       {showPreview && rootNode && (
-        <PreviewModal 
+        <PreviewModal
           rootNode={rootNode}
           breakpoints={breakpoints}
           pageId={id}
-          onClose={handleClosePreview} 
+          type={_type}
+          onClose={handleClosePreview}
         />
       )}
 
@@ -1165,10 +1165,11 @@ interface PreviewModalProps {
   rootNode: import('@/shared/types').BlockNode
   breakpoints: import('@/shared/types').CustomBreakpoint[]
   pageId?: string
+  type: 'page' | 'block'
   onClose: () => void
 }
 
-const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onClose }) => {
+const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, pageId, type, onClose }) => {
   const [selectedBreakpoint, setSelectedBreakpoint] = useState(breakpoints[0]?.id || 'desktop')
   const [isManualMode, setIsManualMode] = useState(false)
   const [manualWidth, setManualWidth] = useState(1440)
@@ -1298,61 +1299,42 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onCl
     return () => document.removeEventListener('wheel', handleWheel, { capture: true })
   }, [zoom])
 
-  // Генерируем HTML из базового дерева (включая specificChildren из всех breakpoints)
-  // и responsive CSS с @media queries — так при изменении ширины стили автоматически применяются
-  const { previewHTML, responsiveCSS, specificHideCSS, stateAnimCSS, keyframes, animScripts } = useMemo(() => {
-    // HTML из базового дерева со всеми specificChildren
-    const html = generateFullHTML(rootNode)
-    
-    // Responsive @media CSS из variations
-    const respCSS = generateResponsiveCSS(rootNode, breakpoints)
-    
-    // Базовый CSS для скрытия specificChildren (по умолчанию скрыты, показываются через @media)
-    const specificIds = collectSpecificChildrenIds(rootNode)
-    let hideCSS = ''
-    if (specificIds.size > 0) {
-      const selectors = Array.from(specificIds).map(id => `[data-element-id="${id}"]`)
-      hideCSS = selectors.join(', ') + ' { display: none !important; }\n'
-    }
-    
-    // CSS для hover/animations
-    const { css: stateAnim, keyframes: kf, scripts: animSc } = generateNodeTreeCSS(rootNode)
-    
-    return {
-      previewHTML: html,
-      responsiveCSS: respCSS,
-      specificHideCSS: hideCSS,
-      stateAnimCSS: stateAnim,
-      keyframes: kf,
-      animScripts: animSc,
-    }
-  }, [rootNode, breakpoints])
+  // HTML превью рендерит бэкенд тем же генератором, что и деплой (паритет с продом:
+  // шрифт Muller, carousel/data-binding/nav runtime, стили форм, global CSS/JS).
+  // responsive CSS, скрытие specificChildren и hover/animations уже внутри этого HTML.
+  const [docHtml, setDocHtml] = useState('')
+  const [isPreviewLoading, setIsPreviewLoading] = useState(true)
+  const [previewError, setPreviewError] = useState<string | null>(null)
 
-  const buildFullDocument = () => {
-    return `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font-family: system-ui, -apple-system, sans-serif; }
-      ${keyframes}
-      ${stateAnimCSS}
-      ${specificHideCSS}
-      ${responsiveCSS}
-    </style>
-  </head>
-  <body>
-    ${previewHTML}
-    ${animScripts ? `<script>${animScripts}<\/script>` : ''}
-  </body>
-</html>`
-  }
+  React.useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      try {
+        setIsPreviewLoading(true)
+        setPreviewError(null)
+        const res = type === 'block'
+          ? await previewApi.renderBlock(rootNode)
+          : await previewApi.renderPage(rootNode, {
+              pageId: pageId && pageId !== 'new' ? pageId : undefined,
+            })
+        if (!cancelled) setDocHtml(res.html)
+      } catch (e) {
+        if (!cancelled) setPreviewError(e instanceof Error ? e.message : 'Не удалось загрузить превью')
+      } finally {
+        if (!cancelled) setIsPreviewLoading(false)
+      }
+    }
+    // Дебаунс: правки структуры не должны спамить бэкенд.
+    const t = setTimeout(run, 400)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [rootNode, type, pageId])
 
   const handleOpenInNewTab = () => {
-    const html = buildFullDocument()
-    const blob = new Blob([html], { type: 'text/html' })
+    if (!docHtml) return
+    const blob = new Blob([docHtml], { type: 'text/html' })
     const url = URL.createObjectURL(blob)
     window.open(url, '_blank')
     // Clean up blob URL after a short delay
@@ -1532,9 +1514,9 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onCl
             transformOrigin: 'center center',
           }}
         >
-          <div 
-            className="bg-white shadow-2xl overflow-auto"
-            style={{ 
+          <div
+            className="bg-white shadow-2xl overflow-auto relative"
+            style={{
               width: `${displayWidth}px`,
               height: `${displayHeight}px`,
               border: isManualMode ? '2px solid #3b82f6' : '2px solid #e5e7eb',
@@ -1542,11 +1524,22 @@ const PreviewModal: React.FC<PreviewModalProps> = ({ rootNode, breakpoints, onCl
             }}
           >
             <iframe
-              srcDoc={buildFullDocument()}
+              srcDoc={docHtml}
               className="w-full h-full border-0"
               title="Preview"
               style={{ pointerEvents: (isResizing || ctrlPressed) ? 'none' : 'auto' }}
             />
+            {isPreviewLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/70">
+                <Loader2 size={28} className="text-gray-500 animate-spin" />
+              </div>
+            )}
+            {previewError && !isPreviewLoading && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 p-6 text-center">
+                <span className="text-sm font-medium text-red-600">Ошибка предпросмотра</span>
+                <span className="text-xs text-gray-500 break-words max-w-full">{previewError}</span>
+              </div>
+            )}
           </div>
           
           {/* Resize handles - positioned outside the iframe container (DevTools style) */}

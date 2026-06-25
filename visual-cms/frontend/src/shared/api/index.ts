@@ -299,6 +299,23 @@ export const deployApi = {
     api.post<DeployResult & { rolledBackTo: number; newVersion: number }>(`/deploy/${pageId}/rollback/${versionId}`),
 }
 
+// Preview API — рендерит превью тем же генератором, что и деплой (паритет с продом:
+// шрифт, карусель, формы, data-bindings, навигация). `structure` — текущий черновик
+// редактора; `pageId` (если страница сохранена) резолвит данные/навигацию/ассеты.
+export const previewApi = {
+  renderPage: (structure: BlockNode, opts?: { pageId?: string; lang?: string }) =>
+    api.post<{ success: boolean; html: string }>('/preview/page', {
+      structure,
+      pageId: opts?.pageId,
+      lang: opts?.lang,
+    }),
+  renderBlock: (structure: BlockNode, opts?: { lang?: string }) =>
+    api.post<{ success: boolean; html: string }>('/preview/block', {
+      structure,
+      lang: opts?.lang,
+    }),
+}
+
 // Data Sources API
 export const dataSourceApi = {
   /**

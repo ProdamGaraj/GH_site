@@ -12,6 +12,7 @@ import dataSubmitRouter from './dataSubmit'
 import templatesRouter from './templates'
 import variablesRouter from './variables'
 import templateTestRouter from './template-test'
+import previewRouter from './preview'
 import mockRouter from './mock'
 import formsRouter from './forms'
 import analyticsRouter from './analytics'
@@ -37,6 +38,7 @@ router.use('/data', dataSubmitRouter)
 router.use('/templates', templatesRouter)
 router.use('/variables', variablesRouter)
 router.use('/template-test', templateTestRouter)
+router.use('/preview', previewRouter)
 router.use('/mock', mockRouter)
 router.use('/forms', formsRouter)
 router.use('/languages', languagesRouter)

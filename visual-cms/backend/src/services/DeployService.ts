@@ -17,6 +17,7 @@ import { linkedBlocksService } from './LinkedBlocksService'
 import { DataBinding } from '../models/DataBinding'
 import { DataSource as DataSourceEntity } from '../models/DataSource'
 import { PageDataConfig } from './DataBindingGenerator'
+import type { BlockNode } from '../types/blockNode'
 import { translationService } from './TranslationService'
 import { languageService } from './LanguageService'
 import { MacroV2Client } from './MacroV2Client'
@@ -280,6 +281,151 @@ export class DeployService {
         errors: [error.message]
       }
     }
+  }
+
+  // ============================================================
+  // Превью (паритет с деплоем, но без записи на диск)
+  // ============================================================
+
+  /**
+   * Origin задеплоенных сайтов для превью. Превью-iframe живёт на origin CMS,
+   * а ассеты (шрифты `/fonts`, картинки `/images`) и относительные fetch'и
+   * data-runtime должны резолвиться туда же, куда и на проде. Берём из env;
+   * если не задан — `<base>` не инжектим (превью работает, но шрифт может
+   * откатиться на системный). Параметр `site` зарезервирован под будущую
+   * per-site логику (subdomain/custom-domain).
+   */
+  private resolvePreviewAssetBase(_site?: Site | null): string {
+    return process.env.PREVIEW_ASSET_ORIGIN || process.env.PUBLIC_SITE_URL || ''
+  }
+
+  /**
+   * Инжектит `<base href>` сразу после `<head>`, чтобы относительные URL
+   * (шрифты/картинки/относительные fetch) резолвились к origin сайта — это даёт
+   * паритет превью с продом. Затрагивает ТОЛЬКО HTML превью; деплой не меняется.
+   */
+  private injectPreviewBaseHref(html: string, baseHref: string): string {
+    if (!baseHref) return html
+    const normalized = baseHref.replace(/\/+$/, '').replace(/"/g, '&quot;')
+    return html.replace(/<head>/i, `<head>\n  <base href="${normalized}/">`)
+  }
+
+  /**
+   * Метаданные по умолчанию для превью несохранённой страницы/блока.
+   */
+  private previewMetadata(structure: BlockNode): { title: string; description: string; keywords: string[] } {
+    const meta = structure?.metadata as { title?: string; name?: string; description?: string } | undefined
+    return {
+      title: meta?.title || meta?.name || 'Предпросмотр',
+      description: meta?.description || '',
+      keywords: [],
+    }
+  }
+
+  /**
+   * Рендерит превью СТРАНИЦЫ тем же путём, что и деплой (`htmlGenerator.generatePage`
+   * + responsive-images), но возвращает строку без записи на диск.
+   *
+   * Гибрид «черновик + pageId»: вёрстка берётся из переданного `structure`
+   * (несохранённый черновик редактора), а данные/навигация/ассеты сайта —
+   * резолвятся по `pageId`. Это переиспользует существующие приватные методы
+   * (linkedBlocks → injectLibraryTemplates → preparePageDataConfig → коллекции →
+   * доп.источники → resolveNavigation → siteAssetOptions), поэтому превью почти
+   * 1:1 совпадает с опубликованной страницей.
+   *
+   * Без `pageId` (новая несохранённая страница) — автономный рендер черновика
+   * без данных/навигации (вёрстка/карусель/формы/шрифт всё равно 1:1).
+   */
+  async renderPagePreview(input: { pageId?: string; structure: BlockNode; lang?: string }): Promise<string> {
+    const { pageId, structure: draftStructure, lang } = input
+    if (!draftStructure) {
+      throw new Error('structure is required')
+    }
+
+    const page = pageId
+      ? await this.pageRepository.findOne({ where: { id: pageId }, relations: ['site'] })
+      : null
+
+    // Нет сохранённой страницы — рендерим черновик как автономный документ.
+    if (!page) {
+      const html = await this.generatePageHtml(draftStructure, {
+        metadata: this.previewMetadata(draftStructure),
+        slug: 'preview',
+        lang,
+      })
+      return this.injectPreviewBaseHref(html, this.resolvePreviewAssetBase(null))
+    }
+
+    // Разворачиваем linked-блоки + library-templates на ЧЕРНОВОЙ структуре и
+    // строим data-config на ней же (как resolveStructureAndConfig, но для
+    // переданного черновика, а не page.structure из БД).
+    let structure = await linkedBlocksService.updateLinkedBlocks(draftStructure)
+    structure = await this.injectLibraryTemplates(structure, page.id)
+    const dataConfig = await this.preparePageDataConfig(page.id, structure)
+
+    // Данные: auto-links коллекций + доп.источники страницы (как в deployPage).
+    if (dataConfig) {
+      const siteCollections = await this.collectionRepository.find({
+        where: { siteId: page.siteId, isActive: true },
+        relations: ['dataSource'],
+      })
+      this.injectCollectionLinks(dataConfig, siteCollections)
+      if (page.additionalSources?.length) {
+        await this.applyPageAdditionalSources(dataConfig, page.additionalSources)
+      }
+    }
+
+    // Навигация: одиночный deployPage её опускает, но в превью пользователь хочет
+    // видеть меню — берём «опубликованное» состояние сайта (как deploySite).
+    let resolvedNav: ResolvedNavItem[] | undefined
+    if (page.site) {
+      const allSitePages = await this.pageRepository.find({ where: { siteId: page.siteId } })
+      resolvedNav = this.resolveNavigation(page.site.settings?.navigation, allSitePages, page.site.homepageId)
+    }
+
+    // Язык: переключатель показываем только при наличии переводов (как в deploy).
+    const activeLanguages = await languageService.getActive()
+    const translationLocales = await translationService.getPageLocales(page.id)
+    const defaultLang = activeLanguages.find(l => l.isDefault)
+    let availableLanguages: { code: string; name: string; flag: string; isDefault: boolean; direction: string }[] | undefined
+    if (translationLocales.length > 0) {
+      availableLanguages = activeLanguages
+        .filter(l => l.isActive && (l.isDefault || translationLocales.includes(l.code)))
+        .map(l => ({ code: l.code, name: l.nativeName, flag: l.flag || '🌐', isDefault: l.isDefault, direction: l.direction }))
+    }
+
+    const isHome = this.isHomePage(page, page.site)
+
+    const html = await this.generatePageHtml(structure, {
+      metadata: page.metadata || { title: page.name, description: '', keywords: [] },
+      slug: isHome ? 'index' : page.slug,
+      dataConfig,
+      lang: lang || defaultLang?.code,
+      direction: defaultLang?.direction,
+      availableLanguages,
+      navigation: resolvedNav,
+      ...this.siteAssetOptions(page.site),
+    })
+
+    return this.injectPreviewBaseHref(html, this.resolvePreviewAssetBase(page.site))
+  }
+
+  /**
+   * Рендерит превью БЛОКА как автономную страницу тем же генератором.
+   * Блок вне контекста страницы, поэтому без data-bindings/навигации — но
+   * шрифт/карусель/формы/стили рендерятся 1:1 с продом.
+   */
+  async renderBlockPreview(input: { structure: BlockNode; lang?: string }): Promise<string> {
+    const { structure, lang } = input
+    if (!structure) {
+      throw new Error('structure is required')
+    }
+    const html = await this.generatePageHtml(structure, {
+      metadata: this.previewMetadata(structure),
+      slug: 'preview',
+      lang,
+    })
+    return this.injectPreviewBaseHref(html, this.resolvePreviewAssetBase(null))
   }
 
   /**
