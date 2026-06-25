@@ -42,9 +42,17 @@ export const CarouselOverlaysSection: React.FC<{ carouselRoot: BlockNode }> = ({
   const setOverlay = (child: BlockNode, on: boolean) => {
     if (on) {
       ensureRootAnchor()
-      mergeProps(child, { position: 'absolute', inset: '0' })
+      // z-index обязателен: в режиме «Слайдер фоном» трек имеет z-index:0, а оверлей
+      // в DOM идёт раньше трека. Без z-index он красится ПОД треком и не виден поверх
+      // слайдов (особенно заметно на видео-слайдах, где фон яркий). Ставим выше трека,
+      // но сохраняем уже заданный пользователем z-index, если он есть.
+      mergeProps(child, {
+        position: 'absolute',
+        inset: '0',
+        zIndex: child.styles?.properties?.zIndex || '1',
+      })
     } else {
-      mergeProps(child, { position: undefined, inset: undefined })
+      mergeProps(child, { position: undefined, inset: undefined, zIndex: undefined })
     }
   }
 
