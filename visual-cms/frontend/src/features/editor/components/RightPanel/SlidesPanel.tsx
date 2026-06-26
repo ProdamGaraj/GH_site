@@ -57,6 +57,7 @@ import { BlockPicker, type BlockPickerSelection } from '@/features/editor/compon
 import { StaticSlidesPanel } from './StaticSlidesPanel'
 import { CarouselControlsPicker } from './CarouselControlsPicker'
 import { CarouselOverlaysSection } from './CarouselOverlaysSection'
+import { CarouselAutoplaySection } from './CarouselAutoplaySection'
 import { RepeatTemplatePicker } from './RepeatTemplatePicker'
 import { RepeatSourcePicker } from './RepeatSourcePicker'
 import { GenericSlideRow } from './GenericSlideRow'
@@ -308,6 +309,7 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
           <p className="text-xs text-gray-500">Управляются как обычные блоки в треке.</p>
         </div>
         <StaticSlidesPanel track={track} />
+        <CarouselAutoplaySection carouselRoot={node} />
         <CarouselControlsPicker carouselRoot={node} />
         <CarouselOverlaysSection carouselRoot={node} />
       </div>
@@ -508,6 +510,7 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
         </Button>
       </div>
 
+      <CarouselAutoplaySection carouselRoot={node} />
       <CarouselControlsPicker carouselRoot={node} />
       <CarouselOverlaysSection carouselRoot={node} />
 
