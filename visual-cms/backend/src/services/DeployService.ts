@@ -18,7 +18,7 @@ import { DataBinding } from '../models/DataBinding'
 import { DataSource as DataSourceEntity } from '../models/DataSource'
 import { PageDataConfig } from './DataBindingGenerator'
 import type { BlockNode } from '../types/blockNode'
-import { translationService } from './TranslationService'
+import { translationService, applyVariableMediaTranslations } from './TranslationService'
 import { languageService } from './LanguageService'
 import { MacroV2Client } from './MacroV2Client'
 import { logger } from './Logger'
@@ -2243,18 +2243,23 @@ export class DeployService {
 
         try {
           const translationMap = await translationService.getTranslationMap(page.id, lang.code)
-          const { structure: translatedStructure, metadata: translatedMetadata } = 
+          const { structure: translatedStructure, metadata: translatedMetadata } =
             translationService.applyTranslations(
-              structure, 
-              translationMap, 
+              structure,
+              translationMap,
               page.metadata || { title: page.name, description: '', keywords: [] }
             )
+
+          // Локализуем медиа repeat-слайдеров в page-переменных под текущий язык.
+          const localizedDataConfig = dataConfig
+            ? { ...dataConfig, variables: applyVariableMediaTranslations(dataConfig.variables, translationMap) }
+            : dataConfig
 
           // Generate localized HTML with lang attribute and language switcher
           const localizedHtml = await this.generatePageHtml(translatedStructure, {
             metadata: translatedMetadata,
             slug: isHome ? 'index' : page.slug,
-            dataConfig,
+            dataConfig: localizedDataConfig,
             lang: lang.code,
             direction: lang.direction,
             availableLanguages,

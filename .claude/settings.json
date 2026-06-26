@@ -152,7 +152,8 @@
       "Bash(echo \"exit=$?\")",
       "Bash(ssh -o BatchMode=yes gh_test \"cd ~/GH_site && git fetch 2>&1 | tail -2; echo '--- origin/master ---' && git log origin/master --oneline -3 && echo '--- files in new commit ---' && git diff --name-only HEAD origin/master | head -20\")",
       "PowerShell(docker compose ls 2>&1)",
-      "Bash(grep -vE \"ts-jest\\\\[config\\\\]|isolatedModules|typescriptlang|^\\\\s*$|will be removed\")"
+      "Bash(grep -vE \"ts-jest\\\\[config\\\\]|isolatedModules|typescriptlang|^\\\\s*$|will be removed\")",
+      "PowerShell(Set-Location D:\\\\CodeRepository\\\\GH_site\\\\visual-cms\\\\frontend; npx eslint --max-warnings 0 src/features/translations/TranslationPanel.tsx; Write-Output \"ESLINT_EXIT=$LASTEXITCODE\")"
     ],
     "additionalDirectories": [
       "\\tmp",

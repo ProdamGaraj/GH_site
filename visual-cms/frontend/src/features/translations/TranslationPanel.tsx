@@ -22,12 +22,15 @@ import {
 } from './translationsSlice'
 import { selectRootNode, selectSelectedNode, setActiveRightPanel, updateNode } from '@/features/editor/editorSlice'
 import { Button } from '@/shared/components/Button'
-import { 
-  Globe, ChevronDown, Check, Search, Image, Type, Link, 
+import {
+  Globe, ChevronDown, Check, Search, Image, Type, Link,
   FileText, Save, Loader2, X, Languages, ArrowRight,
-  Eye, EyeOff, Settings, MousePointer, Trash2
+  Eye, EyeOff, Settings, MousePointer, Trash2, Film
 } from 'lucide-react'
 import type { TranslationEntry } from '@/shared/types/translation'
+import { MediaPicker } from '@/features/media/MediaPicker'
+import type { MediaKind } from '@/shared/api/mediaApi'
+import { pageApi } from '@/shared/api'
 
 // --- Language Binding types ---
 type LangRole = '' | 'lang-switch' | 'lang-selector' | 'lang-current' | 'lang-active'
@@ -85,6 +88,8 @@ const FIELD_ICON: Record<string, React.ReactNode> = {
   title: <Type size={12} />,
   poster: <Image size={12} />,
   'aria-label': <FileText size={12} />,
+  'bg:image': <Image size={12} />,
+  'data-slide-video': <Film size={12} />,
   'meta:title': <FileText size={12} />,
   'meta:description': <FileText size={12} />,
   'meta:ogImage': <Image size={12} />,
@@ -99,15 +104,53 @@ const FIELD_LABEL: Record<string, string> = {
   title: 'Title',
   poster: 'Poster',
   'aria-label': 'Aria Label',
+  'bg:image': 'Фон (картинка)',
+  'data-slide-video': 'Видео слайда',
   'meta:title': 'Meta Title',
   'meta:description': 'Meta Description',
   'meta:ogImage': 'OG Image',
 }
 
+const MEDIA_FIELDS = ['src', 'poster', 'meta:ogImage', 'bg:image', 'data-slide-video']
+
+// Синтетические ключи медиа в page-переменных (repeat-слайдеры): nodeId="pagevar:<var>", field="media:<i>:<sf>".
+const PAGEVAR_PREFIX = 'pagevar:'
+const VAR_MEDIA_PREFIX = 'media:'
+
 function getFieldCategory(field: string): FieldCategory {
   if (field.startsWith('meta:')) return 'meta'
-  if (['src', 'poster', 'meta:ogImage'].includes(field)) return 'media'
+  if (field.startsWith(VAR_MEDIA_PREFIX) || MEDIA_FIELDS.includes(field)) return 'media'
   return 'text'
+}
+
+/** Тип медиатеки для пикера по полю: видео-слайд/src/переменная — любой файл, остальное — картинка. */
+function mediaKindForField(field: string): MediaKind | 'any' {
+  if (field.startsWith(VAR_MEDIA_PREFIX) || field === 'data-slide-video' || field === 'src') return 'any'
+  return 'image'
+}
+
+/** camelCase → "Camel Case" для подписи поля слайда. */
+function humanizeField(sf: string): string {
+  const spaced = sf.replace(/([a-z])([A-Z])/g, '$1 $2')
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
+/** Подпись медиа-поля: статичная из FIELD_LABEL либо «Слайд N · <поле>» для page-переменных. */
+function fieldLabel(field: string): string {
+  if (field.startsWith(VAR_MEDIA_PREFIX)) {
+    const rest = field.slice(VAR_MEDIA_PREFIX.length)
+    const colon = rest.indexOf(':')
+    const idx = Number(rest.slice(0, colon))
+    const sf = rest.slice(colon + 1)
+    return `Слайд ${Number.isInteger(idx) ? idx + 1 : '?'} · ${humanizeField(sf)}`
+  }
+  return FIELD_LABEL[field] || field
+}
+
+/** Человекочитаемое имя узла: «Слайдер · <var>» для page-переменных, иначе из карты дерева. */
+function nodeLabel(nodeId: string, nameMap: Record<string, string>): string {
+  if (nodeId.startsWith(PAGEVAR_PREFIX)) return `Слайдер · ${nodeId.slice(PAGEVAR_PREFIX.length)}`
+  return nameMap[nodeId] || nodeId.slice(0, 8)
 }
 
 function truncate(str: string, maxLen: number): string {
@@ -340,6 +383,10 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
   const [showOnlySelected, setShowOnlySelected] = useState(false)
   const [editedValues, setEditedValues] = useState<Record<string, string>>({})
   const [showLangDropdown, setShowLangDropdown] = useState(false)
+  // Сайт страницы — для скоупа медиатеки в пикере.
+  const [siteId, setSiteId] = useState<string | null>(null)
+  // Контекст пикера: какое медиа-поле какого узла выбираем для текущего языка.
+  const [pickerCtx, setPickerCtx] = useState<{ nodeId: string; field: string } | null>(null)
 
   // Load languages and source content on mount
   useEffect(() => {
@@ -352,6 +399,21 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
       dispatch(fetchTranslationProgress(pageId))
     }
   }, [dispatch, pageId])
+
+  // Подтягиваем siteId страницы для пикера медиатеки.
+  useEffect(() => {
+    if (!pageId) return
+    let cancelled = false
+    pageApi
+      .getById(pageId)
+      .then((p) => {
+        if (!cancelled) setSiteId((p as { siteId?: string | null }).siteId ?? null)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [pageId])
 
   // Load translations when locale changes
   useEffect(() => {
@@ -400,7 +462,7 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
       items = items.filter(e =>
         e.value.toLowerCase().includes(q) ||
         (translationMap[e.nodeId]?.[e.field] || '').toLowerCase().includes(q) ||
-        (nodeNameMap[e.nodeId] || '').toLowerCase().includes(q)
+        nodeLabel(e.nodeId, nodeNameMap).toLowerCase().includes(q)
       )
     }
 
@@ -422,6 +484,18 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
     setEditedValues(prev => ({ ...prev, [key]: value }))
     // Optimistic local update
     dispatch(updateTranslationLocally({ nodeId, field, value }))
+  }
+
+  // Выбор медиа из пикера: сразу сохраняем перевод (URL ассета) и снимаем «грязный» флаг поля.
+  const handlePickMedia = (nodeId: string, field: string, url: string) => {
+    if (!activeLocale) return
+    dispatch(updateTranslationLocally({ nodeId, field, value: url }))
+    dispatch(saveTranslation({ pageId, locale: activeLocale, nodeId, field, value: url }))
+    setEditedValues(prev => {
+      const next = { ...prev }
+      delete next[`${nodeId}::${field}`]
+      return next
+    })
   }
 
   const handleSaveOne = useCallback(async (nodeId: string, field: string) => {
@@ -665,9 +739,9 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
                 {/* Node header */}
                 <div className="flex items-center gap-1 mb-1.5">
                   <span className="text-[10px] font-semibold text-gray-500 uppercase truncate">
-                    {nodeNameMap[nodeId] || nodeId.slice(0, 8)}
+                    {nodeLabel(nodeId, nodeNameMap)}
                   </span>
-                  {nodeId !== '__page__' && (
+                  {nodeId !== '__page__' && !nodeId.startsWith(PAGEVAR_PREFIX) && (
                     <span className="text-[9px] text-gray-300 font-mono">{nodeId.slice(0, 8)}</span>
                   )}
                 </div>
@@ -678,13 +752,15 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
                     const key = `${nodeId}::${entry.field}`
                     const currentTranslation = editedValues[key] ?? translationMap[nodeId]?.[entry.field] ?? ''
                     const isEdited = key in editedValues
-                    const isMediaField = ['src', 'poster', 'meta:ogImage'].includes(entry.field)
+                    const isMediaField = getFieldCategory(entry.field) === 'media'
                     
                     return (
                       <div key={key} className="space-y-1">
                         <div className="flex items-center gap-1">
-                          <span className="text-gray-400">{FIELD_ICON[entry.field] || <Type size={12} />}</span>
-                          <span className="text-[10px] text-gray-500">{FIELD_LABEL[entry.field] || entry.field}</span>
+                          <span className="text-gray-400">
+                            {FIELD_ICON[entry.field] || (isMediaField ? <Image size={12} /> : <Type size={12} />)}
+                          </span>
+                          <span className="text-[10px] text-gray-500">{fieldLabel(entry.field)}</span>
                         </div>
                         
                         {/* Source (original) */}
@@ -701,16 +777,26 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
                         
                         {/* Translation input */}
                         {isMediaField ? (
-                          <input
-                            type="text"
-                            value={currentTranslation}
-                            onChange={(e) => handleEditValue(nodeId, entry.field, e.target.value)}
-                            onBlur={() => isEdited && handleSaveOne(nodeId, entry.field)}
-                            placeholder={`URL ${FIELD_LABEL[entry.field]}...`}
-                            className={`w-full text-xs border rounded px-2 py-1.5 focus:border-blue-400 focus:outline-none text-gray-900 placeholder-gray-400 ${
-                              isEdited ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-white'
-                            }`}
-                          />
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="text"
+                              value={currentTranslation}
+                              onChange={(e) => handleEditValue(nodeId, entry.field, e.target.value)}
+                              onBlur={() => isEdited && handleSaveOne(nodeId, entry.field)}
+                              placeholder={`URL ${fieldLabel(entry.field)}...`}
+                              className={`flex-1 min-w-0 text-xs border rounded px-2 py-1.5 focus:border-blue-400 focus:outline-none text-gray-900 placeholder-gray-400 ${
+                                isEdited ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-white'
+                              }`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setPickerCtx({ nodeId, field: entry.field })}
+                              title="Выбрать из медиатеки"
+                              className="shrink-0 p-1.5 rounded border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-blue-600 transition-colors"
+                            >
+                              <Image size={14} />
+                            </button>
+                          </div>
                         ) : entry.value.length > 80 ? (
                           <textarea
                             value={currentTranslation}
@@ -782,6 +868,19 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
           </div>
         </div>
       )}
+
+      {/* Пикер медиатеки для медиа-полей перевода (src/poster/og:image/фон/видео-слайда) */}
+      <MediaPicker
+        open={pickerCtx !== null}
+        kind={pickerCtx ? mediaKindForField(pickerCtx.field) : 'any'}
+        siteId={siteId}
+        title="Выберите файл для языка"
+        onClose={() => setPickerCtx(null)}
+        onSelect={(asset) => {
+          if (pickerCtx) handlePickMedia(pickerCtx.nodeId, pickerCtx.field, asset.url)
+          setPickerCtx(null)
+        }}
+      />
     </div>
   )
 }

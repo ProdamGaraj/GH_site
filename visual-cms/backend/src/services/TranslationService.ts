@@ -43,12 +43,40 @@ export interface TranslationProgress {
 }
 
 /**
+ * Спец-поле перевода для CSS background-image (картинка-фон, в т.ч. фото-слайды карусели).
+ * Значение перевода хранится как «голый» URL; в backgroundImage оборачивается в url("…").
+ */
+export const BG_IMAGE_FIELD = 'bg:image'
+
+/**
+ * Извлекает «голый» URL из одиночного значения CSS background-image вида url("…").
+ * Возвращает null для градиентов, нескольких фонов, none и прочего «непростого» —
+ * такие случаи не локализуем (иначе можно повредить стиль).
+ */
+export function parseCssUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const v = value.trim()
+  // Кавычки допускают ')' внутри URL; без кавычек — запрещаем ')' и запятые (отсекает множественные фоны).
+  const m =
+    v.match(/^url\(\s*"([^"]*)"\s*\)$/i) ||
+    v.match(/^url\(\s*'([^']*)'\s*\)$/i) ||
+    v.match(/^url\(\s*([^'")]+?)\s*\)$/i)
+  const url = m?.[1]?.trim()
+  return url ? url : null
+}
+
+/** Оборачивает URL обратно в CSS url("…"). Кавычки в URL экранируем. */
+export function toCssUrl(url: string): string {
+  return `url("${url.replace(/"/g, '%22')}")`
+}
+
+/**
  * Recursively extracts all translatable fields from a BlockNode tree.
  * Returns an array of { nodeId, field, value } for all text content and translatable attributes.
  */
-function extractTranslatableFields(node: any): TranslationEntry[] {
+export function extractTranslatableFields(node: any): TranslationEntry[] {
   const entries: TranslationEntry[] = []
-  
+
   if (!node) return entries
 
   const nodeId = node.id
@@ -68,14 +96,23 @@ function extractTranslatableFields(node: any): TranslationEntry[] {
     }
   }
 
-  // Media attributes (src, poster, href) - for different media per language
-  const mediaAttrs = ['src', 'poster', 'href']
+  // Media-атрибуты — разные файлы под язык:
+  //  - src/poster  — <img>/<video>
+  //  - href        — ссылки
+  //  - data-slide-video — видео-фон слайда карусели
+  const mediaAttrs = ['src', 'poster', 'href', 'data-slide-video']
   if (node.attributes) {
     for (const attr of mediaAttrs) {
       if (node.attributes[attr] && typeof node.attributes[attr] === 'string') {
         entries.push({ nodeId, field: attr, value: node.attributes[attr] })
       }
     }
+  }
+
+  // CSS background-image (фото-слайды карусели + любые фоны) — локализуем «голый» URL.
+  const bgUrl = parseCssUrl(node.styles?.properties?.backgroundImage)
+  if (bgUrl) {
+    entries.push({ nodeId, field: BG_IMAGE_FIELD, value: bgUrl })
   }
 
   // Recurse into children
@@ -97,6 +134,186 @@ function extractTranslatableFields(node: any): TranslationEntry[] {
   }
 
   return entries
+}
+
+/**
+ * Применяет переводы к одному узлу дерева (мутирует переданный узел) и рекурсивно к детям.
+ * Узел должен быть уже копией (см. applyTranslationsToTree) — здесь мутируем на месте.
+ */
+export function applyNodeTranslations(node: any, map: TranslationMap): any {
+  if (!node) return node
+
+  const nodeTranslations = map[node.id]
+  if (nodeTranslations) {
+    // Текстовый контент
+    if (nodeTranslations['content']) {
+      node.content = nodeTranslations['content']
+    }
+
+    // Атрибуты (в т.ч. медиа: src/poster/href/data-slide-video)
+    if (node.attributes) {
+      const attrFields = ['src', 'alt', 'href', 'placeholder', 'title', 'poster', 'aria-label', 'data-slide-video']
+      for (const field of attrFields) {
+        if (nodeTranslations[field]) {
+          node.attributes[field] = nodeTranslations[field]
+        }
+      }
+    }
+
+    // CSS background-image — оборачиваем «голый» URL обратно в url("…").
+    if (nodeTranslations[BG_IMAGE_FIELD]) {
+      if (!node.styles) node.styles = { properties: {} }
+      if (!node.styles.properties) node.styles.properties = {}
+      node.styles.properties.backgroundImage = toCssUrl(nodeTranslations[BG_IMAGE_FIELD])
+    }
+  }
+
+  // Дети
+  if (node.children && Array.isArray(node.children)) {
+    node.children = node.children.map((child: any) => applyNodeTranslations(child, map))
+  }
+
+  // Дети из вариаций (specificChildren брейкпоинтов)
+  if (node.variations) {
+    for (const key of Object.keys(node.variations)) {
+      if (node.variations[key].specificChildren) {
+        node.variations[key].specificChildren = node.variations[key].specificChildren.map(
+          (child: any) => applyNodeTranslations(child, map)
+        )
+      }
+    }
+  }
+
+  return node
+}
+
+/**
+ * Применяет переводы ко всему дереву (на копии) + к page-meta. Чистая функция (без БД).
+ */
+export function applyTranslationsToTree(
+  structure: any,
+  translationMap: TranslationMap,
+  pageMetadata?: any
+): { structure: any; metadata: any } {
+  const translated = applyNodeTranslations(JSON.parse(JSON.stringify(structure)), translationMap)
+
+  const metadata = pageMetadata ? { ...pageMetadata } : undefined
+  if (metadata && translationMap['__page__']) {
+    const pageTr = translationMap['__page__']
+    if (pageTr['meta:title']) metadata.title = pageTr['meta:title']
+    if (pageTr['meta:description']) metadata.description = pageTr['meta:description']
+    if (pageTr['meta:ogImage']) metadata.ogImage = pageTr['meta:ogImage']
+  }
+
+  return { structure: translated, metadata }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Локализация медиа в page-переменных (repeat-слайдеры).
+//
+// Медиа repeat-слайдов лежит не в дереве узлов, а в массиве page-переменной
+// (например heroSlides[i].imageUrl). Кодируем такие переводы в общую overlay-модель
+// синтетическими ключами:
+//   nodeId = "pagevar:<varName>"
+//   field  = "media:<index>:<sourceField>"
+// На деплое applyVariableMediaTranslations накладывает их на dataConfig.variables.
+// ──────────────────────────────────────────────────────────────────────────
+
+export const PAGEVAR_PREFIX = 'pagevar:'
+export const VAR_MEDIA_PREFIX = 'media:'
+
+/** Похоже ли строковое значение на ссылку на медиа (картинку/видео). */
+export function looksLikeMediaUrl(value: unknown): boolean {
+  if (typeof value !== 'string') return false
+  const v = value.trim()
+  if (!v) return false
+  if (v.startsWith('/media/')) return true
+  return /\.(jpe?g|png|webp|gif|avif|svg|bmp|mp4|webm|mov|m4v|ogg|ogv)(\?.*)?$/i.test(v)
+}
+
+/** Разбирает field вида "media:<index>:<sourceField>". */
+function parseVarMediaField(field: string): { index: number; sourceField: string } | null {
+  if (typeof field !== 'string' || !field.startsWith(VAR_MEDIA_PREFIX)) return null
+  const rest = field.slice(VAR_MEDIA_PREFIX.length)
+  const colon = rest.indexOf(':')
+  if (colon <= 0) return null
+  const index = Number(rest.slice(0, colon))
+  const sourceField = rest.slice(colon + 1)
+  if (!Number.isInteger(index) || index < 0 || !sourceField) return null
+  return { index, sourceField }
+}
+
+/**
+ * Извлекает переводимые медиа-поля из envelope page-переменных
+ * ({ variables: [{ name, defaultValue }] }). Для каждого массива-переменной,
+ * каждого элемента и каждого строкового поля, похожего на медиа-URL, — одна запись.
+ * Служебные поля (начинаются с '_': _id, _hidden, _*AssetId) пропускаем.
+ */
+export function extractVariableMediaFields(envelope: any): TranslationEntry[] {
+  const entries: TranslationEntry[] = []
+  const vars = envelope?.variables
+  if (!Array.isArray(vars)) return entries
+
+  for (const v of vars) {
+    const name = v?.name
+    const arr = v?.defaultValue
+    if (typeof name !== 'string' || !Array.isArray(arr)) continue
+    arr.forEach((item: any, index: number) => {
+      if (!item || typeof item !== 'object') return
+      for (const [field, value] of Object.entries(item as Record<string, unknown>)) {
+        if (field.startsWith('_')) continue
+        if (looksLikeMediaUrl(value)) {
+          entries.push({
+            nodeId: PAGEVAR_PREFIX + name,
+            field: VAR_MEDIA_PREFIX + index + ':' + field,
+            value: value as string,
+          })
+        }
+      }
+    })
+  }
+  return entries
+}
+
+/**
+ * Накладывает переводы медиа page-переменных (ключи pagevar:/media:) на массив
+ * dataConfig.variables. Возвращает НОВЫЙ массив (исходный не мутируется). Если
+ * подходящих переводов нет — возвращает исходный массив без копирования.
+ */
+export function applyVariableMediaTranslations<T extends { name: string; defaultValue: unknown }>(
+  variables: T[],
+  map: TranslationMap
+): T[] {
+  if (!Array.isArray(variables)) return variables
+
+  const byVar = new Map<string, Array<{ index: number; sourceField: string; value: string }>>()
+  for (const [nodeId, fields] of Object.entries(map)) {
+    if (!nodeId.startsWith(PAGEVAR_PREFIX)) continue
+    const varName = nodeId.slice(PAGEVAR_PREFIX.length)
+    for (const [field, value] of Object.entries(fields)) {
+      const parsed = parseVarMediaField(field)
+      if (!parsed) continue
+      const list = byVar.get(varName) || []
+      list.push({ index: parsed.index, sourceField: parsed.sourceField, value })
+      byVar.set(varName, list)
+    }
+  }
+  if (byVar.size === 0) return variables
+
+  return variables.map((v): T => {
+    const overrides = byVar.get(v.name)
+    if (!overrides || !Array.isArray(v.defaultValue)) return v
+    const arr = (v.defaultValue as unknown[]).map((item) =>
+      item && typeof item === 'object' ? { ...(item as Record<string, unknown>) } : item
+    )
+    for (const o of overrides) {
+      const item = arr[o.index]
+      if (item && typeof item === 'object') {
+        ;(item as Record<string, unknown>)[o.sourceField] = o.value
+      }
+    }
+    return { ...v, defaultValue: arr }
+  })
 }
 
 export class TranslationService {
@@ -244,6 +461,11 @@ export class TranslationService {
     // BlockNode tree content
     entries.push(...extractTranslatableFields(page.structure))
 
+    // Медиа в page-переменных (repeat-слайдеры) — разные файлы под язык.
+    if ((page as any).variables) {
+      entries.push(...extractVariableMediaFields((page as any).variables))
+    }
+
     return entries
   }
 
@@ -299,57 +521,7 @@ export class TranslationService {
    * Used during deploy to generate localized pages.
    */
   applyTranslations(structure: any, translationMap: TranslationMap, pageMetadata?: any): { structure: any; metadata: any } {
-    const translated = this.applyNodeTranslations(JSON.parse(JSON.stringify(structure)), translationMap)
-    
-    let metadata = pageMetadata ? { ...pageMetadata } : undefined
-    if (metadata && translationMap['__page__']) {
-      const pageTr = translationMap['__page__']
-      if (pageTr['meta:title']) metadata.title = pageTr['meta:title']
-      if (pageTr['meta:description']) metadata.description = pageTr['meta:description']
-      if (pageTr['meta:ogImage']) metadata.ogImage = pageTr['meta:ogImage']
-    }
-
-    return { structure: translated, metadata }
-  }
-
-  private applyNodeTranslations(node: any, map: TranslationMap): any {
-    if (!node) return node
-
-    const nodeTranslations = map[node.id]
-    if (nodeTranslations) {
-      // Apply content translation
-      if (nodeTranslations['content']) {
-        node.content = nodeTranslations['content']
-      }
-
-      // Apply attribute translations
-      if (node.attributes) {
-        const attrFields = ['src', 'alt', 'href', 'placeholder', 'title', 'poster', 'aria-label']
-        for (const field of attrFields) {
-          if (nodeTranslations[field]) {
-            node.attributes[field] = nodeTranslations[field]
-          }
-        }
-      }
-    }
-
-    // Recurse into children
-    if (node.children && Array.isArray(node.children)) {
-      node.children = node.children.map((child: any) => this.applyNodeTranslations(child, map))
-    }
-
-    // Recurse into variations specificChildren
-    if (node.variations) {
-      for (const key of Object.keys(node.variations)) {
-        if (node.variations[key].specificChildren) {
-          node.variations[key].specificChildren = node.variations[key].specificChildren.map(
-            (child: any) => this.applyNodeTranslations(child, map)
-          )
-        }
-      }
-    }
-
-    return node
+    return applyTranslationsToTree(structure, translationMap, pageMetadata)
   }
 }
 
