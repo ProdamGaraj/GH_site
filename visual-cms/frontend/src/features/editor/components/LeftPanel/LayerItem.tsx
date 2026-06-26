@@ -1,13 +1,11 @@
 import React, { useState } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectNode, selectSelectedNodeId, deleteNode, selectBreakpoints, selectRootNode } from '@/features/editor/editorSlice'
+import { selectNode, selectSelectedNodeId, deleteNode, selectBreakpoints, selectRootNode, convertNodeToLinkedBlock } from '@/features/editor/editorSlice'
 import * as Icons from 'lucide-react'
 import { cn } from '@/shared/utils'
 import { getNodeBreakpoint, BlockNodeWithViewport } from '../../utils/variationUtils'
-import { useNavigate } from 'react-router-dom'
-import { blockApi, CreateBlockDto } from '@/shared/api'
-import type { BlockNode } from '@/shared/types'
+import { useNavigate, useMatch } from 'react-router-dom'
 
 interface LayerItemProps {
   node: BlockNodeWithViewport
@@ -42,6 +40,11 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
   const breakpoints = useAppSelector(selectBreakpoints)
   const rootNode = useAppSelector(selectRootNode)
   const navigate = useNavigate()
+  // Преобразование в блок доступно только в редакторе СОХРАНЁННОЙ страницы:
+  // связь (linkedBlockId) пишется в БД, а после конвертации мы уходим в редактор
+  // блока. Для новой (ещё не сохранённой) страницы id === 'new' — не настоящий.
+  const pageMatch = useMatch('/editor/page/:id')
+  const pageId = pageMatch?.params.id && pageMatch.params.id !== 'new' ? pageMatch.params.id : undefined
   const [isConverting, setIsConverting] = useState(false)
   
   const isExpanded = expandedNodes.has(node.id)
@@ -166,36 +169,17 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
 
   const handleConvertToBlock = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    
+
     if (isConverting) return
-    
+
     try {
       setIsConverting(true)
-      
-      // Подготовить структуру блока (удалить специфичные для viewport поля)
-      const cleanNode = (n: BlockNodeWithViewport): BlockNode => {
-        const { _viewportId, ...rest } = n
-        return {
-          ...rest,
-          children: n.children?.map(cleanNode) || []
-        }
-      }
-      
-      const blockName = node.metadata?.name || node.tagName || 'Блок'
-      
-      const blockData: CreateBlockDto = {
-        name: blockName,
-        type: 'section',
-        structure: cleanNode(node),
-        isReusable: true,
-        tags: ['converted-from-page']
-      }
-      
-      // Создать блок через API
-      const createdBlock = await blockApi.create(blockData)
-      
-      // Перейти в редактор блока
-      navigate(`/editor/block/${createdBlock.id}`)
+      // Единый путь: создать блок, связать узел (linkedBlockId) и сохранить страницу.
+      // Guard внутри thunk'а не плодит дубль, если узел уже связан.
+      const result = await dispatch(
+        convertNodeToLinkedBlock({ nodeId: node.id, pageId })
+      ).unwrap()
+      navigate(`/editor/block/${result.blockId}`)
     } catch (error) {
       console.error('Ошибка создания блока:', error)
       alert('Не удалось создать блок: ' + (error as Error).message)
@@ -324,7 +308,10 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
           {/* Action buttons */}
           {!isLocked && (
             <>
-              {level > 0 && (
+              {/* Преобразовать в блок: только в редакторе сохранённой страницы
+                  (нужен pageId для записи связи) и только для ещё не связанных
+                  узлов (у связанного linkedBlockId уже есть — повтор не нужен). */}
+              {level > 0 && pageId && !node.metadata?.linkedBlockId && (
                 <button
                   onClick={handleConvertToBlock}
                   className="flex-shrink-0 p-1 hover:bg-green-50 rounded transition-colors"

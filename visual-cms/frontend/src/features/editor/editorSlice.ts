@@ -1,7 +1,9 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
 import type { BlockNode, LayoutMode, CSSProperties, CustomBreakpoint, Browser, StandardMonitor } from '@/shared/types'
 import { generateId } from '@/shared/utils'
 import type { RootState } from '@/app/store'
+import { blockApi, pageApi, type CreateBlockDto } from '@/shared/api'
+import { cleanForLibrary } from '@/features/editor/utils/libraryClean'
 import { findNodeInTree } from '@/features/editor/utils/variationUtils'
 import {
   findNodeById,
@@ -1539,6 +1541,75 @@ export const {
   wrapNodeInLink,
   unwrapNodeFromLink,
 } = editorSlice.actions
+
+/**
+ * Единый канонический путь «преобразовать узел страницы в связанный блок».
+ *
+ * Раньше кнопка «Преобразовать в блок» (LayerItem) лишь создавала блок в
+ * библиотеке и уходила в редактор блока, НЕ проставляя linkedBlockId на узел и
+ * НЕ сохраняя страницу. Узел оставался обычным контейнером → правки блока не
+ * синхронизировались, а повторные клики плодили дубли-сироты. Эта функция
+ * выполняет связывание целиком:
+ *
+ *  1. Guard: если узел уже связан (metadata.linkedBlockId) — повторно блок НЕ
+ *     создаём (иначе дубли), возвращаем существующий id.
+ *  2. Создаём блок из структуры узла. cleanForLibrary убирает с корня
+ *     linkedBlockId/styleOverrides/_viewportId; бэкенд (stripInstanceArtifacts)
+ *     дополнительно страхует.
+ *  3. Проставляем linkedBlockId на узел и сохраняем страницу. Бэкенд схлопнет
+ *     связанный узел в placeholder (инвариант B8), при чтении подставит структуру
+ *     из библиотеки — с этого момента правки блока приходят на страницу.
+ *
+ * Требуется pageId уже сохранённой страницы: связь живёт в БД, а вызывающий код
+ * сразу уходит в редактор блока, поэтому linkedBlockId, оставшийся только в
+ * Redux, потерялся бы при размонтировании редактора страницы.
+ */
+export const convertNodeToLinkedBlock = createAsyncThunk<
+  { blockId: string; created: boolean },
+  { nodeId: string; pageId?: string },
+  { state: RootState }
+>('editor/convertNodeToLinkedBlock', async ({ nodeId, pageId }, { getState, dispatch }) => {
+  const rootNode = getState().editor.rootNode
+  if (!rootNode) throw new Error('Нет структуры страницы')
+  const node = findNodeById(rootNode, nodeId)
+  if (!node) throw new Error('Узел не найден')
+
+  // Guard от повторного преобразования — узел уже связан с библиотекой.
+  const existingLink = node.metadata?.linkedBlockId
+  if (existingLink) {
+    return { blockId: existingLink, created: false }
+  }
+
+  if (!pageId) {
+    throw new Error('Сначала сохраните страницу, затем преобразуйте узел в блок')
+  }
+
+  const blockName = node.metadata?.name || node.tagName || 'Блок'
+  const blockData: CreateBlockDto = {
+    name: blockName,
+    type: 'section',
+    structure: cleanForLibrary(node),
+    isReusable: true,
+    tags: ['converted-from-page'],
+  }
+  const createdBlock = await blockApi.create(blockData)
+
+  // Проставляем связь на узел и сохраняем страницу в БД (бэкенд схлопнет в placeholder).
+  dispatch(
+    updateNode({
+      id: nodeId,
+      updates: {
+        metadata: { ...node.metadata, name: blockName, linkedBlockId: createdBlock.id },
+      },
+    })
+  )
+  const updatedRoot = getState().editor.rootNode
+  if (!updatedRoot) throw new Error('Структура страницы недоступна')
+  await pageApi.update(pageId, { structure: updatedRoot })
+  dispatch(markAsSaved())
+
+  return { blockId: createdBlock.id, created: true }
+})
 
 export const selectClipboard = (state: RootState) => state.editor.clipboard
 
