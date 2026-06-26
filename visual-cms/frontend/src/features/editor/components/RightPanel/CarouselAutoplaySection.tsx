@@ -5,6 +5,7 @@ import type { BlockNode } from '@/shared/types'
 import {
   AUTOPLAY_ATTR,
   LOOP_ATTR,
+  VIDEO_WAIT_ATTR,
   DEFAULT_DELAY_MS,
   MIN_SECONDS,
   readAutoplayMs,
@@ -26,6 +27,7 @@ export const CarouselAutoplaySection: React.FC<{ carouselRoot: BlockNode }> = ({
   const seconds = enabled ? ms / 1000 : DEFAULT_DELAY_MS / 1000
   // Рантайм считает loop=true при отсутствии атрибута; off только при явном 'false'.
   const loop = carouselRoot.attributes?.[LOOP_ATTR] !== 'false'
+  const videoWait = carouselRoot.attributes?.[VIDEO_WAIT_ATTR] === 'true'
 
   const patchAttrs = (next: Record<string, string | undefined>) => {
     const attrs: Record<string, string> = { ...(carouselRoot.attributes || {}) }
@@ -49,6 +51,10 @@ export const CarouselAutoplaySection: React.FC<{ carouselRoot: BlockNode }> = ({
   const setLoop = (on: boolean) => {
     // Пишем 'false' только для выключения; включение = убрать атрибут (дефолт рантайма).
     patchAttrs({ [LOOP_ATTR]: on ? undefined : 'false' })
+  }
+
+  const setVideoWait = (on: boolean) => {
+    patchAttrs({ [VIDEO_WAIT_ATTR]: on ? 'true' : undefined })
   }
 
   return (
@@ -83,6 +89,21 @@ export const CarouselAutoplaySection: React.FC<{ carouselRoot: BlockNode }> = ({
           <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
             <input type="checkbox" checked={loop} onChange={(e) => setLoop(e.target.checked)} />
             <span>Зацикливать (листать по кругу)</span>
+          </label>
+
+          <label className="flex items-start gap-2 text-xs text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={videoWait}
+              onChange={(e) => setVideoWait(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              Смотреть видео до конца
+              <span className="block text-gray-400">
+                Видео-слайды доигрываются полностью, обычные — листаются через заданную задержку.
+              </span>
+            </span>
           </label>
         </>
       )}

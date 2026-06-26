@@ -188,6 +188,62 @@ describe('CarouselRuntime', () => {
     })
   })
 
+  describe('video-wait (смотреть видео до конца)', () => {
+    const bodyWithVideo = (autoplay: number, wait: boolean) => `
+      <div data-carousel="true" data-carousel-autoplay="${autoplay}"${wait ? ' data-carousel-video-wait="true"' : ''}>
+        <div data-carousel-track="true">
+          <div data-carousel-slide="true" data-slide-video="https://cdn/a.mp4" data-element-id="s0"></div>
+          <div data-carousel-slide="true" data-element-id="s1" style="background:#111"></div>
+        </div>
+      </div>
+    `
+    const videoOf = (id: string) =>
+      document.querySelector(`[data-element-id="${id}"]`)!.querySelector<HTMLVideoElement>('video[data-carousel-video="true"]')!
+
+    it('video-wait + autoplay → активное видео НЕ зациклено (loop=false)', async () => {
+      await boot(bodyWithVideo(1000, true))
+      expect(videoOf('s0').loop).toBe(false)
+    })
+
+    it('video-wait без autoplay → видео всё ещё зациклено (loop=true)', async () => {
+      await boot(bodyWithVideo(0, true))
+      expect(videoOf('s0').loop).toBe(true)
+    })
+
+    it('autoplay без video-wait → видео зациклено (loop=true)', async () => {
+      await boot(bodyWithVideo(1000, false))
+      expect(videoOf('s0').loop).toBe(true)
+    })
+
+    it('video-wait: событие ended активного видео листает на следующий слайд', async () => {
+      await boot(bodyWithVideo(1000, true))
+      expect(trackEl().style.transform).toMatch(/translateX\(-?0%\)/)
+      videoOf('s0').dispatchEvent(new Event('ended'))
+      expect(trackEl().style.transform).toBe('translateX(-50%)')
+    })
+
+    it('video-wait: событие error видео тоже листает дальше (fallback)', async () => {
+      await boot(bodyWithVideo(1000, true))
+      videoOf('s0').dispatchEvent(new Event('error'))
+      expect(trackEl().style.transform).toBe('translateX(-50%)')
+    })
+
+    it('video-wait: автоплей не уходит со слайда, пока видео не доиграло', () => {
+      jest.useFakeTimers()
+      try {
+        document.body.innerHTML = bodyWithVideo(50, true)
+        // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+        new Function(RUNTIME_JS)()
+        jest.advanceTimersByTime(500) // 10 интервалов — видео «играет» (ended=false), не листаем
+        expect(trackEl().style.transform).toMatch(/translateX\(-?0%\)/)
+        videoOf('s0').dispatchEvent(new Event('ended'))
+        expect(trackEl().style.transform).toBe('translateX(-50%)')
+      } finally {
+        jest.useRealTimers()
+      }
+    })
+  })
+
   describe('MutationObserver', () => {
     it('перерисовывается при добавлении нового слайда в track', async () => {
       await boot(buildBody(2))

@@ -7,6 +7,8 @@
  *   [data-carousel="true"]            — корень слайдера
  *   [data-carousel-autoplay="5000"]   — автопрокрутка, мс (0/нет = выкл)
  *   [data-carousel-loop="true"]       — зацикленность (по умолчанию true)
+ *   [data-carousel-video-wait="true"] — при автоплее видео-слайды листаются только
+ *                                       после окончания видео (видео не зацикливается)
  *   [data-carousel-track="true"]      — контейнер с слайдами (прямые дети = слайды)
  *   [data-carousel-slide="true"]      — атрибут на каждом слайде (для надёжной фильтрации)
  *   [data-slide-video="<url>"]        — видео-фон слайда; постер = его background-image.
@@ -40,6 +42,8 @@ export function generateCarouselRuntime(): string {
 
     var autoplay = parseInt(root.getAttribute('data-carousel-autoplay') || '0', 10);
     var loop = root.getAttribute('data-carousel-loop') !== 'false';
+    // «Смотреть видео до конца»: при автоплее видео-слайд листается не по таймеру, а по 'ended'.
+    var videoWait = root.getAttribute('data-carousel-video-wait') === 'true';
     var activeClass = root.getAttribute('data-carousel-active-class') || ACTIVE_CLASS_DEFAULT;
 
     var prevBtn = root.querySelector('[data-carousel-prev]');
@@ -198,7 +202,11 @@ export function generateCarouselRuntime(): string {
         if (window.getComputedStyle(slide).position === 'static') slide.style.position = 'relative';
         v = document.createElement('video');
         v.setAttribute('data-carousel-video', 'true');
-        v.muted = true; v.defaultMuted = true; v.loop = true; v.autoplay = true;
+        v.muted = true; v.defaultMuted = true; v.autoplay = true;
+        // «Смотреть видео до конца» + автоплей: НЕ зацикливаем, иначе 'ended' не сработает.
+        // В обычном режиме видео крутится бесконечно как фон.
+        var oneShot = videoWait && autoplay > 0;
+        v.loop = !oneShot;
         v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
         v.playsInline = true; v.preload = 'none';
         // Вписывание видео = вписыванию постера слайда: data-slide-fit (cover|contain).
@@ -207,6 +215,16 @@ export function generateCarouselRuntime(): string {
         var s = document.createElement('source');
         s.src = url; v.appendChild(s);
         slide.insertBefore(v, slide.firstChild);
+        if (oneShot) {
+          // Видео доиграло (или сломалось) → листаем дальше, если слайд ещё активен и нет hover.
+          var advanceAfterVideo = function(){
+            if (state.slides[state.index] !== slide) return;
+            if (state.interacting) return;
+            next(); restartAutoplay();
+          };
+          v.addEventListener('ended', advanceAfterVideo);
+          v.addEventListener('error', advanceAfterVideo);
+        }
       }
       return v;
     }
@@ -266,7 +284,15 @@ export function generateCarouselRuntime(): string {
       stopAutoplay();
       if (autoplay > 0 && state.slides.length > 1) {
         state.timer = setInterval(function(){
-          if (!state.interacting) next();
+          if (state.interacting) return;
+          // «Смотреть видео до конца»: пока активное видео не доиграло — не листаем по
+          // таймеру (уход обеспечит 'ended'-обработчик). Так длинное видео не обрежется.
+          if (videoWait) {
+            var cur = state.slides[state.index];
+            var vv = cur && cur.querySelector && cur.querySelector('video[data-carousel-video="true"]');
+            if (vv && !vv.ended && !vv.error) return;
+          }
+          next();
         }, autoplay);
       }
     }

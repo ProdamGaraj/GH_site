@@ -7,6 +7,8 @@ import type { BlockNode } from '@/shared/types'
  */
 export const AUTOPLAY_ATTR = 'data-carousel-autoplay'
 export const LOOP_ATTR = 'data-carousel-loop'
+/** При автоплее видео-слайды листаются только после окончания видео. */
+export const VIDEO_WAIT_ATTR = 'data-carousel-video-wait'
 export const DEFAULT_DELAY_MS = 5000
 export const MIN_SECONDS = 0.5
 
