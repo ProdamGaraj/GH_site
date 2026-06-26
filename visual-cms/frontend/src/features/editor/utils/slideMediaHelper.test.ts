@@ -94,6 +94,37 @@ describe('buildMediaSlideNode', () => {
     expect(node!.styles.properties.minHeight).toBeUndefined()
   })
 
+  it('по умолчанию fit=cover: data-slide-fit и background-size = cover', () => {
+    const node = buildMediaSlideNode(asset({ kind: 'image' }), { generateId })
+    expect(node!.attributes['data-slide-fit']).toBe('cover')
+    expect(node!.styles.properties.backgroundSize).toBe('cover')
+  })
+
+  it('fit=contain прокидывается в data-slide-fit и background-size (фото)', () => {
+    const node = buildMediaSlideNode(asset({ kind: 'image' }), { generateId, fit: 'contain' })
+    expect(node!.attributes['data-slide-fit']).toBe('contain')
+    expect(node!.styles.properties.backgroundSize).toBe('contain')
+  })
+
+  it('fit=contain для видео: data-slide-fit=contain (object-fit видео в рантайме)', () => {
+    const node = buildMediaSlideNode(asset({ kind: 'video', url: 'https://cdn/v.mp4', posterUrl: null }), {
+      generateId,
+      fit: 'contain',
+    })
+    expect(node!.attributes['data-slide-fit']).toBe('contain')
+    // постера нет → background-size не задаётся, но data-slide-fit всё равно есть
+    expect(node!.styles.properties.backgroundSize).toBeUndefined()
+  })
+
+  it('fit=contain для видео с постером: постер тоже contain', () => {
+    const node = buildMediaSlideNode(
+      asset({ kind: 'video', url: 'https://cdn/v.mp4', posterUrl: 'https://cdn/v.jpg' }),
+      { generateId, fit: 'contain' }
+    )
+    expect(node!.attributes['data-slide-fit']).toBe('contain')
+    expect(node!.styles.properties.backgroundSize).toBe('contain')
+  })
+
   it('ассет без id → metadata без mediaAssetId', () => {
     const node = buildMediaSlideNode(asset({ kind: 'image', id: '' }), { generateId })
     expect(node!.metadata.name).toBe('Фото-слайд')

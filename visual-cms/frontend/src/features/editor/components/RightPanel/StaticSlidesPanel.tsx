@@ -63,6 +63,14 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) =
   const slides = useMemo(() => getSlideChildren(track), [track])
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
+  // Текущее «Вписывание» слайдов: cover (обрезать) | contain (целиком, с полосами).
+  // Читаем из data-slide-fit (надёжно и для видео-слайдов без постера), иначе из
+  // background-size первого слайда, иначе cover. Новые медиа-слайды наследуют это значение.
+  const slideFit =
+    slides[0]?.attributes?.['data-slide-fit'] ||
+    (slides[0]?.styles?.properties as Record<string, string> | undefined)?.backgroundSize ||
+    'cover'
+
   // Пустой слайд-контейнер (его потом стилизуют / задают фон / видео).
   const handleAddEmpty = () => {
     const node: BlockNode = {
@@ -87,6 +95,7 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) =
       generateId,
       extraAttributes: { 'data-carousel-slide': 'true' },
       minHeight: '240px',
+      fit: slideFit,
     })
     if (!node) {
       alert('Документы нельзя добавить как слайд. Выберите фото, GIF или видео.')
@@ -130,10 +139,8 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) =
     dispatch(updateNode({ id: slide.id, updates: { attributes: attrs } }))
   }
 
-  // Вписывание слайдов: cover (обрезать, заполнить) или contain (целиком, с полосами).
-  // Применяем ко всем слайдам: background-size (для фото) + data-slide-fit (для видео).
-  const slideFit =
-    (slides[0]?.styles?.properties as Record<string, string> | undefined)?.backgroundSize || 'cover'
+  // Применяет «Вписывание» ко ВСЕМ слайдам: background-size (для фото/постера) +
+  // data-slide-fit (object-fit видео в рантайме). cover = обрезать, contain = с полосами.
   const handleSetFit = (fit: string) => {
     for (const slide of slides) {
       dispatch(

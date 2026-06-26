@@ -27,11 +27,16 @@ export interface BuildMediaSlideOptions {
   extraAttributes?: Record<string, string>
   /** Минимальная высота слайда (static-режим задаёт '240px'). */
   minHeight?: string
+  /**
+   * Вписывание слайда: 'cover' (обрезать, заполнить) | 'contain' (целиком, с полосами).
+   * Управляет background-size фото/постера и data-slide-fit (object-fit видео в рантайме).
+   * По умолчанию 'cover'.
+   */
+  fit?: string
 }
 
-/** Свойства «заполнения» фоном — общие для фото-слайда и постера видео. */
-const BG_FILL = {
-  backgroundSize: 'cover',
+/** Позиционирование фона — общее для фото-слайда и постера видео (размер задаётся отдельно через fit). */
+const BG_POSITION = {
   backgroundPosition: 'center',
   backgroundRepeat: 'no-repeat',
 } as const
@@ -49,6 +54,7 @@ export function buildMediaSlideNode(
   const isVideo = asset.kind === 'video'
   // Для фото/GIF постер = сама картинка; для видео = сгенерированный poster (если есть).
   const poster = isVideo ? asset.posterUrl : asset.url
+  const fit = opts.fit || 'cover'
 
   return {
     id: opts.generateId(),
@@ -59,6 +65,9 @@ export function buildMediaSlideNode(
     children: [],
     attributes: {
       ...(opts.extraAttributes || {}),
+      // data-slide-fit: рантайм берёт отсюда object-fit видео; для фото дублирует background-size.
+      // Ставим всегда, чтобы новый слайд сразу наследовал текущее «Вписывание» слайдера.
+      'data-slide-fit': fit,
       ...(isVideo ? { 'data-slide-video': asset.url } : {}),
     },
     metadata: {
@@ -69,7 +78,7 @@ export function buildMediaSlideNode(
       properties: {
         width: '100%',
         ...(opts.minHeight ? { minHeight: opts.minHeight } : {}),
-        ...(poster ? { backgroundImage: `url("${poster}")`, ...BG_FILL } : {}),
+        ...(poster ? { backgroundImage: `url("${poster}")`, backgroundSize: fit, ...BG_POSITION } : {}),
       },
     },
   }
