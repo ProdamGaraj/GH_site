@@ -15,6 +15,24 @@
 export const CSRF_COOKIE_NAME = 'vcms_csrf'
 export const CSRF_HEADER_NAME = 'X-CSRF-Token'
 
+/**
+ * Ошибка API с HTTP-статусом. Наследует Error (message сохранён), плюс несёт
+ * status и retryAfter (секунды для 429) — чтобы UI мог различать случаи.
+ */
+export class ApiError extends Error {
+  status: number
+  retryAfter?: number
+  details?: unknown
+
+  constructor(message: string, status: number, opts?: { retryAfter?: number; details?: unknown }) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.retryAfter = opts?.retryAfter
+    this.details = opts?.details
+  }
+}
+
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 export function readCookie(name: string): string | undefined {

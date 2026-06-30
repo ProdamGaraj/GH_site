@@ -1,5 +1,5 @@
 ﻿import { getApiBaseUrl } from './baseUrl'
-import { apiFetch } from './http'
+import { apiFetch, ApiError } from './http'
 
 const API_BASE_URL = getApiBaseUrl()
 
@@ -61,7 +61,12 @@ class ApiClient {
           .join('; ')
         if (fields) message += ` (${fields})`
       }
-      throw new Error(message)
+      // ApiError несёт статус и retryAfter (секунды для 429); message сохранён,
+      // поэтому существующие потребители err.message работают как прежде.
+      throw new ApiError(message, response.status, {
+        retryAfter: typeof error.retryAfter === 'number' ? error.retryAfter : undefined,
+        details: error.details,
+      })
     }
 
     // 204 No Content / пустое тело (например, у DELETE) — JSON парсить нечего.

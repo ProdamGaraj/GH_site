@@ -1,5 +1,12 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { authApi, type AuthUser } from './authApi'
+import { ApiError } from '@/shared/api/http'
+
+/** Полезная нагрузка отклонённого login: текст + (для 429) секунды до повтора. */
+export interface LoginRejectValue {
+  message: string
+  retryAfterSec?: number
+}
 
 /**
  * idle         — стартовое состояние, сессия ещё не проверена
@@ -27,18 +34,25 @@ export const fetchMe = createAsyncThunk('auth/fetchMe', async () => {
   return res.user
 })
 
-/** Вход. На ошибке возвращает текст для показа в форме. */
-export const login = createAsyncThunk(
-  'auth/login',
-  async (creds: { username: string; password: string }, { rejectWithValue }) => {
-    try {
-      const res = await authApi.login(creds.username, creds.password)
-      return res.user
-    } catch (err) {
-      return rejectWithValue(err instanceof Error ? err.message : 'Не удалось войти')
+/** Вход. На ошибке возвращает текст + (для 429) секунды до повтора. */
+export const login = createAsyncThunk<
+  AuthUser,
+  { username: string; password: string },
+  { rejectValue: LoginRejectValue }
+>('auth/login', async (creds, { rejectWithValue }) => {
+  try {
+    const res = await authApi.login(creds.username, creds.password)
+    return res.user
+  } catch (err) {
+    if (err instanceof ApiError) {
+      return rejectWithValue({
+        message: err.message,
+        retryAfterSec: err.status === 429 ? err.retryAfter : undefined,
+      })
     }
-  },
-)
+    return rejectWithValue({ message: err instanceof Error ? err.message : 'Не удалось войти' })
+  }
+})
 
 /** Выход. Чистим состояние локально даже если запрос не прошёл. */
 export const logout = createAsyncThunk('auth/logout', async () => {
@@ -87,7 +101,7 @@ const authSlice = createSlice({
       .addCase(login.rejected, (state, action) => {
         state.user = null
         state.status = 'anonymous'
-        state.loginError = (action.payload as string) ?? 'Не удалось войти'
+        state.loginError = action.payload?.message ?? 'Не удалось войти'
       })
       .addCase(logout.fulfilled, (state) => {
         state.user = null

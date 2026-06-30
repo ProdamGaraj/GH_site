@@ -8,9 +8,10 @@ const BCRYPT_ROUNDS = 12
 /**
  * Хеш для сравнения, когда пользователь не найден. Уравнивает время ответа
  * login на «нет такого юзера» и «неверный пароль» (anti user-enumeration).
- * Это валидный bcrypt-хеш случайной строки — compare всегда вернёт false.
+ * Генерируем в рантайме (один раз) — гарантированно валидный bcrypt-хеш,
+ * поэтому bcrypt.compare никогда не бросит на «битом» хеше, а вернёт false.
  */
-const DUMMY_HASH = '$2b$12$C6UzMDM.H6dfI/f/IKxGhuQ1z9Q1n0t6h0Yx0pY5l0Yx0pY5l0Yi'
+const DUMMY_HASH = bcrypt.hashSync('invalid-placeholder-password', BCRYPT_ROUNDS)
 
 export interface JwtPayload {
   /** user id */

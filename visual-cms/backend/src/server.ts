@@ -1,5 +1,6 @@
 import { AppDataSource } from './config/database'
 import { runSafeMigrations } from './migrations/runner'
+import { ensureAdminUser } from './services/AdminBootstrap'
 import { logger } from './services/Logger'
 import { feedPollingScheduler } from './services/FeedPollingScheduler'
 import app from './app'
@@ -12,6 +13,9 @@ AppDataSource.initialize()
 
     // Применяем идемпотентные миграции (IF NOT EXISTS)
     await runSafeMigrations(AppDataSource)
+
+    // Создаём первого админа из env, если пользователей ещё нет.
+    await ensureAdminUser(AppDataSource)
 
     // Серверный планировщик обновления feed-источников (раз в минуту).
     feedPollingScheduler.start()

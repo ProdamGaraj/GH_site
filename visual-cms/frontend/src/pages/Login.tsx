@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { login } from '@/features/auth/authSlice'
 
@@ -16,7 +17,10 @@ export const Login: React.FC = () => {
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  // Секунды до повторной попытки после 429 (rate limit). 0 = можно отправлять.
+  const [cooldown, setCooldown] = useState(0)
 
   const from = (location.state as LocationState | null)?.from?.pathname || '/'
 
@@ -27,14 +31,23 @@ export const Login: React.FC = () => {
     }
   }, [status, from, navigate])
 
+  // Тикаем обратный отсчёт раз в секунду, пока не дойдём до 0.
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const id = setTimeout(() => setCooldown(cooldown - 1), 1000)
+    return () => clearTimeout(id)
+  }, [cooldown])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (submitting) return
+    if (submitting || cooldown > 0) return
     setSubmitting(true)
     const result = await dispatch(login({ username, password }))
     setSubmitting(false)
     if (login.fulfilled.match(result)) {
       navigate(from, { replace: true })
+    } else if (login.rejected.match(result) && result.payload?.retryAfterSec) {
+      setCooldown(result.payload.retryAfterSec)
     }
   }
 
@@ -48,6 +61,8 @@ export const Login: React.FC = () => {
       </div>
     )
   }
+
+  const disabled = submitting || !username || !password || cooldown > 0
 
   return (
     <div className="h-screen flex items-center justify-center bg-gray-50">
@@ -80,29 +95,47 @@ export const Login: React.FC = () => {
           <label htmlFor="password" className="block text-sm font-medium text-gray-700">
             Пароль
           </label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-          />
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              tabIndex={-1}
+              title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+              aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
         </div>
 
-        {loginError && (
-          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            {loginError}
+        {cooldown > 0 ? (
+          <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            Слишком много попыток. Повторите через {cooldown} с.
           </div>
+        ) : (
+          loginError && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {loginError}
+            </div>
+          )
         )}
 
         <button
           type="submit"
-          disabled={submitting || !username || !password}
+          disabled={disabled}
           className="w-full py-2.5 rounded-lg bg-primary-600 text-white font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {submitting ? 'Вход…' : 'Войти'}
+          {submitting ? 'Вход…' : cooldown > 0 ? `Повторите через ${cooldown} с` : 'Войти'}
         </button>
       </form>
     </div>
