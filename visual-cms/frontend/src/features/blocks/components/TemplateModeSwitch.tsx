@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Wand2, X, Sparkles, RefreshCw } from 'lucide-react'
 import type { Block } from '@/shared/types'
 import type { TemplateCategory } from '@/shared/types/template'
+import { apiFetch } from '@/shared/api/http'
 
 interface TemplateModeSwitchProps {
   block: Block
@@ -16,7 +17,7 @@ export const TemplateModeSwitch: React.FC<TemplateModeSwitchProps> = ({ block, o
   const handleEnableTemplate = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/blocks/${block.id}/enable-template`, {
+      const response = await apiFetch(`/api/blocks/${block.id}/enable-template`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -45,7 +46,7 @@ export const TemplateModeSwitch: React.FC<TemplateModeSwitchProps> = ({ block, o
 
     setLoading(true)
     try {
-      const response = await fetch(`/api/blocks/${block.id}/disable-template`, {
+      const response = await apiFetch(`/api/blocks/${block.id}/disable-template`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       })
@@ -64,7 +65,7 @@ export const TemplateModeSwitch: React.FC<TemplateModeSwitchProps> = ({ block, o
   const handleRefreshFields = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/blocks/${block.id}/refresh-fields`, {
+      const response = await apiFetch(`/api/blocks/${block.id}/refresh-fields`, {
         method: 'POST'
       })
 

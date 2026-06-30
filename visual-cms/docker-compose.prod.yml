@@ -24,3 +24,8 @@ services:
   backend:
     environment:
       - PUBLIC_SITE_URL=https://gh.uz
+      # Боевой сайт на HTTPS — cookie только по защищённому соединению.
+      - COOKIE_SECURE=true
+      # Секрет берём из окружения хоста (НЕ коммитим реальное значение).
+      # Задать на сервере: export JWT_SECRET=... перед `docker compose up`.
+      - JWT_SECRET=${JWT_SECRET}

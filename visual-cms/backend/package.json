@@ -10,7 +10,8 @@
     "test": "jest",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
-    "typeorm": "typeorm-ts-node-commonjs"
+    "typeorm": "typeorm-ts-node-commonjs",
+    "seed:admin": "ts-node src/scripts/seed-admin.ts"
   },
   "dependencies": {
     "aws-sdk": "^2.1551.0",

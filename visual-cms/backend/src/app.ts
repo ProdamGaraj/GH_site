@@ -5,21 +5,25 @@ import dotenv from 'dotenv'
 import routes from './routes'
 import healthRouter from './routes/health'
 import swaggerRouter from './docs/swagger'
-import { 
-  errorHandler, 
-  notFoundHandler, 
-  requestTiming, 
+import {
+  errorHandler,
+  notFoundHandler,
+  requestTiming,
   rateLimit,
   compressionHint,
   queryOptimization,
   getTimingStats,
   getErrorStats,
+  requireAuth,
 } from './middleware'
 import { cacheService } from './services/CacheService'
 
 dotenv.config()
 
 const app = express()
+
+// За nginx-реверс-прокси: доверяем X-Forwarded-* (req.secure/протокол, IP).
+app.set('trust proxy', 1)
 
 // Performance middleware
 app.use(requestTiming)
@@ -46,7 +50,7 @@ app.use(cors({
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token']
 }))
 app.use(helmet({
   contentSecurityPolicy: {
@@ -63,7 +67,12 @@ app.use(helmet({
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
 
-// API Documentation (Swagger UI)
+// Auth-защита всего API-слоя. Должна стоять ДО роутов и swagger: пропускает
+// только публичный allowlist (см. middleware/auth.ts), остальное под /api
+// требует валидной JWT-cookie. Не-/api пути (health, статика) не трогает.
+app.use(requireAuth)
+
+// API Documentation (Swagger UI) — под защитой (виден только залогиненным)
 app.use('/api/docs', swaggerRouter)
 
 // Routes

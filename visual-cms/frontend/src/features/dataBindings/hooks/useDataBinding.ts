@@ -8,6 +8,7 @@ import {
   selectAllBindings 
 } from '../dataBindingsSlice'
 import type { DataBinding, InputBindingConfig } from '@/shared/types/dataBinding'
+import { apiFetch } from '@/shared/api/http'
 
 interface UseDataBindingOptions {
   /** Auto-fetch on mount */
@@ -251,7 +252,7 @@ export function useFormSubmit(blockId: string): {
     setSuccess(false)
 
     try {
-      const response = await fetch('/api/data-fetch/submit-with-binding', {
+      const response = await apiFetch('/api/data-fetch/submit-with-binding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

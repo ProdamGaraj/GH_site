@@ -53,3 +53,8 @@ export {
   validate,
   validateQuery,
 } from './validate'
+
+// Authentication
+export {
+  requireAuth,
+} from './auth'

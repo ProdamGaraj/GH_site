@@ -13,9 +13,12 @@ import analyticsReducer from '@/features/analytics/analyticsSlice'
 import translationsReducer from '@/features/translations/translationsSlice'
 import sitesReducer from '@/features/sites/sitesSlice'
 import collectionsReducer from '@/features/collections/collectionsSlice'
+import authReducer, { sessionExpired } from '@/features/auth/authSlice'
+import { setUnauthorizedHandler } from '@/shared/api/http'
 
 export const store = configureStore({
   reducer: {
+    auth: authReducer,
     editor: editorReducer,
     pages: pagesReducer,
     sites: sitesReducer,
@@ -31,6 +34,11 @@ export const store = configureStore({
     forms: formsReducer,
     translations: translationsReducer,
   },
+})
+
+// Любой 401 от API → помечаем сессию истёкшей; RequireAuth уведёт на /login.
+setUnauthorizedHandler(() => {
+  store.dispatch(sessionExpired())
 })
 
 export type RootState = ReturnType<typeof store.getState>

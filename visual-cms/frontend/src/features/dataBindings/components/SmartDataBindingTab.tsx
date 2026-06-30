@@ -21,6 +21,7 @@ import type { Block } from '@/shared/types'
 import type { DataTransform, DynamicFilter } from '@/shared/types/transforms'
 import { collectionApi, type Collection } from '@/shared/api/collectionApi'
 import { isClientRuntimeType } from '@/shared/types/dataSource'
+import { apiFetch } from '@/shared/api/http'
 
 interface SmartDataBindingTabProps {
   blockId: string
@@ -437,7 +438,7 @@ export const SmartDataBindingTab: React.FC<SmartDataBindingTabProps> = ({ blockI
         
         console.log('🧪 Есть несохранённые изменения:', hasUnsavedChanges)
         
-        const response = await fetch('/api/data/fetch-with-transforms', {
+        const response = await apiFetch('/api/data/fetch-with-transforms', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

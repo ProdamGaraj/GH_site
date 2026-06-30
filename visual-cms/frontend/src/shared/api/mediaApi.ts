@@ -11,6 +11,7 @@
 
 import { api } from './index'
 import { getApiBaseUrl } from './baseUrl'
+import { apiFetch } from './http'
 
 export type MediaKind = 'image' | 'video' | 'document'
 
@@ -186,7 +187,7 @@ export const mediaApi = {
       fd.append('variantWidths', input.variantWidths.join(','))
     }
 
-    const resp = await fetch(`${API_BASE}/media`, { method: 'POST', body: fd })
+    const resp = await apiFetch(`${API_BASE}/media`, { method: 'POST', body: fd })
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({ message: `HTTP ${resp.status}` }))
       throw new Error(err.message || `Upload failed (${resp.status})`)
@@ -196,7 +197,7 @@ export const mediaApi = {
 
   update: (id: string, patch: UpdateMediaInput): Promise<MediaAsset> => {
     // PATCH not implemented in shared ApiClient — use raw fetch with JSON.
-    return fetch(`${API_BASE}/media/${id}`, {
+    return apiFetch(`${API_BASE}/media/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
@@ -227,7 +228,7 @@ export const mediaFolderApi = {
   },
 
   create: (input: CreateFolderInput): Promise<MediaFolder> =>
-    fetch(`${API_BASE}/media/folders`, {
+    apiFetch(`${API_BASE}/media/folders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -238,7 +239,7 @@ export const mediaFolderApi = {
     id: string,
     patch: { name?: string; parentId?: string | null },
   ): Promise<MediaFolder> =>
-    fetch(`${API_BASE}/media/folders/${id}`, {
+    apiFetch(`${API_BASE}/media/folders/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),

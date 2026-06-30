@@ -1,4 +1,5 @@
 import type { PageDataSource } from '../components/PageDataSourcesEditor'
+import { apiFetch } from '@/shared/api/http'
 
 type DataListener = (data: unknown, error?: Error) => void
 
@@ -273,7 +274,7 @@ class PageDataService {
   }
 
   private async fetchFromApi(source: PageDataSource): Promise<unknown> {
-    const response = await fetch(`${this.apiBaseUrl}/data-fetch/fetch-with-binding`, {
+    const response = await apiFetch(`${this.apiBaseUrl}/data-fetch/fetch-with-binding`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

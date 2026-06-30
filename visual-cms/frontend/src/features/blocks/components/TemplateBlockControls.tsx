@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Sparkles, XCircle, AlertTriangle, CheckCircle } from 'lucide-react'
+import { apiFetch } from '@/shared/api/http'
 
 interface TemplateBlockControlsProps {
   blockId: string
@@ -28,7 +29,7 @@ export const TemplateBlockControls: React.FC<TemplateBlockControlsProps> = ({
   const handleEnable = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/blocks/${blockId}/enable-template`, {
+      const response = await apiFetch(`/api/blocks/${blockId}/enable-template`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -53,7 +54,7 @@ export const TemplateBlockControls: React.FC<TemplateBlockControlsProps> = ({
   const handleDisable = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/blocks/${blockId}/disable-template`, {
+      const response = await apiFetch(`/api/blocks/${blockId}/disable-template`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })

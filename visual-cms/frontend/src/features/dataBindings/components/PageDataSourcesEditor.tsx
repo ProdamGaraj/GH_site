@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { apiFetch } from '@/shared/api/http'
 
 /**
  * Page Data Source - привязка источника данных к странице с алиасом
@@ -58,7 +59,7 @@ export const PageDataSourcesEditor: React.FC<PageDataSourcesEditorProps> = ({
     const loadDataSources = async () => {
       try {
         setLoading(true)
-        const response = await fetch('/api/data-sources')
+        const response = await apiFetch('/api/data-sources')
         if (response.ok) {
           const data = await response.json()
           // Backend возвращает объект с полями {items, total, page, limit, totalPages}

@@ -18,9 +18,20 @@ import { SitePagesPage } from '@/pages/SitePagesPage'
 import { CollectionsPage } from '@/pages/CollectionsPage'
 import { CollectionEditor } from '@/pages/CollectionEditor'
 import { MediaLibraryPage } from '@/pages/MediaLibraryPage'
+import { Login } from '@/pages/Login'
+import { RequireAuth } from '@/widgets/auth/RequireAuth'
 
 
 export const router = createBrowserRouter([
+  // Публичный маршрут логина — вне RequireAuth.
+  {
+    path: '/login',
+    element: <Login />,
+  },
+  // Всё остальное — только при валидной сессии.
+  {
+    element: <RequireAuth />,
+    children: [
   {
     path: '/',
     element: <MainLayout />,
@@ -111,6 +122,8 @@ export const router = createBrowserRouter([
   {
     path: '/data-sources/:id/edit',
     element: <DataSourceEditor />,
+  },
+    ],
   },
 ], {
   // Must match Vite's `base` so routes resolve when the app is served under the

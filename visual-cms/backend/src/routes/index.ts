@@ -20,9 +20,11 @@ import languagesRouter from './languages'
 import translationsRouter from './translations'
 import collectionsRouter from './collections'
 import mediaRouter from './media'
+import authRouter from './auth'
 
 const router = Router()
 
+router.use('/auth', authRouter)
 router.use('/sites', sitesRouter)
 router.use('/collections', collectionsRouter)
 router.use('/analytics', analyticsRouter)

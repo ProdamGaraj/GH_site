@@ -149,6 +149,12 @@ declare global {
   namespace Express {
     interface Request {
       id?: string
+      /** Заполняется requireAuth после валидации JWT-cookie. */
+      user?: {
+        id: string
+        username: string
+        role: string
+      }
     }
   }
 }

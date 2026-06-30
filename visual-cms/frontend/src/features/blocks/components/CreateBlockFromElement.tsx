@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Package, Sparkles } from 'lucide-react'
 import type { BlockNode } from '@/shared/types'
+import { apiFetch } from '@/shared/api/http'
 
 interface CreateBlockFromElementProps {
   element: BlockNode
@@ -22,7 +23,7 @@ export const CreateBlockFromElement: React.FC<CreateBlockFromElementProps> = ({
   const handleCreate = async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/blocks/create-from-element', {
+      const response = await apiFetch('/api/blocks/create-from-element', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

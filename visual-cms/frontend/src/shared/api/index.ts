@@ -1,4 +1,5 @@
 ﻿import { getApiBaseUrl } from './baseUrl'
+import { apiFetch } from './http'
 
 const API_BASE_URL = getApiBaseUrl()
 
@@ -47,8 +48,9 @@ class ApiClient {
       },
     }
 
-    const response = await fetch(url, config)
-    
+    // apiFetch добавляет credentials, CSRF-заголовок на мутациях и обработку 401.
+    const response = await apiFetch(url, config)
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Network error' }))
       let message = error.message || `HTTP error ${response.status}`

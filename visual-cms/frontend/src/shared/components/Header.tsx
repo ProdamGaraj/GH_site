@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Home, FileText, Box, Database, Settings, Menu, BarChart3, Globe, Layers, Image as ImageIcon } from 'lucide-react'
+import { LogoutButton } from '@/features/auth/LogoutButton'
 
 interface HeaderProps {
   showActions?: React.ReactNode
@@ -117,18 +118,18 @@ export const Header: React.FC<HeaderProps> = ({ showActions, centerActions, righ
             {centerActions}
           </div>
 
-          {/* 3. Справа - действия со страницей (сохранить, экспорт, публикация) */}
+          {/* 3. Справа - действия со страницей (сохранить, экспорт, публикация) + выход */}
           <div className="flex items-center gap-2">
             {rightActions}
+            <LogoutButton />
           </div>
         </>
       ) : (
-        /* Fallback для старого API с showActions */
-        showActions && (
-          <div className="flex items-center gap-2">
-            {showActions}
-          </div>
-        )
+        /* Fallback для старого API с showActions + кнопка выхода (всегда справа) */
+        <div className="flex items-center gap-2">
+          {showActions}
+          <LogoutButton />
+        </div>
       )}
     </header>
   )
