@@ -15,7 +15,12 @@ AppDataSource.initialize()
     await runSafeMigrations(AppDataSource)
 
     // Создаём первого админа из env, если пользователей ещё нет.
-    await ensureAdminUser(AppDataSource)
+    // Не фатально: сбой сидинга не должен ронять весь backend (иначе 502).
+    try {
+      await ensureAdminUser(AppDataSource)
+    } catch (err) {
+      logger.error('Admin bootstrap failed (continuing)', err instanceof Error ? err : undefined)
+    }
 
     // Серверный планировщик обновления feed-источников (раз в минуту).
     feedPollingScheduler.start()
