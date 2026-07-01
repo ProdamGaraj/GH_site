@@ -2263,6 +2263,8 @@ export class DeployService {
             lang: lang.code,
             direction: lang.direction,
             availableLanguages,
+            // Карта переводов языка — для адаптивного медиа «экран × язык» (<picture>/фон-@media).
+            translationMap,
             ...this.siteAssetOptions(page.site),
           })
 

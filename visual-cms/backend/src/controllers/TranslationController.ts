@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { translationService } from '../services/TranslationService'
-import { asyncHandler, NotFoundError } from '../middleware'
+import { translationIOService } from '../services/TranslationIOService'
+import { asyncHandler, NotFoundError, ValidationError } from '../middleware'
 
 export class TranslationController {
   /**
@@ -107,6 +108,35 @@ export class TranslationController {
     const { fromLocale, toLocale } = req.body
     const result = await translationService.copyTranslations(pageId, fromLocale, toLocale)
     res.json(result)
+  })
+
+  /**
+   * GET /api/translations/site/:siteId/export
+   * Экспорт всех переводов сайта в XLSX (для внешних переводчиков).
+   */
+  exportSite = asyncHandler(async (req: Request, res: Response) => {
+    const { siteId } = req.params
+    const { buffer, filename } = await translationIOService.exportSite(siteId)
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.send(buffer)
+  })
+
+  /**
+   * POST /api/translations/site/:siteId/import  (multipart, поле "file")
+   * Импорт переводов сайта из XLSX. Возвращает отчёт { imported, updated, skipped, orphans }.
+   */
+  importSite = asyncHandler(async (req: Request, res: Response) => {
+    const { siteId } = req.params
+    const file = (req as Request & { file?: { buffer: Buffer } }).file
+    if (!file || !file.buffer) {
+      throw new ValidationError('Файл не загружен (ожидается поле "file")')
+    }
+    const report = await translationIOService.importSite(siteId, file.buffer)
+    res.json(report)
   })
 }
 

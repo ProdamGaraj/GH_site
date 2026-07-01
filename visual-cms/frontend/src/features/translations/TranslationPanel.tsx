@@ -19,13 +19,20 @@ import {
   selectNonDefaultLanguages,
   selectDefaultLanguage,
   updateTranslationLocally,
+  exportSiteTranslations,
+  importSiteTranslations,
+  clearImportReport,
+  selectTranslationsIoBusy,
+  selectTranslationImportReport,
 } from './translationsSlice'
-import { selectRootNode, selectSelectedNode, setActiveRightPanel, updateNode } from '@/features/editor/editorSlice'
+import { selectRootNode, selectSelectedNode, setActiveRightPanel, updateNode, selectBreakpoints } from '@/features/editor/editorSlice'
+import { ResponsiveMediaMatrix } from '@/features/media/ResponsiveMediaMatrix'
 import { Button } from '@/shared/components/Button'
 import {
   Globe, ChevronDown, Check, Search, Image, Type, Link,
   FileText, Save, Loader2, X, Languages, ArrowRight,
-  Eye, EyeOff, Settings, MousePointer, Trash2, Film
+  Eye, EyeOff, Settings, MousePointer, Trash2, Film,
+  Download, Upload, AlertTriangle
 } from 'lucide-react'
 import type { TranslationEntry } from '@/shared/types/translation'
 import { MediaPicker } from '@/features/media/MediaPicker'
@@ -377,6 +384,10 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
   const progress = useAppSelector(selectTranslationProgress)
   const selectedNode = useAppSelector(selectSelectedNode)
   const rootNode = useAppSelector(selectRootNode)
+  const breakpoints = useAppSelector(selectBreakpoints)
+  const ioBusy = useAppSelector(selectTranslationsIoBusy)
+  const importReport = useAppSelector(selectTranslationImportReport)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCategory, setFilterCategory] = useState<FieldCategory>('all')
@@ -545,6 +556,24 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
   const hasUnsaved = Object.keys(editedValues).length > 0
   const activeLang = languages.find(l => l.code === activeLocale)
 
+  const handleExport = () => {
+    if (siteId) dispatch(exportSiteTranslations(siteId))
+  }
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && siteId) dispatch(importSiteTranslations({ siteId, file }))
+    e.target.value = '' // позволяем повторно выбрать тот же файл
+  }
+
+  // Матрица адаптивного медиа — для выбранного медиа-узла (img или узел с фоном).
+  const mediaNode =
+    selectedNode &&
+    ((selectedNode.tagName || '').toLowerCase() === 'img' ||
+      (selectedNode as { elementType?: string }).elementType === 'image' ||
+      !!(selectedNode as { styles?: { properties?: { backgroundImage?: string } } }).styles?.properties?.backgroundImage)
+      ? selectedNode
+      : null
+
   if (languages.length === 0 || nonDefaultLangs.length === 0) {
     return (
       <div className="p-4 text-center text-sm text-gray-500 space-y-3">
@@ -569,6 +598,29 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
           <Languages size={16} className="text-blue-600" />
           <span className="text-xs font-semibold text-gray-600 uppercase flex-1">Переводы</span>
           <button
+            onClick={handleExport}
+            disabled={!siteId || ioBusy}
+            className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title={siteId ? 'Экспорт переводов сайта (XLSX)' : 'Страница не привязана к сайту'}
+          >
+            {ioBusy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!siteId || ioBusy}
+            className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title={siteId ? 'Импорт переводов сайта (XLSX)' : 'Страница не привязана к сайту'}
+          >
+            <Upload size={14} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <button
             onClick={() => dispatch(setActiveRightPanel('languageSettings'))}
             className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
             title="Настройки языков"
@@ -576,6 +628,30 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
             <Settings size={14} />
           </button>
         </div>
+
+        {/* Отчёт импорта XLSX */}
+        {importReport && (
+          <div className="flex items-start gap-2 p-2 rounded bg-blue-50 border border-blue-100 text-[11px] text-blue-800">
+            <Check size={12} className="mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <div>
+                Импорт: +{importReport.imported} нов., {importReport.updated} обн., {importReport.skipped} пропущ.
+              </div>
+              {importReport.orphans.length > 0 && (
+                <div className="flex items-center gap-1 text-amber-700 mt-0.5">
+                  <AlertTriangle size={11} />
+                  {importReport.orphans.length} строк не сопоставлено (устаревшие ключи)
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => dispatch(clearImportReport())}
+              className="p-0.5 rounded hover:bg-blue-100 text-blue-400 hover:text-blue-600"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
         
         {/* Language selector */}
         <div className="relative">
@@ -720,6 +796,22 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
           </div>
         )}
       </div>
+
+      {/* Матрица адаптивного медиа «экран × язык» для выбранного медиа-узла */}
+      {mediaNode && (
+        <ResponsiveMediaMatrix
+          key={mediaNode.id}
+          node={mediaNode}
+          rootNode={rootNode}
+          pageId={pageId}
+          siteId={siteId}
+          breakpoints={breakpoints}
+          defaultLang={defaultLang}
+          activeLang={activeLang}
+          activeLocale={activeLocale}
+          translationMap={translationMap}
+        />
+      )}
 
       {/* Content: Translation entries */}
       <div className="flex-1 overflow-y-auto">

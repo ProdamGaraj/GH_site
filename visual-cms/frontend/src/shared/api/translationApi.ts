@@ -2,6 +2,8 @@
  * API layer for Languages and Translations
  */
 import { api } from './index'
+import { apiFetch } from './http'
+import { getApiBaseUrl } from './baseUrl'
 import type {
   Language,
   CreateLanguageRequest,
@@ -73,4 +75,46 @@ export const translationApi = {
   /** Copy translations between locales */
   copyTranslations: (pageId: string, fromLocale: string, toLocale: string) =>
     api.post<Translation[]>(`/translations/${pageId}/copy`, { fromLocale, toLocale }),
+
+  /** Экспорт всех переводов сайта в XLSX — скачивает файл в браузере. */
+  exportSite: async (siteId: string): Promise<void> => {
+    const res = await apiFetch(`${getApiBaseUrl()}/translations/site/${siteId}/export`, { method: 'GET' })
+    if (!res.ok) throw new Error(`Не удалось выгрузить переводы (${res.status})`)
+    const blob = await res.blob()
+    const cd = res.headers.get('Content-Disposition') || ''
+    const m = cd.match(/filename="?([^"]+)"?/)
+    const filename = m ? m[1] : `translations-${siteId}.xlsx`
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  },
+
+  /** Импорт переводов сайта из XLSX. Возвращает отчёт. */
+  importSite: async (siteId: string, file: File): Promise<TranslationImportReport> => {
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await apiFetch(`${getApiBaseUrl()}/translations/site/${siteId}/import`, {
+      method: 'POST',
+      body: fd,
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Импорт не удался' }))
+      throw new Error(err.message || `Импорт не удался (${res.status})`)
+    }
+    return res.json() as Promise<TranslationImportReport>
+  },
+}
+
+/** Отчёт импорта переводов (соответствует backend TranslationIOService.ImportReport). */
+export interface TranslationImportReport {
+  imported: number
+  updated: number
+  skipped: number
+  orphans: Array<{ page?: string; nodeId: string; field: string; reason: string }>
+  locales: string[]
 }

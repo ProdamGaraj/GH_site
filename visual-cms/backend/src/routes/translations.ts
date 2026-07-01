@@ -1,9 +1,19 @@
 import { Router } from 'express'
+import multer from 'multer'
 import { translationController } from '../controllers/TranslationController'
 import { validate } from '../middleware/validate'
 import { bulkTranslationSchema, upsertTranslationSchema, copyTranslationsSchema } from '../schemas/translation.schema'
 
 const router = Router()
+
+// Загрузка XLSX для импорта: в память, лимит 15 МБ (P2).
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } })
+
+// --- Сайтовый экспорт/импорт (регистрируем до /:pageId/*, чтобы 'site' не поймался как pageId) ---
+// GET /api/translations/site/:siteId/export - выгрузка всех переводов сайта в XLSX
+router.get('/site/:siteId/export', translationController.exportSite)
+// POST /api/translations/site/:siteId/import - импорт переводов сайта из XLSX (поле "file")
+router.post('/site/:siteId/import', upload.single('file'), translationController.importSite)
 
 // GET /api/translations/:pageId/source - extract translatable fields
 router.get('/:pageId/source', translationController.getTranslatableContent)

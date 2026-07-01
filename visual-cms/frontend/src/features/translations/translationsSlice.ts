@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
 import type { RootState } from '@/app/store'
 import { languageApi, translationApi } from '@/shared/api/translationApi'
+import type { TranslationImportReport } from '@/shared/api/translationApi'
 import type {
   Language,
   CreateLanguageRequest,
@@ -37,6 +38,11 @@ interface TranslationsState {
   
   // Translation panel open state
   panelOpen: boolean
+
+  // Site XLSX export/import
+  ioBusy: boolean
+  ioError: string | null
+  importReport: TranslationImportReport | null
 }
 
 const initialState: TranslationsState = {
@@ -57,8 +63,12 @@ const initialState: TranslationsState = {
   
   progress: [],
   progressLoading: false,
-  
+
   panelOpen: false,
+
+  ioBusy: false,
+  ioError: null,
+  importReport: null,
 }
 
 // === Language thunks ===
@@ -209,6 +219,22 @@ export const copyTranslations = createAsyncThunk(
   }
 )
 
+// === Site XLSX export/import ===
+
+export const exportSiteTranslations = createAsyncThunk(
+  'translations/exportSite',
+  async (siteId: string) => {
+    await translationApi.exportSite(siteId)
+  }
+)
+
+export const importSiteTranslations = createAsyncThunk(
+  'translations/importSite',
+  async ({ siteId, file }: { siteId: string; file: File }) => {
+    return await translationApi.importSite(siteId, file)
+  }
+)
+
 // === Slice ===
 
 const translationsSlice = createSlice({
@@ -229,6 +255,10 @@ const translationsSlice = createSlice({
       state.translationMap = {}
       state.sourceContent = []
       state.progress = []
+    },
+    clearImportReport: (state) => {
+      state.importReport = null
+      state.ioError = null
     },
     // Optimistic update for single translation
     updateTranslationLocally: (state, action: PayloadAction<{ nodeId: string; field: string; value: string }>) => {
@@ -385,6 +415,32 @@ const translationsSlice = createSlice({
       .addCase(fetchTranslationProgress.rejected, (state) => {
         state.progressLoading = false
       })
+
+      // Site XLSX export/import
+      .addCase(exportSiteTranslations.pending, (state) => {
+        state.ioBusy = true
+        state.ioError = null
+      })
+      .addCase(exportSiteTranslations.fulfilled, (state) => {
+        state.ioBusy = false
+      })
+      .addCase(exportSiteTranslations.rejected, (state, action) => {
+        state.ioBusy = false
+        state.ioError = action.error.message || 'Не удалось выгрузить переводы'
+      })
+      .addCase(importSiteTranslations.pending, (state) => {
+        state.ioBusy = true
+        state.ioError = null
+        state.importReport = null
+      })
+      .addCase(importSiteTranslations.fulfilled, (state, action) => {
+        state.ioBusy = false
+        state.importReport = action.payload
+      })
+      .addCase(importSiteTranslations.rejected, (state, action) => {
+        state.ioBusy = false
+        state.ioError = action.error.message || 'Импорт не удался'
+      })
   },
 })
 
@@ -393,6 +449,7 @@ export const {
   toggleTranslationPanel,
   setTranslationPanelOpen,
   clearTranslations,
+  clearImportReport,
   updateTranslationLocally,
 } = translationsSlice.actions
 
@@ -412,6 +469,9 @@ export const selectSourceContent = (state: RootState) => state.translations.sour
 export const selectSourceContentLoading = (state: RootState) => state.translations.sourceContentLoading
 export const selectTranslationProgress = (state: RootState) => state.translations.progress
 export const selectTranslationPanelOpen = (state: RootState) => state.translations.panelOpen
+export const selectTranslationsIoBusy = (state: RootState) => state.translations.ioBusy
+export const selectTranslationsIoError = (state: RootState) => state.translations.ioError
+export const selectTranslationImportReport = (state: RootState) => state.translations.importReport
 
 // Get translation for a specific node+field
 export const selectNodeTranslation = (nodeId: string, field: string) => (state: RootState) =>

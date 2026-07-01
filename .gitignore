@@ -7,7 +7,6 @@ lol.html
 .tmp_residential_structure.json
 api_resp.json
 .vscode/launch.json
-visual-cms/backend/src/migrations/add-stats-to-collections.sql
 visual-cms/backups/visual_cms_20260429-102421.sql
 visual-cms/backups/visual_cms_20260429-102428.dump
 visual-cms/scripts/diagnose-transforms.sql
@@ -28,3 +27,4 @@ test.html
 Сайт Голден хаус/*
 gh-export/*
 gh-export.rar
+

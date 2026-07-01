@@ -316,6 +316,45 @@ export function applyVariableMediaTranslations<T extends { name: string; default
   })
 }
 
+/**
+ * Извлекает пер-брейкпоинтные медиа-поля из variations дерева.
+ * Экранные оверрайды (базовый язык) хранятся в
+ * variations[bpId].inheritedOverrides[nodeId] — берём `.attributes.src` и
+ * `.styles.backgroundImage` (голый URL). Кодируем брейкпоинт в имя поля:
+ *   `src@<bpId>` / `bg:image@<bpId>`
+ * «Оригинал» такого поля = экранное значение базового языка; так пер-брейкпоинтное
+ * медиа видно и в панели переводов, и в экспорте, и в прогрессе.
+ */
+export function extractResponsiveMediaFields(root: any): TranslationEntry[] {
+  const entries: TranslationEntry[] = []
+
+  const walk = (node: any): void => {
+    if (!node) return
+    if (node.variations) {
+      for (const [bpId, variation] of Object.entries(node.variations as Record<string, any>)) {
+        const io = variation?.inheritedOverrides
+        if (io) {
+          for (const [descId, ov] of Object.entries(io as Record<string, any>)) {
+            const src = ov?.attributes?.src
+            if (typeof src === 'string' && src.trim()) {
+              entries.push({ nodeId: descId, field: `src@${bpId}`, value: src })
+            }
+            const bgUrl = parseCssUrl(ov?.styles?.backgroundImage)
+            if (bgUrl) {
+              entries.push({ nodeId: descId, field: `${BG_IMAGE_FIELD}@${bpId}`, value: bgUrl })
+            }
+          }
+        }
+        for (const sc of variation?.specificChildren || []) walk(sc)
+      }
+    }
+    for (const child of node.children || []) walk(child)
+  }
+
+  walk(root)
+  return entries
+}
+
 export class TranslationService {
   private repository = AppDataSource.getRepository(Translation)
   private pageRepository = AppDataSource.getRepository(Page)
@@ -390,6 +429,66 @@ export class TranslationService {
   }
 
   /**
+   * Батчевый upsert переводов одной локали (P1: без N+1).
+   * Грузит существующие переводы локали ОДНИМ запросом, диффает в памяти и
+   * сохраняет изменения пачками. Записи с одинаковым (nodeId, field) во входе
+   * дедупятся — побеждает последняя. Возвращает счётчики вставок/обновлений.
+   */
+  async bulkUpsertBatched(
+    pageId: string,
+    locale: string,
+    entries: TranslationEntry[],
+  ): Promise<{ inserted: number; updated: number; unchanged: number }> {
+    if (entries.length === 0) return { inserted: 0, updated: 0, unchanged: 0 }
+
+    const existing = await this.repository.find({ where: { pageId, locale } })
+    const byKey = new Map<string, Translation>()
+    for (const t of existing) byKey.set(`${t.nodeId}::${t.field}`, t)
+
+    // Дедуп входа по ключу (последняя запись побеждает).
+    const dedup = new Map<string, TranslationEntry>()
+    for (const e of entries) dedup.set(`${e.nodeId}::${e.field}`, e)
+
+    const toSave: Translation[] = []
+    let inserted = 0
+    let updated = 0
+    let unchanged = 0
+
+    for (const [key, e] of dedup) {
+      const cur = byKey.get(key)
+      if (cur) {
+        const statusChanged = !!e.status && cur.status !== e.status
+        if (cur.value !== e.value || statusChanged) {
+          cur.value = e.value
+          if (e.status) cur.status = e.status
+          toSave.push(cur)
+          updated++
+        } else {
+          unchanged++
+        }
+      } else {
+        toSave.push(
+          this.repository.create({
+            pageId,
+            locale,
+            nodeId: e.nodeId,
+            field: e.field,
+            value: e.value,
+            status: e.status || 'draft',
+          }),
+        )
+        inserted++
+      }
+    }
+
+    if (toSave.length > 0) {
+      await this.repository.save(toSave, { chunk: 200 })
+    }
+
+    return { inserted, updated, unchanged }
+  }
+
+  /**
    * Update a single translation
    */
   async upsertOne(pageId: string, locale: string, nodeId: string, field: string, value: string, status?: string): Promise<Translation> {
@@ -460,6 +559,9 @@ export class TranslationService {
 
     // BlockNode tree content
     entries.push(...extractTranslatableFields(page.structure))
+
+    // Пер-брейкпоинтные медиа (матрица «экран × язык»): src@bp / bg:image@bp.
+    entries.push(...extractResponsiveMediaFields(page.structure))
 
     // Медиа в page-переменных (repeat-слайдеры) — разные файлы под язык.
     if ((page as any).variables) {

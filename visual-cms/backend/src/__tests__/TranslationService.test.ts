@@ -15,6 +15,7 @@ import {
   looksLikeMediaUrl,
   extractVariableMediaFields,
   applyVariableMediaTranslations,
+  extractResponsiveMediaFields,
 } from '../services/TranslationService'
 
 describe('parseCssUrl', () => {
@@ -190,5 +191,48 @@ describe('applyVariableMediaTranslations', () => {
     const out: any = applyVariableMediaTranslations(variables, map)
     expect(out[0].defaultValue.length).toBe(2)
     expect(out[0].defaultValue[0].imageUrl).toBe('/media/orig1.png')
+  })
+})
+
+describe('extractResponsiveMediaFields', () => {
+  it('извлекает src@bp и bg:image@bp из inheritedOverrides variations', () => {
+    const root = {
+      id: 'root',
+      children: [
+        { id: 'img1', tagName: 'img', attributes: { src: '/base.jpg' } },
+        { id: 'hero', styles: { properties: { backgroundImage: 'url("/base.png")' } } },
+      ],
+      variations: {
+        mobile: {
+          inheritedOverrides: {
+            img1: { attributes: { src: '/m.jpg' } },
+            hero: { styles: { backgroundImage: 'url("/m.png")' } },
+          },
+        },
+      },
+    }
+    const out = extractResponsiveMediaFields(root)
+    expect(out).toEqual(
+      expect.arrayContaining([
+        { nodeId: 'img1', field: 'src@mobile', value: '/m.jpg' },
+        { nodeId: 'hero', field: `${BG_IMAGE_FIELD}@mobile`, value: '/m.png' },
+      ]),
+    )
+  })
+
+  it('градиент в оверрайде фона не даёт bg-поля (не url())', () => {
+    const root = {
+      id: 'root',
+      children: [{ id: 'hero' }],
+      variations: {
+        tablet: { inheritedOverrides: { hero: { styles: { backgroundImage: 'linear-gradient(#000,#fff)' } } } },
+      },
+    }
+    const out = extractResponsiveMediaFields(root)
+    expect(out.find((e) => e.field.startsWith(BG_IMAGE_FIELD))).toBeUndefined()
+  })
+
+  it('нет variations — пустой список', () => {
+    expect(extractResponsiveMediaFields({ id: 'x', children: [] })).toEqual([])
   })
 })

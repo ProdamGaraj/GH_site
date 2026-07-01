@@ -351,18 +351,24 @@ export class StyleGenerator {
    * Обходит дерево рекурсивно, собирает все inheritedOverrides и specificChildren,
    * группирует по breakpoint и генерирует @media (max-width) блоки.
    */
+  /**
+   * Возвращает breakpoints страницы: из metadata корня либо стандартный fallback
+   * (совпадает с дефолтами frontend editorSlice). Единый источник для responsive-CSS
+   * и ResponsiveMediaResolver — чтобы @media и <picture> использовали одни и те же ширины.
+   */
+  getBreakpoints(rootNode: BlockNode): BreakpointDef[] {
+    const breakpoints: BreakpointDef[] = rootNode?.metadata?.breakpoints || []
+    if (breakpoints.length > 0) return breakpoints
+    return [
+      { id: 'desktop-fhd', name: 'Desktop FHD', width: 1920 },
+      { id: 'desktop-hd', name: 'Desktop HD', width: 1440 },
+      { id: 'tablet', name: 'Tablet', width: 768 },
+      { id: 'mobile', name: 'Mobile', width: 375 },
+    ]
+  }
+
   generateResponsiveCSS(rootNode: BlockNode): string {
-    // Извлекаем breakpoints из metadata root-узла, с fallback на стандартные
-    let breakpoints: BreakpointDef[] = rootNode.metadata?.breakpoints || []
-    if (breakpoints.length === 0) {
-      // Fallback: default breakpoints matching frontend editorSlice defaults
-      breakpoints = [
-        { id: 'desktop-fhd', name: 'Desktop FHD', width: 1920 },
-        { id: 'desktop-hd', name: 'Desktop HD', width: 1440 },
-        { id: 'tablet', name: 'Tablet', width: 768 },
-        { id: 'mobile', name: 'Mobile', width: 375 },
-      ]
-    }
+    const breakpoints = this.getBreakpoints(rootNode)
 
     // Сортируем breakpoints от большего к меньшему для правильного каскада CSS
     const sortedBreakpoints = [...breakpoints].sort((a, b) => b.width - a.width)
@@ -407,7 +413,11 @@ export class StyleGenerator {
             if (override.hidden) {
               breakpointRules[bpId].push(`${selector} { display: none !important; }`)
             } else if (override.styles && Object.keys(override.styles).length > 0) {
-              const propsStr = cssPropertiesToString(override.styles, true)
+              // backgroundImage под брейкпоинт разрешается ResponsiveMediaResolver
+              // (учитывает матрицу «экран × язык»), поэтому исключаем его здесь,
+              // чтобы не эмитить фон дважды и не нарушать приоритет языка.
+              const { backgroundImage: _bg, ...restStyles } = override.styles
+              const propsStr = cssPropertiesToString(restStyles, true)
               if (propsStr) {
                 breakpointRules[bpId].push(`${selector} { ${propsStr} }`)
               }

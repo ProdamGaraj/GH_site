@@ -4,6 +4,13 @@
 import { styleGenerator } from './StyleGenerator'
 import { generateDataBindingRuntime, type PageDataConfig } from './DataBindingGenerator'
 import { generateCarouselRuntime } from './CarouselRuntime'
+import {
+  resolveResponsiveMedia,
+  generateBackgroundMediaCss,
+  buildPictureTag,
+  type MediaPlanMap,
+  type TranslationFieldMap,
+} from './ResponsiveMediaResolver'
 import type { BlockNode, CSSProperties } from '../types/blockNode'
 
 export interface AvailableLanguage {
@@ -53,6 +60,11 @@ export interface GeneratePageOptions {
   siteCustomHead?: string
   /** Сырой HTML сайта перед </body> (Site.settings.customBodyEndHtml). */
   siteCustomBodyEnd?: string
+  /**
+   * Переводы активного языка (плоская карта nodeId→field→value) для разрешения
+   * адаптивного медиа «экран × язык». Для дефолтного языка не передаётся ({}).
+   */
+  translationMap?: TranslationFieldMap
 }
 
 export class HtmlGenerator {
@@ -65,13 +77,20 @@ export class HtmlGenerator {
     // Собираем ID specificChildren для базового скрытия
     const specificChildrenIds = styleGenerator.collectSpecificChildrenIds(structure)
 
-    const bodyContent = this.renderNode(structure)
+    // План адаптивного медиа (матрица «экран × язык»): <picture> для <img> и фон-@media.
+    const breakpoints = styleGenerator.getBreakpoints(structure)
+    const mediaPlan = resolveResponsiveMedia(structure, options.translationMap || {}, breakpoints)
+
+    const bodyContent = this.renderNode(structure, '  ', mediaPlan)
 
     // Генерируем CSS для hover, анимаций и т.д.
     const { css: dynamicCSS, keyframes, scripts } = styleGenerator.generateNodeTreeStyles(structure)
 
     // Генерируем responsive CSS (@media queries) из variations
     const responsiveCSS = styleGenerator.generateResponsiveCSS(structure)
+
+    // Фоновые @media из плана медиа (backgroundImage делегирован сюда из StyleGenerator).
+    const responsiveMediaCSS = generateBackgroundMediaCss(mediaPlan, breakpoints)
 
     // Базовый CSS для скрытия specificChildren (они показываются только в своём @media)
     let specificHideCSS = ''
@@ -195,7 +214,7 @@ ${authoredCss}
     
     /* Form and output binding styles */
     ${styleGenerator.generateFormStyles()}
-${specificHideCSS}${responsiveCSS}
+${specificHideCSS}${responsiveCSS}${responsiveMediaCSS}
   </style>
 ${siteCustomHead ? '  ' + siteCustomHead.split('\n').join('\n  ') + '\n' : ''}${customHeadHtml ? '  ' + customHeadHtml.split('\n').join('\n  ') + '\n' : ''}</head>
 <body>
@@ -323,21 +342,29 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
   /**
    * Некурсивно рендерит узел в HTML
    */
-  private renderNode(node: BlockNode, indent: string = '  '): string {
+  private renderNode(node: BlockNode, indent: string = '  ', mediaPlan?: MediaPlanMap): string {
     if (!node) return ''
-    
+
     const tagName = node.tagName || 'div'
     const styles = this.renderStyles(node.styles?.properties || {})
     const attributes = this.renderAttributes(node.attributes || {})
-    
+
     // Добавляем data-element-id для CSS селекторов (hover, анимации) и data-element-name
     const dataAttr = ` data-element-id="${node.id}"` + (node.metadata?.name ? ` data-element-name="${node.metadata.name.replace(/"/g, '&quot;')}"` : '')
-    
+
     // Void elements (самозакрывающиеся)
     const voidElements = ['input', 'img', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr']
-    
+
     if (voidElements.includes(tagName.toLowerCase())) {
-      return `${indent}<${tagName}${styles}${dataAttr}${attributes} />\n`
+      const voidTag = `<${tagName}${styles}${dataAttr}${attributes} />`
+      // Адаптивный <img> (art-direction): оборачиваем в <picture> с <source media>.
+      // data-element-id и атрибуты остаются на внутреннем <img> — CSS-селекторы,
+      // карусель и биндинги не замечают разницы.
+      const imgSources = tagName.toLowerCase() === 'img' ? mediaPlan?.get(node.id)?.img : undefined
+      if (imgSources && imgSources.length > 0) {
+        return `${indent}${buildPictureTag(voidTag, imgSources, (s) => this.escapeHtml(s))}\n`
+      }
+      return `${indent}${voidTag}\n`
     }
     
     // HTML code elements - output raw content without escaping
@@ -353,17 +380,17 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
     const textContent = node.content ? this.escapeHtml(node.content) : ''
     
     // Дочерние элементы
-    const childrenHtml = node.children?.map(child => 
-      this.renderNode(child, indent + '  ')
+    const childrenHtml = node.children?.map(child =>
+      this.renderNode(child, indent + '  ', mediaPlan)
     ).join('') || ''
-    
+
     // Viewport-specific elements from variations (specificChildren)
     let specificChildrenHtml = ''
     if (node.variations) {
       for (const variation of Object.values(node.variations)) {
         if (variation.specificChildren) {
           specificChildrenHtml += variation.specificChildren.map(child =>
-            this.renderNode(child, indent + '  ')
+            this.renderNode(child, indent + '  ', mediaPlan)
           ).join('')
         }
       }

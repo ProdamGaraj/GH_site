@@ -504,7 +504,87 @@ const editorSlice = createSlice({
       state.rootNode = updateInNode(state.rootNode)
       state.isDirty = true
     },
-    
+
+    /**
+     * Устанавливает медиа выбранного узла для базового языка в матрице «экран × язык».
+     *  - breakpoint == null  → базовый экран: пишем прямо в узел
+     *    (src → attributes.src; bg → styles.properties.backgroundImage = url("…"));
+     *  - breakpoint != null  → экранный оверрайд в variations родителя (или самого
+     *    root-узла) → inheritedOverrides[nodeId].{attributes.src | styles.backgroundImage}.
+     * value === '' удаляет соответствующее значение. Не зависит от editMode
+     * (матрица адресует ячейку явно). Локали пишутся отдельно через переводы.
+     */
+    setNodeMediaOverride: (state, action: PayloadAction<{
+      nodeId: string
+      breakpoint: string | null
+      slot: 'src' | 'bg'
+      value: string
+    }>) => {
+      if (!state.rootNode) return
+      const { nodeId, breakpoint, slot, value } = action.payload
+
+      // База (без брейкпоинта) — прямо в узел.
+      if (!breakpoint) {
+        const applyBase = (n: BlockNode): BlockNode => {
+          if (n.id === nodeId) {
+            if (slot === 'src') {
+              const attributes = { ...(n.attributes || {}) }
+              if (value) attributes.src = value
+              else delete attributes.src
+              return { ...n, attributes }
+            }
+            const properties = { ...(n.styles?.properties || {}) }
+            if (value) properties.backgroundImage = `url("${value}")`
+            else delete properties.backgroundImage
+            return { ...n, styles: { ...n.styles, properties } }
+          }
+          return { ...n, children: n.children.map(applyBase) }
+        }
+        state.rootNode = applyBase(state.rootNode)
+        state.isDirty = true
+        return
+      }
+
+      // Экранный оверрайд — в variations владельца (родитель, либо сам root).
+      const isRoot = state.rootNode.id === nodeId
+      const owner = isRoot ? state.rootNode : findParentNode(state.rootNode, nodeId)
+      if (!owner) return
+
+      const applyOverride = (n: BlockNode): BlockNode => {
+        if (n.id === owner.id) {
+          const variations = n.variations || {}
+          const variation = variations[breakpoint] || {}
+          const io = variation.inheritedOverrides || {}
+          const cur = io[nodeId] || {}
+          const nextOverride = { ...cur }
+          if (slot === 'src') {
+            const attrs = { ...(cur.attributes || {}) }
+            if (value) attrs.src = value
+            else delete attrs.src
+            nextOverride.attributes = attrs
+          } else {
+            const styles = { ...(cur.styles || {}) }
+            if (value) styles.backgroundImage = `url("${value}")`
+            else delete styles.backgroundImage
+            nextOverride.styles = styles
+          }
+          return {
+            ...n,
+            variations: {
+              ...variations,
+              [breakpoint]: {
+                ...variation,
+                inheritedOverrides: { ...io, [nodeId]: nextOverride },
+              },
+            },
+          }
+        }
+        return { ...n, children: n.children.map(applyOverride) }
+      }
+      state.rootNode = applyOverride(state.rootNode)
+      state.isDirty = true
+    },
+
     updateNodeStyles: (state, action: PayloadAction<{
       nodeId: string
       properties?: Partial<CSSProperties>
@@ -1493,6 +1573,7 @@ export const {
   insertPreparedNode,
   updateNode,
   updateNodeStyles,
+  setNodeMediaOverride,
   updateLayoutMode,
   deleteNode,
   moveNode,
