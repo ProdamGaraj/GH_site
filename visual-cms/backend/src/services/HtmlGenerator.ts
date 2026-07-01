@@ -4,6 +4,7 @@
 import { styleGenerator } from './StyleGenerator'
 import { generateDataBindingRuntime, type PageDataConfig } from './DataBindingGenerator'
 import { generateCarouselRuntime } from './CarouselRuntime'
+import { generateResponsiveMediaRuntime } from './ResponsiveMediaRuntime'
 import {
   resolveResponsiveMedia,
   generateBackgroundMediaCss,
@@ -222,6 +223,8 @@ ${bodyContent}
 ${this.generateLanguageSwitcher(slug, lang, availableLanguages)}
 ${navigation && navigation.length > 0 ? this.generateNavRuntime(navigation) : ''}
 ${dataConfig ? generateDataBindingRuntime(dataConfig) : ''}
+  <script>window.__ghBreakpoints = ${JSON.stringify(breakpoints.map(b => ({ id: b.id, width: b.width })))};</script>
+${generateResponsiveMediaRuntime()}
 ${generateCarouselRuntime()}
 ${authoredJs}${scripts ? `<script>\n${scripts}\n</script>` : ''}
 ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>

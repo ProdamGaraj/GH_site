@@ -156,6 +156,23 @@ describe('extractVariableMediaFields', () => {
     expect(extractVariableMediaFields({ variables: [{ name: 'count', defaultValue: 5 }] })).toEqual([])
     expect(extractVariableMediaFields(null)).toEqual([])
   })
+
+  it('извлекает пер-брейкпоинтные медиа слайда из _responsive → media:i:field@bp', () => {
+    const env: any = {
+      variables: [
+        {
+          name: 'heroSlides',
+          type: 'array',
+          defaultValue: [
+            { imageUrl: '/media/1.png', _responsive: { imageUrl: { tablet: '/media/1t.png', mobile: '/media/1m.png' } } },
+          ],
+        },
+      ],
+    }
+    const e = extractVariableMediaFields(env)
+    expect(e).toContainEqual({ nodeId: 'pagevar:heroSlides', field: 'media:0:imageUrl@tablet', value: '/media/1t.png' })
+    expect(e).toContainEqual({ nodeId: 'pagevar:heroSlides', field: 'media:0:imageUrl@mobile', value: '/media/1m.png' })
+  })
 })
 
 describe('applyVariableMediaTranslations', () => {
@@ -191,6 +208,16 @@ describe('applyVariableMediaTranslations', () => {
     const out: any = applyVariableMediaTranslations(variables, map)
     expect(out[0].defaultValue.length).toBe(2)
     expect(out[0].defaultValue[0].imageUrl).toBe('/media/orig1.png')
+  })
+
+  it('пер-брейкпоинтный ключ media:i:field@bp → item._responsive[field][bp], без мутации оригинала', () => {
+    const variables = makeVars()
+    const map = { 'pagevar:heroSlides': { 'media:0:imageUrl@mobile': '/media/en1m.png' } }
+    const out: any = applyVariableMediaTranslations(variables, map)
+    expect(out[0].defaultValue[0]._responsive.imageUrl.mobile).toBe('/media/en1m.png')
+    // базовый imageUrl не тронут; оригинал без _responsive
+    expect(out[0].defaultValue[0].imageUrl).toBe('/media/orig1.png')
+    expect(variables[0].defaultValue[0]._responsive).toBeUndefined()
   })
 })
 

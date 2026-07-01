@@ -765,6 +765,10 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       // Видимость блоков слайда (чекбоксы «Отображать»): item._hidden = ['ctaText', ...].
       // Текст/ссылку прячем (display:none), фон — очищаем. Зеркалит Canvas RepeaterRenderer.
       applyHiddenFields(clone, item, fieldMappings);
+
+      // Адаптив-медиа слайда: item._responsive[field] = { bpId: url } → data-rmedia
+      // (свап по вьюпорту делает ResponsiveMediaRuntime). Зеркалит резолюцию цели applyHiddenFields.
+      applyResponsiveMedia(clone, item, fieldMappings);
       
       // Auto-link: если repeater привязан к коллекции, проставляем href
       if (config.collectionLink) {
@@ -1038,6 +1042,48 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       } else if (prop.indexOf('attr.') === 0 || prop === 'src' || prop === 'href') {
         el.style.display = 'none';
       }
+    });
+  }
+
+  // Проставляет data-rmedia на целевые элементы медиа-полей слайда из
+  // item._responsive[sourceField] = { bpId: url }. Свап по вьюпорту — в
+  // ResponsiveMediaRuntime. Резолвит цель как applyHiddenFields (self./[data-bind=X]).
+  function applyResponsiveMedia(clone, item, mappings) {
+    var rm = item && item._responsive;
+    if (!rm || typeof rm !== 'object' || !mappings) return;
+    mappings.forEach(function(m) {
+      var map = rm[m.sourceField];
+      if (!map || typeof map !== 'object') return;
+      var tp = m.targetProperty || '';
+      var el = null, prop = '';
+      if (tp.indexOf('self.') === 0) {
+        el = clone;
+        prop = tp.slice(5);
+      } else {
+        var sel = tp.match(/^\\[data-bind=([^\\]]+)\\]\\.(.+)$/);
+        if (sel) {
+          var key = sel[1].replace(/^['"]|['"]$/g, '');
+          el = (clone.getAttribute && clone.getAttribute('data-bind') === key)
+            ? clone
+            : clone.querySelector('[data-bind="' + key + '"]');
+          prop = sel[2];
+        }
+      }
+      if (!el) return;
+      var kind = null;
+      if (prop === 'src' || prop === 'attr.src') kind = 'src';
+      else if (prop.indexOf('style.') === 0 && /background/i.test(prop)) kind = 'bg';
+      if (!kind) return;
+      // Если цель — контейнер, а значение картинка, applyValue мог уйти во вложенный
+      // <img>. Для kind='src' ищем такой же вложенный img, чтобы свап попал в него.
+      if (kind === 'src' && el.tagName !== 'IMG') {
+        var innerImg = el.querySelector('img');
+        if (innerImg) el = innerImg;
+      }
+      try {
+        el.setAttribute('data-rmedia', JSON.stringify(map));
+        el.setAttribute('data-rmedia-kind', kind);
+      } catch (e) {}
     });
   }
 

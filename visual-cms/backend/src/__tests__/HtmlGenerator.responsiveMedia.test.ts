@@ -74,6 +74,14 @@ describe('HtmlGenerator — адаптивное медиа', () => {
     expect(html).toContain('[data-element-id="hero"] { background-image: url("/m.png") !important; }')
   })
 
+  it('эмитит window.__ghBreakpoints и подключает ResponsiveMediaRuntime (для слайдера)', () => {
+    const tree = node({ metadata: { breakpoints: BPS }, children: [imgNode()] })
+    const html = htmlGenerator.generatePage(tree, opts())
+    expect(html).toContain('window.__ghBreakpoints = ')
+    expect(html).toContain('"id":"tablet","width":768')
+    expect(html).toContain('data-rmedia') // рантайм свапа присутствует
+  })
+
   it('приоритет языка: перевод базового src подавляет экранный вариант базового языка', () => {
     const tree = node({
       metadata: { breakpoints: BPS },

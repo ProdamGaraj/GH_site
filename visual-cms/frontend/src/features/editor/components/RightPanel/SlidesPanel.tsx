@@ -9,7 +9,9 @@ import {
   selectNode,
   selectSelectedNode,
   selectRootNode,
+  selectBreakpoints,
 } from '@/features/editor/editorSlice'
+import { writeSlideResponsive } from '@/features/editor/utils/slideResponsiveHelper'
 import { selectAllBindings, bumpBindingsVersion } from '@/features/dataBindings/dataBindingsSlice'
 import {
   DndContext,
@@ -167,6 +169,7 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
   const activePanel = useAppSelector(selectActiveRightPanel)
   const selectedNode = useAppSelector(selectSelectedNode)
   const rootNode = useAppSelector(selectRootNode)
+  const breakpoints = useAppSelector(selectBreakpoints)
   const allBindings = useAppSelector(selectAllBindings)
 
   // Карусель, к которой относится панель: сам выбранный узел, если он карусель,
@@ -196,8 +199,9 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
   const [error, setError] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  // Контекст MediaPicker: {slideId, sourceField} — чтобы знать, какое поле какого слайда правим.
-  const [pickerCtx, setPickerCtx] = useState<{ slideId: string; sourceField: string } | null>(null)
+  // Контекст MediaPicker: {slideId, sourceField, bpId?} — какое поле какого слайда правим
+  // (bpId — для пер-брейкпоинтного адаптив-варианта).
+  const [pickerCtx, setPickerCtx] = useState<{ slideId: string; sourceField: string; bpId?: string } | null>(null)
   const [staticPickerOpen, setStaticPickerOpen] = useState(false)
   // Отдельный MediaPicker для добавления слайда-фотографии (только картинка во весь слайд).
   const [photoPickerOpen, setPhotoPickerOpen] = useState(false)
@@ -600,7 +604,8 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
                       onChange={next => updateSlide(id, next)}
                       onDelete={() => removeSlide(id)}
                       onDuplicate={() => duplicateSlide(id)}
-                      onPickMedia={sourceField => setPickerCtx({ slideId: id, sourceField })}
+                      onPickMedia={(sourceField, bpId) => setPickerCtx({ slideId: id, sourceField, bpId })}
+                      breakpoints={breakpoints}
                     />
                   )
                 })}
@@ -669,10 +674,16 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
           if (pickerCtx) {
             const target = slides.find(s => s._id === pickerCtx.slideId)
             if (target) {
-              const next: RawSlide = { ...target }
-              next[pickerCtx.sourceField] = asset.url
-              next[`_${pickerCtx.sourceField}AssetId`] = asset.id
-              updateSlide(pickerCtx.slideId, next)
+              if (pickerCtx.bpId) {
+                // Пер-брейкпоинтный адаптив-вариант → item._responsive[field][bp].
+                const next = writeSlideResponsive(target, pickerCtx.sourceField, pickerCtx.bpId, asset.url) as RawSlide
+                updateSlide(pickerCtx.slideId, next)
+              } else {
+                const next: RawSlide = { ...target }
+                next[pickerCtx.sourceField] = asset.url
+                next[`_${pickerCtx.sourceField}AssetId`] = asset.id
+                updateSlide(pickerCtx.slideId, next)
+              }
             }
           }
           setPickerCtx(null)

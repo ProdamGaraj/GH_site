@@ -1,7 +1,7 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Trash2, Copy, ChevronDown, ChevronRight, Image as ImageIcon } from 'lucide-react'
+import { GripVertical, Trash2, Copy, ChevronDown, ChevronRight, Image as ImageIcon, Monitor, X } from 'lucide-react'
 import { Input } from '@/shared/components/Input'
 import { Button } from '@/shared/components/Button'
 import {
@@ -11,8 +11,19 @@ import {
   isSlideFieldVisible,
   setSlideFieldVisible,
 } from '@/features/editor/utils/bindingMapperHelper'
+import {
+  readSlideResponsive,
+  writeSlideResponsive,
+  countSlideResponsive,
+} from '@/features/editor/utils/slideResponsiveHelper'
 
 export type SlideAlignment = 'left' | 'center' | 'right'
+
+interface SlideBreakpoint {
+  id: string
+  name: string
+  width: number
+}
 
 interface GenericSlideRowProps {
   slide: Record<string, unknown>
@@ -23,8 +34,10 @@ interface GenericSlideRowProps {
   onChange: (next: Record<string, unknown>) => void
   onDelete: () => void
   onDuplicate: () => void
-  /** Открывает MediaPicker для конкретного поля. Передаётся ключ поля. */
-  onPickMedia: (sourceField: string) => void
+  /** Открывает MediaPicker для поля (bpId — для пер-брейкпоинтного адаптив-варианта). */
+  onPickMedia: (sourceField: string, bpId?: string) => void
+  /** Брейкпоинты для адаптива медиа слайда (по убыванию ширины). */
+  breakpoints?: SlideBreakpoint[]
 }
 
 /**
@@ -42,7 +55,11 @@ export const GenericSlideRow: React.FC<GenericSlideRowProps> = ({
   onDelete,
   onDuplicate,
   onPickMedia,
+  breakpoints = [],
 }) => {
+  // Раскрытие адаптив-блока по полю (какие media-поля показывают пер-брейкпоинт варианты).
+  const [rmOpen, setRmOpen] = useState<Record<string, boolean>>({})
+  const sortedBps = [...breakpoints].sort((a, b) => b.width - a.width)
   const id = String((slide._id as string | undefined) ?? `slide-${index}`)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
   const style: React.CSSProperties = {
@@ -127,6 +144,8 @@ export const GenericSlideRow: React.FC<GenericSlideRowProps> = ({
           {schema.map(field => {
             const value = readSlideValue(slide, field.sourceField)
             if (field.kind === 'media') {
+              const rmCount = countSlideResponsive(slide, field.sourceField)
+              const isRmOpen = !!rmOpen[field.sourceField]
               return (
                 <div key={field.sourceField} style={{ opacity: isSlideFieldVisible(slide, field.sourceField) ? 1 : 0.5 }}>
                   <FieldHeader field={field} />
@@ -146,6 +165,59 @@ export const GenericSlideRow: React.FC<GenericSlideRowProps> = ({
                       Из медиатеки
                     </Button>
                   </div>
+
+                  {/* Адаптив медиа слайда: разные файлы под экран (matchMedia-свап на деплое) */}
+                  {sortedBps.length > 0 && (
+                    <div className="mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setRmOpen(prev => ({ ...prev, [field.sourceField]: !prev[field.sourceField] }))}
+                        className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-blue-600 transition-colors"
+                      >
+                        <Monitor size={11} />
+                        Адаптив под экран{rmCount > 0 ? ` · ${rmCount}` : ''}
+                        {isRmOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                      </button>
+                      {isRmOpen && (
+                        <div className="mt-1 space-y-1 pl-4 border-l border-gray-100">
+                          {sortedBps.map(bp => {
+                            const rmValue = readSlideResponsive(slide, field.sourceField, bp.id)
+                            return (
+                              <div key={bp.id} className="flex items-center gap-1">
+                                <span className="text-[10px] text-gray-400 w-24 shrink-0 truncate" title={`${bp.name} (≤${bp.width})`}>
+                                  {bp.name} ≤{bp.width}
+                                </span>
+                                <Input
+                                  value={rmValue}
+                                  onChange={e => onChange(writeSlideResponsive(slide, field.sourceField, bp.id, e.target.value))}
+                                  placeholder="как базовый"
+                                  className="flex-1 !h-7 !text-[11px]"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => onPickMedia(field.sourceField, bp.id)}
+                                  title="Выбрать из медиатеки"
+                                  className="shrink-0 p-1 rounded border border-gray-200 text-gray-500 hover:text-blue-600 hover:border-blue-300"
+                                >
+                                  <ImageIcon size={12} />
+                                </button>
+                                {rmValue && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onChange(writeSlideResponsive(slide, field.sourceField, bp.id, ''))}
+                                    title="Очистить"
+                                    className="shrink-0 p-1 rounded text-gray-300 hover:text-red-500"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             }

@@ -270,6 +270,22 @@ export function extractVariableMediaFields(envelope: any): TranslationEntry[] {
           })
         }
       }
+      // Пер-брейкпоинтные варианты медиа слайда: item._responsive[field][bp].
+      const rm = (item as { _responsive?: unknown })._responsive
+      if (rm && typeof rm === 'object') {
+        for (const [field, byBp] of Object.entries(rm as Record<string, unknown>)) {
+          if (!byBp || typeof byBp !== 'object') continue
+          for (const [bp, url] of Object.entries(byBp as Record<string, unknown>)) {
+            if (looksLikeMediaUrl(url)) {
+              entries.push({
+                nodeId: PAGEVAR_PREFIX + name,
+                field: VAR_MEDIA_PREFIX + index + ':' + field + '@' + bp,
+                value: url as string,
+              })
+            }
+          }
+        }
+      }
     })
   }
   return entries
@@ -308,8 +324,18 @@ export function applyVariableMediaTranslations<T extends { name: string; default
     )
     for (const o of overrides) {
       const item = arr[o.index]
-      if (item && typeof item === 'object') {
-        ;(item as Record<string, unknown>)[o.sourceField] = o.value
+      if (!item || typeof item !== 'object') continue
+      const rec = item as Record<string, unknown>
+      const at = o.sourceField.indexOf('@')
+      if (at > 0) {
+        // Пер-брейкпоинтный вариант: пишем в _responsive[field][bp] (новые объекты, без мутации оригинала).
+        const field = o.sourceField.slice(0, at)
+        const bp = o.sourceField.slice(at + 1)
+        const curResp = rec._responsive && typeof rec._responsive === 'object' ? (rec._responsive as Record<string, Record<string, unknown>>) : {}
+        const curField = curResp[field] && typeof curResp[field] === 'object' ? curResp[field] : {}
+        rec._responsive = { ...curResp, [field]: { ...curField, [bp]: o.value } }
+      } else {
+        rec[o.sourceField] = o.value
       }
     }
     return { ...v, defaultValue: arr }
