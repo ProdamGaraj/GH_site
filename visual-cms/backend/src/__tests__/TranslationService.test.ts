@@ -72,6 +72,14 @@ describe('extractTranslatableFields — медиа', () => {
       value: 'v.mp4',
     })
   })
+
+  it('текст обычного узла извлекается, а html-code — НЕТ (сырой HTML вне переводов)', () => {
+    const text = { id: 't1', elementType: 'text', content: 'Привет' }
+    expect(extractTranslatableFields(text)).toContainEqual({ nodeId: 't1', field: 'content', value: 'Привет' })
+
+    const html = { id: 'h1', elementType: 'html-code', content: '<div>много<br>сырого HTML</div>' }
+    expect(extractTranslatableFields(html).find((x) => x.field === 'content')).toBeUndefined()
+  })
 })
 
 describe('applyTranslationsToTree — медиа', () => {

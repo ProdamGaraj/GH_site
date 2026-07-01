@@ -81,8 +81,12 @@ export function extractTranslatableFields(node: any): TranslationEntry[] {
 
   const nodeId = node.id
 
-  // Text content
-  if (node.content && typeof node.content === 'string' && node.content.trim()) {
+  // Text content. html-code исключаем: это сырой HTML/markup, руками не переводится
+  // и может превышать лимиты (в т.ч. ломал экспорт XLSX) — вне системы переводов.
+  if (
+    node.elementType !== 'html-code' &&
+    node.content && typeof node.content === 'string' && node.content.trim()
+  ) {
     entries.push({ nodeId, field: 'content', value: node.content })
   }
 
