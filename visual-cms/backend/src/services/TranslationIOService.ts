@@ -225,7 +225,7 @@ export class TranslationIOService {
 
       // Карта колонок языков: индекс → код (только валидные target-локали).
       const localeCols: Array<{ col: number; code: string }> = []
-      headerRow.eachCell((cell, col) => {
+      headerRow.eachCell((cell: ExcelJS.Cell, col: number) => {
         if (col < FIRST_LOCALE_COL) return
         const code = parseLocaleCode(cell.value)
         if (code && validLocales.has(code)) {
