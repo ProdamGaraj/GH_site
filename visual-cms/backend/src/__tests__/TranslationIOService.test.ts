@@ -101,6 +101,31 @@ describe('TranslationIOService — экспорт', () => {
     // Ключевые колонки скрыты.
     expect(ws.getColumn(1).hidden).toBe(true)
   })
+
+  it('не даёт Excel «восстанавливать»: первый лист видимый, _meta скрыт и последний', async () => {
+    const { buffer } = await translationIOService.exportSite('site-1')
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(buffer as unknown as ExcelJS.Buffer)
+
+    // Активная вкладка (index 0) — НЕ скрытый _meta.
+    expect(wb.worksheets[0].name).not.toBe('_meta')
+    expect(wb.worksheets[0].state).toBe('visible')
+    // _meta присутствует, скрыт и не первый.
+    const meta = wb.getWorksheet('_meta')!
+    expect(meta.state).toBe('veryHidden')
+    expect(wb.worksheets[wb.worksheets.length - 1].name).toBe('_meta')
+  })
+
+  it('сайт без переводимого контента: есть видимый лист (не только скрытый _meta)', async () => {
+    mockExtract.mockResolvedValue([]) // ни одного переводимого поля
+    const { buffer } = await translationIOService.exportSite('site-1')
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(buffer as unknown as ExcelJS.Buffer)
+
+    const visible = wb.worksheets.filter((w) => w.state === 'visible')
+    expect(visible.length).toBeGreaterThanOrEqual(1)
+    expect(wb.worksheets[0].state).toBe('visible')
+  })
 })
 
 describe('TranslationIOService — импорт', () => {

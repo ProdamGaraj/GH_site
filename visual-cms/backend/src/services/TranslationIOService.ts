@@ -111,16 +111,8 @@ export class TranslationIOService {
     wb.creator = 'Visual CMS'
     wb.created = new Date()
 
-    // Служебный лист для валидации при импорте.
-    const meta = wb.addWorksheet(META_SHEET)
-    meta.state = 'veryHidden'
-    meta.addRow(['version', FORMAT_VERSION])
-    meta.addRow(['siteId', siteId])
-    meta.addRow(['siteSlug', site.slug])
-    meta.addRow(['defaultLocale', defaultLang?.code || ''])
-    meta.addRow(['locales', targetLangs.map((l) => l.code).join(',')])
-
     const usedNames = new Set<string>()
+    let visibleSheets = 0
 
     for (const page of pages) {
       const source = await translationService.extractTranslatableContent(page.id)
@@ -168,7 +160,28 @@ export class TranslationIOService {
       for (let c = FIRST_LOCALE_COL; c <= header.length; c++) ws.getColumn(c).width = 40
       ws.getRow(1).font = { bold: true }
       ws.views = [{ state: 'frozen', ySplit: 1 }]
+      visibleSheets++
     }
+
+    // Книга обязана иметь хотя бы один ВИДИМЫЙ лист (иначе один скрытый _meta →
+    // Excel считает файл повреждённым и предлагает «восстановить»).
+    if (visibleSheets === 0) {
+      const empty = wb.addWorksheet('Переводы')
+      empty.addRow(['На сайте нет переводимого контента'])
+    }
+
+    // Служебный лист — В КОНЦЕ и скрытый. Активной вкладкой должен остаться
+    // ВИДИМЫЙ лист (индекс 0): active-лист не может быть скрытым, иначе Excel
+    // «чинит» книгу при открытии. Явно фиксируем activeTab на первый лист.
+    const meta = wb.addWorksheet(META_SHEET)
+    meta.state = 'veryHidden'
+    meta.addRow(['version', FORMAT_VERSION])
+    meta.addRow(['siteId', siteId])
+    meta.addRow(['siteSlug', site.slug])
+    meta.addRow(['defaultLocale', defaultLang?.code || ''])
+    meta.addRow(['locales', targetLangs.map((l) => l.code).join(',')])
+
+    wb.views = [{ activeTab: 0, x: 0, y: 0, width: 10000, height: 20000, firstSheet: 0, visibility: 'visible' }]
 
     const arrayBuffer = await wb.xlsx.writeBuffer()
     const buffer = Buffer.from(arrayBuffer as ArrayBuffer)
