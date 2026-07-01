@@ -27,6 +27,24 @@ import { languageService } from './LanguageService'
 
 const FORMAT_VERSION = 1
 const META_SHEET = '_meta'
+/** Жёсткий лимит Excel на длину содержимого ячейки. Больше → Excel «чинит» файл. */
+const EXCEL_CELL_MAX = 32767
+// Недопустимые в XML 1.0 управляющие символы (кроме tab/LF/CR).
+// eslint-disable-next-line no-control-regex
+const INVALID_XML_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F]/g
+
+/**
+ * Готовит строковое значение к записи в ячейку XLSX:
+ *  - вычищает недопустимые в XML управляющие символы (иначе «unreadable content»);
+ *  - обрезает до лимита Excel в 32767 символов (иначе «repaired records»).
+ * Большие значения — это обычно сырой HTML из html-code узлов, руками не переводится.
+ */
+function safeCell(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  let s = String(value).replace(INVALID_XML_CHARS, '')
+  if (s.length > EXCEL_CELL_MAX) s = s.slice(0, EXCEL_CELL_MAX)
+  return s
+}
 const KEY_COLS = 3 // A,B,C — скрытые ключи
 const INFO_COLS = 2 // D,E — Элемент, Поле
 const FIRST_LOCALE_COL = KEY_COLS + INFO_COLS + 1 + 1 // после F (оригинал) → G = 7
@@ -135,12 +153,12 @@ export class TranslationIOService {
       // Заголовок.
       const header = ['pageId', 'nodeId', 'field', 'Элемент', 'Поле', `Оригинал [${defaultLang?.code || ''}]`]
       for (const lang of targetLangs) header.push(`${lang.nativeName} [${lang.code}]`)
-      ws.addRow(header)
+      ws.addRow(header.map(safeCell))
 
       for (const entry of source) {
         const k = `${entry.nodeId}::${entry.field}`
         const byLoc = current.get(k) || {}
-        const row: (string | undefined)[] = [
+        const row: unknown[] = [
           page.id,
           entry.nodeId,
           entry.field,
@@ -149,7 +167,8 @@ export class TranslationIOService {
           entry.value,
         ]
         for (const lang of targetLangs) row.push(byLoc[lang.code] ?? '')
-        ws.addRow(row)
+        // Санитизируем каждую ячейку: лимит длины + чистка управляющих символов.
+        ws.addRow(row.map(safeCell))
       }
 
       // Скрываем технические ключевые колонки; фиксируем строку заголовка.

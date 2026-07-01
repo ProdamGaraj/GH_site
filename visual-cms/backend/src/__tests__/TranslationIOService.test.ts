@@ -116,6 +116,19 @@ describe('TranslationIOService — экспорт', () => {
     expect(wb.worksheets[wb.worksheets.length - 1].name).toBe('_meta')
   })
 
+  it('обрезает значение до лимита Excel (32767) и чистит управляющие символы', async () => {
+    const huge = 'x'.repeat(40000) + String.fromCharCode(7) + 'y' // >32767 + BEL
+    mockExtract.mockResolvedValue([{ nodeId: 'n1', field: 'content', value: huge }])
+    const { buffer } = await translationIOService.exportSite('site-1')
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(buffer as unknown as ExcelJS.Buffer)
+    const ws = wb.worksheets.find((w) => w.name !== '_meta')!
+    const cell = ws.getRow(2).getCell(6).value // «Оригинал» = колонка 6
+    expect(typeof cell).toBe('string')
+    expect((cell as string).length).toBe(32767) // обрезано под лимит Excel
+    expect(cell as string).not.toContain(String.fromCharCode(7)) // управляющий символ вычищен
+  })
+
   it('сайт без переводимого контента: есть видимый лист (не только скрытый _meta)', async () => {
     mockExtract.mockResolvedValue([]) // ни одного переводимого поля
     const { buffer } = await translationIOService.exportSite('site-1')
