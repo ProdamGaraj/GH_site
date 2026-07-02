@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useAppSelector, useAppDispatch } from '@/app/hooks'
-import { selectRootNode, selectDragState, selectViewport, selectBreakpoints, selectZoom, selectPanOffset, selectBlockAlignment, selectEditMode, setZoom, setPanOffset, selectCanvasColor, selectRunScriptsInCanvas } from '@/features/editor/editorSlice'
+import { selectRootNode, selectDragState, selectViewport, selectBreakpoints, selectZoom, selectPanOffset, selectBlockAlignment, selectEditMode, setZoom, setPanOffset, selectCanvasColor, selectRunScriptsInCanvas, selectBrowsers, selectSelectedBrowser } from '@/features/editor/editorSlice'
 import { CanvasRenderer } from './CanvasRenderer'
 import type { DropIndicator } from '../../utils/dndUtils'
 import { DropIndicatorOverlay, DropTargetHighlight } from './DropIndicatorOverlay'
@@ -33,17 +33,31 @@ export const Canvas: React.FC<CanvasProps> = ({
   const editMode = useAppSelector(selectEditMode)
   const canvasColor = useAppSelector(selectCanvasColor)
   const runScriptsInCanvas = useAppSelector(selectRunScriptsInCanvas)
+  const browsers = useAppSelector(selectBrowsers)
+  const selectedBrowserId = useAppSelector(selectSelectedBrowser)
   const canvasRef = useRef<HTMLDivElement>(null)
   const panContainerRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
   const [isSpacePressed, setIsSpacePressed] = useState(false)
+  // Высота контента вьюпорта (нескейленная) — для разметки экранов пунктиром.
+  const [viewportContentHeight, setViewportContentHeight] = useState(0)
   // Локальный pan offset для плавности (без Redux при drag)
   const localPanRef = useRef({ x: storedPanOffset.x, y: storedPanOffset.y })
   
   const currentBreakpoint = breakpoints.find(bp => bp.id === viewport)
-  
+
+  // Реальная видимая высота экрана = высота брейкпоинта минус «хром» выбранного
+  // браузера (адресная строка и т.п.). Это ТА ЖЕ база, от которой useComputedStyles
+  // считает 100vh — поэтому коробка канваса совпадает и с блоками (vh), и с реальным
+  // экраном. Без выбранного браузера offset = 0 (поведение как раньше).
+  const selectedBrowser = selectedBrowserId ? browsers.find(b => b.id === selectedBrowserId) : null
+  const browserOffset = selectedBrowser?.viewportHeightOffset || 0
+  const effectiveScreenHeight = currentBreakpoint?.height
+    ? Math.max(1, currentBreakpoint.height - browserOffset)
+    : undefined
+
   // Мемоизируем эффективное дерево - пересчитывается только при изменении rootNode, viewport или editMode
   const effectiveTree = useMemo(() => {
     if (!rootNode) return null
@@ -77,10 +91,30 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   }, [runScriptsInCanvas, globalJs])
 
+  // Замер высоты контента вьюпорта для разметки экранов. ResizeObserver даёт
+  // нескейленную layout-высоту (transform не влияет на измеряемый box), поэтому
+  // линии рисуем в тех же координатах, что и контент (до scale).
+  useEffect(() => {
+    const el = viewportRef.current
+    if (!el) return
+    const measure = () => setViewportContentHeight(el.scrollHeight)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [rootNode, viewport, editMode])
+
   // Синхронизируем localPanRef с Redux при внешних изменениях
   useEffect(() => {
     localPanRef.current = { x: storedPanOffset.x, y: storedPanOffset.y }
   }, [storedPanOffset])
+
+  // Высота одного «экрана» для разметки = реальная видимая высота (с учётом
+  // «хрома» браузера), иначе дефолт 900. Число целых экранов в контенте.
+  const screenHeight = effectiveScreenHeight || 900
+  const screenLineCount = screenHeight > 0
+    ? Math.floor(viewportContentHeight / screenHeight)
+    : 0
 
   // Zoom with Ctrl + Mouse Wheel
   useEffect(() => {
@@ -231,11 +265,13 @@ export const Canvas: React.FC<CanvasProps> = ({
             width: editMode === 'responsive' && currentBreakpoint 
               ? `${currentBreakpoint.width}px` 
               : editorType === 'page' ? '1280px' : '800px',
-            // Высота фиксированная, если задана в breakpoint (для правильных пропорций)
-            ...(editMode === 'responsive' && currentBreakpoint?.height ? {
-              height: `${currentBreakpoint.height}px`,
-              minHeight: `${currentBreakpoint.height}px`,
-              maxHeight: `${currentBreakpoint.height}px`,
+            // Высота фиксированная = реальная видимая высота экрана (высота брейкпоинта
+            // минус «хром» браузера). Совпадает с базой для 100vh в useComputedStyles,
+            // поэтому коробка канваса = реальный экран, а не полная высота монитора.
+            ...(editMode === 'responsive' && effectiveScreenHeight ? {
+              height: `${effectiveScreenHeight}px`,
+              minHeight: `${effectiveScreenHeight}px`,
+              maxHeight: `${effectiveScreenHeight}px`,
               overflow: 'auto',
             } : {}),
             transform: `scale(${zoom / 100})`,
@@ -253,7 +289,10 @@ export const Canvas: React.FC<CanvasProps> = ({
               <div className="bg-purple-100 px-3 py-1.5 rounded shadow-sm border border-purple-300">
                 <span className="font-medium text-purple-700">Режим {currentBreakpoint.name}:</span>
                 <span className="ml-1 text-purple-600">{currentBreakpoint.width}px</span>
-                {currentBreakpoint.height && <span className="text-purple-600"> × {currentBreakpoint.height}px</span>}
+                {effectiveScreenHeight && <span className="text-purple-600"> × {effectiveScreenHeight}px</span>}
+                {browserOffset > 0 && currentBreakpoint.height && (
+                  <span className="ml-1 text-purple-400">(экран {currentBreakpoint.height} − хром {browserOffset})</span>
+                )}
               </div>
             </div>
           )}
@@ -267,6 +306,49 @@ export const Canvas: React.FC<CanvasProps> = ({
             rootNode={rootNode || undefined}
             libraryBlockId={libraryBlockId}
           />
+
+          {/* Разметка экранов: пунктирные линии на границах экранов + номер над линией.
+              pointer-events:none, полупрозрачно — гайд, не мешающий редактированию. */}
+          {screenLineCount > 0 && (
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: viewportContentHeight,
+                pointerEvents: 'none',
+                zIndex: 45,
+              }}
+            >
+              {Array.from({ length: screenLineCount }).map((_, i) => {
+                const y = (i + 1) * screenHeight
+                return (
+                  <div key={i} style={{ position: 'absolute', top: y, left: 0, right: 0 }}>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        bottom: 3,
+                        left: 8,
+                        fontSize: 11,
+                        lineHeight: 1,
+                        color: 'rgba(30,30,45,0.5)',
+                        background: 'rgba(255,255,255,0.72)',
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        fontFamily: 'system-ui, sans-serif',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Экран {i + 1}
+                    </span>
+                    <div style={{ borderTop: '1px dashed rgba(70,70,100,0.35)' }} />
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
