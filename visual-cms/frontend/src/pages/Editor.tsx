@@ -227,6 +227,12 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
 
   useEffect(() => {
     const loadEditor = async () => {
+      // Site-level ассеты резолвим ниже по page.siteId. По умолчанию (блок /
+      // новая страница / страница без сайта) — сбрасываем, чтобы канвас не тянул
+      // чужой site-CSS от прежде открытой страницы.
+      const { setSiteGlobalAssets } = await import('@/features/editor/editorSlice')
+      dispatch(setSiteGlobalAssets({}))
+
       // Проверяем есть ли импортированный контент
       const importedContentStr = sessionStorage.getItem('importedContent')
       if (importedContentStr && (!id || id === 'new')) {
@@ -292,7 +298,19 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
           const { loadEditor: loadEditorAction } = await import('@/features/editor/editorSlice')
           dispatch(loadEditorAction(result.structure))
           setPageVersion(result.version || 1)
-          
+
+          // Site-level globalCss/globalJs страницы: резолвим по siteId и кладём в
+          // стор — канвас инжектит их так же, как деплой (site → page → block).
+          if (result.siteId) {
+            try {
+              const { siteApi } = await import('@/shared/api')
+              const site = await siteApi.getById(result.siteId)
+              dispatch(setSiteGlobalAssets({ css: site.settings?.globalCss, js: site.settings?.globalJs }))
+            } catch {
+              // Сайт недоступен — остаёмся без site-CSS, редактор не роняем.
+            }
+          }
+
           // Load page settings
           setPageSettings({
             name: result.name,

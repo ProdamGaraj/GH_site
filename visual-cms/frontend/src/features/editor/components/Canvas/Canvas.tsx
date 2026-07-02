@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useAppSelector, useAppDispatch } from '@/app/hooks'
-import { selectRootNode, selectDragState, selectViewport, selectBreakpoints, selectZoom, selectPanOffset, selectBlockAlignment, selectEditMode, setZoom, setPanOffset, selectCanvasColor, selectRunScriptsInCanvas, selectEffectiveBrowserOffset, setAutoChromeOffset } from '@/features/editor/editorSlice'
+import { selectRootNode, selectDragState, selectViewport, selectBreakpoints, selectZoom, selectPanOffset, selectBlockAlignment, selectEditMode, setZoom, setPanOffset, selectCanvasColor, selectRunScriptsInCanvas, selectSiteGlobalCss, selectSiteGlobalJs, selectEffectiveBrowserOffset, setAutoChromeOffset } from '@/features/editor/editorSlice'
 import { CanvasRenderer } from './CanvasRenderer'
 import type { DropIndicator } from '../../utils/dndUtils'
 import { DropIndicatorOverlay, DropTargetHighlight } from './DropIndicatorOverlay'
@@ -33,6 +33,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   const editMode = useAppSelector(selectEditMode)
   const canvasColor = useAppSelector(selectCanvasColor)
   const runScriptsInCanvas = useAppSelector(selectRunScriptsInCanvas)
+  const siteGlobalCss = useAppSelector(selectSiteGlobalCss)
+  const siteGlobalJs = useAppSelector(selectSiteGlobalJs)
   const browserOffset = useAppSelector(selectEffectiveBrowserOffset)
   const canvasRef = useRef<HTMLDivElement>(null)
   const panContainerRef = useRef<HTMLDivElement>(null)
@@ -95,8 +97,17 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Общий CSS (страница + блоки) для живого превью. Применяется так же, как на деплое,
   // — поэтому правила @media/:hover/@keyframes из globalCss видны прямо в канвасе.
-  const globalCss = useMemo(() => collectTreeGlobalCss(rootNode), [rootNode])
-  const globalJs = useMemo(() => collectTreeGlobalJs(rootNode), [rootNode])
+  // Site-ассеты (Site.settings.globalCss/globalJs) резолвятся по page.siteId в
+  // Editor.tsx. Инжектим их ПЕРЕД page/block — тот же порядок, что на деплое
+  // (reset → site → page → block). Для блоков/страниц без сайта — пусто.
+  const globalCss = useMemo(
+    () => [siteGlobalCss, collectTreeGlobalCss(rootNode)].filter(Boolean).join('\n\n'),
+    [rootNode, siteGlobalCss],
+  )
+  const globalJs = useMemo(
+    () => [siteGlobalJs, collectTreeGlobalJs(rootNode)].filter(Boolean).join('\n'),
+    [rootNode, siteGlobalJs],
+  )
 
   // vh/vw в globalCss браузер считает от ОКНА редактора, а не от выбранного экрана —
   // контент получал не те пропорции (и разметка экранов «уезжала»). Пересчитываем

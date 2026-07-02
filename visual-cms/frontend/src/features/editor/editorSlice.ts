@@ -56,6 +56,12 @@ interface EditorState {
   statePreviewMode: 'none' | 'hover' | 'active' | 'focus' | 'disabled'
   // Выполнять общий JS страницы/блоков прямо в холсте (опасно: чужой JS в редакторе)
   runScriptsInCanvas: boolean
+  // Общие CSS/JS уровня САЙТА (Site.settings.globalCss/globalJs) для текущей страницы.
+  // Резолвятся по page.siteId при загрузке; канвас инжектит их ДО page/block-ассетов
+  // (порядок как на деплое: reset → site → page → block). Для блоков/страниц без
+  // сайта — undefined.
+  siteGlobalCss?: string
+  siteGlobalJs?: string
   // Цвет фона холста
   canvasColor: string
   // Буфер обмена (для Ctrl+C / Ctrl+V): хранит копию узла без перегенерации id.
@@ -126,6 +132,8 @@ const initialState: EditorState = {
   },
   statePreviewMode: 'none',
   runScriptsInCanvas: false,
+  siteGlobalCss: undefined,
+  siteGlobalJs: undefined,
   canvasColor: '#ffffff',
   clipboard: null,
 }
@@ -1379,6 +1387,11 @@ const editorSlice = createSlice({
     setRunScriptsInCanvas: (state, action: PayloadAction<boolean>) => {
       state.runScriptsInCanvas = action.payload
     },
+    // Общие ассеты сайта для текущей страницы (по page.siteId). Пусто → блок/страница без сайта.
+    setSiteGlobalAssets: (state, action: PayloadAction<{ css?: string; js?: string }>) => {
+      state.siteGlobalCss = action.payload.css
+      state.siteGlobalJs = action.payload.js
+    },
 
     // Undo - вернуться к предыдущему состоянию
     undo: (state) => {
@@ -1622,6 +1635,7 @@ export const {
   finishInlineBlockEdit,
   setStatePreviewMode,
   setRunScriptsInCanvas,
+  setSiteGlobalAssets,
   undo,
   redo,
   saveToHistory,
@@ -1746,6 +1760,8 @@ export const selectActiveEditBreakpoint = (state: RootState) => state.editor.act
 export const selectInlineBlockEdit = (state: RootState) => state.editor.inlineBlockEdit
 export const selectStatePreviewMode = (state: RootState) => state.editor.statePreviewMode
 export const selectRunScriptsInCanvas = (state: RootState) => state.editor.runScriptsInCanvas
+export const selectSiteGlobalCss = (state: RootState) => state.editor.siteGlobalCss
+export const selectSiteGlobalJs = (state: RootState) => state.editor.siteGlobalJs
 
 // Helper selector to find a node by id
 export const selectNodeById = (state: RootState, nodeId: string): BlockNode | null => {
