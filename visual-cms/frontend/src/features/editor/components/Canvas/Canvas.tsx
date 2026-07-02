@@ -6,6 +6,7 @@ import type { DropIndicator } from '../../utils/dndUtils'
 import { DropIndicatorOverlay, DropTargetHighlight } from './DropIndicatorOverlay'
 import { getEffectiveTree } from '../../utils/variationUtils'
 import { collectTreeGlobalCss, collectTreeGlobalJs } from '../../utils/exportUtils'
+import { compileMediaForWidth } from '../../utils/compileCanvasMedia'
 
 interface CanvasProps {
   dropIndicator?: DropIndicator | null
@@ -109,13 +110,15 @@ export const Canvas: React.FC<CanvasProps> = ({
     [rootNode, siteGlobalJs],
   )
 
-  // vh/vw в globalCss браузер считает от ОКНА редактора, а не от выбранного экрана —
-  // контент получал не те пропорции (и разметка экранов «уезжала»). Пересчитываем
-  // viewport-единицы в px от той же базы, что useComputedStyles для стилей узлов:
-  // ширина брейкпоинта и видимая высота (брейкпоинт − «хром» браузера).
+  // В канвасе общий CSS живёт инлайновым <style> в DOM редактора, а «экран» —
+  // это div фикс. ширины + transform:scale. Поэтому @media и vw/vh браузер считает
+  // от ОКНА РЕДАКТОРА, а не от выбранного брейкпоинта, и адаптив в канвасе «не
+  // виден» (меню не сворачивается в бургер и т.п.). Приводим CSS к выбранному экрану:
+  //  1) «компилируем» размерные @media под ширину брейкпоинта;
+  //  2) пересчитываем vw/vh в px от той же базы (ширина брейкпоинта и видимая высота).
   const displayGlobalCss = useMemo(() => {
     if (!globalCss || editMode !== 'responsive' || !currentBreakpoint) return globalCss
-    let css = globalCss
+    let css = compileMediaForWidth(globalCss, currentBreakpoint.width)
     if (effectiveScreenHeight) {
       css = css.replace(/(\d*\.?\d+)(?:s|d|l)?vh\b/g, (_m, num) =>
         `${(parseFloat(num) / 100) * effectiveScreenHeight}px`)
