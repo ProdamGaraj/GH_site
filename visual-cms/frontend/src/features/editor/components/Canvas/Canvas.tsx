@@ -73,6 +73,22 @@ export const Canvas: React.FC<CanvasProps> = ({
   const globalCss = useMemo(() => collectTreeGlobalCss(rootNode), [rootNode])
   const globalJs = useMemo(() => collectTreeGlobalJs(rootNode), [rootNode])
 
+  // vh/vw в globalCss браузер считает от ОКНА редактора, а не от выбранного экрана —
+  // контент получал не те пропорции (и разметка экранов «уезжала»). Пересчитываем
+  // viewport-единицы в px от той же базы, что useComputedStyles для стилей узлов:
+  // ширина брейкпоинта и видимая высота (брейкпоинт − «хром» браузера).
+  const displayGlobalCss = useMemo(() => {
+    if (!globalCss || editMode !== 'responsive' || !currentBreakpoint) return globalCss
+    let css = globalCss
+    if (effectiveScreenHeight) {
+      css = css.replace(/(\d*\.?\d+)(?:s|d|l)?vh\b/g, (_m, num) =>
+        `${(parseFloat(num) / 100) * effectiveScreenHeight}px`)
+    }
+    css = css.replace(/(\d*\.?\d+)(?:s|d|l)?vw\b/g, (_m, num) =>
+      `${(parseFloat(num) / 100) * currentBreakpoint.width}px`)
+    return css
+  }, [globalCss, editMode, currentBreakpoint, effectiveScreenHeight])
+
   // Опционально выполняем общий JS прямо в холсте (тумблер). Скрипт вставляется живым
   // <script>-элементом (React не исполняет script из JSX). Чужой JS может конфликтовать
   // с React-разметкой — поэтому строго по явному выбору пользователя.
@@ -110,10 +126,11 @@ export const Canvas: React.FC<CanvasProps> = ({
   }, [storedPanOffset])
 
   // Высота одного «экрана» для разметки = реальная видимая высота (с учётом
-  // «хрома» браузера), иначе дефолт 900. Число целых экранов в контенте.
+  // «хрома» браузера), иначе дефолт 900. Линии только ВНУТРИ контента:
+  // граница, совпадающая с самым низом страницы, не рисуется (−1px).
   const screenHeight = effectiveScreenHeight || 900
   const screenLineCount = screenHeight > 0
-    ? Math.floor(viewportContentHeight / screenHeight)
+    ? Math.max(0, Math.floor((viewportContentHeight - 1) / screenHeight))
     : 0
 
   // Zoom with Ctrl + Mouse Wheel
@@ -231,9 +248,9 @@ export const Canvas: React.FC<CanvasProps> = ({
         cursor: isPanning ? 'grabbing' : 'default',
       }}
     >
-      <div 
+      <div
         ref={panContainerRef}
-        className="min-h-full p-6 flex justify-center"
+        className="min-h-full min-w-max p-6 flex justify-center"
         style={{
           transform: `translate(${storedPanOffset.x}px, ${storedPanOffset.y}px)`,
           transition: isPanning ? 'none' : 'transform 0.1s ease-out',
@@ -261,18 +278,18 @@ export const Canvas: React.FC<CanvasProps> = ({
           ref={viewportRef}
           className="relative canvas-viewport"
           style={{
-            // Фиксированная ширина viewport (как экран)
-            width: editMode === 'responsive' && currentBreakpoint 
-              ? `${currentBreakpoint.width}px` 
+            // Фиксированная ширина viewport (как экран). flexShrink 0 обязателен:
+            // это flex-item внутри justify-center, и без него ширина больше рабочей
+            // области УЖИМАЕТСЯ (1920 выглядел как 1440 — flex-shrink по умолчанию 1).
+            width: editMode === 'responsive' && currentBreakpoint
+              ? `${currentBreakpoint.width}px`
               : editorType === 'page' ? '1280px' : '800px',
-            // Высота фиксированная = реальная видимая высота экрана (высота брейкпоинта
-            // минус «хром» браузера). Совпадает с базой для 100vh в useComputedStyles,
-            // поэтому коробка канваса = реальный экран, а не полная высота монитора.
+            flexShrink: 0,
+            // Высота НЕ фиксируется — канвас растёт со страницей (не скролл-окно).
+            // Минимум = реальная видимая высота экрана (брейкпоинт − «хром» браузера),
+            // та же база, от которой useComputedStyles считает 100vh.
             ...(editMode === 'responsive' && effectiveScreenHeight ? {
-              height: `${effectiveScreenHeight}px`,
               minHeight: `${effectiveScreenHeight}px`,
-              maxHeight: `${effectiveScreenHeight}px`,
-              overflow: 'auto',
             } : {}),
             transform: `scale(${zoom / 100})`,
             transformOrigin: 'top center',
@@ -297,7 +314,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             </div>
           )}
           {/* Общие стили страницы/блоков — живое превью (@media, :hover, @keyframes) */}
-          {globalCss && <style>{globalCss}</style>}
+          {displayGlobalCss && <style>{displayGlobalCss}</style>}
           <CanvasRenderer
             node={effectiveTree || rootNode}
             isRoot
