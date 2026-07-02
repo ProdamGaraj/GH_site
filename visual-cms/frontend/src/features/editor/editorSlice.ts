@@ -33,7 +33,10 @@ interface EditorState {
   breakpoints: CustomBreakpoint[]
   browsers: Browser[]
   standardMonitors: StandardMonitor[]
-  selectedBrowser: string | null  // ID выбранного браузера
+  selectedBrowser: string | null  // ID выбранного браузера ('auto' = измерить текущий)
+  // Реально измеренный «хром» текущего браузера (монитор − window.innerHeight).
+  // Обновляется слушателем resize в Canvas; используется при selectedBrowser === 'auto'.
+  autoChromeOffset: number
   zoom: number
   activeLeftPanel: string | null
   activeRightPanel: string | null
@@ -105,7 +108,10 @@ const initialState: EditorState = {
     { id: 'iphone-15-pro', name: 'iPhone 15 Pro', width: 393, height: 852, icon: '📱' },
     { id: 'iphone-se', name: 'iPhone SE', width: 375, height: 667, icon: '📱' },
   ],
-  selectedBrowser: 'chrome',  // По умолчанию Chrome
+  // Связка «экран (breakpoint) + браузер» задаёт viewport будущего пользователя:
+  // ширина монитора × (высота − хром браузера). По умолчанию Chrome.
+  selectedBrowser: 'chrome',
+  autoChromeOffset: 0,
   zoom: 100,
   activeLeftPanel: 'layers',
   activeRightPanel: 'basicSettings',
@@ -1135,7 +1141,11 @@ const editorSlice = createSlice({
     setSelectedBrowser: (state, action: PayloadAction<string | null>) => {
       state.selectedBrowser = action.payload
     },
-    
+
+    setAutoChromeOffset: (state, action: PayloadAction<number>) => {
+      state.autoChromeOffset = Math.max(0, action.payload)
+    },
+
     setActiveLeftPanel: (state, action: PayloadAction<string | null>) => {
       state.activeLeftPanel = action.payload
     },
@@ -1597,6 +1607,7 @@ export const {
   loadRootNode,
   setZoom,
   setSelectedBrowser,
+  setAutoChromeOffset,
   setActiveLeftPanel,
   setActiveRightPanel,
   setActiveRightPanelTab,
@@ -1714,6 +1725,15 @@ export const selectBreakpoints = (state: RootState) => state.editor.breakpoints
 export const selectBrowsers = (state: RootState) => state.editor.browsers
 export const selectStandardMonitors = (state: RootState) => state.editor.standardMonitors
 export const selectSelectedBrowser = (state: RootState) => state.editor.selectedBrowser
+export const selectAutoChromeOffset = (state: RootState) => state.editor.autoChromeOffset
+// Эффективный «хром» браузера для вычитания из высоты экрана:
+// 'auto' — реальный замер текущего окна, иначе — константа выбранного браузера.
+export const selectEffectiveBrowserOffset = (state: RootState): number => {
+  const sel = state.editor.selectedBrowser
+  if (!sel) return 0
+  if (sel === 'auto') return state.editor.autoChromeOffset
+  return state.editor.browsers.find(b => b.id === sel)?.viewportHeightOffset || 0
+}
 export const selectZoom = (state: RootState) => state.editor.zoom
 export const selectActiveLeftPanel = (state: RootState) => state.editor.activeLeftPanel
 export const selectActiveRightPanel = (state: RootState) => state.editor.activeRightPanel

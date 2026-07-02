@@ -1,13 +1,12 @@
 import { useMemo } from 'react'
 import { useAppSelector } from '@/app/hooks'
-import { selectViewport, selectBreakpoints, selectBrowsers, selectSelectedBrowser } from '../editorSlice'
+import { selectViewport, selectBreakpoints, selectEffectiveBrowserOffset } from '../editorSlice'
 import type { BlockNode } from '@/shared/types'
 
 export const useComputedStyles = (node: BlockNode): React.CSSProperties => {
   const viewport = useAppSelector(selectViewport)
   const breakpoints = useAppSelector(selectBreakpoints)
-  const browsers = useAppSelector(selectBrowsers)
-  const selectedBrowserId = useAppSelector(selectSelectedBrowser)
+  const browserOffset = useAppSelector(selectEffectiveBrowserOffset)
   
   return useMemo(() => {
     // Defensive: ensure node.styles and node.styles.properties exist
@@ -24,14 +23,10 @@ export const useComputedStyles = (node: BlockNode): React.CSSProperties => {
 
     // Преобразуем viewport units (vh, vw) в пиксели на основе breakpoint и browser offset
     if (currentBreakpoint) {
-      // Получаем browser из глобального selectedBrowser
-      const browser = selectedBrowserId 
-        ? browsers.find(b => b.id === selectedBrowserId)
-        : null
-      
-      // Вычисляем реальную высоту viewport с учетом browser offset
-      const effectiveViewportHeight = currentBreakpoint.height && browser
-        ? currentBreakpoint.height - browser.viewportHeightOffset
+      // Реальная видимая высота = высота брейкпоинта − эффективный «хром» браузера
+      // (константа выбранного браузера либо реальный замер в режиме «авто»).
+      const effectiveViewportHeight = currentBreakpoint.height
+        ? Math.max(1, currentBreakpoint.height - browserOffset)
         : currentBreakpoint.height
       
       const convertViewportUnits = (value: string): string => {
@@ -93,5 +88,5 @@ export const useComputedStyles = (node: BlockNode): React.CSSProperties => {
     }
 
     return baseStyles as React.CSSProperties
-  }, [node.styles, node.layoutMode, node.tagName, node.elementType, viewport, breakpoints, browsers, selectedBrowserId])
+  }, [node.styles, node.layoutMode, node.tagName, node.elementType, viewport, breakpoints, browserOffset])
 }

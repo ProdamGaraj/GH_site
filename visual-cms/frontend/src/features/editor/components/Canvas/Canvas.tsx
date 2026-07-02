@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useAppSelector, useAppDispatch } from '@/app/hooks'
-import { selectRootNode, selectDragState, selectViewport, selectBreakpoints, selectZoom, selectPanOffset, selectBlockAlignment, selectEditMode, setZoom, setPanOffset, selectCanvasColor, selectRunScriptsInCanvas, selectBrowsers, selectSelectedBrowser } from '@/features/editor/editorSlice'
+import { selectRootNode, selectDragState, selectViewport, selectBreakpoints, selectZoom, selectPanOffset, selectBlockAlignment, selectEditMode, setZoom, setPanOffset, selectCanvasColor, selectRunScriptsInCanvas, selectEffectiveBrowserOffset, setAutoChromeOffset } from '@/features/editor/editorSlice'
 import { CanvasRenderer } from './CanvasRenderer'
 import type { DropIndicator } from '../../utils/dndUtils'
 import { DropIndicatorOverlay, DropTargetHighlight } from './DropIndicatorOverlay'
@@ -33,8 +33,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const editMode = useAppSelector(selectEditMode)
   const canvasColor = useAppSelector(selectCanvasColor)
   const runScriptsInCanvas = useAppSelector(selectRunScriptsInCanvas)
-  const browsers = useAppSelector(selectBrowsers)
-  const selectedBrowserId = useAppSelector(selectSelectedBrowser)
+  const browserOffset = useAppSelector(selectEffectiveBrowserOffset)
   const canvasRef = useRef<HTMLDivElement>(null)
   const panContainerRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
@@ -48,15 +47,41 @@ export const Canvas: React.FC<CanvasProps> = ({
   
   const currentBreakpoint = breakpoints.find(bp => bp.id === viewport)
 
-  // Реальная видимая высота экрана = высота брейкпоинта минус «хром» выбранного
-  // браузера (адресная строка и т.п.). Это ТА ЖЕ база, от которой useComputedStyles
-  // считает 100vh — поэтому коробка канваса совпадает и с блоками (vh), и с реальным
-  // экраном. Без выбранного браузера offset = 0 (поведение как раньше).
-  const selectedBrowser = selectedBrowserId ? browsers.find(b => b.id === selectedBrowserId) : null
-  const browserOffset = selectedBrowser?.viewportHeightOffset || 0
+  // Реальная видимая высота экрана = высота брейкпоинта минус «хром» браузера
+  // (адресная строка и т.п.; в режиме «авто» — реальный замер текущего окна).
+  // Это ТА ЖЕ база, от которой useComputedStyles считает 100vh — поэтому коробка
+  // канваса совпадает и с блоками (vh), и с реальным экраном.
   const effectiveScreenHeight = currentBreakpoint?.height
     ? Math.max(1, currentBreakpoint.height - browserOffset)
     : undefined
+
+  // Замер реального «хрома» текущего браузера: монитор − видимая область окна.
+  // Обновляется на resize (развернул/свернул окно, докнул devtools и т.п.).
+  useEffect(() => {
+    const measure = () =>
+      dispatch(setAutoChromeOffset(Math.max(0, (window.screen?.height || 0) - window.innerHeight)))
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [dispatch])
+
+  // Автоподгонка зума при смене связки «экран+браузер»: канвас относится к полю
+  // редактора так же, как viewport сайта — к экрану пользователя. Один экран
+  // будущего пользователя (ширина × видимая высота) виден целиком. Ручной зум
+  // после этого не трогаем — пересчёт только при смене breakpoint/браузера.
+  useEffect(() => {
+    if (editMode !== 'responsive' || !currentBreakpoint) return
+    const workspace = canvasRef.current
+    if (!workspace) return
+    const availW = workspace.clientWidth - 48   // p-6 поля вокруг канваса
+    const availH = workspace.clientHeight - 48
+    if (availW <= 0 || availH <= 0) return
+    const targetH = effectiveScreenHeight || currentBreakpoint.height || (currentBreakpoint.width * 9) / 16
+    const fit = Math.min(availW / currentBreakpoint.width, availH / targetH) * 100
+    dispatch(setZoom(Math.round(fit)))
+    dispatch(setPanOffset({ x: 0, y: 0 }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewport, editMode, browserOffset, dispatch])
 
   // Мемоизируем эффективное дерево - пересчитывается только при изменении rootNode, viewport или editMode
   const effectiveTree = useMemo(() => {
@@ -304,11 +329,10 @@ export const Canvas: React.FC<CanvasProps> = ({
           {editMode === 'responsive' && currentBreakpoint && (
             <div className="absolute -top-8 left-0 right-0 flex items-center justify-center gap-2 text-xs text-gray-500">
               <div className="bg-purple-100 px-3 py-1.5 rounded shadow-sm border border-purple-300">
-                <span className="font-medium text-purple-700">Режим {currentBreakpoint.name}:</span>
-                <span className="ml-1 text-purple-600">{currentBreakpoint.width}px</span>
-                {effectiveScreenHeight && <span className="text-purple-600"> × {effectiveScreenHeight}px</span>}
+                <span className="font-medium text-purple-700">{currentBreakpoint.name} · viewport пользователя:</span>
+                <span className="ml-1 text-purple-600">{currentBreakpoint.width}{effectiveScreenHeight ? ` × ${effectiveScreenHeight}` : ''}px</span>
                 {browserOffset > 0 && currentBreakpoint.height && (
-                  <span className="ml-1 text-purple-400">(экран {currentBreakpoint.height} − хром {browserOffset})</span>
+                  <span className="ml-1 text-purple-400">(монитор {currentBreakpoint.height} − браузер {browserOffset})</span>
                 )}
               </div>
             </div>

@@ -6,7 +6,7 @@ import { ColorPicker } from '@/shared/components/ColorPicker'
 import { ExpandableButton } from '@/shared/components/ExpandableButton'
 import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, ExternalLink, ChevronDown, Palette, Pencil, FileText, Library, Code2 } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, loadEditor, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor, selectInlineBlockEdit, startInlineBlockEdit, cancelInlineBlockEdit, finishInlineBlockEdit, deleteNode, duplicateNode, copyNode, pasteFromClipboard, selectSelectedNodeId, selectClipboard } from '@/features/editor/editorSlice'
+import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, loadEditor, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, updateBrowser, selectAutoChromeOffset, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor, selectInlineBlockEdit, startInlineBlockEdit, cancelInlineBlockEdit, finishInlineBlockEdit, deleteNode, duplicateNode, copyNode, pasteFromClipboard, selectSelectedNodeId, selectClipboard } from '@/features/editor/editorSlice'
 import { createBlock, updateBlock, selectBlocksSaving, selectBlocks } from '@/features/blocks/blocksSlice'
 import { createPage, updatePage, fetchPageById, selectPagesSaving } from '@/features/pages/pagesSlice'
 import { BreakpointManager } from './BreakpointManager'
@@ -66,6 +66,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const editMode = useAppSelector(selectEditMode)
   const browsers = useAppSelector(selectBrowsers)
   const selectedBrowser = useAppSelector(selectSelectedBrowser)
+  const autoChromeOffset = useAppSelector(selectAutoChromeOffset)
   const canUndo = useAppSelector(selectCanUndo)
   const canRedo = useAppSelector(selectCanRedo)
   const canvasColor = useAppSelector(selectCanvasColor)
@@ -908,17 +909,44 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 className="px-2 py-1 text-sm text-gray-900 border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="" className='text-xs text-gray-600'>Не выбран</option>
+                <option value="auto" className='text-sm text-black-600'>🎯 Авто (как браузер редактора)</option>
                 {browsers.map(browser => (
                   <option key={browser.id} value={browser.id} className='text-sm text-black-600'>
                     {browser.icon} {browser.name}
                   </option>
                 ))}
               </select>
-              {selectedBrowser && browsers.find(b => b.id === selectedBrowser) && (
-                <span className="text-xs text-gray-800">
-                  {browsers.find(b => b.id === selectedBrowser)?.viewportHeightOffset}px
+              {selectedBrowser === 'auto' && (
+                <span
+                  className="text-xs text-gray-800"
+                  title="Реальный замер «хрома» текущего окна: высота монитора − видимая область (вкладки, адресная строка, панель задач). Обновляется при изменении окна."
+                >
+                  {autoChromeOffset}px
                 </span>
               )}
+              {(() => {
+                const browser = selectedBrowser && selectedBrowser !== 'auto' ? browsers.find(b => b.id === selectedBrowser) : null
+                if (!browser) return null
+                return (
+                  <label
+                    className="flex items-center gap-1 text-xs text-gray-800"
+                    title="«Хром» браузера: высота вкладок/адресной строки + панель задач. Вычитается из высоты экрана. Калибровка: высота монитора − window.innerHeight в реальном браузере."
+                  >
+                    <input
+                      type="number"
+                      min={0}
+                      max={400}
+                      value={browser.viewportHeightOffset}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10)
+                        dispatch(updateBrowser({ ...browser, viewportHeightOffset: Number.isNaN(val) ? 0 : Math.max(0, Math.min(400, val)) }))
+                      }}
+                      className="w-14 px-1 py-0.5 text-xs text-gray-900 border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    />
+                    px
+                  </label>
+                )
+              })()}
             </div>
           </>
         )}
