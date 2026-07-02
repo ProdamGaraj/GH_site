@@ -7,7 +7,9 @@
  *    topLevelOnly не лезет внутрь вложенных элементов (защита от задвоения);
  *  - importFromHTML: @media/:hover/@keyframes целиком в globalCss (раньше терялось),
  *    инлайн <script>→globalJs, внешние <link>/<script src>→customHeadHtml,
- *    простые .class{} по-прежнему инлайнятся в styles.properties (канвас),
+ *    простые .class{} инлайнятся в styles.properties (канвас), НО класс, который
+ *    ещё участвует в @media/псевдо/комбинаторах, не инлайнится — его база тоже
+ *    уходит в globalCss (иначе инлайн перебивал бы эти правила),
  *    битый/пустой HTML не падает;
  *  - mergeHtmlIntoTree: верхнеуровневые инлайн ассеты → globalCss/globalJs,
  *    сохранение metadata совпавших узлов, стабильный round-trip.
@@ -103,8 +105,10 @@ describe('importFromHTML — захват стилей/скриптов', () => 
     // hover распознан → в states, не дублируется в globalCss
     expect(root.metadata.globalCss).not.toContain(':hover')
     expect(root.styles.states?.hover?.color).toBe('blue')
-    // базовый .box → properties
-    expect((root.styles.properties as Record<string, string>).color).toBe('black')
+    // .box участвует в @media → его базовое правило НЕ инлайнится (иначе инлайн
+    // перебил бы @media), а тоже уходит в globalCss; в properties его свойств нет
+    expect((root.styles.properties as Record<string, string>).color).toBeUndefined()
+    expect(root.metadata.globalCss).toContain('.box')
   })
 
   it('инлайн <script>→globalJs, внешние <link>/<script src>→customHeadHtml', () => {
@@ -127,6 +131,31 @@ describe('importFromHTML — захват стилей/скриптов', () => 
     expect((root.styles.properties as Record<string, string>).color).toBe('red')
     // распознанное правило не оседает в globalCss (одна точка правды)
     expect(root.metadata.globalCss || '').not.toContain('.box')
+  })
+
+  it('класс с @media: базовое правило НЕ инлайнится, а уходит в globalCss ПЕРЕД @media', () => {
+    // Регрессия: инлайн base перебивал бы @media (баг «бургер не собирается»).
+    const html = `
+      <style>
+        .menu { display: flex; gap: 8px; }
+        .burger { display: none; }
+        @media (max-width: 1180px) {
+          .menu { display: none; }
+          .burger { display: inline-flex; }
+        }
+      </style>
+      <nav class="menu"></nav><button class="burger"></button>`
+    const root = importFromHTML(html)
+    const css = root.metadata.globalCss || ''
+    const menu = root.children.find(c => c.attributes.class === 'menu')
+    const burger = root.children.find(c => c.attributes.class === 'burger')
+    // базовые правила классов из @media НЕ инлайнятся…
+    expect((menu?.styles.properties as Record<string, string>).display).toBeUndefined()
+    expect((burger?.styles.properties as Record<string, string>).display).toBeUndefined()
+    // …а лежат сырыми в globalCss, причём ДО @media (чтобы @media их переопределял)
+    expect(css).toContain('.menu {')
+    expect(css).toContain('.burger {')
+    expect(css.indexOf('.menu {')).toBeLessThan(css.indexOf('@media'))
   })
 
   it('маппит :hover/:focus/:active/:disabled в states по классу элемента', () => {
@@ -297,7 +326,9 @@ describe('importFromFiles (html + css + js)', () => {
       css: '.hero { padding: 10px; } .btn:hover { color: red; } @media (max-width: 600px) { .hero { padding: 2px; } }',
       js: 'BUNDLE_JS()',
     })
-    expect((result.styles.properties as Record<string, string>).padding).toBe('10px')
+    // .hero участвует в @media → базовое правило не инлайнится, уходит в globalCss
+    expect((result.styles.properties as Record<string, string>).padding).toBeUndefined()
+    expect(result.metadata.globalCss).toContain('.hero')
     expect(result.children[0].styles.states?.hover?.color).toBe('red')
     expect(result.metadata.globalCss).toContain('@media')
     expect(result.metadata.globalJs).toContain('BUNDLE_JS()')

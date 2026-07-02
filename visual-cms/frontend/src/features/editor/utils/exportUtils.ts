@@ -742,11 +742,19 @@ type StateType = 'hover' | 'active' | 'focus' | 'disabled'
 
 /** Результат разбора таблицы стилей при импорте. */
 interface ParsedStylesheet {
-  /** className → базовые свойства (инлайнятся в styles.properties). */
+  /**
+   * className → базовые свойства (инлайнятся в styles.properties).
+   * ИСКЛЮЧЕНИЕ: класс, у которого есть ещё и «сырые» правила в leftover
+   * (@media/псевдо/комбинаторы), сюда НЕ попадает — его базовое правило уходит
+   * в leftover (globalCss), иначе инлайн перебивал бы эти правила.
+   */
   base: Map<string, Record<string, string>>
   /** className → состояния (:hover/:active/:focus/:disabled → styles.states). */
   states: Map<string, Partial<Record<StateType, Record<string, string>>>>
-  /** Нераспознанное (вложенные селекторы, @media, @keyframes, id/тег, группы) → globalCss. */
+  /**
+   * Нераспознанное (вложенные селекторы, @media, @keyframes, id/тег, группы) →
+   * globalCss. Плюс базовые правила классов, участвующих в этих правилах (см. base).
+   */
   leftover: string
 }
 
@@ -761,6 +769,9 @@ interface ParsedStylesheet {
  */
 function parseStylesheet(cssText: string): ParsedStylesheet {
   const base = new Map<string, Record<string, string>>()
+  // Сырой текст базового правила класса (нужен, чтобы при необходимости вернуть
+  // правило в globalCss как есть, без пересборки из распарсенных свойств).
+  const baseRaw = new Map<string, string>()
   const states = new Map<string, Partial<Record<StateType, Record<string, string>>>>()
   const leftover: string[] = []
 
@@ -805,6 +816,7 @@ function parseStylesheet(cssText: string): ParsedStylesheet {
     if (baseMatch) {
       const cls = baseMatch[1]
       base.set(cls, { ...(base.get(cls) || {}), ...parseInlineStyles(block) })
+      baseRaw.set(cls, (baseRaw.has(cls) ? `${baseRaw.get(cls)}\n` : '') + block.trim())
     } else if (stateMatch) {
       const cls = stateMatch[1]
       const st = stateMatch[2] as StateType
@@ -816,7 +828,26 @@ function parseStylesheet(cssText: string): ParsedStylesheet {
     }
   }
 
-  return { base, states, leftover: leftover.join('\n\n').trim() }
+  // Класс, у которого КРОМЕ базового правила есть ещё «сырые» правила в leftover
+  // (@media / :pseudo-элементы / комбинаторы / группы), нельзя инлайнить: инлайн-
+  // стиль элемента (style="…") перебивает правила из globalCss без !important, и
+  // тогда `@media .cls{…}` и `.parent .cls{…}` не срабатывают (адаптив/темизация
+  // ломаются — ровно этот баг с бургер-меню). Поэтому базовое правило таких классов
+  // тоже оставляем сырым в globalCss — ПЕРЕД остальным leftover, чтобы @media и
+  // сложные селекторы могли его переопределять — и убираем из base (не инлайним).
+  const leftoverStr = leftover.join('\n\n')
+  const referenced = new Set<string>()
+  for (const m of leftoverStr.matchAll(/\.([A-Za-z0-9_-]+)/g)) referenced.add(m[1])
+
+  const movedRules: string[] = []
+  for (const cls of Array.from(base.keys())) {
+    if (referenced.has(cls)) {
+      movedRules.push(`.${cls} {${baseRaw.get(cls) ?? ''}}`)
+      base.delete(cls)
+    }
+  }
+
+  return { base, states, leftover: [...movedRules, ...leftover].join('\n\n').trim() }
 }
 
 /**
