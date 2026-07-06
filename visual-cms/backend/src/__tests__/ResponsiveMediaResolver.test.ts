@@ -54,7 +54,7 @@ describe('resolveResponsiveMedia — <img> матрица приоритета',
     const map: TranslationFieldMap = { [imgId]: { [breakpointField('src', 'mobile')]: '/ru-mobile.jpg' } }
     const plan = resolveResponsiveMedia(root, map, BPS)
     expect(plan.get(imgId)?.img).toEqual([
-      { bpId: 'mobile', width: 375, value: '/ru-mobile.jpg' },
+      { bpId: 'mobile', width: 375, value: '/ru-mobile.jpg', media: '(max-width: 767px)' },
     ])
   })
 
@@ -77,7 +77,7 @@ describe('resolveResponsiveMedia — <img> матрица приоритета',
     )
     const plan = resolveResponsiveMedia(root, {}, BPS) // дефолтный язык, переводов нет
     expect(plan.get(imgId)?.img).toEqual([
-      { bpId: 'tablet', width: 768, value: '/base-tablet.jpg' },
+      { bpId: 'tablet', width: 768, value: '/base-tablet.jpg', media: '(min-width: 768px)' },
     ])
   })
 
@@ -91,7 +91,7 @@ describe('resolveResponsiveMedia — <img> матрица приоритета',
     }
     const plan = resolveResponsiveMedia(root, map, BPS)
     expect(plan.get(imgId)?.img).toEqual([
-      { bpId: 'tablet', width: 768, value: '/ru-tablet.jpg' },
+      { bpId: 'tablet', width: 768, value: '/ru-tablet.jpg', media: '(min-width: 768px)' },
     ])
   })
 
@@ -157,7 +157,7 @@ describe('resolveResponsiveMedia — background-image', () => {
     const map: TranslationFieldMap = { [imgId]: { 'bg:image@mobile': '/ru-mobile.png' } }
     const plan = resolveResponsiveMedia(root, map, BPS)
     expect(plan.get(imgId)?.bg).toEqual([
-      { bpId: 'mobile', width: 375, value: 'url("/ru-mobile.png")' },
+      { bpId: 'mobile', width: 375, value: 'url("/ru-mobile.png")', media: '(max-width: 767px)' },
     ])
   })
 
@@ -168,7 +168,7 @@ describe('resolveResponsiveMedia — background-image', () => {
     )
     const plan = resolveResponsiveMedia(root, {}, BPS)
     expect(plan.get(imgId)?.bg).toEqual([
-      { bpId: 'tablet', width: 768, value: 'linear-gradient(#000,#fff)' },
+      { bpId: 'tablet', width: 768, value: 'linear-gradient(#000,#fff)', media: '(min-width: 768px)' },
     ])
   })
 
@@ -192,8 +192,8 @@ describe('generateBackgroundMediaCss', () => {
       ] }],
     ])
     const css = generateBackgroundMediaCss(plan, BPS)
-    // tablet (768) идёт раньше mobile (375)
-    expect(css.indexOf('max-width: 768px')).toBeLessThan(css.indexOf('max-width: 375px'))
+    // tablet — самый широкий (min-width) и идёт раньше mobile (max-width до tablet−1)
+    expect(css.indexOf('(min-width: 768px)')).toBeLessThan(css.indexOf('(max-width: 767px)'))
     expect(css).toContain('[data-element-id="n1"] { background-image: url("/t.png") !important; }')
   })
 

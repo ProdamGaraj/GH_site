@@ -11,9 +11,10 @@
  * Базовое значение (для вьюпорта шире всех брейкпоинтов) берётся с самого
  * элемента при первом проходе (background-image / атрибут src).
  *
- * Ширины брейкпоинтов — из window.__ghBreakpoints (эмитит HtmlGenerator).
- * Выбор: наименьший brейкпоинт, чей max-width ≥ вьюпорта (самый точный экран),
- * среди присутствующих в карте; иначе — база. Совпадает с семантикой @media/<picture>.
+ * Ширины брейкпоинтов — из window.__ghBreakpoints (эмитит HtmlGenerator,
+ * boundary = верхняя граница диапазона из breakpointRanges; null = без границы).
+ * Выбор: брейкпоинт с наименьшей boundary ≥ вьюпорта среди присутствующих в
+ * карте; иначе — база. Совпадает с семантикой @media/<picture>.
  */
 export function generateResponsiveMediaRuntime(): string {
   return `<script>
@@ -28,12 +29,17 @@ export function generateResponsiveMediaRuntime(): string {
     return el.__rmBase;
   }
 
+  function boundOf(bp){
+    if (bp.boundary === null) return Infinity;
+    return typeof bp.boundary === 'number' ? bp.boundary : bp.width;
+  }
+
   function pick(map, w){
     var best = null;
     for (var i = 0; i < BPS.length; i++){
       var bp = BPS[i];
       if (map[bp.id] == null || map[bp.id] === '') continue;
-      if (w <= bp.width && (best === null || bp.width < best.width)) best = bp;
+      if (w <= boundOf(bp) && (best === null || boundOf(bp) < boundOf(best))) best = bp;
     }
     return best ? map[best.id] : null;
   }

@@ -10,6 +10,7 @@ import type {
   Animation,
   BreakpointDef,
 } from '../types/blockNode'
+import { computeBreakpointRanges } from './breakpointRanges'
 
 // Animation preset keyframes
 const ANIMATION_KEYFRAMES: Record<string, string> = {
@@ -370,13 +371,15 @@ export class StyleGenerator {
   generateResponsiveCSS(rootNode: BlockNode): string {
     const breakpoints = this.getBreakpoints(rootNode)
 
-    // Сортируем breakpoints от большего к меньшему для правильного каскада CSS
-    const sortedBreakpoints = [...breakpoints].sort((a, b) => b.width - a.width)
+    // Диапазоны применения: границы между breakpoints, а не дизайн-ширины.
+    // Список отсортирован по убыванию ширины — меньший экран эмитится позже
+    // и побеждает в каскаде (все правила с !important, решает порядок).
+    const ranges = computeBreakpointRanges(breakpoints)
 
     // Собираем CSS-правила для каждого breakpoint
     const breakpointRules: Record<string, string[]> = {}
-    for (const bp of sortedBreakpoints) {
-      breakpointRules[bp.id] = []
+    for (const range of ranges) {
+      breakpointRules[range.id] = []
     }
 
     // Рекурсивно собираем overrides из всего дерева
@@ -384,10 +387,10 @@ export class StyleGenerator {
 
     // Генерируем итоговый CSS
     let css = '\n    /* Responsive styles */\n'
-    for (const bp of sortedBreakpoints) {
-      const rules = breakpointRules[bp.id]
+    for (const range of ranges) {
+      const rules = breakpointRules[range.id]
       if (!rules || rules.length === 0) continue
-      css += `    @media (max-width: ${bp.width}px) {\n`
+      css += `    @media ${range.media} {\n`
       css += rules.map(r => `      ${r}`).join('\n')
       css += '\n    }\n'
     }

@@ -38,6 +38,31 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
     }))
   }
 
+  // Булевы атрибуты (controls/autoplay/loop/muted/playsinline): в HTML само
+  // присутствие атрибута = «вкл», поэтому «выкл» — это УДАЛЕНИЕ ключа, а не
+  // пустая строка (controls="" включал контролы на деплое). extra — атрибуты,
+  // которые надо выставить вместе (autoplay требует muted+playsinline).
+  const handleBooleanAttributeChange = (attr: string, on: boolean, extra?: Record<string, string>) => {
+    const attributes = { ...(node.attributes || {}) }
+    if (on) {
+      attributes[attr] = 'true'
+    } else {
+      delete attributes[attr]
+    }
+    Object.assign(attributes, extra || {})
+    dispatch(updateNode({
+      id: node.id,
+      updates: { attributes },
+    }))
+  }
+
+  // Присутствие атрибута со значением, отличным от 'false', = включено
+  // ('' — легаси/импорт голого атрибута; семантика совпадает с деплоем).
+  const isBooleanAttributeOn = (attr: string): boolean => {
+    const value = node.attributes?.[attr]
+    return value !== undefined && value !== 'false'
+  }
+
   const handleStyleChange = (property: string, value: string) => {
     dispatch(updateNodeStyles({
       nodeId: node.id,
@@ -369,57 +394,91 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
           
           {isVideoElement && (
             <div className="space-y-2">
+              <Input
+                label="Постер (превью до запуска)"
+                value={node.attributes?.poster || ''}
+                onChange={(e) => handleAttributeChange('poster', e.target.value)}
+                placeholder="https://example.com/poster.jpg"
+              />
+
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   id="video-controls"
-                  checked={node.attributes?.controls === 'true'}
-                  onChange={(e) => handleAttributeChange('controls', e.target.checked ? 'true' : '')}
+                  checked={isBooleanAttributeOn('controls')}
+                  onChange={(e) => handleBooleanAttributeChange('controls', e.target.checked)}
                   className="rounded border-gray-300"
                 />
                 <label htmlFor="video-controls" className="text-xs text-gray-600">
                   Показать контролы
                 </label>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   id="video-autoplay"
-                  checked={node.attributes?.autoplay === 'true'}
-                  onChange={(e) => handleAttributeChange('autoplay', e.target.checked ? 'true' : '')}
+                  checked={isBooleanAttributeOn('autoplay')}
+                  onChange={(e) =>
+                    // Автозапуск без muted браузеры блокируют, iOS требует playsinline —
+                    // включаем их вместе, иначе «видео не играет».
+                    handleBooleanAttributeChange(
+                      'autoplay',
+                      e.target.checked,
+                      e.target.checked ? { muted: 'true', playsinline: 'true' } : undefined
+                    )
+                  }
                   className="rounded border-gray-300"
                 />
                 <label htmlFor="video-autoplay" className="text-xs text-gray-600">
-                  Автозапуск
+                  Автозапуск (включит «Без звука»)
                 </label>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   id="video-loop"
-                  checked={node.attributes?.loop === 'true'}
-                  onChange={(e) => handleAttributeChange('loop', e.target.checked ? 'true' : '')}
+                  checked={isBooleanAttributeOn('loop')}
+                  onChange={(e) => handleBooleanAttributeChange('loop', e.target.checked)}
                   className="rounded border-gray-300"
                 />
                 <label htmlFor="video-loop" className="text-xs text-gray-600">
                   Зациклить
                 </label>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   id="video-muted"
-                  checked={node.attributes?.muted === 'true'}
-                  onChange={(e) => handleAttributeChange('muted', e.target.checked ? 'true' : '')}
+                  checked={isBooleanAttributeOn('muted')}
+                  onChange={(e) => handleBooleanAttributeChange('muted', e.target.checked)}
                   className="rounded border-gray-300"
                 />
                 <label htmlFor="video-muted" className="text-xs text-gray-600">
                   Без звука
                 </label>
               </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="video-playsinline"
+                  checked={isBooleanAttributeOn('playsinline')}
+                  onChange={(e) => handleBooleanAttributeChange('playsinline', e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <label htmlFor="video-playsinline" className="text-xs text-gray-600">
+                  В контейнере (playsinline, нужно для iPhone)
+                </label>
+              </div>
+
+              {isBooleanAttributeOn('autoplay') && !isBooleanAttributeOn('muted') && (
+                <p className="text-xs text-amber-600">
+                  Автозапуск без «Без звука» будет заблокирован браузером.
+                </p>
+              )}
             </div>
           )}
         </div>

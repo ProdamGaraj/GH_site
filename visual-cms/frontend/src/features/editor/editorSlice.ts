@@ -4,7 +4,7 @@ import { generateId } from '@/shared/utils'
 import type { RootState } from '@/app/store'
 import { blockApi, pageApi, type CreateBlockDto } from '@/shared/api'
 import { cleanForLibrary } from '@/features/editor/utils/libraryClean'
-import { findNodeInTree } from '@/features/editor/utils/variationUtils'
+import { findNodeInTree, normalizeLegacyRootOverrides } from '@/features/editor/utils/variationUtils'
 import {
   findNodeById,
   findParentNode,
@@ -219,8 +219,11 @@ const editorSlice = createSlice({
   initialState,
   reducers: {
     loadEditor: (state, action: PayloadAction<BlockNode>) => {
-      state.rootNode = action.payload
-      state.history = [action.payload]
+      // Чиним легаси-записи старого deleteNode (hidden-override в корне вместо
+      // родителя) — иначе «удалённые» элементы видны в редакторе, но скрыты на деплое.
+      const normalized = normalizeLegacyRootOverrides(action.payload)
+      state.rootNode = normalized
+      state.history = [normalized]
       state.historyIndex = 0
       state.isDirty = false
     },
@@ -256,13 +259,22 @@ const editorSlice = createSlice({
     },
     
     selectNode: (state, action: PayloadAction<string | null>) => {
-      console.log('selectNode reducer called with:', action.payload)
-      console.log('Previous selectedNodeId:', state.selectedNodeId)
-      state.selectedNodeId = action.payload
-      console.log('New selectedNodeId:', state.selectedNodeId)
-      
+      let nodeId = action.payload
+
+      // Клоны repeater'а на канвасе имеют id `<templateId>-clone-<n>` и в дереве
+      // не существуют: выбор клона делал удаление/правки тихим no-op. Маппим
+      // выбор на узел-шаблон, если сам id в дереве не найден.
+      if (nodeId && state.rootNode && nodeId.includes('-clone-') && !findNodeById(state.rootNode, nodeId)) {
+        const templateId = nodeId.replace(/-clone-\d+/g, '')
+        if (findNodeById(state.rootNode, templateId)) {
+          nodeId = templateId
+        }
+      }
+
+      state.selectedNodeId = nodeId
+
       // При выборе узла открыть basicSettings если панель не выбрана или это elementProperties
-      if (action.payload !== null && (!state.activeRightPanel || state.activeRightPanel === 'elementProperties')) {
+      if (nodeId !== null && (!state.activeRightPanel || state.activeRightPanel === 'elementProperties')) {
         state.activeRightPanel = 'basicSettings'
       }
     },
@@ -824,21 +836,33 @@ const editorSlice = createSlice({
         }
         
         if (findInBaseTree(state.rootNode)) {
-          // Элемент в базовом дереве - скрываем его через override
-          if (!state.rootNode.variations) {
-            state.rootNode.variations = {}
+          // Элемент в базовом дереве — скрываем через override у РОДИТЕЛЯ.
+          // Рендер (getEffectiveTree) читает inheritedOverrides из variations
+          // непосредственного родителя (как updateNodeStyles/setNodeMediaOverride);
+          // запись в root делала «удаление» тихим no-op для всех элементов
+          // глубже первого уровня. Легаси-записи в root чинит
+          // normalizeLegacyRootOverrides при загрузке.
+          const owner = state.rootNode.id === nodeId
+            ? null
+            : (findParentNode(state.rootNode, nodeId) || state.rootNode)
+          if (!owner) return
+
+          if (!owner.variations) {
+            owner.variations = {}
           }
-          if (!state.rootNode.variations[breakpointId]) {
-            state.rootNode.variations[breakpointId] = {}
+          if (!owner.variations[breakpointId]) {
+            owner.variations[breakpointId] = {}
           }
-          if (!state.rootNode.variations[breakpointId].inheritedOverrides) {
-            state.rootNode.variations[breakpointId].inheritedOverrides = {}
+          if (!owner.variations[breakpointId].inheritedOverrides) {
+            owner.variations[breakpointId].inheritedOverrides = {}
           }
-          
-          state.rootNode.variations[breakpointId].inheritedOverrides![nodeId] = {
+
+          owner.variations[breakpointId].inheritedOverrides![nodeId] = {
+            ...owner.variations[breakpointId].inheritedOverrides![nodeId],
             hidden: true
           }
-          
+
+          pushToHistory(state)
           state.isDirty = true
           state.selectedNodeId = null
           return
@@ -901,16 +925,31 @@ const editorSlice = createSlice({
       }
       
       // Если не нашли в variations, удаляем из базового дерева
+      let foundInBase = false
       const deleteFromNode = (current: BlockNode): BlockNode => {
         return {
           ...current,
           children: (current.children || [])
-            .filter(child => child.id !== nodeId)
+            .filter(child => {
+              if (child.id === nodeId) {
+                foundInBase = true
+                return false
+              }
+              return true
+            })
             .map(deleteFromNode),
         }
       }
-      
+
       state.rootNode = deleteFromNode(state.rootNode)
+
+      // Узел не найден нигде (например, id клона repeater'а) — ничего не меняем:
+      // раньше здесь всё равно писались history и isDirty, маскируя no-op.
+      if (!foundInBase) {
+        console.warn('deleteNode: узел не найден в дереве:', nodeId)
+        return
+      }
+
       pushToHistory(state)
       state.isDirty = true
       state.selectedNodeId = null
@@ -1137,7 +1176,7 @@ const editorSlice = createSlice({
     
     // Загрузить структуру из импорта
     loadRootNode: (state, action: PayloadAction<BlockNode>) => {
-      state.rootNode = action.payload
+      state.rootNode = normalizeLegacyRootOverrides(action.payload)
       state.isDirty = true
       state.selectedNodeId = null
     },

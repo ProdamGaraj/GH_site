@@ -215,6 +215,73 @@ export function getNodeBreakpoint(
 }
 
 /**
+ * Миграция легаси-данных: старый deleteNode писал hidden-override удаляемого
+ * элемента ВСЕГДА в variations корня, а рендер (getEffectiveTree) читает
+ * inheritedOverrides только из variations непосредственного родителя. Такие
+ * записи для не-прямых детей корня — мёртвый груз: элемент оставался видимым
+ * в редакторе, но скрывался на деплое (StyleGenerator читает всё дерево).
+ *
+ * Переносим каждый root-override к фактическому родителю узла. Если у родителя
+ * уже есть свой override — родительский приоритетнее (мержим поверх).
+ * Overrides для прямых детей корня и для неизвестных id не трогаем.
+ * Возвращает новый корень (вход не мутируется); без легаси-записей — вход как есть.
+ */
+export function normalizeLegacyRootOverrides(root: BlockNode): BlockNode {
+  const rootOverridesByBp = root.variations
+  if (!rootOverridesByBp) return root
+
+  // Индекс nodeId → id родителя (только базовое дерево — туда писал deleteNode).
+  const parentIdOf = new Map<string, string>()
+  const indexParents = (node: BlockNode): void => {
+    for (const child of node.children || []) {
+      parentIdOf.set(child.id, node.id)
+      indexParents(child)
+    }
+  }
+  indexParents(root)
+
+  // Собираем записи на перенос: bpId → nodeId → override.
+  const toMove: Array<{ bpId: string; nodeId: string; override: NonNullable<NonNullable<BlockNode['variations']>[string]['inheritedOverrides']>[string]; parentId: string }> = []
+  for (const [bpId, variation] of Object.entries(rootOverridesByBp)) {
+    for (const [nodeId, override] of Object.entries(variation.inheritedOverrides || {})) {
+      const parentId = parentIdOf.get(nodeId)
+      if (parentId && parentId !== root.id) {
+        toMove.push({ bpId, nodeId, override, parentId })
+      }
+    }
+  }
+  if (toMove.length === 0) return root
+
+  const cloned: BlockNode = JSON.parse(JSON.stringify(root))
+
+  for (const { bpId, nodeId, override, parentId } of toMove) {
+    // Удаляем с корня
+    delete cloned.variations![bpId].inheritedOverrides![nodeId]
+
+    // Пишем к родителю (его существующие значения приоритетнее)
+    const findById = (node: BlockNode, id: string): BlockNode | null => {
+      if (node.id === id) return node
+      for (const child of node.children || []) {
+        const found = findById(child, id)
+        if (found) return found
+      }
+      return null
+    }
+    const parent = findById(cloned, parentId)
+    if (!parent) continue
+    if (!parent.variations) parent.variations = {}
+    if (!parent.variations[bpId]) parent.variations[bpId] = {}
+    if (!parent.variations[bpId].inheritedOverrides) parent.variations[bpId].inheritedOverrides = {}
+    parent.variations[bpId].inheritedOverrides![nodeId] = {
+      ...override,
+      ...parent.variations[bpId].inheritedOverrides![nodeId],
+    }
+  }
+
+  return cloned
+}
+
+/**
  * Найти узел в дереве (включая вариации)
  */
 export function findNodeInTree(

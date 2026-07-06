@@ -4,7 +4,7 @@ import { Button } from '@/shared/components/Button'
 import { Input } from '@/shared/components/Input'
 import { ColorPicker } from '@/shared/components/ColorPicker'
 import { ExpandableButton } from '@/shared/components/ExpandableButton'
-import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, ExternalLink, ChevronDown, Palette, Pencil, FileText, Library, Code2 } from 'lucide-react'
+import { Save, Eye, Undo, Redo, X, Check, Loader2, Monitor, Tablet, Smartphone, Laptop, Watch, Settings, Settings2, ZoomIn, ZoomOut, AlignLeft, AlignCenter, AlignRight, Download, Upload, ExternalLink, ChevronDown, Palette, Pencil, FileText, Library, Code2, SlidersHorizontal, MoreHorizontal } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { selectRootNode, selectIsDirty, selectBreakpoints, selectZoom, selectBlockAlignment, selectEditMode, markAsSaved, setZoom, setBlockAlignment, setEditMode, setActiveEditBreakpoint, loadRootNode, loadEditor, selectBrowsers, selectSelectedBrowser, setSelectedBrowser, updateBrowser, selectAutoChromeOffset, selectCanUndo, selectCanRedo, undo, redo, selectCanvasColor, setCanvasColor, selectInlineBlockEdit, startInlineBlockEdit, cancelInlineBlockEdit, finishInlineBlockEdit, deleteNode, duplicateNode, copyNode, pasteFromClipboard, selectSelectedNodeId, selectClipboard } from '@/features/editor/editorSlice'
 import { createBlock, updateBlock, selectBlocksSaving, selectBlocks } from '@/features/blocks/blocksSlice'
@@ -88,6 +88,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   const [isReusable, setIsReusable] = useState(true)
   const [zoomInput, setZoomInput] = useState(String(zoom))
   const [showViewportDropdown, setShowViewportDropdown] = useState(false)
+  // C3 (хедер): второстепенные контролы спрятаны в два меню, чтобы тулбар
+  // не вылезал за границы экрана.
+  const [showCanvasMenu, setShowCanvasMenu] = useState(false)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [isSavingToLibrary, setIsSavingToLibrary] = useState(false)
   const [blockSaveResult, setBlockSaveResult] = useState<{ success: boolean; message: string } | null>(null)
   const [saveResult, setSaveResult] = useState<{ success: boolean; message: string } | null>(null)
@@ -695,15 +699,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         </>
       )}
       
-      {/* Canvas color */}
-      <div className="flex items-center gap-1 mr-2" title="Цвет фона холста">
-        <Palette size={14} className="text-gray-500" />
-        <ColorPicker
-          value={canvasColor}
-          onChange={(value) => dispatch(setCanvasColor(value))}
-        />
-      </div>
-      
       <div className="flex items-center gap-2">
         {/* Zoom controls */}
         <button
@@ -775,45 +770,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <Redo size={16} className="text-gray-600" />
         </Button>
         
-        {/* Block alignment (only for block editor in responsive mode) */}
-        {!isPageEditor && editMode === 'responsive' && (
-          <>
-            <div className="h-6 w-px bg-gray-300 mx-2" />
-            
-            <div className="flex items-center gap-1 bg-gray-100 rounded p-1">
-              <button
-                onClick={() => dispatch(setBlockAlignment('left'))}
-                className={`p-1.5 rounded transition-colors ${
-                  blockAlignment === 'left' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
-                }`}
-                title="Выровнять по левому краю"
-              >
-                <AlignLeft size={16} className={blockAlignment === 'left' ? 'text-primary-600' : 'text-gray-600'} />
-              </button>
-              <button
-                onClick={() => dispatch(setBlockAlignment('center'))}
-                className={`p-1.5 rounded transition-colors ${
-                  blockAlignment === 'center' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
-                }`}
-                title="Выровнять по центру"
-              >
-                <AlignCenter size={16} className={blockAlignment === 'center' ? 'text-primary-600' : 'text-gray-600'} />
-              </button>
-              <button
-                onClick={() => dispatch(setBlockAlignment('right'))}
-                className={`p-1.5 rounded transition-colors ${
-                  blockAlignment === 'right' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
-                }`}
-                title="Выровнять по правому краю"
-              >
-                <AlignRight size={16} className={blockAlignment === 'right' ? 'text-primary-600' : 'text-gray-600'} />
-              </button>
-            </div>
-          </>
-        )}
-        
         <div className="h-6 w-px bg-gray-300 mx-2" />
-        
+
         {/* Viewport switcher with Base mode */}
         {onViewportChange && (
           <>
@@ -886,75 +844,176 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                           </button>
                         )
                       })}
+                      <button
+                        onClick={() => {
+                          setShowViewportDropdown(false)
+                          setShowBreakpointManager(true)
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-t border-gray-100"
+                      >
+                        <Settings size={16} />
+                        <span>Управление экранами…</span>
+                      </button>
                     </div>
                   </>
                 )}
               </div>
-              
-              <button
-                onClick={() => setShowBreakpointManager(true)}
-                className="p-1.5 rounded hover:bg-gray-200 transition-colors border-l border-gray-300 ml-1 pl-2"
-                title="Управление breakpoints"
-              >
-                <Settings size={16} className="text-gray-600" />
-              </button>
-            </div>
-            
-            {/* Browser Selector */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Браузер:</span>
-              <select
-                value={selectedBrowser || ''}
-                onChange={(e) => dispatch(setSelectedBrowser(e.target.value || null))}
-                className="px-2 py-1 text-sm text-gray-900 border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="" className='text-xs text-gray-600'>Не выбран</option>
-                <option value="auto" className='text-sm text-black-600'>🎯 Авто (как браузер редактора)</option>
-                {browsers.map(browser => (
-                  <option key={browser.id} value={browser.id} className='text-sm text-black-600'>
-                    {browser.icon} {browser.name}
-                  </option>
-                ))}
-              </select>
-              {selectedBrowser === 'auto' && (
-                <span
-                  className="text-xs text-gray-800"
-                  title="Реальный замер «хрома» текущего окна: высота монитора − видимая область (вкладки, адресная строка, панель задач). Обновляется при изменении окна."
-                >
-                  {autoChromeOffset}px
-                </span>
-              )}
-              {(() => {
-                const browser = selectedBrowser && selectedBrowser !== 'auto' ? browsers.find(b => b.id === selectedBrowser) : null
-                if (!browser) return null
-                return (
-                  <label
-                    className="flex items-center gap-1 text-xs text-gray-800"
-                    title="«Хром» браузера: высота вкладок/адресной строки + панель задач. Вычитается из высоты экрана. Калибровка: высота монитора − window.innerHeight в реальном браузере."
-                  >
-                    <input
-                      type="number"
-                      min={0}
-                      max={400}
-                      value={browser.viewportHeightOffset}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value, 10)
-                        dispatch(updateBrowser({ ...browser, viewportHeightOffset: Number.isNaN(val) ? 0 : Math.max(0, Math.min(400, val)) }))
-                      }}
-                      className="w-14 px-1 py-0.5 text-xs text-gray-900 border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
-                    />
-                    px
-                  </label>
-                )
-              })()}
             </div>
           </>
         )}
+
+        <div className="h-6 w-px bg-gray-300 mx-2" />
+
+        {/* Настройки холста: цвет, выравнивание, браузер — спрятаны в меню,
+            чтобы тулбар не переполнялся (C3) */}
+        <div className="relative">
+          <button
+            onClick={() => setShowCanvasMenu(!showCanvasMenu)}
+            className={`flex items-center gap-1 p-1.5 rounded transition-colors ${
+              showCanvasMenu ? 'bg-gray-200' : 'hover:bg-gray-200'
+            }`}
+            title="Настройки холста"
+          >
+            <SlidersHorizontal size={16} className="text-gray-600" />
+            <ChevronDown size={12} className="text-gray-500" />
+          </button>
+
+          {showCanvasMenu && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowCanvasMenu(false)}
+              />
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[280px] p-3 space-y-3">
+                {/* Canvas color */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-sm text-gray-700">
+                    <Palette size={14} className="text-gray-500" />
+                    Цвет фона холста
+                  </span>
+                  <ColorPicker
+                    value={canvasColor}
+                    onChange={(value) => dispatch(setCanvasColor(value))}
+                  />
+                </div>
+
+                {/* Block alignment (only for block editor in responsive mode) */}
+                {!isPageEditor && editMode === 'responsive' && (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm text-gray-700">Выравнивание блока</span>
+                    <div className="flex items-center gap-1 bg-gray-100 rounded p-1">
+                      <button
+                        onClick={() => dispatch(setBlockAlignment('left'))}
+                        className={`p-1.5 rounded transition-colors ${
+                          blockAlignment === 'left' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
+                        }`}
+                        title="Выровнять по левому краю"
+                      >
+                        <AlignLeft size={16} className={blockAlignment === 'left' ? 'text-primary-600' : 'text-gray-600'} />
+                      </button>
+                      <button
+                        onClick={() => dispatch(setBlockAlignment('center'))}
+                        className={`p-1.5 rounded transition-colors ${
+                          blockAlignment === 'center' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
+                        }`}
+                        title="Выровнять по центру"
+                      >
+                        <AlignCenter size={16} className={blockAlignment === 'center' ? 'text-primary-600' : 'text-gray-600'} />
+                      </button>
+                      <button
+                        onClick={() => dispatch(setBlockAlignment('right'))}
+                        className={`p-1.5 rounded transition-colors ${
+                          blockAlignment === 'right' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
+                        }`}
+                        title="Выровнять по правому краю"
+                      >
+                        <AlignRight size={16} className={blockAlignment === 'right' ? 'text-primary-600' : 'text-gray-600'} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Browser Selector */}
+                {onViewportChange && (
+                  <div className="space-y-1">
+                    <span className="text-sm text-gray-700">Браузер (высота «хрома»)</span>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={selectedBrowser || ''}
+                        onChange={(e) => dispatch(setSelectedBrowser(e.target.value || null))}
+                        className="flex-1 px-2 py-1 text-sm text-gray-900 border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="" className='text-xs text-gray-600'>Не выбран</option>
+                        <option value="auto" className='text-sm text-black-600'>🎯 Авто (как браузер редактора)</option>
+                        {browsers.map(browser => (
+                          <option key={browser.id} value={browser.id} className='text-sm text-black-600'>
+                            {browser.icon} {browser.name}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedBrowser === 'auto' && (
+                        <span
+                          className="text-xs text-gray-800"
+                          title="Реальный замер «хрома» текущего окна: высота монитора − видимая область (вкладки, адресная строка, панель задач). Обновляется при изменении окна."
+                        >
+                          {autoChromeOffset}px
+                        </span>
+                      )}
+                      {(() => {
+                        const browser = selectedBrowser && selectedBrowser !== 'auto' ? browsers.find(b => b.id === selectedBrowser) : null
+                        if (!browser) return null
+                        return (
+                          <label
+                            className="flex items-center gap-1 text-xs text-gray-800"
+                            title="«Хром» браузера: высота вкладок/адресной строки + панель задач. Вычитается из высоты экрана. Калибровка: высота монитора − window.innerHeight в реальном браузере."
+                          >
+                            <input
+                              type="number"
+                              min={0}
+                              max={400}
+                              value={browser.viewportHeightOffset}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10)
+                                dispatch(updateBrowser({ ...browser, viewportHeightOffset: Number.isNaN(val) ? 0 : Math.max(0, Math.min(400, val)) }))
+                              }}
+                              className="w-14 px-1 py-0.5 text-xs text-gray-900 border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+                            />
+                            px
+                          </label>
+                        )
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </>
   )
 
-  // Правая часть - действия СО страницей (сохранить, экспорт, публикация)
+  // Правая часть - действия СО страницей. Видимой остаётся только главная
+  // кнопка (Сохранить / В библиотеку) + Предпросмотр; остальное — в меню «⋯» (C3).
+  const moreMenuItems: Array<{ icon: React.ReactNode; label: string; title?: string; onClick: () => void }> = [
+    {
+      icon: <Code2 size={16} />,
+      label: 'Исходный код',
+      title: 'Редактировать полный HTML-код страницы',
+      onClick: () => setShowHtmlEditor(true),
+    },
+    {
+      icon: <Download size={16} />,
+      label: 'Экспорт',
+      onClick: () => { setShowExportModal(true); setImportTabActive(false) },
+    },
+    {
+      icon: <Upload size={16} />,
+      label: 'Импорт',
+      onClick: () => { setShowExportModal(true); setImportTabActive(true) },
+    },
+  ]
+
   const rightContent = (
     <>
       <ExpandableButton
@@ -963,29 +1022,44 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         onClick={handlePreview}
         variant="secondary"
       />
-      
-      <ExpandableButton
-        icon={<Code2 size={16} />}
-        label="Исходный код"
-        onClick={() => setShowHtmlEditor(true)}
-        variant="secondary"
-        title="Редактировать полный HTML-код страницы"
-      />
 
-      <ExpandableButton
-        icon={<Download size={16} />}
-        label="Экспорт"
-        onClick={() => { setShowExportModal(true); setImportTabActive(false) }}
-        variant="secondary"
-      />
-      
-      <ExpandableButton
-        icon={<Upload size={16} />}
-        label="Импорт"
-        onClick={() => { setShowExportModal(true); setImportTabActive(true) }}
-        variant="secondary"
-      />
-      
+      <div className="relative">
+        <button
+          onClick={() => setShowMoreMenu(!showMoreMenu)}
+          className={`p-2 rounded-lg border border-gray-300 transition-colors ${
+            showMoreMenu ? 'bg-gray-200' : 'hover:bg-gray-100'
+          }`}
+          title="Ещё действия"
+        >
+          <MoreHorizontal size={16} className="text-gray-600" />
+        </button>
+
+        {showMoreMenu && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setShowMoreMenu(false)}
+            />
+            <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[200px] py-1">
+              {moreMenuItems.map((item) => (
+                <button
+                  key={item.label}
+                  onClick={() => {
+                    setShowMoreMenu(false)
+                    item.onClick()
+                  }}
+                  title={item.title}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Conditional save buttons based on edit mode */}
       {isBlockEditMode ? (
         <>

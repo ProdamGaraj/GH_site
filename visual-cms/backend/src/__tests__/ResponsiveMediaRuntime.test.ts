@@ -16,8 +16,10 @@ describe('generateResponsiveMediaRuntime', () => {
     expect(js).toContain("setAttribute('src'")
   })
 
-  it('выбирает наименьший подходящий брейкпоинт (max-width семантика) и наблюдает DOM', () => {
-    expect(js).toContain('w <= bp.width')
+  it('выбирает наименьший подходящий брейкпоинт по boundary (границы диапазонов) и наблюдает DOM', () => {
+    expect(js).toContain('w <= boundOf(bp)')
+    // boundary null = самый широкий breakpoint, не ограничен сверху
+    expect(js).toContain('bp.boundary === null')
     expect(js).toContain('MutationObserver')
     expect(js).toContain('window.__ghRMedia')
   })

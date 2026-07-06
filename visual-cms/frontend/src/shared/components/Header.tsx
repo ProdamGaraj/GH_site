@@ -111,15 +111,17 @@ export const Header: React.FC<HeaderProps> = ({ showActions, centerActions, righ
         )}
       </div>
 
-      {/* 2. Центр - действия на странице (масштаб, цвета, viewport и т.д.) */}
+      {/* 2. Центр - действия на странице (масштаб, цвета, viewport и т.д.).
+          min-w-0 + shrink-0 справа: центр ужимается первым, тулбар не вылезает
+          за границы экрана (без overflow-hidden — дропдауны absolute). */}
       {hasThreeColumns ? (
         <>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {centerActions}
           </div>
 
           {/* 3. Справа - действия со страницей (сохранить, экспорт, публикация) + выход */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {rightActions}
             <LogoutButton />
           </div>

@@ -55,7 +55,9 @@ describe('HtmlGenerator — адаптивное медиа', () => {
     })
     const html = htmlGenerator.generatePage(tree, opts())
     expect(html).toContain('<picture>')
-    expect(html).toContain('<source media="(max-width: 375px)" srcset="/m.jpg" />')
+    // Граница mobile = tablet(768) − 1, а не дизайн-ширина 375: реальные
+    // телефоны (390–430px) должны попадать в mobile-диапазон.
+    expect(html).toContain('<source media="(max-width: 767px)" srcset="/m.jpg" />')
     // data-element-id на внутреннем <img>, а не на <picture>
     expect(html).toMatch(/<picture><source[^>]+\/><img[^>]*data-element-id="img-1"[^>]*\/><\/picture>/)
   })
@@ -70,7 +72,7 @@ describe('HtmlGenerator — адаптивное медиа', () => {
     })
     const html = htmlGenerator.generatePage(tree, opts())
     expect(html).toContain('Responsive media (background)')
-    expect(html).toContain('@media (max-width: 375px)')
+    expect(html).toContain('@media (max-width: 767px)')
     expect(html).toContain('[data-element-id="hero"] { background-image: url("/m.png") !important; }')
   })
 
@@ -78,7 +80,10 @@ describe('HtmlGenerator — адаптивное медиа', () => {
     const tree = node({ metadata: { breakpoints: BPS }, children: [imgNode()] })
     const html = htmlGenerator.generatePage(tree, opts())
     expect(html).toContain('window.__ghBreakpoints = ')
-    expect(html).toContain('"id":"tablet","width":768')
+    // tablet — самый широкий: boundary null (не ограничен сверху);
+    // mobile — до tablet−1.
+    expect(html).toContain('"id":"tablet","width":768,"boundary":null')
+    expect(html).toContain('"id":"mobile","width":375,"boundary":767')
     expect(html).toContain('data-rmedia') // рантайм свапа присутствует
   })
 

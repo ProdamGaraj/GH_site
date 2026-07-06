@@ -13,6 +13,7 @@ import {
   type TranslationFieldMap,
 } from './ResponsiveMediaResolver'
 import type { BlockNode, CSSProperties } from '../types/blockNode'
+import { breakpointRangeMap } from './breakpointRanges'
 
 export interface AvailableLanguage {
   code: string
@@ -223,7 +224,14 @@ ${bodyContent}
 ${this.generateLanguageSwitcher(slug, lang, availableLanguages)}
 ${navigation && navigation.length > 0 ? this.generateNavRuntime(navigation) : ''}
 ${dataConfig ? generateDataBindingRuntime(dataConfig) : ''}
-  <script>window.__ghBreakpoints = ${JSON.stringify(breakpoints.map(b => ({ id: b.id, width: b.width })))};</script>
+  <script>window.__ghBreakpoints = ${JSON.stringify((() => {
+    // boundary = верхняя граница диапазона (null = не ограничен сверху) —
+    // рантайм свапа медиа обязан совпадать с границами @media/<picture>.
+    const ranges = breakpointRangeMap(breakpoints)
+    return breakpoints
+      .filter(b => typeof b.width === 'number')
+      .map(b => ({ id: b.id, width: b.width, boundary: ranges.get(b.id)?.maxWidth ?? null }))
+  })())};</script>
 ${generateResponsiveMediaRuntime()}
 ${generateCarouselRuntime()}
 ${authoredJs}${scripts ? `<script>\n${scripts}\n</script>` : ''}
@@ -350,7 +358,7 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
 
     const tagName = node.tagName || 'div'
     const styles = this.renderStyles(node.styles?.properties || {})
-    const attributes = this.renderAttributes(node.attributes || {})
+    const attributes = this.renderAttributes(this.normalizeMediaAttributes(tagName, node.attributes || {}))
 
     // Добавляем data-element-id для CSS селекторов (hover, анимации) и data-element-name
     const dataAttr = ` data-element-id="${node.id}"` + (node.metadata?.name ? ` data-element-name="${node.metadata.name.replace(/"/g, '&quot;')}"` : '')
@@ -438,16 +446,47 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
   }
 
   /**
+   * Булевы HTML-атрибуты: в HTML само присутствие атрибута = «включено»
+   * (controls="false" и controls="" — это ВКЛ). Редактор хранит их строками
+   * 'true'/'false'/'', поэтому эмитим голый атрибут только при 'true',
+   * иначе опускаем — иначе выключить controls/autoplay было невозможно.
+   */
+  private static readonly BOOLEAN_ATTRS = new Set([
+    'controls', 'autoplay', 'loop', 'muted', 'playsinline',
+    'disabled', 'checked', 'required', 'readonly', 'multiple', 'selected',
+  ])
+
+  /**
+   * Гарантии воспроизводимости <video>: autoplay без muted браузеры блокируют,
+   * а iOS дополнительно требует playsinline. Чтобы «видео с автозапуском» из
+   * редактора реально играло, добавляем оба атрибута к autoplay-видео.
+   */
+  private normalizeMediaAttributes(tagName: string, attributes: Record<string, string>): Record<string, string> {
+    if (tagName.toLowerCase() !== 'video') return attributes
+    const autoplayOn = attributes.autoplay !== undefined && attributes.autoplay !== 'false'
+    if (!autoplayOn) return attributes
+    return { ...attributes, muted: 'true', playsinline: 'true' }
+  }
+
+  /**
    * Конвертирует объект атрибутов в строку атрибутов
    */
   private renderAttributes(attributes: Record<string, string>): string {
     if (!attributes || Object.keys(attributes).length === 0) {
       return ''
     }
-    
+
     return Object.entries(attributes)
       .filter(([key, value]) => value !== undefined && value !== null && key !== 'style')
-      .map(([key, value]) => ` ${key}="${this.escapeHtml(value)}"`)
+      .map(([key, value]) => {
+        if (HtmlGenerator.BOOLEAN_ATTRS.has(key.toLowerCase())) {
+          // Семантика HTML: присутствие атрибута = ВКЛ ('' — импорт голого атрибута,
+          // 'controls="controls"' — легаси-разметка). Выкл = 'false' или отсутствие
+          // атрибута (редактор при снятии галки удаляет ключ).
+          return value === 'false' ? '' : ` ${key}`
+        }
+        return ` ${key}="${this.escapeHtml(value)}"`
+      })
       .join('')
   }
 

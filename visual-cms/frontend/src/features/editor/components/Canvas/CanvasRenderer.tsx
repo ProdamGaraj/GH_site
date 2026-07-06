@@ -291,6 +291,19 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
     elementProps.alt = node.attributes?.alt || ''
   }
 
+  if (node.tagName === 'video') {
+    // Без проброса атрибутов <video> на канвасе был пустым боксом.
+    // Автоплей в редакторе не включаем; muted всегда — канвас не должен звучать.
+    if (node.attributes?.src) elementProps.src = node.attributes.src
+    if (node.attributes?.poster) elementProps.poster = node.attributes.poster
+    elementProps.controls = node.attributes?.controls !== undefined && node.attributes.controls !== 'false'
+    elementProps.loop = node.attributes?.loop !== undefined && node.attributes.loop !== 'false'
+    elementProps.muted = true
+    elementProps.playsInline = true
+    elementProps.autoPlay = false
+    elementProps.preload = 'metadata'
+  }
+
   // Handle select elements
   if (node.tagName === 'select') {
     elementProps.value = node.attributes?.value || ''

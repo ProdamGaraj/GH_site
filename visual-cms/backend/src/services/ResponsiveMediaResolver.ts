@@ -26,6 +26,7 @@
  */
 import type { BlockNode, BreakpointDef } from '../types/blockNode'
 import { parseCssUrl, toCssUrl, BG_IMAGE_FIELD } from './TranslationService'
+import { breakpointRangeMap } from './breakpointRanges'
 
 const SRC_FIELD = 'src'
 
@@ -35,6 +36,8 @@ export interface ResponsiveSource {
   width: number
   /** Для img — URL (для srcset); для bg — готовая CSS-строка background-image. */
   value: string
+  /** Условие @media диапазона breakpoint'а (границы — breakpointRanges). */
+  media?: string
 }
 
 /** План адаптивного медиа для одного узла. */
@@ -127,6 +130,7 @@ function resolveSlot(
   breakpoints: BreakpointDef[],
   screenOf: (bpId: string) => string | undefined,
   cellToCss: (raw: string) => string,
+  mediaOf?: (bpId: string) => string | undefined,
 ): ResponsiveSource[] {
   const sources: ResponsiveSource[] = []
 
@@ -147,7 +151,7 @@ function resolveSlot(
 
     // Эмитим источник только если он реально отличается от локализованной базы.
     if (value !== undefined && value !== base) {
-      sources.push({ bpId: bp.id, width: bp.width, value })
+      sources.push({ bpId: bp.id, width: bp.width, value, media: mediaOf?.(bp.id) })
     }
   }
 
@@ -170,6 +174,8 @@ export function resolveResponsiveMedia(
   if (!root || !breakpoints || breakpoints.length === 0) return plan
 
   const overrideIndex = buildOverrideIndex(root)
+  const ranges = breakpointRangeMap(breakpoints)
+  const mediaOf = (bpId: string) => ranges.get(bpId)?.media
 
   const walk = (node: BlockNode): void => {
     if (node && node.id) {
@@ -189,6 +195,7 @@ export function resolveResponsiveMedia(
           breakpoints,
           (bpId) => byBp?.get(bpId)?.src,
           (raw) => raw, // ячейка img — это просто URL
+          mediaOf,
         )
         if (img.length > 0) nodePlan.img = img
       }
@@ -205,6 +212,7 @@ export function resolveResponsiveMedia(
           breakpoints,
           (bpId) => byBp?.get(bpId)?.bg,
           (raw) => toCssUrl(raw), // перевод bg:image хранит голый URL → оборачиваем
+          mediaOf,
         )
         if (bg.length > 0) nodePlan.bg = bg
       }
@@ -248,19 +256,24 @@ export function generateBackgroundMediaCss(
   }
   if (byBp.size === 0) return ''
 
-  const sorted = [...breakpoints]
-    .filter((bp) => typeof bp.width === 'number')
-    .sort((a, b) => b.width - a.width)
+  // Границы диапазонов — как в StyleGenerator.generateResponsiveCSS.
+  const ranges = computeSortedRanges(breakpoints)
 
   let css = '\n    /* Responsive media (background) */\n'
-  for (const bp of sorted) {
-    const rules = byBp.get(bp.id)
+  for (const range of ranges) {
+    const rules = byBp.get(range.id)
     if (!rules || rules.length === 0) continue
-    css += `    @media (max-width: ${bp.width}px) {\n`
+    css += `    @media ${range.media} {\n`
     css += rules.map((r) => `      ${r}`).join('\n')
     css += '\n    }\n'
   }
   return css
+}
+
+// Локальный шорткат: диапазоны в порядке эмиссии (по убыванию ширины).
+function computeSortedRanges(breakpoints: BreakpointDef[]) {
+  const map = breakpointRangeMap(breakpoints)
+  return [...map.values()]
 }
 
 /**
@@ -277,7 +290,7 @@ export function buildPictureTag(
 ): string {
   const sorted = [...sources].sort((a, b) => a.width - b.width)
   const sourceTags = sorted
-    .map((s) => `<source media="(max-width: ${s.width}px)" srcset="${escapeAttr(s.value)}" />`)
+    .map((s) => `<source media="${s.media || `(max-width: ${s.width}px)`}" srcset="${escapeAttr(s.value)}" />`)
     .join('')
   return `<picture>${sourceTags}${imgTag}</picture>`
 }
