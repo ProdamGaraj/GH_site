@@ -62,7 +62,10 @@ export const ResponsiveMediaMatrix: React.FC<ResponsiveMediaMatrixProps> = ({
   const dispatch = useAppDispatch()
   const [picker, setPicker] = useState<{ bpId: string | null; col: 'base' | 'locale' } | null>(null)
 
-  const slot: Slot = (node.tagName || '').toLowerCase() === 'img' || node.elementType === 'image' ? 'src' : 'bg'
+  const tag = (node.tagName || '').toLowerCase()
+  const isVideo = tag === 'video'
+  // src-слот: <img>/<video> (у видео на деплое свап делает data-rmedia-рантайм).
+  const slot: Slot = tag === 'img' || node.elementType === 'image' || isVideo ? 'src' : 'bg'
 
   // Строки: базовый экран + брейкпоинты по убыванию ширины.
   const rows = useMemo(
@@ -146,7 +149,7 @@ export const ResponsiveMediaMatrix: React.FC<ResponsiveMediaMatrixProps> = ({
       <div className="flex items-center gap-2 mb-2">
         <Monitor size={12} className="text-blue-500" />
         <span className="text-[10px] font-semibold text-gray-600 uppercase">
-          Адаптивное медиа · {slot === 'src' ? 'Изображение' : 'Фон'}
+          Адаптивное медиа · {slot === 'bg' ? 'Фон' : isVideo ? 'Видео' : 'Изображение'}
         </span>
       </div>
 
@@ -179,7 +182,7 @@ export const ResponsiveMediaMatrix: React.FC<ResponsiveMediaMatrixProps> = ({
 
       <MediaPicker
         open={picker !== null}
-        kind={slot === 'src' ? 'any' : 'image'}
+        kind={slot === 'bg' ? 'image' : isVideo ? 'video' : 'any'}
         siteId={siteId}
         title="Выберите медиа для ячейки"
         onClose={() => setPicker(null)}

@@ -16,6 +16,13 @@ describe('generateResponsiveMediaRuntime', () => {
     expect(js).toContain("setAttribute('src'")
   })
 
+  it('смена src у <video> вызывает load(), без смены — не трогает элемент', () => {
+    // guard от перезапуска видео на каждом resize
+    expect(js).toContain("el.getAttribute('src') !== v")
+    expect(js).toContain("el.tagName === 'VIDEO'")
+    expect(js).toContain('el.load()')
+  })
+
   it('выбирает наименьший подходящий брейкпоинт по boundary (границы диапазонов) и наблюдает DOM', () => {
     expect(js).toContain('w <= boundOf(bp)')
     // boundary null = самый широкий breakpoint, не ограничен сверху

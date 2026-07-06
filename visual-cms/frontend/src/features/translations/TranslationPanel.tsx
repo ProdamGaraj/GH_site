@@ -565,10 +565,11 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
     e.target.value = '' // позволяем повторно выбрать тот же файл
   }
 
-  // Матрица адаптивного медиа — для выбранного медиа-узла (img или узел с фоном).
+  // Матрица адаптивного медиа — для выбранного медиа-узла (img, video или узел с фоном).
   const mediaNode =
     selectedNode &&
     ((selectedNode.tagName || '').toLowerCase() === 'img' ||
+      (selectedNode.tagName || '').toLowerCase() === 'video' ||
       (selectedNode as { elementType?: string }).elementType === 'image' ||
       !!(selectedNode as { styles?: { properties?: { backgroundImage?: string } } }).styles?.properties?.backgroundImage)
       ? selectedNode

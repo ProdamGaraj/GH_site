@@ -4,6 +4,8 @@
  * Статические узлы дерева получают адаптив через <picture>/@media на деплое
  * (ResponsiveMediaResolver). Но слайды repeat-карусели штампует JS-рантайм
  * data-bindings уже в браузере, поэтому для них используем свап по вьюпорту.
+ * Тем же механизмом свапается src статических <video> (HtmlGenerator ставит
+ * data-rmedia): media-атрибут на <video><source> браузеры игнорируют.
  *
  * Контракт (проставляет DataBindingGenerator при наличии item._responsive):
  *   data-rmedia="{"tablet":"/t.jpg","mobile":"/m.jpg"}"  — карта bpId→URL
@@ -52,7 +54,12 @@ export function generateResponsiveMediaRuntime(): string {
     var chosen = pick(map, window.innerWidth || document.documentElement.clientWidth || 0);
     if (kind === 'src'){
       var v = chosen != null ? chosen : base;
-      if (v) el.setAttribute('src', v);
+      // Меняем только при реальной смене: лишний setAttribute на <video>
+      // перезапускал бы воспроизведение при каждом resize.
+      if (v && el.getAttribute('src') !== v){
+        el.setAttribute('src', v);
+        if (el.tagName === 'VIDEO' && typeof el.load === 'function') el.load();
+      }
     } else {
       el.style.backgroundImage = chosen != null
         ? 'url("' + String(chosen).replace(/"/g, '\\\\"') + '")'

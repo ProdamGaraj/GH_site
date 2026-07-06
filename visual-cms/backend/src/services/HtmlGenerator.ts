@@ -358,7 +358,20 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
 
     const tagName = node.tagName || 'div'
     const styles = this.renderStyles(node.styles?.properties || {})
-    const attributes = this.renderAttributes(this.normalizeMediaAttributes(tagName, node.attributes || {}))
+    let attributes = this.renderAttributes(this.normalizeMediaAttributes(tagName, node.attributes || {}))
+
+    // Брейкпоинтные подмены src у <video>: media-атрибут на <video><source>
+    // браузеры игнорируют, поэтому свапаем JS-рантаймом data-rmedia (тот же,
+    // что у динамических слайдов). Язык уже запечён в base-src (applyTranslations),
+    // а карта содержит только экраны, отличные от базы.
+    if (tagName.toLowerCase() === 'video' && !(node.attributes || {})['data-rmedia']) {
+      const videoSources = mediaPlan?.get(node.id)?.img
+      if (videoSources && videoSources.length > 0) {
+        const rmediaMap: Record<string, string> = {}
+        for (const s of videoSources) rmediaMap[s.bpId] = s.value
+        attributes += ` data-rmedia="${this.escapeHtml(JSON.stringify(rmediaMap))}" data-rmedia-kind="src"`
+      }
+    }
 
     // Добавляем data-element-id для CSS селекторов (hover, анимации) и data-element-name
     const dataAttr = ` data-element-id="${node.id}"` + (node.metadata?.name ? ` data-element-name="${node.metadata.name.replace(/"/g, '&quot;')}"` : '')

@@ -42,7 +42,11 @@ export interface ResponsiveSource {
 
 /** План адаптивного медиа для одного узла. */
 export interface NodeMediaPlan {
-  /** Источники `<source>` для `<picture>` у `<img>` (art-direction). */
+  /**
+   * Брейкпоинтные подмены src: для `<img>` — источники `<source>` в `<picture>`
+   * (art-direction), для `<video>` — карта data-rmedia (свап JS-рантаймом:
+   * media-атрибут у `<video><source>` браузеры игнорируют).
+   */
   img?: ResponsiveSource[]
   /** Оверрайды background-image по брейкпоинтам (@media). */
   bg?: ResponsiveSource[]
@@ -183,8 +187,9 @@ export function resolveResponsiveMedia(
       const byBp = overrideIndex.get(node.id)
       const nodePlan: NodeMediaPlan = {}
 
-      // ── <img src> → <picture> (только для тега img) ──
-      if ((node.tagName || '').toLowerCase() === 'img') {
+      // ── src-слот: <img> → <picture>, <video> → data-rmedia (JS-свап) ──
+      const tag = (node.tagName || '').toLowerCase()
+      if (tag === 'img' || tag === 'video') {
         const base = node.attributes?.src
         const localeOverridden = fields?.[SRC_FIELD] !== undefined
         const img = resolveSlot(

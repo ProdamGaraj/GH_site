@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { updateNode, updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
 import { ImageUpload } from './ImageUpload'
+import { resolveMediaUrl, type MediaAsset } from '@/shared/api/mediaApi'
 import { LinkSettings } from './LinkSettings'
 import { AttributesEditor } from './AttributesEditor'
 import { Link as LinkIcon, Image as ImageIcon, Code as CodeIcon } from 'lucide-react'
@@ -61,6 +62,18 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
   const isBooleanAttributeOn = (attr: string): boolean => {
     const value = node.attributes?.[attr]
     return value !== undefined && value !== 'false'
+  }
+
+  // Видео из медиатеки: src + постер пишем одним updateNode (два последовательных
+  // dispatch'а потеряли бы src — второй спредит устаревшие node.attributes).
+  // Постер ассета берём только если свой ещё не задан.
+  const handleVideoAssetSelect = (asset: MediaAsset) => {
+    const attributes = { ...(node.attributes || {}) }
+    attributes.src = resolveMediaUrl(asset.url)
+    if (asset.posterUrl && !attributes.poster) {
+      attributes.poster = resolveMediaUrl(asset.posterUrl)
+    }
+    dispatch(updateNode({ id: node.id, updates: { attributes } }))
   }
 
   const handleStyleChange = (property: string, value: string) => {
@@ -370,12 +383,25 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
             {isVideoElement ? 'Видео' : 'Iframe'}
           </h4>
           
-          <Input
-            label="URL (src)"
-            value={node.attributes?.src || ''}
-            onChange={(e) => handleAttributeChange('src', e.target.value)}
-            placeholder={isVideoElement ? 'https://example.com/video.mp4' : 'https://example.com'}
-          />
+          {isVideoElement ? (
+            // Видео: URL / загрузка файла / выбор из медиатеки. При выборе
+            // ассета постер подхватывается автоматически (handleVideoAssetSelect).
+            <ImageUpload
+              value={node.attributes?.src || ''}
+              onChange={(url) => handleAttributeChange('src', url)}
+              onSelectAsset={handleVideoAssetSelect}
+              label="Видео (src)"
+              placeholder="https://example.com/video.mp4"
+              kind="video"
+            />
+          ) : (
+            <Input
+              label="URL (src)"
+              value={node.attributes?.src || ''}
+              onChange={(e) => handleAttributeChange('src', e.target.value)}
+              placeholder="https://example.com"
+            />
+          )}
           
           <div className="grid grid-cols-2 gap-2">
             <Input
@@ -394,11 +420,12 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
           
           {isVideoElement && (
             <div className="space-y-2">
-              <Input
-                label="Постер (превью до запуска)"
+              <ImageUpload
                 value={node.attributes?.poster || ''}
-                onChange={(e) => handleAttributeChange('poster', e.target.value)}
+                onChange={(url) => handleAttributeChange('poster', url)}
+                label="Постер (превью до запуска)"
                 placeholder="https://example.com/poster.jpg"
+                kind="image"
               />
 
               <div className="flex items-center gap-2">

@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback } from 'react'
 import { Upload, X, Image as ImageIcon, Link as LinkIcon, Loader2, FolderOpen } from 'lucide-react'
-import { mediaApi, resolveMediaUrl } from '@/shared/api/mediaApi'
+import { mediaApi, resolveMediaUrl, type MediaAsset } from '@/shared/api/mediaApi'
 import { MediaPicker } from '@/features/media/MediaPicker'
 import { useProjectVariantWidths } from '@/features/media/useProjectVariantWidths'
 
@@ -11,6 +11,13 @@ interface ImageUploadProps {
   placeholder?: string
   /** Restrict media kind. Default 'image'. */
   kind?: 'image' | 'video' | 'any'
+  /**
+   * Если задан — при выборе из галереи/загрузке файла вызывается ВМЕСТО
+   * onChange с полным asset'ом (нужно, когда потребитель пишет несколько
+   * атрибутов атомарно: например src + poster у видео). Ручной ввод URL
+   * по-прежнему идёт через onChange.
+   */
+  onSelectAsset?: (asset: MediaAsset) => void
 }
 
 export const ImageUpload: React.FC<ImageUploadProps> = ({
@@ -19,6 +26,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   label = 'Изображение',
   placeholder = 'https://example.com/image.jpg',
   kind = 'image',
+  onSelectAsset,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUrlMode, setIsUrlMode] = useState(true)
@@ -57,14 +65,18 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
         variantWidths: isImage && showImageOptions && makeResponsive ? variantWidths : undefined,
       })
       // Если создана оптимизированная версия — подставляем её (легче, без потери качества).
-      onChange(resolveMediaUrl(asset.optimizedUrl || asset.url))
+      if (onSelectAsset) {
+        onSelectAsset(asset)
+      } else {
+        onChange(resolveMediaUrl(asset.optimizedUrl || asset.url))
+      }
     } catch (error: any) {
       console.error('Upload error:', error)
       alert(`Ошибка загрузки: ${error?.message || ''}`)
     } finally {
       setIsUploading(false)
     }
-  }, [onChange, kind, showImageOptions, optimize, makeResponsive, variantWidths])
+  }, [onChange, onSelectAsset, kind, showImageOptions, optimize, makeResponsive, variantWidths])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -220,15 +232,27 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
         </div>
       )}
 
-      {/* Preview */}
+      {/* Preview: <img> для картинок, <video> для видео */}
       {value && !previewError && (
         <div className="relative border border-gray-200 rounded overflow-hidden bg-gray-50">
-          <img
-            src={value}
-            alt="Preview"
-            className="w-full max-h-32 object-contain"
-            onError={() => setPreviewError(true)}
-          />
+          {kind === 'video' ? (
+            <video
+              src={value}
+              controls
+              muted
+              playsInline
+              preload="metadata"
+              className="w-full max-h-32 object-contain"
+              onError={() => setPreviewError(true)}
+            />
+          ) : (
+            <img
+              src={value}
+              alt="Preview"
+              className="w-full max-h-32 object-contain"
+              onError={() => setPreviewError(true)}
+            />
+          )}
           <button
             type="button"
             onClick={handleClear}
@@ -242,7 +266,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       {previewError && value && (
         <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
           <ImageIcon size={14} />
-          <span>Не удалось загрузить изображение</span>
+          <span>{kind === 'video' ? 'Не удалось загрузить видео' : 'Не удалось загрузить изображение'}</span>
         </div>
       )}
 
@@ -251,7 +275,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
         kind={kind}
         onClose={() => setPickerOpen(false)}
         onSelect={(asset) => {
-          onChange(resolveMediaUrl(asset.url))
+          if (onSelectAsset) {
+            onSelectAsset(asset)
+          } else {
+            onChange(resolveMediaUrl(asset.url))
+          }
           setPreviewError(false)
         }}
       />
