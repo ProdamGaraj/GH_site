@@ -358,7 +358,9 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
 
     const tagName = node.tagName || 'div'
     const styles = this.renderStyles(node.styles?.properties || {})
-    let attributes = this.renderAttributes(this.normalizeMediaAttributes(tagName, node.attributes || {}))
+    let attributes = this.renderAttributes(
+      this.normalizeLinkAttributes(tagName, this.normalizeMediaAttributes(tagName, node.attributes || {}))
+    )
 
     // Брейкпоинтные подмены src у <video>: media-атрибут на <video><source>
     // браузеры игнорируют, поэтому свапаем JS-рантаймом data-rmedia (тот же,
@@ -479,6 +481,20 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
     const autoplayOn = attributes.autoplay !== undefined && attributes.autoplay !== 'false'
     if (!autoplayOn) return attributes
     return { ...attributes, muted: 'true', playsinline: 'true' }
+  }
+
+  /**
+   * Внутренние относительные href у <a> ("contacts", "./news") на деплое ломаются:
+   * страницы публикуются директориями /<slug>/index.html, и браузер резолвит
+   * такой href относительно текущей страницы (/about/contacts вместо /contacts).
+   * Приводим к корневому виду. Не трогаем: абсолютные URL (scheme:, //),
+   * уже корневые (/), якоря (#) и query (?).
+   */
+  private normalizeLinkAttributes(tagName: string, attributes: Record<string, string>): Record<string, string> {
+    if (tagName.toLowerCase() !== 'a') return attributes
+    const href = attributes.href
+    if (!href || /^(?:[a-z][a-z0-9+.-]*:|\/\/|\/|#|\?)/i.test(href)) return attributes
+    return { ...attributes, href: '/' + href.replace(/^(?:\.\.?\/)+/, '') }
   }
 
   /**
