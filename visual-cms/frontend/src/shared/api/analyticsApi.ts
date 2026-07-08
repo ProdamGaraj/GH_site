@@ -68,6 +68,6 @@ export const analyticsApi = {
     api.get<TrafficSource[]>('/analytics/traffic-sources', { params: params as any }),
 
   // Realtime
-  getRealtime: (params?: { pageId?: string }) =>
+  getRealtime: (params?: { pageId?: string; siteId?: string }) =>
     api.get<RealTimeStats>('/analytics/realtime', { params: params as any }),
 }

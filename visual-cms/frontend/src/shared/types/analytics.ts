@@ -194,6 +194,8 @@ export interface PageDetailedAnalytics {
 
 export interface AnalyticsQuery {
   pageId?: string
+  /** Фильтр по сайту: агрегирует все страницы сайта (взаимоисключим с pageId). */
+  siteId?: string
   from?: string
   to?: string
   category?: string

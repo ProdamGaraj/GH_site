@@ -22,6 +22,7 @@ interface AnalyticsState {
   // Filters
   dateRange: { from: string; to: string }
   selectedPageId: string | null
+  selectedSiteId: string | null
   requestCategory: string  // 'all' | 'api' | 'preflight' | 'static' | 'service'
 
   // Data
@@ -54,6 +55,7 @@ const initialState: AnalyticsState = {
     to: now.toISOString().split('T')[0],
   },
   selectedPageId: null,
+  selectedSiteId: null,
   requestCategory: 'all',
 
   overview: null,
@@ -156,7 +158,7 @@ export const fetchTrafficSources = createAsyncThunk(
 
 export const fetchRealtime = createAsyncThunk(
   'analytics/fetchRealtime',
-  async (params?: { pageId?: string }) => {
+  async (params?: { pageId?: string; siteId?: string }) => {
     return await analyticsApi.getRealtime(params)
   }
 )
@@ -179,6 +181,9 @@ const analyticsSlice = createSlice({
     },
     setSelectedPageId(state, action: PayloadAction<string | null>) {
       state.selectedPageId = action.payload
+    },
+    setSelectedSiteId(state, action: PayloadAction<string | null>) {
+      state.selectedSiteId = action.payload
     },
     setActiveTab(state, action: PayloadAction<AnalyticsState['activeTab']>) {
       state.activeTab = action.payload
@@ -294,5 +299,5 @@ const analyticsSlice = createSlice({
   },
 })
 
-export const { setDateRange, setSelectedPageId, setActiveTab, clearPageDetailed, setRequestCategory } = analyticsSlice.actions
+export const { setDateRange, setSelectedPageId, setSelectedSiteId, setActiveTab, clearPageDetailed, setRequestCategory } = analyticsSlice.actions
 export default analyticsSlice.reducer

@@ -6,10 +6,11 @@ import {
   fetchRealtime,
   fetchRequestStats,
   setDateRange,
-  setSelectedPageId,
+  setSelectedSiteId,
   setActiveTab,
   setRequestCategory,
 } from '@/features/analytics/analyticsSlice'
+import { fetchSites } from '@/features/sites/sitesSlice'
 import {
   BarChart3,
   Users,
@@ -228,6 +229,7 @@ export const AnalyticsPage: React.FC = () => {
   const {
     dateRange,
     selectedPageId,
+    selectedSiteId,
     overview,
     timeSeries,
     pages,
@@ -246,42 +248,53 @@ export const AnalyticsPage: React.FC = () => {
     requestCategory,
   } = useAppSelector((state) => state.analytics)
 
-  const allPages = useAppSelector((state) => state.pages.items)
+  const allSites = useAppSelector((state) => state.sites.items)
 
   // ─── Data fetching ──────────────────────────────────────────
 
   const fetchData = useCallback(() => {
     const params = {
       pageId: selectedPageId || undefined,
+      siteId: selectedSiteId || undefined,
       from: dateRange.from,
       to: dateRange.to,
     }
     dispatch(fetchFullReport(params))
-  }, [dispatch, selectedPageId, dateRange])
+  }, [dispatch, selectedPageId, selectedSiteId, dateRange])
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
 
+  // Список сайтов для фильтра: аналитика открывается напрямую, и без этого
+  // запроса селектор пуст (items наполнялся только визитом в раздел «Сайты»).
+  useEffect(() => {
+    dispatch(fetchSites())
+  }, [dispatch])
+
   // Realtime auto-refresh
   useEffect(() => {
     if (activeTab !== 'realtime') return
-    const poll = () => dispatch(fetchRealtime({ pageId: selectedPageId || undefined }))
+    const poll = () => dispatch(fetchRealtime({
+      pageId: selectedPageId || undefined,
+      siteId: selectedSiteId || undefined,
+    }))
     poll()
     const iv = setInterval(poll, 10000)
     return () => clearInterval(iv)
-  }, [dispatch, activeTab, selectedPageId])
+  }, [dispatch, activeTab, selectedPageId, selectedSiteId])
 
   // Re-fetch requests when category filter changes
   useEffect(() => {
     if (activeTab !== 'requests') return
     dispatch(fetchRequestStats({
       pageId: selectedPageId || undefined,
+      siteId: selectedSiteId || undefined,
       from: dateRange.from,
       to: dateRange.to,
       category: requestCategory,
     }))
-  }, [dispatch, requestCategory, activeTab, selectedPageId, dateRange])
+  }, [dispatch, requestCategory, activeTab, selectedPageId, selectedSiteId, dateRange])
 
   // ─── Date preset handler ───────────────────────────────────
 
@@ -329,15 +342,15 @@ export const AnalyticsPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            {/* Page filter */}
+            {/* Site filter (разбиение по страницам — во вкладке «Страницы») */}
             <select
               className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
-              value={selectedPageId || ''}
-              onChange={e => dispatch(setSelectedPageId(e.target.value || null))}
+              value={selectedSiteId || ''}
+              onChange={e => dispatch(setSelectedSiteId(e.target.value || null))}
             >
               <option value="">Все сайты</option>
-              {allPages.map(p => (
-                <option key={p.id} value={p.id}>{p.name} ({p.slug})</option>
+              {allSites.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
 

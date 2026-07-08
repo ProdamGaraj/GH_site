@@ -2,7 +2,6 @@ import { AppDataSource } from '../config/database'
 import { AnalyticsEvent, AnalyticsEventType, DeviceCategory, RequestCategory } from '../models/AnalyticsEvent'
 import { AnalyticsSession } from '../models/AnalyticsSession'
 import { logger } from './Logger'
-import { Between, In, IsNull, Not } from 'typeorm'
 
 // ─── Типы для API ответов ──────────────────────────────────────
 
@@ -289,9 +288,26 @@ function classifyRequest(url: string | null | undefined, method: string | null |
 
 // ─── Сервис ────────────────────────────────────────────────────
 
+/**
+ * SQL-фрагмент фильтра по сайту: pageId события/сессии принадлежит страницам
+ * сайта. Подставляется с алиасом таблицы; параметр :siteId обязателен.
+ */
+const SITE_FILTER_SQL = '"pageId" IN (SELECT p.id FROM pages p WHERE p."siteId" = :siteId)'
+
 class AnalyticsService {
   private eventRepo = AppDataSource.getRepository(AnalyticsEvent)
   private sessionRepo = AppDataSource.getRepository(AnalyticsSession)
+
+  /** Дашборд фильтрует либо по конкретной странице, либо по сайту (все её страницы). */
+  private applyPageOrSiteFilter(
+    qb: { andWhere: (sql: string, params?: Record<string, unknown>) => unknown },
+    alias: string,
+    pageId?: string,
+    siteId?: string,
+  ): void {
+    if (pageId) qb.andWhere(`${alias}."pageId" = :pageId`, { pageId })
+    else if (siteId) qb.andWhere(`${alias}.${SITE_FILTER_SQL}`, { siteId })
+  }
 
   // ─── Приём событий (public endpoint) ─────────────────────────
 
@@ -514,20 +530,21 @@ class AnalyticsService {
   async getFullReport(
     pageId?: string,
     range?: DateRange,
+    siteId?: string,
   ): Promise<FullAnalyticsReport> {
     const [overview, timeSeries, pages, blocks, requests, webVitals, devices, browsers, countries, trafficSources, topReferrers] =
       await Promise.all([
-        this.getOverview(pageId, range),
-        this.getTimeSeries(pageId, range),
-        this.getPageStats(pageId, range),
-        this.getBlockStats(pageId, range),
-        this.getRequestStats(pageId, range, 'all'),  // Full report includes all categories
-        this.getWebVitals(pageId, range),
-        this.getDeviceBreakdown(pageId, range),
-        this.getBrowserBreakdown(pageId, range),
-        this.getCountryBreakdown(pageId, range),
-        this.getTrafficSources(pageId, range),
-        this.getTopReferrers(pageId, range),
+        this.getOverview(pageId, range, siteId),
+        this.getTimeSeries(pageId, range, siteId),
+        this.getPageStats(pageId, range, siteId),
+        this.getBlockStats(pageId, range, siteId),
+        this.getRequestStats(pageId, range, 'all', siteId),  // Full report includes all categories
+        this.getWebVitals(pageId, range, siteId),
+        this.getDeviceBreakdown(pageId, range, siteId),
+        this.getBrowserBreakdown(pageId, range, siteId),
+        this.getCountryBreakdown(pageId, range, siteId),
+        this.getTrafficSources(pageId, range, siteId),
+        this.getTopReferrers(pageId, range, siteId),
       ])
 
     return { overview, timeSeries, pages, blocks, requests, webVitals, devices, browsers, countries, trafficSources, topReferrers }
@@ -535,9 +552,9 @@ class AnalyticsService {
 
   // ─── Overview ────────────────────────────────────────────────
 
-  async getOverview(pageId?: string, range?: DateRange): Promise<OverviewStats> {
+  async getOverview(pageId?: string, range?: DateRange, siteId?: string): Promise<OverviewStats> {
     const qb = this.sessionRepo.createQueryBuilder('s')
-    if (pageId) qb.andWhere('s.pageId = :pageId', { pageId })
+    this.applyPageOrSiteFilter(qb, 's', pageId, siteId)
     if (range) qb.andWhere('s.startedAt BETWEEN :from AND :to', { from: range.from, to: range.to })
 
     const result = await qb
@@ -575,7 +592,7 @@ class AnalyticsService {
 
   // ─── Временной ряд ──────────────────────────────────────────
 
-  async getTimeSeries(pageId?: string, range?: DateRange): Promise<TimeSeriesPoint[]> {
+  async getTimeSeries(pageId?: string, range?: DateRange, siteId?: string): Promise<TimeSeriesPoint[]> {
     const defaultFrom = new Date()
     defaultFrom.setDate(defaultFrom.getDate() - 30)
     const from = range?.from || defaultFrom
@@ -600,7 +617,7 @@ class AnalyticsService {
       .groupBy(dateTrunc)
       .orderBy(dateTrunc, 'ASC')
 
-    if (pageId) qb.andWhere('s."pageId" = :pageId', { pageId })
+    this.applyPageOrSiteFilter(qb, 's', pageId, siteId)
 
     const rows = await qb.getRawMany()
 
@@ -619,7 +636,7 @@ class AnalyticsService {
 
   // ─── Статистика страниц ─────────────────────────────────────
 
-  async getPageStats(pageId?: string, range?: DateRange): Promise<PageStats[]> {
+  async getPageStats(pageId?: string, range?: DateRange, siteId?: string): Promise<PageStats[]> {
     const qb = this.eventRepo.createQueryBuilder('e')
       .select([
         'e."pageSlug" as "pageSlug"',
@@ -633,7 +650,7 @@ class AnalyticsService {
       .addGroupBy('e."pageId"')
       .orderBy('"pageviews"', 'DESC')
 
-    if (pageId) qb.andWhere('e."pageId" = :pageId', { pageId })
+    this.applyPageOrSiteFilter(qb, 'e', pageId, siteId)
     if (range) qb.andWhere('e."createdAt" BETWEEN :from AND :to', { from: range.from, to: range.to })
 
 
@@ -690,7 +707,7 @@ class AnalyticsService {
 
   // ─── Статистика блоков ──────────────────────────────────────
 
-  async getBlockStats(pageId?: string, range?: DateRange): Promise<BlockStats[]> {
+  async getBlockStats(pageId?: string, range?: DateRange, siteId?: string): Promise<BlockStats[]> {
     // Группировка ТОЛЬКО по blockId: разные события одного блока могут нести
     // разный blockType (клик без data-block-type, легаси block_leave без типа) —
     // группировка по (blockId, blockType) раздваивала блок на строки
@@ -708,7 +725,7 @@ class AnalyticsService {
       .groupBy('e."blockId"')
       .orderBy('"views"', 'DESC')
 
-    if (pageId) qb.andWhere('e."pageId" = :pageId', { pageId })
+    this.applyPageOrSiteFilter(qb, 'e', pageId, siteId)
     if (range) qb.andWhere('e."createdAt" BETWEEN :from AND :to', { from: range.from, to: range.to })
 
     const rows = await qb.getRawMany()
@@ -729,10 +746,11 @@ class AnalyticsService {
 
   // ─── Статистика запросов ────────────────────────────────────
 
-  async getRequestStats(pageId?: string, range?: DateRange, category?: string): Promise<RequestStats> {
+  async getRequestStats(pageId?: string, range?: DateRange, category?: string, siteId?: string): Promise<RequestStats> {
     const where: string[] = ['e."eventType" IN (\'request_sent\', \'request_received\')']
     const params: Record<string, unknown> = {}
     if (pageId) { where.push('e."pageId" = :pageId'); params.pageId = pageId }
+    else if (siteId) { where.push(`e.${SITE_FILTER_SQL}`); params.siteId = siteId }
     if (range) { where.push('e."createdAt" BETWEEN :from AND :to'); params.from = range.from; params.to = range.to }
     // Category filter: 'api' = only real API, 'all' = everything, specific = that category
     if (category && category !== 'all') {
@@ -784,6 +802,7 @@ class AnalyticsService {
     const catWhere: string[] = ['e."eventType" IN (\'request_sent\', \'request_received\')']
     const catParams: Record<string, unknown> = {}
     if (pageId) { catWhere.push('e."pageId" = :pageId'); catParams.pageId = pageId }
+    else if (siteId) { catWhere.push(`e.${SITE_FILTER_SQL}`); catParams.siteId = siteId }
     if (range) { catWhere.push('e."createdAt" BETWEEN :from AND :to'); catParams.from = range.from; catParams.to = range.to }
     const byCategoryQb = this.eventRepo.createQueryBuilder('e')
       .select(['COALESCE(e."requestCategory", \'api\') as "category"', 'COUNT(*) as "count"'])
@@ -844,14 +863,9 @@ class AnalyticsService {
 
   // ─── Web Vitals ─────────────────────────────────────────────
 
-  async getWebVitals(pageId?: string, range?: DateRange): Promise<WebVitalsStats> {
-    const qb = this.eventRepo.createQueryBuilder('e')
-      .where('e."eventType" = \'performance\'')
-    if (pageId) qb.andWhere('e."pageId" = :pageId', { pageId })
-    if (range) qb.andWhere('e."createdAt" BETWEEN :from AND :to', { from: range.from, to: range.to })
-
+  async getWebVitals(pageId?: string, range?: DateRange, siteId?: string): Promise<WebVitalsStats> {
     const buildVitalQuery = async (field: string, goodThreshold: number, poorThreshold: number) => {
-      const r = await this.eventRepo.createQueryBuilder('e')
+      const vitalQb = this.eventRepo.createQueryBuilder('e')
         .select([
           `AVG(e."${field}") as "avg"`,
           `PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY e."${field}") as "p75"`,
@@ -860,9 +874,9 @@ class AnalyticsService {
           `COUNT(*) FILTER (WHERE e."${field}" > ${poorThreshold}) as "poor"`,
         ])
         .where(`e."eventType" = 'performance' AND e."${field}" IS NOT NULL`)
-        .andWhere(pageId ? 'e."pageId" = :pageId' : '1=1', { pageId })
-        .andWhere(range ? 'e."createdAt" BETWEEN :from AND :to' : '1=1', range ? { from: range.from, to: range.to } : {})
-        .getRawOne()
+      this.applyPageOrSiteFilter(vitalQb, 'e', pageId, siteId)
+      if (range) vitalQb.andWhere('e."createdAt" BETWEEN :from AND :to', { from: range.from, to: range.to })
+      const r = await vitalQb.getRawOne()
 
       return {
         avg: parseFloat(r?.avg || '0'),
@@ -887,12 +901,12 @@ class AnalyticsService {
 
   // ─── Device breakdown ───────────────────────────────────────
 
-  async getDeviceBreakdown(pageId?: string, range?: DateRange): Promise<DeviceBreakdown[]> {
+  async getDeviceBreakdown(pageId?: string, range?: DateRange, siteId?: string): Promise<DeviceBreakdown[]> {
     const qb = this.sessionRepo.createQueryBuilder('s')
       .select(['s.device as "device"', 'COUNT(*) as "count"'])
       .groupBy('s.device')
       .orderBy('"count"', 'DESC')
-    if (pageId) qb.andWhere('s."pageId" = :pageId', { pageId })
+    this.applyPageOrSiteFilter(qb, 's', pageId, siteId)
     if (range) qb.andWhere('s."startedAt" BETWEEN :from AND :to', { from: range.from, to: range.to })
 
     const rows = await qb.getRawMany()
@@ -907,13 +921,13 @@ class AnalyticsService {
 
   // ─── Browser breakdown ──────────────────────────────────────
 
-  async getBrowserBreakdown(pageId?: string, range?: DateRange): Promise<BrowserBreakdown[]> {
+  async getBrowserBreakdown(pageId?: string, range?: DateRange, siteId?: string): Promise<BrowserBreakdown[]> {
     const qb = this.sessionRepo.createQueryBuilder('s')
       .select(['s.browser as "browser"', 'COUNT(*) as "count"'])
       .groupBy('s.browser')
       .orderBy('"count"', 'DESC')
       .limit(20)
-    if (pageId) qb.andWhere('s."pageId" = :pageId', { pageId })
+    this.applyPageOrSiteFilter(qb, 's', pageId, siteId)
     if (range) qb.andWhere('s."startedAt" BETWEEN :from AND :to', { from: range.from, to: range.to })
 
     const rows = await qb.getRawMany()
@@ -928,14 +942,14 @@ class AnalyticsService {
 
   // ─── Country breakdown ──────────────────────────────────────
 
-  async getCountryBreakdown(pageId?: string, range?: DateRange): Promise<CountryBreakdown[]> {
+  async getCountryBreakdown(pageId?: string, range?: DateRange, siteId?: string): Promise<CountryBreakdown[]> {
     const qb = this.sessionRepo.createQueryBuilder('s')
       .select(['s.country as "country"', 'COUNT(*) as "count"'])
       .where('s.country IS NOT NULL')
       .groupBy('s.country')
       .orderBy('"count"', 'DESC')
       .limit(30)
-    if (pageId) qb.andWhere('s."pageId" = :pageId', { pageId })
+    this.applyPageOrSiteFilter(qb, 's', pageId, siteId)
     if (range) qb.andWhere('s."startedAt" BETWEEN :from AND :to', { from: range.from, to: range.to })
 
     const rows = await qb.getRawMany()
@@ -950,7 +964,7 @@ class AnalyticsService {
 
   // ─── Traffic Sources ────────────────────────────────────────
 
-  async getTrafficSources(pageId?: string, range?: DateRange): Promise<TrafficSource[]> {
+  async getTrafficSources(pageId?: string, range?: DateRange, siteId?: string): Promise<TrafficSource[]> {
     const qb = this.sessionRepo.createQueryBuilder('s')
       .select([
         `COALESCE(s."utmSource", CASE
@@ -972,7 +986,7 @@ class AnalyticsService {
       .groupBy('"source"')
       .orderBy('"sessions"', 'DESC')
 
-    if (pageId) qb.andWhere('s."pageId" = :pageId', { pageId })
+    this.applyPageOrSiteFilter(qb, 's', pageId, siteId)
     if (range) qb.andWhere('s."startedAt" BETWEEN :from AND :to', { from: range.from, to: range.to })
 
     const rows = await qb.getRawMany()
@@ -988,7 +1002,7 @@ class AnalyticsService {
 
   // ─── Top Referrers ──────────────────────────────────────────
 
-  async getTopReferrers(pageId?: string, range?: DateRange): Promise<{ referrer: string; count: number }[]> {
+  async getTopReferrers(pageId?: string, range?: DateRange, siteId?: string): Promise<{ referrer: string; count: number }[]> {
     const qb = this.sessionRepo.createQueryBuilder('s')
       .select(['s.referrer as "referrer"', 'COUNT(*) as "count"'])
       .where('s.referrer IS NOT NULL AND s.referrer != \'\'')
@@ -996,7 +1010,7 @@ class AnalyticsService {
       .orderBy('"count"', 'DESC')
       .limit(30)
 
-    if (pageId) qb.andWhere('s."pageId" = :pageId', { pageId })
+    this.applyPageOrSiteFilter(qb, 's', pageId, siteId)
     if (range) qb.andWhere('s."startedAt" BETWEEN :from AND :to', { from: range.from, to: range.to })
 
     const rows = await qb.getRawMany()
@@ -1009,7 +1023,7 @@ class AnalyticsService {
 
   // ─── Realtime ───────────────────────────────────────────────
 
-  async getRealtime(pageId?: string): Promise<RealTimeStats> {
+  async getRealtime(pageId?: string, siteId?: string): Promise<RealTimeStats> {
     // 45s = 3× heartbeat interval (15s). After 45s with no heartbeat, user is considered gone.
     const activeThreshold = new Date(Date.now() - 45 * 1000)
     // Окно «последние 5 минут» — совпадает с подписью в UI (раньше было 2 мин,
@@ -1019,12 +1033,12 @@ class AnalyticsService {
     // Active visitors/sessions — from sessions table using endedAt (updated by heartbeats every 15s)
     const sessionQb = this.sessionRepo.createQueryBuilder('s')
       .where('s."endedAt" >= :activeThreshold', { activeThreshold })
-    if (pageId) sessionQb.andWhere('s."pageId" = :pageId', { pageId })
+    this.applyPageOrSiteFilter(sessionQb, 's', pageId, siteId)
 
     // Recent events — from events table (informational feed)
     const eventQb = this.eventRepo.createQueryBuilder('e')
       .where('e."createdAt" >= :recentWindow', { recentWindow })
-    if (pageId) eventQb.andWhere('e."pageId" = :pageId', { pageId })
+    this.applyPageOrSiteFilter(eventQb, 'e', pageId, siteId)
 
     const [activeVisitors, activeSessions, recentPageviews, recentEvents] = await Promise.all([
       sessionQb.clone().select('COUNT(DISTINCT s."visitorId")', 'count').getRawOne().then(r => parseInt(r?.count || '0')),
@@ -1037,11 +1051,8 @@ class AnalyticsService {
         .limit(10)
         .getRawMany()
         .then(rows => rows.map(r => ({ pageSlug: r.pageSlug || '/', count: parseInt(r.count || '0') }))),
-      this.eventRepo.find({
-        where: { createdAt: Between(recentWindow, new Date()) as any },
-        order: { createdAt: 'DESC' },
-        take: 20,
-      }),
+      // Через eventQb, чтобы фид уважал фильтры pageId/siteId
+      eventQb.clone().orderBy('e."createdAt"', 'DESC').take(20).getMany(),
     ])
 
     return { activeVisitors, activeSessions, recentPageviews, recentEvents }

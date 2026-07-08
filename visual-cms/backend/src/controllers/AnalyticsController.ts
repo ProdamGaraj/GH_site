@@ -46,11 +46,12 @@ export class AnalyticsController {
 
   getFullReport = async (req: Request, res: Response) => {
     try {
-      const { pageId, from, to } = req.query
+      const { pageId, siteId, from, to } = req.query
       const range = this.parseRange(from as string, to as string)
       const report = await analyticsService.getFullReport(
         pageId as string | undefined,
         range,
+        siteId as string | undefined,
       )
       res.json(report)
     } catch (err: any) {
@@ -63,11 +64,12 @@ export class AnalyticsController {
 
   getOverview = async (req: Request, res: Response) => {
     try {
-      const { pageId, from, to } = req.query
+      const { pageId, siteId, from, to } = req.query
       const range = this.parseRange(from as string, to as string)
       const overview = await analyticsService.getOverview(
         pageId as string | undefined,
         range,
+        siteId as string | undefined,
       )
       res.json(overview)
     } catch (err: any) {
@@ -80,11 +82,12 @@ export class AnalyticsController {
 
   getTimeSeries = async (req: Request, res: Response) => {
     try {
-      const { pageId, from, to } = req.query
+      const { pageId, siteId, from, to } = req.query
       const range = this.parseRange(from as string, to as string)
       const data = await analyticsService.getTimeSeries(
         pageId as string | undefined,
         range,
+        siteId as string | undefined,
       )
       res.json(data)
     } catch (err: any) {
@@ -97,11 +100,12 @@ export class AnalyticsController {
 
   getPageStats = async (req: Request, res: Response) => {
     try {
-      const { pageId, from, to } = req.query
+      const { pageId, siteId, from, to } = req.query
       const range = this.parseRange(from as string, to as string)
       const data = await analyticsService.getPageStats(
         pageId as string | undefined,
         range,
+        siteId as string | undefined,
       )
       res.json(data)
     } catch (err: any) {
@@ -114,11 +118,12 @@ export class AnalyticsController {
 
   getBlockStats = async (req: Request, res: Response) => {
     try {
-      const { pageId, from, to } = req.query
+      const { pageId, siteId, from, to } = req.query
       const range = this.parseRange(from as string, to as string)
       const data = await analyticsService.getBlockStats(
         pageId as string | undefined,
         range,
+        siteId as string | undefined,
       )
       res.json(data)
     } catch (err: any) {
@@ -131,12 +136,13 @@ export class AnalyticsController {
 
   getRequestStats = async (req: Request, res: Response) => {
     try {
-      const { pageId, from, to, category } = req.query
+      const { pageId, siteId, from, to, category } = req.query
       const range = this.parseRange(from as string, to as string)
       const data = await analyticsService.getRequestStats(
         pageId as string | undefined,
         range,
         category as string | undefined,
+        siteId as string | undefined,
       )
       res.json(data)
     } catch (err: any) {
@@ -149,11 +155,12 @@ export class AnalyticsController {
 
   getWebVitals = async (req: Request, res: Response) => {
     try {
-      const { pageId, from, to } = req.query
+      const { pageId, siteId, from, to } = req.query
       const range = this.parseRange(from as string, to as string)
       const data = await analyticsService.getWebVitals(
         pageId as string | undefined,
         range,
+        siteId as string | undefined,
       )
       res.json(data)
     } catch (err: any) {
@@ -166,11 +173,12 @@ export class AnalyticsController {
 
   getDevices = async (req: Request, res: Response) => {
     try {
-      const { pageId, from, to } = req.query
+      const { pageId, siteId, from, to } = req.query
       const range = this.parseRange(from as string, to as string)
       const data = await analyticsService.getDeviceBreakdown(
         pageId as string | undefined,
         range,
+        siteId as string | undefined,
       )
       res.json(data)
     } catch (err: any) {
@@ -181,11 +189,12 @@ export class AnalyticsController {
 
   getBrowsers = async (req: Request, res: Response) => {
     try {
-      const { pageId, from, to } = req.query
+      const { pageId, siteId, from, to } = req.query
       const range = this.parseRange(from as string, to as string)
       const data = await analyticsService.getBrowserBreakdown(
         pageId as string | undefined,
         range,
+        siteId as string | undefined,
       )
       res.json(data)
     } catch (err: any) {
@@ -196,11 +205,12 @@ export class AnalyticsController {
 
   getCountries = async (req: Request, res: Response) => {
     try {
-      const { pageId, from, to } = req.query
+      const { pageId, siteId, from, to } = req.query
       const range = this.parseRange(from as string, to as string)
       const data = await analyticsService.getCountryBreakdown(
         pageId as string | undefined,
         range,
+        siteId as string | undefined,
       )
       res.json(data)
     } catch (err: any) {
@@ -213,11 +223,12 @@ export class AnalyticsController {
 
   getTrafficSources = async (req: Request, res: Response) => {
     try {
-      const { pageId, from, to } = req.query
+      const { pageId, siteId, from, to } = req.query
       const range = this.parseRange(from as string, to as string)
       const data = await analyticsService.getTrafficSources(
         pageId as string | undefined,
         range,
+        siteId as string | undefined,
       )
       res.json(data)
     } catch (err: any) {
@@ -230,9 +241,10 @@ export class AnalyticsController {
 
   getRealtime = async (req: Request, res: Response) => {
     try {
-      const { pageId } = req.query
+      const { pageId, siteId } = req.query
       const data = await analyticsService.getRealtime(
         pageId as string | undefined,
+        siteId as string | undefined,
       )
       res.json(data)
     } catch (err: any) {
