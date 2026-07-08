@@ -74,6 +74,16 @@
   var eventQueue = []
   var sessionStart = Date.now()
 
+  // Внутренние переходы не считаются источником трафика: реферер с того же
+  // хоста, что и страница, — это self-referral, зануляем (иначе «Реферреры»
+  // забиваются собственными страницами сайта).
+  var REFERRER = document.referrer || null
+  if (REFERRER) {
+    try {
+      if (new URL(REFERRER).host === window.location.host) REFERRER = null
+    } catch (e) {}
+  }
+
   function pushEvent(type, data) {
     var ev = {
       eventType: type,
@@ -82,7 +92,7 @@
       pageId: PAGE_ID,
       pageSlug: PAGE_SLUG,
       url: window.location.href,
-      referrer: document.referrer || null,
+      referrer: REFERRER,
       screenWidth: window.screen.width,
       screenHeight: window.screen.height,
     }
@@ -271,6 +281,9 @@
         if (entry.isIntersecting) {
           blockTimers[blockId] = blockTimers[blockId] || { totalTime: 0 }
           blockTimers[blockId].startTime = Date.now()
+          // Тип запоминаем: финализация при уходе со страницы шлёт block_leave
+          // из таймера, и без типа блок раздваивался в статистике на 'unknown'.
+          blockTimers[blockId].type = blockType
 
           pushEvent('block_view', {
             blockId: blockId,
@@ -466,6 +479,39 @@
     return origXHRSend.apply(this, arguments)
   }
 
+  // ─── 6b. Static resources (img/css/js/fonts) ─────────────
+  // fetch/XHR перехвачены выше; статику браузер грузит сам — берём её из
+  // Performance API, иначе вкладка «Запросы» на статичном сайте пуста.
+
+  function trackResourceEntry(entry) {
+    if (!entry || !entry.name) return
+    // fetch/xhr/beacon уже учтены перехватчиками; beacon — наша же аналитика
+    var it = entry.initiatorType
+    if (it === 'fetch' || it === 'xmlhttprequest' || it === 'beacon') return
+    if (entry.name.indexOf('/api/analytics') !== -1) return
+
+    pushEvent('request_received', {
+      requestUrl: entry.name.substring(0, 500),
+      requestMethod: 'GET',
+      responseTime: Math.round(entry.duration),
+      requestCategory: classifyRequest(entry.name, 'GET'),
+      responseSize: entry.transferSize || null,
+    })
+  }
+
+  function trackStaticResources() {
+    if (!('PerformanceObserver' in window)) return
+    try {
+      // Уже загруженные до инициализации трекера
+      performance.getEntriesByType('resource').forEach(trackResourceEntry)
+      new PerformanceObserver(function (list) {
+        list.getEntries().forEach(trackResourceEntry)
+      }).observe({ type: 'resource' })
+    } catch (e) {}
+  }
+
+  trackStaticResources()
+
   // ─── 7. Error tracking ──────────────────────────────────
 
   window.addEventListener('error', function (e) {
@@ -531,7 +577,11 @@
           var d = Date.now() - blockTimers[bid].startTime
           blockTimers[bid].totalTime += d
           blockTimers[bid].startTime = null
-          pushEvent('block_leave', { blockId: bid, blockViewDuration: d })
+          pushEvent('block_leave', {
+            blockId: bid,
+            blockType: blockTimers[bid].type || null,
+            blockViewDuration: d,
+          })
         }
       }
 

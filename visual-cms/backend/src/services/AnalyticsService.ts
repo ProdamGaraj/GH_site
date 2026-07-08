@@ -188,6 +188,61 @@ function anonymizeIp(ip: string | null): string | null {
   return parts.join('.')
 }
 
+/**
+ * Self-referral: реферер с того же хоста, что и страница, — это внутренний
+ * переход, а не источник трафика. Возвращает null для таких (иначе отчёт
+ * «Реферреры» забивается собственными страницами сайта). Страховка на случай
+ * старого закэшированного трекера — свежий трекер зануляет их сам.
+ */
+export function stripSameHostReferrer(
+  referrer: string | null | undefined,
+  pageUrl: string | null | undefined,
+): string | null {
+  if (!referrer) return null
+  if (!pageUrl) return referrer
+  try {
+    if (new URL(referrer).host === new URL(pageUrl).host) return null
+  } catch {
+    // не-URL значения оставляем как есть
+  }
+  return referrer
+}
+
+/**
+ * Заполняет пропущенные bucket'ы временного ряда нулями: без этого при данных
+ * за один день/час график получает единственную точку и спарклайны пусты
+ * (линии из одной точки не бывает).
+ */
+export function zeroFillTimeSeries(
+  rows: TimeSeriesPoint[],
+  from: Date,
+  to: Date,
+  granularity: 'hour' | 'day',
+): TimeSeriesPoint[] {
+  const stepMs = granularity === 'hour' ? 3600_000 : 86_400_000
+  const bucketOf = (d: Date): number => Math.floor(d.getTime() / stepMs) * stepMs
+
+  const byBucket = new Map<number, TimeSeriesPoint>()
+  for (const row of rows) {
+    byBucket.set(bucketOf(new Date(row.date)), row)
+  }
+
+  const filled: TimeSeriesPoint[] = []
+  for (let t = bucketOf(from); t <= to.getTime(); t += stepMs) {
+    filled.push(
+      byBucket.get(t) || {
+        date: new Date(t).toISOString(),
+        pageviews: 0,
+        visitors: 0,
+        sessions: 0,
+        avgResponseTime: 0,
+        bounceRate: 0,
+      },
+    )
+  }
+  return filled
+}
+
 // Классификация запроса на сервере (fallback если клиент не прислал)
 function classifyRequest(url: string | null | undefined, method: string | null | undefined): RequestCategory {
   if (!url) return 'service'
@@ -246,6 +301,11 @@ class AnalyticsService {
   ): Promise<{ saved: number }> {
     const parsed = parseUserAgent(userAgent)
     const anonIp = anonymizeIp(ip)
+
+    // Зануляем self-referral ДО сохранения и обновления сессий.
+    for (const ev of events) {
+      ev.referrer = stripSameHostReferrer(ev.referrer, ev.url) || undefined
+    }
 
     const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -525,7 +585,7 @@ class AnalyticsService {
 
     const rows = await qb.getRawMany()
 
-    return rows.map(r => ({
+    const points = rows.map(r => ({
       date: r.date instanceof Date ? r.date.toISOString() : r.date,
       pageviews: parseInt(r.pageviews || '0'),
       visitors: parseInt(r.visitors || '0'),
@@ -533,6 +593,9 @@ class AnalyticsService {
       avgResponseTime: parseFloat(r.avgResponseTime || '0'),
       bounceRate: parseFloat(r.bounceRate || '0'),
     }))
+
+    // Пустые bucket'ы → нули, иначе спарклайны с данными за один день пустуют.
+    return zeroFillTimeSeries(points, from, to, granularity)
   }
 
   // ─── Статистика страниц ─────────────────────────────────────
@@ -609,17 +672,21 @@ class AnalyticsService {
   // ─── Статистика блоков ──────────────────────────────────────
 
   async getBlockStats(pageId?: string, range?: DateRange): Promise<BlockStats[]> {
+    // Группировка ТОЛЬКО по blockId: разные события одного блока могут нести
+    // разный blockType (клик без data-block-type, легаси block_leave без типа) —
+    // группировка по (blockId, blockType) раздваивала блок на строки
+    // «section: N просмотров» и «unknown: 0 просмотров, но с временем».
+    // Тип берём лучший из имеющихся (MAX игнорирует NULL).
     const qb = this.eventRepo.createQueryBuilder('e')
       .select([
         'e."blockId" as "blockId"',
-        'e."blockType" as "blockType"',
+        'MAX(e."blockType") as "blockType"',
         'COUNT(*) FILTER (WHERE e."eventType" = \'block_view\') as "views"',
         'AVG(e."blockViewDuration") FILTER (WHERE e."blockViewDuration" IS NOT NULL) as "avgViewDuration"',
         'COUNT(*) FILTER (WHERE e."eventType" = \'click\' AND e."blockId" IS NOT NULL) as "clicks"',
       ])
       .where('e."blockId" IS NOT NULL')
       .groupBy('e."blockId"')
-      .addGroupBy('e."blockType"')
       .orderBy('"views"', 'DESC')
 
     if (pageId) qb.andWhere('e."pageId" = :pageId', { pageId })
@@ -926,8 +993,9 @@ class AnalyticsService {
   async getRealtime(pageId?: string): Promise<RealTimeStats> {
     // 45s = 3× heartbeat interval (15s). After 45s with no heartbeat, user is considered gone.
     const activeThreshold = new Date(Date.now() - 45 * 1000)
-    // 2-minute window for recent pageviews and event feed (informational)
-    const recentWindow = new Date(Date.now() - 2 * 60 * 1000)
+    // Окно «последние 5 минут» — совпадает с подписью в UI (раньше было 2 мин,
+    // и свежие просмотры «терялись» из realtime раньше времени).
+    const recentWindow = new Date(Date.now() - 5 * 60 * 1000)
 
     // Active visitors/sessions — from sessions table using endedAt (updated by heartbeats every 15s)
     const sessionQb = this.sessionRepo.createQueryBuilder('s')
