@@ -209,6 +209,36 @@ export function stripSameHostReferrer(
 }
 
 /**
+ * UTM-метки живут в URL ЦЕЛЕВОЙ страницы (?utm_source=telegram), а не в
+ * реферере: приложения (Telegram, WhatsApp, почта) реферер не передают вовсе —
+ * UTM и есть способ пометить такой трафик. Парсим сначала url страницы,
+ * фолбэк — referrer (на случай редиректов, сохранивших метки).
+ */
+export function parseUtmParams(
+  pageUrl: string | null | undefined,
+  referrer: string | null | undefined,
+): { utmSource: string | null; utmMedium: string | null; utmCampaign: string | null; utmContent: string | null; utmTerm: string | null } {
+  const empty = { utmSource: null, utmMedium: null, utmCampaign: null, utmContent: null, utmTerm: null }
+  for (const candidate of [pageUrl, referrer]) {
+    if (!candidate) continue
+    try {
+      const u = new URL(candidate)
+      const utmSource = u.searchParams.get('utm_source')
+      const utmMedium = u.searchParams.get('utm_medium')
+      const utmCampaign = u.searchParams.get('utm_campaign')
+      const utmContent = u.searchParams.get('utm_content')
+      const utmTerm = u.searchParams.get('utm_term')
+      if (utmSource || utmMedium || utmCampaign || utmContent || utmTerm) {
+        return { utmSource, utmMedium, utmCampaign, utmContent, utmTerm }
+      }
+    } catch {
+      // не-URL — пробуем следующий кандидат
+    }
+  }
+  return empty
+}
+
+/**
  * Заполняет пропущенные bucket'ы временного ряда нулями: без этого при данных
  * за один день/час график получает единственную точку и спарклайны пусты
  * (линии из одной точки не бывает).
@@ -351,6 +381,7 @@ class AnalyticsService {
       visitorId: string
       pageSlug?: string
       pageId?: string
+      url?: string
       referrer?: string
       scrollDepth?: number
       responseTime?: number
@@ -375,23 +406,11 @@ class AnalyticsService {
       let session = await this.sessionRepo.findOneBy({ sessionId })
       const first = sessionEvents[0]
 
-      // UTM params из referrer/url
-      let utmSource: string | null = null
-      let utmMedium: string | null = null
-      let utmCampaign: string | null = null
-      let utmContent: string | null = null
-      let utmTerm: string | null = null
-      try {
-        const urlStr = first.referrer || ''
-        if (urlStr) {
-          const u = new URL(urlStr)
-          utmSource = u.searchParams.get('utm_source')
-          utmMedium = u.searchParams.get('utm_medium')
-          utmCampaign = u.searchParams.get('utm_campaign')
-          utmContent = u.searchParams.get('utm_content')
-          utmTerm = u.searchParams.get('utm_term')
-        }
-      } catch {}
+      // UTM — из URL страницы (метки живут там), фолбэк — referrer.
+      // Раньше парсили только referrer: ссылки вида ?utm_source=telegram
+      // не распознавались вовсе (Telegram и другие приложения реферер не шлют).
+      const { utmSource, utmMedium, utmCampaign, utmContent, utmTerm } =
+        parseUtmParams(first.url, first.referrer)
 
       if (!session) {
         session = this.sessionRepo.create({

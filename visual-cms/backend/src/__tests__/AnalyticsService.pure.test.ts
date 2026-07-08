@@ -6,7 +6,7 @@
  *  - спарклайны «Просмотры/Посетители/Ср. время отклика» пустовали при данных
  *    за один день — временной ряд возвращал одну точку.
  */
-import { stripSameHostReferrer, zeroFillTimeSeries } from '../services/AnalyticsService'
+import { stripSameHostReferrer, zeroFillTimeSeries, parseUtmParams } from '../services/AnalyticsService'
 
 describe('stripSameHostReferrer', () => {
   const pageUrl = 'https://test_analytics.gh.uz/news/'
@@ -32,6 +32,38 @@ describe('stripSameHostReferrer', () => {
 
   it('невалидный реферер оставляем как есть', () => {
     expect(stripSameHostReferrer('android-app://org.telegram', pageUrl)).toBe('android-app://org.telegram')
+  })
+})
+
+describe('parseUtmParams', () => {
+  it('метки берутся из URL страницы (Telegram/приложения реферер не шлют)', () => {
+    const r = parseUtmParams('https://site.uz/?utm_source=telegram&utm_medium=social&utm_campaign=july', null)
+    expect(r.utmSource).toBe('telegram')
+    expect(r.utmMedium).toBe('social')
+    expect(r.utmCampaign).toBe('july')
+  })
+
+  it('URL страницы приоритетнее реферера', () => {
+    const r = parseUtmParams(
+      'https://site.uz/?utm_source=telegram',
+      'https://google.com/?utm_source=google',
+    )
+    expect(r.utmSource).toBe('telegram')
+  })
+
+  it('фолбэк на реферер, когда в URL страницы меток нет', () => {
+    const r = parseUtmParams('https://site.uz/news/', 'https://ads.example.com/?utm_source=ads')
+    expect(r.utmSource).toBe('ads')
+  })
+
+  it('без меток нигде → все null', () => {
+    const r = parseUtmParams('https://site.uz/', 'https://google.com/')
+    expect(r).toEqual({ utmSource: null, utmMedium: null, utmCampaign: null, utmContent: null, utmTerm: null })
+  })
+
+  it('невалидные значения не роняют парсер', () => {
+    const r = parseUtmParams('not-a-url', null)
+    expect(r.utmSource).toBeNull()
   })
 })
 
