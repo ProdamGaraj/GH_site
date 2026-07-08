@@ -238,6 +238,7 @@ export class DeployService {
         lang: defaultLang?.code,
         direction: defaultLang?.direction,
         availableLanguages: availableLangsForSwitcher,
+        analyticsPageId: page.id,
         ...this.siteAssetOptions(page.site),
       })
 
@@ -500,6 +501,7 @@ export class DeployService {
             lang: defLang?.code,
             direction: defLang?.direction,
             availableLanguages: pageLangSwitcher,
+            analyticsPageId: page.id,
             ...this.siteAssetOptions(page.site),
           })
 
@@ -619,6 +621,7 @@ export class DeployService {
             direction: defLang?.direction,
             availableLanguages: pageLangSwitcher,
             navigation: resolvedNav,
+            analyticsPageId: page.id,
             ...this.siteAssetOptions(site),
           })
 
@@ -874,12 +877,14 @@ export class DeployService {
             }
           }
 
-          // Генерируем HTML
+          // Генерируем HTML. Для аналитики: кастомная страница — её id,
+          // авто-шаблон — id страницы-шаблона (slug у трекера свой на каждый item).
           const html = await this.generatePageHtml(pageStructure, {
             metadata: pageMetadata,
             slug: itemSlug,
             dataConfig: pageDataConfig,
             navigation: resolvedNav,
+            analyticsPageId: override ? override.customPageId : templatePage.id,
             ...this.siteAssetOptions(collection.site),
           })
 
@@ -2265,6 +2270,7 @@ export class DeployService {
             availableLanguages,
             // Карта переводов языка — для адаптивного медиа «экран × язык» (<picture>/фон-@media).
             translationMap,
+            analyticsPageId: page.id,
             ...this.siteAssetOptions(page.site),
           })
 

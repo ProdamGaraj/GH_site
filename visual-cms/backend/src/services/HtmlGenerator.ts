@@ -67,6 +67,12 @@ export interface GeneratePageOptions {
    * адаптивного медиа «экран × язык». Для дефолтного языка не передаётся ({}).
    */
   translationMap?: TranslationFieldMap
+  /**
+   * UUID страницы для аналитики. Если задан — в конец <body> инжектится
+   * /api/analytics/tracker.js (pageview, Web Vitals, engagement блоков и т.д.).
+   * Деплой передаёт всегда; превью — НЕ передаёт, чтобы не загрязнять статистику.
+   */
+  analyticsPageId?: string
 }
 
 export class HtmlGenerator {
@@ -234,6 +240,7 @@ ${dataConfig ? generateDataBindingRuntime(dataConfig) : ''}
   })())};</script>
 ${generateResponsiveMediaRuntime()}
 ${generateCarouselRuntime()}
+${options.analyticsPageId ? `  <script src="/api/analytics/tracker.js" data-page-id="${options.analyticsPageId}" defer></script>\n` : ''}
 ${authoredJs}${scripts ? `<script>\n${scripts}\n</script>` : ''}
 ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
 </html>`
