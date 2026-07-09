@@ -15,10 +15,14 @@ COPY . .
 
 # Entrypoint синхронизирует node_modules с package.json на КАЖДОМ старте — иначе
 # анонимный том /app/node_modules (dev-compose) отстаёт при добавлении зависимостей
-# и бэкенд падает с «Cannot find module …». chmod: exec-бит теряется на Windows-хосте.
+# и бэкенд падает с «Cannot find module …».
 RUN chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 5000
 
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+# Запуск через `sh`, а НЕ exec-формой ["/app/docker-entrypoint.sh"]: dev-compose
+# bind-монтирует ./backend:/app и перекрывает слой образа (с chmod +x) хостовым
+# файлом, у которого на Windows нет exec-бита → "permission denied". sh читает
+# скрипт по read-биту (есть у 644), exec-бит не требуется.
+ENTRYPOINT ["sh", "/app/docker-entrypoint.sh"]
 CMD ["npm", "run", "dev"]
