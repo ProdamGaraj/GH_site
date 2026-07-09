@@ -16,6 +16,7 @@ import { LinkedChangesModal } from './LinkedChangesModal'
 import { blockApi, pageApi, previewApi } from '@/shared/api'
 import type { ChangedLinkedInstance, LinkedDecision } from '@/shared/api'
 import { cleanForLibrary, isLinkedPlaceholder, stripViewportIds } from '../utils/libraryClean'
+import { isTypingContext } from '../utils/isEditableTarget'
 import type { BlockNode } from '@/shared/types'
 
 
@@ -110,11 +111,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   // Ctrl+S обрабатывается отдельным effect'ом ниже — после определения handleSave.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if user is typing in input/textarea
-      const target = e.target as HTMLElement
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-        return
-      }
+      // Skip if user is typing in a field (input/textarea/select/contenteditable/Monaco).
+      // Monaco редактирует не в <textarea>, а во внутреннем слое — простой
+      // tagName-проверки мало, иначе Ctrl+V в поле стилей вставлял копию блока.
+      if (isTypingContext(e)) return
 
       const isCtrl = e.ctrlKey || e.metaKey
 
@@ -334,10 +334,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   })
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-        return
-      }
+      // Ctrl+S всё равно перехватываем даже в поле (сохранение уместно),
+      // но набор текста в Monaco/полях не должен триггерить прочее — гард общий.
+      if (isTypingContext(e)) return
       if ((e.ctrlKey || e.metaKey) && e.key === 's' && !e.shiftKey) {
         e.preventDefault()
         void handleSaveRef.current()

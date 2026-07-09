@@ -1,0 +1,365 @@
+/* Header / верхняя навигация (.gnav и её дети) — вынесено из test.css.
+   Порядок @media сохранён как в исходнике для идентичного каскада. */
+
+.gnav {
+  position: fixed;
+  top: clamp(10px, 1.45vw, 18px);
+  left: 50%;
+  z-index: 9999;
+  width: min(calc(100% - clamp(20px, 2.9vw, 36px)), 1432px);
+  padding: clamp(12px, 1.3vw, 18px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(253, 184, 42, .82);
+  border-radius: clamp(18px, 2.2vw, 28px);
+  background: rgba(255, 255, 255, .08);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .18), 0 0 28px rgba(253, 184, 42, .18), inset 0 0 0 1px rgba(255, 255, 255, .08);
+  transform: translateX(-50%);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.gnav::before,
+.gnav::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.gnav::before {
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(115deg, #fdb82a, #fff1b6, #c98715, #fdb82a, #fff6cf);
+  background-size: 260% 260%;
+  opacity: .9;
+  animation: navGoldFlow 4.6s ease-in-out infinite;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.gnav::after {
+  top: -70%;
+  bottom: -70%;
+  left: -40%;
+  width: 32%;
+  background: linear-gradient(110deg, transparent, rgba(255, 255, 255, .34), transparent);
+  transform: rotate(12deg);
+  animation: navGoldShine 5.4s ease-in-out infinite;
+}
+
+@keyframes navGoldFlow {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes navGoldShine {
+  0% {
+    left: -44%;
+    opacity: 0;
+  }
+
+  24% {
+    opacity: .8;
+  }
+
+  52%,
+  100% {
+    left: 112%;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gnav::before,
+  .gnav::after {
+    animation: none;
+  }
+}
+
+.glogo,
+.gmenu,
+.nav-actions {
+  position: relative;
+  z-index: 1;
+}
+
+.glogo {
+  display: inline-flex;
+  align-items: center;
+  min-width: 134px;
+}
+
+.glogo img {
+  width: clamp(118px, 10vw, 154px);
+  height: 42px;
+  object-fit: contain;
+  object-position: left center;
+  transform: translateX(5px);
+  filter: drop-shadow(0 2px 16px rgba(0, 0, 0, .2));
+  transition: filter .25s ease, opacity .25s ease, transform .25s ease;
+}
+
+.gnav.logo-light .glogo img {
+  filter: brightness(0) invert(1) drop-shadow(0 2px 16px rgba(0, 0, 0, .28));
+}
+
+.gnav.logo-dark .glogo img {
+  filter: drop-shadow(0 2px 16px rgba(0, 0, 0, .2));
+}
+
+.gnav.logo-dark .gmenu,
+.gnav.logo-dark .gbook,
+.gnav.logo-dark .language-switch {
+  border-color: rgba(21, 24, 29, .08);
+  background: rgba(255, 255, 255, .58);
+}
+
+.gnav.logo-dark .gmenu a:not(.active),
+.gnav.logo-dark .gbook,
+.gnav.logo-dark .language-switch button:not(.active) {
+  color: rgba(21, 24, 29, .72);
+}
+
+.gmenu {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: min(860px, 58vw);
+  padding: 5px;
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, .28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .14);
+  scrollbar-width: none;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.gmenu::-webkit-scrollbar {
+  display: none;
+}
+
+.gmenu a {
+  padding: 9px 13px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, .9);
+  font-size: 13px;
+  transition: background .25s ease, color .25s ease;
+  white-space: nowrap;
+}
+
+.gmenu a.active {
+  background: var(--white);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.gmenu a:not(.active):hover {
+  background: rgba(255, 255, 255, .16);
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.language-switch,
+.gbook {
+  border: 1px solid rgba(255, 255, 255, .3);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .16);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.language-switch {
+  min-width: 86px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px;
+}
+
+.language-switch button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: rgba(255, 255, 255, .82);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.language-switch button.active {
+  background: var(--white);
+  color: var(--ink);
+}
+
+.gbook {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 11px 13px 11px 20px;
+  color: var(--white);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: transform .25s ease, background .25s ease;
+  white-space: nowrap;
+}
+
+.gbook:hover {
+  background: rgba(255, 255, 255, .26);
+  transform: translateY(-1px);
+}
+
+.gbook .arw {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+/* ── Responsive (порядок @media как в исходнике) ── */
+
+@media (max-width: 1180px) {
+  .gnav {
+    flex-wrap: wrap;
+  }
+
+  .gmenu {
+    order: 3;
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 680px) {
+  .glogo {
+    min-width: 118px;
+  }
+
+  .glogo img {
+    width: 118px;
+    height: 38px;
+  }
+
+  .nav-actions {
+    gap: 8px;
+  }
+
+  .language-switch {
+    min-width: 78px;
+    min-height: 44px;
+  }
+
+  .language-switch button {
+    width: 31px;
+    height: 31px;
+  }
+
+  .nav-actions > .gbook {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+
+  .nav-actions > .gbook .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .gmenu a {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 1360px) {
+  .gnav {
+    gap: 10px;
+  }
+
+  .gmenu {
+    max-width: min(780px, 52vw);
+  }
+
+  .nav-actions {
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 980px) {
+  .gnav {
+    align-items: center;
+  }
+
+  .gmenu {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  .gnav {
+    top: 8px;
+    width: calc(100% - 16px);
+    padding: 10px;
+    gap: 8px;
+    border-radius: 20px;
+  }
+
+  .gmenu {
+    padding: 4px;
+  }
+
+  .gmenu a {
+    min-height: 34px;
+  }
+}
+
+@media (max-width: 380px) {
+  .glogo {
+    min-width: 106px;
+  }
+
+  .glogo img {
+    width: 106px;
+  }
+
+  .language-switch {
+    min-width: 72px;
+  }
+
+  .gmenu a {
+    padding: 7px 10px;
+  }
+}
