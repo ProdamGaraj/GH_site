@@ -69,6 +69,33 @@ describe('HtmlGenerator — нормализация href у <a>', () => {
     expect(aTag(html)).toContain(expected)
   })
 
+  it('легаси ".html" превращается в чистый URL (файла .html на деплое нет — 404)', () => {
+    expect(aTag(htmlGenerator.generatePage(page([linkNode({ href: 'contacts.html' })]), opts)))
+      .toContain('href="/contacts"')
+    expect(aTag(htmlGenerator.generatePage(page([linkNode({ href: '/news.html' })]), opts)))
+      .toContain('href="/news"')
+  })
+
+  it('index.html → корень, хэш сохраняется', () => {
+    expect(aTag(htmlGenerator.generatePage(page([linkNode({ href: 'index.html' })]), opts)))
+      .toContain('href="/"')
+    expect(aTag(htmlGenerator.generatePage(page([linkNode({ href: 'index.html#top' })]), opts)))
+      .toContain('href="/#top"')
+    expect(aTag(htmlGenerator.generatePage(page([linkNode({ href: 'news/index.html' })]), opts)))
+      .toContain('href="/news"')
+  })
+
+  it('query сохраняется при нормализации', () => {
+    expect(aTag(htmlGenerator.generatePage(page([linkNode({ href: 'search.html?q=1' })]), opts)))
+      .toContain('href="/search?q=1"')
+  })
+
+  it('подключает рантайм подсветки активного пункта меню', () => {
+    const html = htmlGenerator.generatePage(page([linkNode({ href: '/contacts' })]), opts)
+    expect(html).toContain('vcms-active-link')
+    expect(html).toContain("setAttribute('aria-current', 'page')")
+  })
+
   it('не-<a> теги не затрагиваются (относительный src у img остаётся)', () => {
     const img: BlockNode = {
       id: 'img-1',

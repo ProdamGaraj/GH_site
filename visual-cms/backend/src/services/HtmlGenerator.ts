@@ -5,6 +5,7 @@ import { styleGenerator } from './StyleGenerator'
 import { generateDataBindingRuntime, type PageDataConfig } from './DataBindingGenerator'
 import { generateCarouselRuntime } from './CarouselRuntime'
 import { generateResponsiveMediaRuntime } from './ResponsiveMediaRuntime'
+import { generateActiveLinkRuntime } from './ActiveLinkRuntime'
 import {
   resolveResponsiveMedia,
   generateBackgroundMediaCss,
@@ -240,6 +241,7 @@ ${dataConfig ? generateDataBindingRuntime(dataConfig) : ''}
   })())};</script>
 ${generateResponsiveMediaRuntime()}
 ${generateCarouselRuntime()}
+${generateActiveLinkRuntime()}
 ${options.analyticsPageId ? `  <script src="/api/analytics/tracker.js" data-page-id="${options.analyticsPageId}" defer></script>\n` : ''}
 ${authoredJs}${scripts ? `<script>\n${scripts}\n</script>` : ''}
 ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>
@@ -491,17 +493,37 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
   }
 
   /**
-   * Внутренние относительные href у <a> ("contacts", "./news") на деплое ломаются:
-   * страницы публикуются директориями /<slug>/index.html, и браузер резолвит
-   * такой href относительно текущей страницы (/about/contacts вместо /contacts).
-   * Приводим к корневому виду. Не трогаем: абсолютные URL (scheme:, //),
-   * уже корневые (/), якоря (#) и query (?).
+   * Внутренние href у <a> на деплое требуют двух нормализаций:
+   *  1) относительные ("contacts", "./news") — к корневым: страницы публикуются
+   *     директориями /<slug>/index.html, и браузер резолвил бы их относительно
+   *     текущей страницы (/about/contacts вместо /contacts);
+   *  2) легаси ".html" ("contacts.html", "/index.html#top") — на чистые URL:
+   *     файла contacts.html на деплое НЕТ (есть contacts/index.html), такие
+   *     ссылки отдавали 404.
+   * Не трогаем: абсолютные URL (scheme:, //), якоря (#) и query (?).
    */
   private normalizeLinkAttributes(tagName: string, attributes: Record<string, string>): Record<string, string> {
     if (tagName.toLowerCase() !== 'a') return attributes
     const href = attributes.href
-    if (!href || /^(?:[a-z][a-z0-9+.-]*:|\/\/|\/|#|\?)/i.test(href)) return attributes
-    return { ...attributes, href: '/' + href.replace(/^(?:\.\.?\/)+/, '') }
+    if (!href || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#|\?)/i.test(href)) return attributes
+
+    // Отделяем ?query/#hash — нормализуем только путь
+    const match = href.match(/^([^?#]*)([?#].*)?$/)
+    let path = match?.[1] ?? href
+    const suffix = match?.[2] ?? ''
+
+    path = path.replace(/^(?:\.\.?\/)+/, '')
+    if (!path.startsWith('/')) path = '/' + path
+
+    // Чистые URL: .html срезаем, index-страница = корень директории
+    if (/\.html?$/i.test(path)) {
+      path = path.replace(/\.html?$/i, '')
+      if (path === '/index') path = '/'
+      else if (path.endsWith('/index')) path = path.slice(0, -'/index'.length) || '/'
+    }
+
+    const normalized = path + suffix
+    return normalized === href ? attributes : { ...attributes, href: normalized }
   }
 
   /**
