@@ -612,6 +612,123 @@ label {
 }
 `
   }
+
+  /**
+   * Канонический reset/base страницы. ЕДИНЫЙ источник для двух окружений:
+   *  - деплой/превью — инлайнится в <head> (см. HtmlGenerator.generatePage);
+   *  - канвас редактора — через getBaseCssScoped(), чтобы правки одного места
+   *    доезжали в оба, а рукопашная копия reset в index.css больше не дрейфила.
+   * @font-face СЮДА НЕ входит: в канвасе Muller уже загружен (frontend/index.css),
+   * а на деплое @font-face эмитится отдельно (свой origin /fonts/*.woff2).
+   */
+  getResetCss(): string {
+    return [
+      '    /* Reset & Base Styles */',
+      '    *, *::before, *::after {',
+      '      box-sizing: border-box;',
+      '      margin: 0;',
+      '      padding: 0;',
+      '    }',
+      '    ',
+      '    html {',
+      '      scroll-behavior: smooth;',
+      '    }',
+      '    ',
+      '    body {',
+      "      font-family: 'Muller', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;",
+      '      line-height: 1.5;',
+      '      -webkit-font-smoothing: antialiased;',
+      '    }',
+      '    ',
+      '    img {',
+      '      max-width: 100%;',
+      '      height: auto;',
+      '      display: block;',
+      '    }',
+      '    ',
+      '    a {',
+      '      text-decoration: none;',
+      '      color: inherit;',
+      '    }',
+      '    ',
+      '    button {',
+      '      font-family: inherit;',
+      '      cursor: pointer;',
+      '    }',
+      '    ',
+      '    input, textarea {',
+      '      font-family: inherit;',
+      '    }',
+    ].join('\n')
+  }
+
+  /**
+   * Статичная база страницы (reset + форм-стили) — то, что не зависит от
+   * конкретной страницы. Общий источник для деплоя и канваса.
+   */
+  getBaseCss(): string {
+    return `${this.getResetCss()}\n${this.generateFormStyles()}`
+  }
+
+  /**
+   * База, заскоупленная под контейнер канваса, чтобы инжект в DOM редактора
+   * не задевал UI CMS. Отдаётся эндпоинтом GET /api/preview/base-css.
+   */
+  getBaseCssScoped(scope: string): string {
+    return scopeCss(this.getBaseCss(), scope)
+  }
+}
+
+/**
+ * Префиксует каждый селектор «глобального» CSS контейнером `scope`, чтобы его
+ * можно было инжектить в общий DOM редактора, не задевая интерфейс CMS.
+ * Правила:
+ *  - список через запятую разворачивается — префиксуется каждый селектор;
+ *  - html/body/:root → сам scope (это корень канваса, а не потомок);
+ *  - `@`-блоки (@font-face/@keyframes/@media) проходят ДОСЛОВНО вместе с телом
+ *    (скоупинг keyframes/шрифтов сломал бы их);
+ *  - комментарии в позиции селектора срезаются.
+ */
+export function scopeCss(css: string, scope: string): string {
+  let out = ''
+  let i = 0
+  const n = css.length
+  while (i < n) {
+    const braceOpen = css.indexOf('{', i)
+    if (braceOpen === -1) {
+      out += css.slice(i)
+      break
+    }
+    // Парная закрывающая скобка с учётом вложенности (@keyframes/@media).
+    let depth = 1
+    let j = braceOpen + 1
+    while (j < n && depth > 0) {
+      const ch = css[j]
+      if (ch === '{') depth++
+      else if (ch === '}') depth--
+      j++
+    }
+    const preludeClean = css.slice(i, braceOpen).replace(/\/\*[\s\S]*?\*\//g, '').trim()
+    if (preludeClean === '' || preludeClean.startsWith('@')) {
+      // at-rule или только комментарий/пробелы — эмитим блок как есть.
+      out += css.slice(i, j)
+    } else {
+      const scoped = preludeClean
+        .split(',')
+        .map((s) => scopeSelector(s.trim(), scope))
+        .filter(Boolean)
+        .join(', ')
+      out += `\n${scoped} ${css.slice(braceOpen, j)}`
+    }
+    i = j
+  }
+  return out
+}
+
+function scopeSelector(sel: string, scope: string): string {
+  if (!sel) return sel
+  if (sel === 'html' || sel === 'body' || sel === ':root') return scope
+  return `${scope} ${sel}`
 }
 
 export const styleGenerator = new StyleGenerator()

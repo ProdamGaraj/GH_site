@@ -178,42 +178,7 @@ export class HtmlGenerator {
       font-style: normal;
     }
     
-    /* Reset & Base Styles */
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    
-    html {
-      scroll-behavior: smooth;
-    }
-    
-    body {
-      font-family: 'Muller', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      line-height: 1.5;
-      -webkit-font-smoothing: antialiased;
-    }
-    
-    img {
-      max-width: 100%;
-      height: auto;
-      display: block;
-    }
-    
-    a {
-      text-decoration: none;
-      color: inherit;
-    }
-    
-    button {
-      font-family: inherit;
-      cursor: pointer;
-    }
-    
-    input, textarea {
-      font-family: inherit;
-    }
+${styleGenerator.getResetCss()}
 ${authoredCss}
     /* Keyframes for animations */
     ${keyframes}

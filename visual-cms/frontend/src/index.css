@@ -131,40 +131,11 @@ body {
   scrollbar-color: #cbd5e1 #f1f5f9;
 }
 
-/* Canvas Viewport - точное соответствие реальному сайту */
-.canvas-viewport *,
-.canvas-viewport *::before,
-.canvas-viewport *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-.canvas-viewport {
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
-
-.canvas-viewport img {
-  max-width: 100%;
-  height: auto;
-  display: block;
-}
-
-.canvas-viewport a {
-  text-decoration: none;
-  color: inherit;
-}
-
-.canvas-viewport button {
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.canvas-viewport input,
-.canvas-viewport textarea {
-  font-family: inherit;
-}
+/* Canvas Viewport — reset + форм-стили НЕ дублируются здесь.
+   Единый источник — backend StyleGenerator.getBaseCss() (тот же CSS, что и на
+   деплое); канвас фетчит его заскоупленным под .canvas-viewport через
+   useCanvasBaseCss() и инжектит в <head>. Раньше рукопашная копия reset жила
+   здесь, дрейфила (без форм-стилей) и давала расхождение «редактор ≠ деплой». */
 
 /* Canvas element styles */
 .canvas-element {

@@ -7,6 +7,7 @@ import { DropIndicatorOverlay, DropTargetHighlight } from './DropIndicatorOverla
 import { getEffectiveTree } from '../../utils/variationUtils'
 import { collectTreeGlobalCss, collectTreeGlobalJs } from '../../utils/exportUtils'
 import { compileMediaForWidth } from '../../utils/compileCanvasMedia'
+import { useCanvasBaseCss } from '../../hooks/useCanvasBaseCss'
 
 interface CanvasProps {
   dropIndicator?: DropIndicator | null
@@ -37,6 +38,11 @@ export const Canvas: React.FC<CanvasProps> = ({
   const siteGlobalCss = useAppSelector(selectSiteGlobalCss)
   const siteGlobalJs = useAppSelector(selectSiteGlobalJs)
   const browserOffset = useAppSelector(selectEffectiveBrowserOffset)
+
+  // Инжект канонического base-CSS деплоя (reset + форм-стили), scoped под
+  // .canvas-viewport — единый источник с опубликованной страницей.
+  useCanvasBaseCss()
+
   const canvasRef = useRef<HTMLDivElement>(null)
   const panContainerRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)

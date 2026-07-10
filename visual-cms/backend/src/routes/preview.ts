@@ -7,5 +7,6 @@ const router = Router()
 
 router.post('/page', validate(renderPagePreviewSchema), previewController.renderPage)
 router.post('/block', validate(renderBlockPreviewSchema), previewController.renderBlock)
+router.get('/base-css', previewController.baseCss)
 
 export default router
