@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { getApiBaseUrl } from '@/shared/api/baseUrl'
+import { apiFetch } from '@/shared/api/http'
 
 /**
  * Инжект канонического base-CSS деплоя (reset + форм-стили) в канвас редактора.
@@ -21,8 +22,10 @@ let inFlight: Promise<string> | null = null
 async function loadBaseCss(): Promise<string> {
   if (cachedCss != null) return cachedCss
   if (!inFlight) {
+    // apiFetch: credentials: 'include' — эндпоинт под общей auth-мидлварой /api
+    // (как preview POST). Голый fetch без cookie сессии → 401.
     const url = `${getApiBaseUrl()}/preview/base-css?scope=${encodeURIComponent(SCOPE)}`
-    inFlight = fetch(url)
+    inFlight = apiFetch(url)
       .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`base-css ${r.status}`))))
       .then((css) => {
         cachedCss = css
