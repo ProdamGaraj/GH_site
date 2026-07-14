@@ -38,11 +38,9 @@ import { Header } from '@/shared/components/Header'
 import { EditorToolbar } from '@/features/editor/components/EditorToolbar'
 import { Canvas } from '@/features/editor/components/Canvas/Canvas'
 // import { LeftPanel } from '@/features/editor/components/LeftPanel/LeftPanel'
-import { RightPanel } from '@/features/editor/components/RightPanel/RightPanel'
 import { LibraryPanel } from '@/features/editor/components/LibraryPanel/LibraryPanel'
 import { PageSettingsPanel } from '@/features/editor/components/PageSettings/PageSettingsPanel'
 import { BasicSettingsPanel } from '@/features/editor/components/RightPanel/BasicSettingsPanel'
-import { ElementPropertiesPanel } from '@/features/editor/components/RightPanel/ElementPropertiesPanel'
 import { PositioningPanel } from '@/features/editor/components/RightPanel/PositioningPanel'
 import { ColorsPanel } from '@/features/editor/components/RightPanel/ColorsPanel'
 import { ContentPanel } from '@/features/editor/components/RightPanel/ContentPanel'
@@ -65,6 +63,7 @@ import { DataBindingProvider } from '@/features/dataBindings'
 import { TranslationPanel } from '@/features/translations/TranslationPanel'
 import { LanguageSettingsPanel } from '@/features/translations/LanguageSettingsPanel'
 import { VersionHistoryPanel } from '@/features/editor/components/VersionHistoryPanel'
+import { visibleRightPanelSections } from '@/features/editor/rightPanelSections'
 
 import { 
   DropIndicator, 
@@ -102,13 +101,20 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   const [isResizingLeft, setIsResizingLeft] = useState(false)
   const [rightPanelWidth, setRightPanelWidth] = useState(320)
   const [isResizingRight, setIsResizingRight] = useState(false)
+  // Правая панель — одна непрерывная лента секций; сайдбар лишь скроллит к ним.
+  const rightSections = visibleRightPanelSections(type)
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false)
+  const [activeSection, setActiveSection] = useState<string>(rightSections[0]?.id || 'basicSettings')
+  const rightScrollRef = useRef<HTMLDivElement>(null)
   // const [isLibraryOpen, setIsLibraryOpen] = useState(true)
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null)
   const [targetContainerRect, setTargetContainerRect] = useState<DOMRect | null>(null)
   const [targetLayoutMode, setTargetLayoutMode] = useState<'flex' | 'grid' | 'absolute' | 'table'>('flex')
   const [activeNode, setActiveNode] = useState<BlockNode | null>(null)
   const [loading, setLoading] = useState(false)
-  const [currentBlockData, setCurrentBlockData] = useState<any>(null) // Данные загруженного блока (для Template)
+  // Данные загруженного блока (Template) — сохраняем при загрузке; сейчас не
+  // читаются в панели (ленте), сеттер оставлен для будущего использования.
+  const [, setCurrentBlockData] = useState<any>(null)
   const [pageVersion, setPageVersion] = useState(1)
   const [pageSettings, setPageSettings] = useState<EditorPageSettings>({
     name: '',
@@ -224,6 +230,58 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       document.body.style.userSelect = ''
     }
   }, [isResizingRight])
+
+  // Скролл ленты к секции + раскрытие панели, если свёрнута. rAF — на случай,
+  // когда контейнер только что вернулся из collapsed и ещё не в DOM.
+  const scrollToSection = useCallback((sectionId: string) => {
+    setRightPanelCollapsed(false)
+    setActiveSection(sectionId)
+    requestAnimationFrame(() => {
+      const root = rightScrollRef.current
+      const el = root?.querySelector<HTMLElement>(`[data-rp="${sectionId}"]`)
+      if (root && el) {
+        const delta = el.getBoundingClientRect().top - root.getBoundingClientRect().top
+        root.scrollTo({ top: root.scrollTop + delta, behavior: 'smooth' })
+      }
+    })
+  }, [])
+
+  // Scroll-spy: активна последняя секция, чей верх поднялся к верху контейнера.
+  // Обновляем activeSection только при смене — без churn на каждый пиксель.
+  useEffect(() => {
+    const root = rightScrollRef.current
+    if (rightPanelCollapsed || activeRightPanel === 'languageSettings' || !root) return
+
+    let raf = 0
+    const spy = () => {
+      raf = 0
+      const rootTop = root.getBoundingClientRect().top
+      const secs = Array.from(root.querySelectorAll<HTMLElement>('[data-rp]'))
+      let current = secs[0]?.dataset.rp
+      for (const s of secs) {
+        if (s.getBoundingClientRect().top - rootTop <= 8) current = s.dataset.rp
+        else break
+      }
+      if (current) setActiveSection((prev) => (prev === current ? prev : current))
+    }
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(spy)
+    }
+    root.addEventListener('scroll', onScroll, { passive: true })
+    spy()
+    return () => {
+      root.removeEventListener('scroll', onScroll)
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [rightPanelCollapsed, activeRightPanel, type])
+
+  // Выбор элемента на канвасе → раскрыть панель и промотать к «Основным».
+  // Сохраняет прежнее поведение (selectNode авто-открывал basicSettings).
+  const selectedNodeId = useAppSelector((s) => s.editor.selectedNodeId)
+  useEffect(() => {
+    if (selectedNodeId) scrollToSection('basicSettings')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedNodeId])
 
   useEffect(() => {
     const loadEditor = async () => {
@@ -894,9 +952,74 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
     )
   }
 
+  // Контент одной секции ленты по её id. Секции, которых нет для текущего
+  // режима (pageOnly в редакторе блока), в rightSections не попадают.
+  const renderRightSection = (sectionId: string): React.ReactNode => {
+    switch (sectionId) {
+      case 'pageSettings':
+        return inlineBlockEdit.active ? (
+          <div className="p-4 text-sm text-gray-500">Настройки страницы недоступны в режиме редактирования блока.</div>
+        ) : (
+          <PageSettingsPanel
+            pageId={id}
+            settings={pageSettings}
+            onChange={(newSettings) => {
+              setPageSettings(newSettings)
+              dispatch(markAsDirty())
+            }}
+          />
+        )
+      case 'basicSettings':
+        return <BasicSettingsPanel pageId={type === 'page' ? id : undefined} />
+      case 'positioning':
+        return <PositioningPanel />
+      case 'colors':
+        return <ColorsPanel />
+      case 'content':
+        return <ContentPanel />
+      case 'states':
+        return <StatesPanel />
+      case 'animations':
+        return <AnimationsPanel />
+      case 'scripts':
+        return <ScriptsPanel />
+      case 'data':
+        return <DataPanel pageId={type === 'page' ? id : undefined} libraryBlockId={type === 'block' ? id : undefined} />
+      case 'slides':
+        return <SlidesPanel pageId={type === 'page' ? id : undefined} />
+      case 'translations':
+        return id ? <TranslationPanel pageId={id} /> : null
+      case 'versionHistory':
+        return id ? (
+          <VersionHistoryPanel
+            pageId={id}
+            currentVersion={pageVersion}
+            onRestore={async (restoredPage) => {
+              const { loadEditor: loadEditorAction } = await import('@/features/editor/editorSlice')
+              dispatch(loadEditorAction(restoredPage.structure))
+              setPageVersion(restoredPage.version || pageVersion + 1)
+              if (restoredPage.metadata) {
+                setPageSettings(prev => ({
+                  ...prev,
+                  metaTitle: restoredPage.metadata?.title || prev.metaTitle,
+                  metaDescription: restoredPage.metadata?.description || prev.metaDescription,
+                  keywords: restoredPage.metadata?.keywords?.join(', ') || prev.keywords,
+                }))
+              }
+            }}
+            onClose={() => scrollToSection('basicSettings')}
+          />
+        ) : null
+      case 'css':
+        return <CSSPanel />
+      default:
+        return null
+    }
+  }
+
   return (
     <DataBindingProvider pageId={id || 'new'}>
-      <DndContext 
+      <DndContext
       sensors={sensors}
       collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
@@ -1018,9 +1141,9 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
             libraryBlockId={type === 'block' ? id : undefined}
           />
           
-          {/* Right Panel Content */}
-          {activeRightPanel && (
-            <div 
+          {/* Right Panel — одна непрерывная лента секций (scroll-spy + шорткаты) */}
+          {!rightPanelCollapsed && (
+            <div
               className="bg-white border-l border-gray-200 flex flex-col relative"
               style={{ width: `${rightPanelWidth}px` }}
             >
@@ -1030,131 +1153,35 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                 className="absolute left-0 top-0 bottom-0 w-1 hover:w-2 bg-transparent hover:bg-blue-400 cursor-col-resize transition-all z-20"
                 title="Изменить ширину"
               />
-              
+
               <button
-                onClick={() => dispatch(setActiveRightPanel(null))}
+                onClick={() => setRightPanelCollapsed(true)}
                 className="absolute -left-3 top-4 z-10 w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors shadow-sm"
                 title="Скрыть панель"
               >
                 <ChevronRight size={14} className="text-gray-600" />
               </button>
-              
-              <div className="flex-1 overflow-y-auto overflow-x-auto ">
-                {type === 'page' && activeRightPanel === 'pageSettings' && !inlineBlockEdit.active && (
-                  <PageSettingsPanel
-                    pageId={id}
-                    settings={pageSettings}
-                    onChange={(newSettings) => {
-                      setPageSettings(newSettings)
-                      dispatch(markAsDirty())
-                    }}
-                  />
-                )}
-                
-                {/* Basic Settings Panel */}
-                {activeRightPanel === 'basicSettings' && (
-                  <BasicSettingsPanel 
-                    pageId={type === 'page' ? id : undefined}
-                  />
-                )}
-                
-                {/* Element Properties Panel */}
-                {activeRightPanel === 'elementProperties' && (
-                  <ElementPropertiesPanel />
-                )}
-                
-                {/* Positioning Panel */}
-                {activeRightPanel === 'positioning' && (
-                  <PositioningPanel />
-                )}
-                
-                {/* Colors Panel */}
-                {activeRightPanel === 'colors' && (
-                  <ColorsPanel />
-                )}
-                
-                {/* Content Panel */}
-                {activeRightPanel === 'content' && (
-                  <ContentPanel />
-                )}
-                
-                {/* States Panel */}
-                {activeRightPanel === 'states' && (
-                  <StatesPanel />
-                )}
-                
-                {/* Animations Panel */}
-                {activeRightPanel === 'animations' && (
-                  <AnimationsPanel />
-                )}
-                
-                {/* Scripts Panel */}
-                {activeRightPanel === 'scripts' && (
-                  <ScriptsPanel />
-                )}
-                
-                {/* Data Panel */}
-                {activeRightPanel === 'data' && (
-                  <DataPanel pageId={type === 'page' ? id : undefined} libraryBlockId={type === 'block' ? id : undefined} />
-                )}
-                
-                {/* Slides Panel (carousel editor) */}
-                {activeRightPanel === 'slides' && (
-                  <SlidesPanel pageId={type === 'page' ? id : undefined} />
-                )}
-                
-                {/* CSS Panel */}
-                {activeRightPanel === 'css' && (
-                  <CSSPanel />
-                )}
-                
-                {/* Translations Panel */}
-                {type === 'page' && activeRightPanel === 'translations' && id && (
-                  <TranslationPanel pageId={id} />
-                )}
-                
-                {/* Language Settings Panel */}
-                {type === 'page' && activeRightPanel === 'languageSettings' && (
+
+              {/* Настройки языков — единственный подэкран-оверлей поверх ленты
+                  (открывается из «Переводов»); всё остальное — непрерывная лента. */}
+              {type === 'page' && activeRightPanel === 'languageSettings' ? (
+                <div className="flex-1 overflow-y-auto overflow-x-auto">
                   <LanguageSettingsPanel onClose={() => dispatch(setActiveRightPanel('translations'))} />
-                )}
-                
-                {/* Version History Panel */}
-                {type === 'page' && activeRightPanel === 'versionHistory' && id && (
-                  <VersionHistoryPanel
-                    pageId={id}
-                    currentVersion={pageVersion}
-                    onRestore={async (restoredPage) => {
-                      const { loadEditor: loadEditorAction } = await import('@/features/editor/editorSlice')
-                      dispatch(loadEditorAction(restoredPage.structure))
-                      setPageVersion(restoredPage.version || pageVersion + 1)
-                      if (restoredPage.metadata) {
-                        setPageSettings(prev => ({
-                          ...prev,
-                          metaTitle: restoredPage.metadata?.title || prev.metaTitle,
-                          metaDescription: restoredPage.metadata?.description || prev.metaDescription,
-                          keywords: restoredPage.metadata?.keywords?.join(', ') || prev.keywords,
-                        }))
-                      }
-                    }}
-                    onClose={() => dispatch(setActiveRightPanel(null))}
-                  />
-                )}
-                
-                {/* Показываем панель свойств элемента (old properties with tabs - deprecated) */}
-                {activeRightPanel === 'properties' && (
-                  <RightPanel 
-                    pageSettings={type === 'page' ? pageSettings : undefined}
-                    onPageSettingsChange={type === 'page' ? setPageSettings : undefined}
-                    pageId={type === 'page' ? id : undefined}
-                    currentBlockData={type === 'block' ? currentBlockData : undefined}
-                  />
-                )}
-              </div>
+                </div>
+              ) : (
+                <div ref={rightScrollRef} className="flex-1 overflow-y-auto overflow-x-auto">
+                  {rightSections.map((s) => (
+                    <section key={s.id} data-rp={s.id} className="border-b border-gray-200 last:border-b-0">
+                      {renderRightSection(s.id)}
+                    </section>
+                  ))}
+                </div>
+              )}
             </div>
           )}
-          
-          {/* Right Sidebar with Icons */}
-          <RightSidebar mode={type} />
+
+          {/* Right Sidebar — кнопки-шорткаты к секциям ленты */}
+          <RightSidebar mode={type} activeSection={activeSection} onNavigate={scrollToSection} />
         </div>
       </div>
       
