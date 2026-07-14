@@ -35,7 +35,16 @@ export const BlockInfoSection: React.FC<BlockInfoSectionProps> = ({ node }) => {
 
     blockApi.getUsages(node.metadata.linkedBlockId)
       .then(data => {
-        if (!cancelled) setUsages(data)
+        // Бэкенд findBlockUsages отдаёт { pageId, pageName, pageSlug }, а не
+        // { type, id, name }. Нормализуем (терпим и уже-правильную форму), иначе
+        // u.id undefined → падение на u.id.slice.
+        const normalized: BlockUsage[] = (data as any[]).map((u) => ({
+          type: (u.type || 'page') as 'page' | 'block',
+          id: u.id ?? u.pageId ?? '',
+          name: u.name ?? u.pageName ?? '',
+          nodePath: u.nodePath,
+        }))
+        if (!cancelled) setUsages(normalized)
       })
       .catch(err => {
         console.error('Failed to load block usages:', err)
@@ -137,24 +146,26 @@ export const BlockInfoSection: React.FC<BlockInfoSectionProps> = ({ node }) => {
           {!usagesLoading && usages.length > 0 && (
             <ul className="space-y-1.5">
               {usages.map((u, idx) => (
-                <li key={`${u.id}-${idx}`} className="flex items-center gap-2 text-xs">
+                <li key={`${u.id ?? 'noid'}-${idx}`} className="flex items-center gap-2 text-xs">
                   {u.type === 'page' ? (
                     <FileText size={12} className="text-blue-500 flex-shrink-0" />
                   ) : (
                     <Puzzle size={12} className="text-purple-500 flex-shrink-0" />
                   )}
                   <span className="truncate text-gray-700" title={u.name}>
-                    {u.name || u.id.slice(0, 8)}
+                    {u.name || u.id?.slice(0, 8) || 'без ID'}
                   </span>
-                  <a
-                    href={u.type === 'page' ? `/pages/${u.id}` : `/blocks/${u.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ml-auto text-blue-500 hover:text-blue-700 flex-shrink-0"
-                    title="Открыть"
-                  >
-                    <ExternalLink size={11} />
-                  </a>
+                  {u.id && (
+                    <a
+                      href={u.type === 'page' ? `/pages/${u.id}` : `/blocks/${u.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-auto text-blue-500 hover:text-blue-700 flex-shrink-0"
+                      title="Открыть"
+                    >
+                      <ExternalLink size={11} />
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
