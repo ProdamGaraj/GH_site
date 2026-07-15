@@ -105,7 +105,14 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   const rightSections = visibleRightPanelSections(type)
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false)
   const [activeSection, setActiveSection] = useState<string>(rightSections[0]?.id || 'basicSettings')
-  const rightScrollRef = useRef<HTMLDivElement>(null)
+  const rightScrollRef = useRef<HTMLDivElement | null>(null)
+  // Контейнер ленты как state: он монтируется ПОЗЖЕ первого рендера (после
+  // загрузки страницы), и scroll-spy должен переподписаться на реальный DOM-узел.
+  const [rightScrollEl, setRightScrollEl] = useState<HTMLDivElement | null>(null)
+  const attachRightScroll = useCallback((el: HTMLDivElement | null) => {
+    rightScrollRef.current = el
+    setRightScrollEl(el)
+  }, [])
   // const [isLibraryOpen, setIsLibraryOpen] = useState(true)
   const [dropIndicator, setDropIndicator] = useState<DropIndicator | null>(null)
   const [targetContainerRect, setTargetContainerRect] = useState<DOMRect | null>(null)
@@ -248,8 +255,10 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
 
   // Scroll-spy: активна последняя секция, чей верх поднялся к верху контейнера.
   // Обновляем activeSection только при смене — без churn на каждый пиксель.
+  // Подписка через rightScrollEl (state), а не ref: контейнер появляется после
+  // загрузки, и слушатель должен навеситься на актуальный узел.
   useEffect(() => {
-    const root = rightScrollRef.current
+    const root = rightScrollEl
     if (rightPanelCollapsed || activeRightPanel === 'languageSettings' || !root) return
 
     let raf = 0
@@ -273,14 +282,14 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       root.removeEventListener('scroll', onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [rightPanelCollapsed, activeRightPanel, type])
+  }, [rightScrollEl, rightPanelCollapsed, activeRightPanel, type])
 
-  // Выбор элемента на канвасе → раскрыть панель и промотать к «Основным».
-  // Сохраняет прежнее поведение (selectNode авто-открывал basicSettings).
+  // Выбор элемента на канвасе → только раскрыть панель, если свёрнута.
+  // Ленту НЕ скроллим: при переключении блоков панель остаётся на месте,
+  // чтобы можно было править одну и ту же секцию у разных элементов.
   const selectedNodeId = useAppSelector((s) => s.editor.selectedNodeId)
   useEffect(() => {
-    if (selectedNodeId) scrollToSection('basicSettings')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (selectedNodeId) setRightPanelCollapsed(false)
   }, [selectedNodeId])
 
   useEffect(() => {
@@ -1169,7 +1178,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
                   <LanguageSettingsPanel onClose={() => dispatch(setActiveRightPanel('translations'))} />
                 </div>
               ) : (
-                <div ref={rightScrollRef} className="flex-1 overflow-y-auto overflow-x-auto">
+                <div ref={attachRightScroll} className="flex-1 overflow-y-auto overflow-x-auto">
                   {rightSections.map((s) => (
                     <section key={s.id} data-rp={s.id} className="border-b border-gray-200 last:border-b-0">
                       {renderRightSection(s.id)}
