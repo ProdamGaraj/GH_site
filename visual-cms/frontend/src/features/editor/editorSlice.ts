@@ -5,6 +5,7 @@ import type { RootState } from '@/app/store'
 import { blockApi, pageApi, type CreateBlockDto } from '@/shared/api'
 import { cleanForLibrary } from '@/features/editor/utils/libraryClean'
 import { findNodeInTree, normalizeLegacyRootOverrides } from '@/features/editor/utils/variationUtils'
+import { bgUrlPatch, composeBgStack } from '@/features/media/responsiveMediaMatrix.utils'
 import {
   findNodeById,
   findParentNode,
@@ -559,9 +560,13 @@ const editorSlice = createSlice({
               else delete attributes.src
               return { ...n, attributes }
             }
-            const properties = { ...(n.styles?.properties || {}) }
-            if (value) properties.backgroundImage = `url("${value}")`
-            else delete properties.backgroundImage
+            // Фон может жить в background shorthand (градиент + url у импорта) —
+            // патчим то свойство, где он задан, сохраняя градиентные слои.
+            const properties = { ...(n.styles?.properties || {}) } as Record<string, string>
+            for (const [k, v] of Object.entries(bgUrlPatch(properties, value))) {
+              if (v) properties[k] = v
+              else delete properties[k]
+            }
             return { ...n, styles: { ...n.styles, properties } }
           }
           return { ...n, children: n.children.map(applyBase) }
@@ -575,6 +580,10 @@ const editorSlice = createSlice({
       const isRoot = state.rootNode.id === nodeId
       const owner = isRoot ? state.rootNode : findParentNode(state.rootNode, nodeId)
       if (!owner) return
+
+      // Для bg-оверрайда сохраняем градиентные слои базы узла (затемнение),
+      // подменяя только картинку: пишем полный стек background-image.
+      const targetNode = findNodeInTree(state.rootNode, nodeId, null, 'base')
 
       const applyOverride = (n: BlockNode): BlockNode => {
         if (n.id === owner.id) {
@@ -590,7 +599,7 @@ const editorSlice = createSlice({
             nextOverride.attributes = attrs
           } else {
             const styles = { ...(cur.styles || {}) }
-            if (value) styles.backgroundImage = `url("${value}")`
+            if (value) styles.backgroundImage = composeBgStack(targetNode?.styles?.properties, value)
             else delete styles.backgroundImage
             nextOverride.styles = styles
           }

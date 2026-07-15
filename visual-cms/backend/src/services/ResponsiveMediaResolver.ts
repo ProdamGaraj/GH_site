@@ -25,7 +25,8 @@
  * Чистый модуль: без БД и окружения — всё для юнит-тестов.
  */
 import type { BlockNode, BreakpointDef } from '../types/blockNode'
-import { parseCssUrl, toCssUrl, BG_IMAGE_FIELD } from './TranslationService'
+import { BG_IMAGE_FIELD } from './TranslationService'
+import { composeBgStack } from './cssBackground'
 import { breakpointRangeMap } from './breakpointRanges'
 
 const SRC_FIELD = 'src'
@@ -216,7 +217,9 @@ export function resolveResponsiveMedia(
           localeOverridden,
           breakpoints,
           (bpId) => byBp?.get(bpId)?.bg,
-          (raw) => toCssUrl(raw), // перевод bg:image хранит голый URL → оборачиваем
+          // Перевод bg:image хранит голый URL → полный стек с градиентами базы
+          // (фон в background shorthand у импорта: затемнение сохраняем).
+          (raw) => composeBgStack(node.styles?.properties, raw),
           mediaOf,
         )
         if (bg.length > 0) nodePlan.bg = bg

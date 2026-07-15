@@ -4,21 +4,8 @@ import { updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
 import { ColorPicker } from '@/shared/components/ColorPicker'
 import { ImageUpload } from './ImageUpload'
+import { extractBgUrl, bgUrlPatch } from '@/features/media/responsiveMediaMatrix.utils'
 import type { BlockNode } from '@/shared/types'
-
-/** Strip CSS `url("...")` wrapper, return bare URL. */
-function unwrapCssUrl(raw: string): string {
-  if (!raw) return ''
-  const m = raw.match(/^\s*url\((['"]?)(.+?)\1\)\s*$/i)
-  return m ? m[2] : raw
-}
-
-/** Wrap bare URL into CSS `url("...")` form. Empty → ''. */
-function wrapCssUrl(url: string): string {
-  if (!url) return ''
-  if (/^\s*url\(/i.test(url)) return url
-  return `url("${url}")`
-}
 
 interface ColorsTabProps {
   node: BlockNode
@@ -53,8 +40,16 @@ export const ColorsTab: React.FC<ColorsTabProps> = ({ node }) => {
           </div>
           <ImageUpload
             label="Фоновое изображение"
-            value={unwrapCssUrl(node.styles.properties?.backgroundImage || '')}
-            onChange={(url) => handleStyleChange('backgroundImage', wrapCssUrl(url))}
+            value={extractBgUrl(node.styles.properties) || ''}
+            onChange={(url) => {
+              // Фон может жить в background shorthand (градиент + url, импорт) —
+              // патчим то свойство, где он реально задан, сохраняя градиенты.
+              dispatch(updateNodeStyles({
+                nodeId: node.id,
+                properties: bgUrlPatch(node.styles.properties, url),
+                breakpoint: viewport,
+              }))
+            }}
             placeholder="https://example.com/image.jpg"
             kind="image"
           />

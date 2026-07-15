@@ -5,7 +5,7 @@ import { saveTranslation, deleteTranslation, updateTranslationLocally } from '@/
 import { MediaPicker } from '@/features/media/MediaPicker'
 import { Image as ImageIcon, X, Monitor } from 'lucide-react'
 import type { BlockNode } from '@/shared/types'
-import { parseCssUrl, translationField, findOverride, type MediaSlot } from './responsiveMediaMatrix.utils'
+import { firstCssUrl, extractBgUrl, translationField, findOverride, type MediaSlot } from './responsiveMediaMatrix.utils'
 
 /**
  * Матрица адаптивного медиа «экран × язык» для выбранного узла.
@@ -76,15 +76,16 @@ export const ResponsiveMediaMatrix: React.FC<ResponsiveMediaMatrixProps> = ({
     [breakpoints],
   )
 
-  // Значение ячейки базового языка (голый URL).
+  // Значение ячейки базового языка (голый URL). Фон видим и в background
+  // shorthand (градиент + url у импортированных страниц), и в стеке override.
   const baseValue = (bpId: string | null): string => {
     if (bpId === null) {
       return slot === 'src'
         ? node.attributes?.src || ''
-        : parseCssUrl(node.styles?.properties?.backgroundImage) || ''
+        : extractBgUrl(node.styles?.properties) || ''
     }
     const ov = findOverride(rootNode, node.id, bpId)
-    return slot === 'src' ? ov?.attributes?.src || '' : parseCssUrl(ov?.styles?.backgroundImage) || ''
+    return slot === 'src' ? ov?.attributes?.src || '' : firstCssUrl(ov?.styles?.backgroundImage) || ''
   }
 
   // Значение ячейки активного языка (голый URL).

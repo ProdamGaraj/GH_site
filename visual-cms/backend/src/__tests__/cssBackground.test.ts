@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest'
+/**
+ * Хелперы многослойных фонов: поиск/замена url-слоя в background shorthand
+ * и стеке background-image с сохранением градиентов (затемнения).
+ */
 import {
-  parseCssUrl,
-  translationField,
-  findOverride,
   firstCssUrl,
   splitCssLayers,
   replaceCssUrl,
@@ -10,34 +10,14 @@ import {
   extractBgUrl,
   bgUrlPatch,
   composeBgStack,
-} from './responsiveMediaMatrix.utils'
-import type { BlockNode } from '@/shared/types'
+} from '../services/cssBackground'
+import { applyTranslationsToTree } from '../services/TranslationService'
+import { resolveResponsiveMedia } from '../services/ResponsiveMediaResolver'
+import type { BlockNode, BreakpointDef } from '../types/blockNode'
 
 // Реальный кейс: фон импортированного hero — градиент + url в background shorthand.
 const HERO_BG =
   'linear-gradient(90deg, rgba(13,15,18,.74), rgba(13,15,18,.2) 58%, rgba(13,15,18,.55)), url("https://img.example/office.jpg") center / cover'
-
-describe('parseCssUrl', () => {
-  it('извлекает URL из url("…")/url(\'…\')/url(…)', () => {
-    expect(parseCssUrl('url("/a.png")')).toBe('/a.png')
-    expect(parseCssUrl("url('/b.png')")).toBe('/b.png')
-    expect(parseCssUrl('url(/c.png)')).toBe('/c.png')
-  })
-  it('null для градиентов и мусора', () => {
-    expect(parseCssUrl('linear-gradient(#000,#fff)')).toBeNull()
-    expect(parseCssUrl(undefined)).toBeNull()
-    expect(parseCssUrl('')).toBeNull()
-  })
-})
-
-describe('translationField', () => {
-  it('кодирует слот и брейкпоинт', () => {
-    expect(translationField('src', null)).toBe('src')
-    expect(translationField('src', 'tablet')).toBe('src@tablet')
-    expect(translationField('bg', null)).toBe('bg:image')
-    expect(translationField('bg', 'mobile')).toBe('bg:image@mobile')
-  })
-})
 
 describe('firstCssUrl / splitCssLayers', () => {
   it('находит url внутри многослойного значения', () => {
@@ -46,7 +26,7 @@ describe('firstCssUrl / splitCssLayers', () => {
     expect(firstCssUrl('linear-gradient(#000,#fff)')).toBeNull()
     expect(firstCssUrl(undefined)).toBeNull()
   })
-  it('режет по запятым верхнего уровня, не трогая запятые в скобках', () => {
+  it('режет по запятым верхнего уровня', () => {
     const layers = splitCssLayers(HERO_BG)
     expect(layers).toHaveLength(2)
     expect(layers[0]).toContain('linear-gradient')
@@ -69,7 +49,7 @@ describe('replaceCssUrl / removeUrlLayers', () => {
   })
 })
 
-describe('extractBgUrl / bgUrlPatch', () => {
+describe('extractBgUrl / bgUrlPatch / composeBgStack', () => {
   it('видит фон и в backgroundImage, и в background shorthand', () => {
     expect(extractBgUrl({ backgroundImage: 'url("/a.png")' })).toBe('/a.png')
     expect(extractBgUrl({ background: HERO_BG })).toBe('https://img.example/office.jpg')
@@ -85,41 +65,46 @@ describe('extractBgUrl / bgUrlPatch', () => {
     })
     expect(bgUrlPatch({}, '/new.jpg')).toEqual({ backgroundImage: 'url("/new.jpg")' })
   })
-  it('очистка: удаляет url-слой, пустое значение = удалить свойство', () => {
-    expect(bgUrlPatch({ background: HERO_BG }, '').background).not.toContain('url(')
-    expect(bgUrlPatch({ backgroundImage: 'url("/a.png")' }, '')).toEqual({ backgroundImage: '' })
-    expect(bgUrlPatch({}, '')).toEqual({ backgroundImage: '' })
-  })
-})
-
-describe('composeBgStack', () => {
-  it('градиенты базы + новый url (затемнение сохраняется)', () => {
-    const stack = composeBgStack({ background: HERO_BG }, '/new.jpg')
-    expect(stack).toBe(
+  it('стек для override: градиенты базы + новый url', () => {
+    expect(composeBgStack({ background: HERO_BG }, '/new.jpg')).toBe(
       'linear-gradient(90deg, rgba(13,15,18,.74), rgba(13,15,18,.2) 58%, rgba(13,15,18,.55)), url("/new.jpg")',
     )
-  })
-  it('без градиентов — просто url', () => {
     expect(composeBgStack({ backgroundImage: 'url("/a.png")' }, '/new.jpg')).toBe('url("/new.jpg")')
     expect(composeBgStack(undefined, '/new.jpg')).toBe('url("/new.jpg")')
   })
 })
 
-describe('findOverride', () => {
-  const root = {
-    id: 'root',
-    tagName: 'div',
-    children: [{ id: 'img1', tagName: 'img', attributes: { src: '/base.jpg' }, children: [] }],
-    variations: {
-      mobile: { inheritedOverrides: { img1: { attributes: { src: '/m.jpg' } } } },
-    },
-  } as unknown as BlockNode
+describe('интеграция: фон в background shorthand', () => {
+  const heroNode = (): BlockNode =>
+    ({
+      id: 'hero',
+      tagName: 'article',
+      elementType: 'container',
+      attributes: {},
+      styles: { properties: { background: HERO_BG } },
+      children: [],
+    }) as unknown as BlockNode
 
-  it('находит оверрайд потомка в variations предка', () => {
-    expect(findOverride(root, 'img1', 'mobile')?.attributes?.src).toBe('/m.jpg')
+  it('applyTranslations: перевод bg:image подменяет url внутри shorthand, градиент цел', () => {
+    const structure = { id: 'root', tagName: 'div', children: [heroNode()], styles: { properties: {} }, attributes: {} }
+    const { structure: result } = applyTranslationsToTree(structure, { hero: { 'bg:image': '/media/loc.jpg' } })
+    const hero = result.children[0]
+    expect(hero.styles.properties.background).toContain('url("/media/loc.jpg")')
+    expect(hero.styles.properties.background).toContain('linear-gradient(90deg')
+    expect(hero.styles.properties.backgroundImage).toBeUndefined()
   })
-  it('null если нет оверрайда / нет дерева', () => {
-    expect(findOverride(root, 'img1', 'tablet')).toBeNull()
-    expect(findOverride(null, 'img1', 'mobile')).toBeNull()
+
+  it('resolver: языковая ячейка bg:image@bp даёт стек «градиент + url»', () => {
+    const breakpoints: BreakpointDef[] = [{ id: 'mobile', name: 'Mobile', width: 767 }]
+    const plan = resolveResponsiveMedia(
+      heroNode(),
+      { hero: { 'bg:image@mobile': '/media/m.jpg' } },
+      breakpoints,
+    )
+    const bg = plan.get('hero')?.bg
+    expect(bg).toHaveLength(1)
+    expect(bg![0].value).toBe(
+      'linear-gradient(90deg, rgba(13,15,18,.74), rgba(13,15,18,.2) 58%, rgba(13,15,18,.55)), url("/media/m.jpg")',
+    )
   })
 })

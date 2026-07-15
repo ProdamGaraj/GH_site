@@ -10,6 +10,7 @@ import { In } from 'typeorm'
 import { AppDataSource } from '../config/database'
 import { Translation } from '../models/Translation'
 import { Page } from '../models/Page'
+import { extractBgUrl, bgUrlPatch } from './cssBackground'
 
 export interface TranslationEntry {
   nodeId: string
@@ -114,7 +115,8 @@ export function extractTranslatableFields(node: any): TranslationEntry[] {
   }
 
   // CSS background-image (фото-слайды карусели + любые фоны) — локализуем «голый» URL.
-  const bgUrl = parseCssUrl(node.styles?.properties?.backgroundImage)
+  // Фон видим и в background shorthand (градиент + url у импортированных страниц).
+  const bgUrl = extractBgUrl(node.styles?.properties)
   if (bgUrl) {
     entries.push({ nodeId, field: BG_IMAGE_FIELD, value: bgUrl })
   }
@@ -164,11 +166,16 @@ export function applyNodeTranslations(node: any, map: TranslationMap): any {
       }
     }
 
-    // CSS background-image — оборачиваем «голый» URL обратно в url("…").
+    // CSS background-image — подменяем url там, где фон реально живёт
+    // (backgroundImage или background shorthand), сохраняя градиентные слои.
     if (nodeTranslations[BG_IMAGE_FIELD]) {
       if (!node.styles) node.styles = { properties: {} }
       if (!node.styles.properties) node.styles.properties = {}
-      node.styles.properties.backgroundImage = toCssUrl(nodeTranslations[BG_IMAGE_FIELD])
+      const patch = bgUrlPatch(node.styles.properties, nodeTranslations[BG_IMAGE_FIELD])
+      for (const [k, v] of Object.entries(patch)) {
+        if (v) node.styles.properties[k] = v
+        else delete node.styles.properties[k]
+      }
     }
   }
 

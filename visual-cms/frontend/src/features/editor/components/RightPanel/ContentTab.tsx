@@ -6,6 +6,7 @@ import { updateNode, updateNodeStyles, selectViewport } from '@/features/editor/
 import { Input } from '@/shared/components/Input'
 import { ImageUpload } from './ImageUpload'
 import { MediaLanguageSection } from '@/features/media/MediaLanguageSection'
+import { extractBgUrl } from '@/features/media/responsiveMediaMatrix.utils'
 import { resolveMediaUrl, type MediaAsset } from '@/shared/api/mediaApi'
 import { LinkSettings } from './LinkSettings'
 import { AttributesEditor } from './AttributesEditor'
@@ -100,7 +101,7 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
     isImageElement ||
     isVideoElement ||
     node.elementType === 'image' ||
-    !!node.styles?.properties?.backgroundImage ||
+    !!extractBgUrl(node.styles?.properties) ||
     !!node.attributes?.['data-slide-video']
 
   // Local state for HTML code editor with debounced save
