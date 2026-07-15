@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Trash2, Copy, ChevronDown, ChevronRight, Image as ImageIcon, Monitor, X } from 'lucide-react'
+import { GripVertical, Trash2, Copy, ChevronDown, ChevronRight, Image as ImageIcon, Monitor, X, Languages } from 'lucide-react'
 import { Input } from '@/shared/components/Input'
 import { Button } from '@/shared/components/Button'
 import {
@@ -25,6 +25,25 @@ interface SlideBreakpoint {
   width: number
 }
 
+/**
+ * Контекст языкового варианта media-полей слайда (repeat-карусель).
+ * Переводы живут как pagevar-переводы страницы: nodeId="pagevar:<var>",
+ * field="media:<index>:<sourceField>" — привязаны к ИНДЕКСУ слайда в массиве.
+ */
+export interface SlideLangContext {
+  /** Подпись активного языка (флаг + название). */
+  label: string
+  read: (sourceField: string) => string
+  /** Локальное (optimistic) обновление значения перевода. */
+  write: (sourceField: string, value: string) => void
+  /** Сохранить (или удалить при пустом значении) перевод — на blur/очистку. */
+  commit: (sourceField: string, value: string) => void
+  /** Открыть MediaPicker для языкового варианта поля. */
+  pick: (sourceField: string) => void
+  /** Если задано — редактирование заблокировано (например, слайды не сохранены). */
+  disabledReason?: string
+}
+
 interface GenericSlideRowProps {
   slide: Record<string, unknown>
   index: number
@@ -38,6 +57,8 @@ interface GenericSlideRowProps {
   onPickMedia: (sourceField: string, bpId?: string) => void
   /** Брейкпоинты для адаптива медиа слайда (по убыванию ширины). */
   breakpoints?: SlideBreakpoint[]
+  /** Языковой вариант media-полей (активный не-дефолтный язык страницы). */
+  lang?: SlideLangContext
 }
 
 /**
@@ -56,9 +77,12 @@ export const GenericSlideRow: React.FC<GenericSlideRowProps> = ({
   onDuplicate,
   onPickMedia,
   breakpoints = [],
+  lang,
 }) => {
   // Раскрытие адаптив-блока по полю (какие media-поля показывают пер-брейкпоинт варианты).
   const [rmOpen, setRmOpen] = useState<Record<string, boolean>>({})
+  // Раскрытие блока языкового варианта по полю.
+  const [langOpen, setLangOpen] = useState<Record<string, boolean>>({})
   const sortedBps = [...breakpoints].sort((a, b) => b.width - a.width)
   const id = String((slide._id as string | undefined) ?? `slide-${index}`)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
@@ -146,6 +170,8 @@ export const GenericSlideRow: React.FC<GenericSlideRowProps> = ({
             if (field.kind === 'media') {
               const rmCount = countSlideResponsive(slide, field.sourceField)
               const isRmOpen = !!rmOpen[field.sourceField]
+              const isLangOpen = !!langOpen[field.sourceField]
+              const langValue = lang ? lang.read(field.sourceField) : ''
               return (
                 <div key={field.sourceField} style={{ opacity: isSlideFieldVisible(slide, field.sourceField) ? 1 : 0.5 }}>
                   <FieldHeader field={field} />
@@ -215,6 +241,57 @@ export const GenericSlideRow: React.FC<GenericSlideRowProps> = ({
                             )
                           })}
                         </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Языковой вариант медиа (pagevar-перевод по индексу слайда) */}
+                  {lang && (
+                    <div className="mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setLangOpen(prev => ({ ...prev, [field.sourceField]: !prev[field.sourceField] }))}
+                        className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-blue-600 transition-colors"
+                      >
+                        <Languages size={11} />
+                        Вариант · {lang.label}{langValue ? ' · 1' : ''}
+                        {isLangOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                      </button>
+                      {isLangOpen && (
+                        lang.disabledReason ? (
+                          <p className="mt-1 pl-4 text-[10px] text-amber-600">{lang.disabledReason}</p>
+                        ) : (
+                          <div className="mt-1 pl-4 border-l border-gray-100 flex items-center gap-1">
+                            <Input
+                              value={langValue}
+                              onChange={e => lang.write(field.sourceField, e.target.value)}
+                              onBlur={e => lang.commit(field.sourceField, e.target.value.trim())}
+                              placeholder="как базовый"
+                              className="flex-1 !h-7 !text-[11px]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => lang.pick(field.sourceField)}
+                              title="Выбрать из медиатеки"
+                              className="shrink-0 p-1 rounded border border-gray-200 text-gray-500 hover:text-blue-600 hover:border-blue-300"
+                            >
+                              <ImageIcon size={12} />
+                            </button>
+                            {langValue && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  lang.write(field.sourceField, '')
+                                  lang.commit(field.sourceField, '')
+                                }}
+                                title="Убрать языковой вариант"
+                                className="shrink-0 p-1 rounded text-gray-300 hover:text-red-500"
+                              >
+                                <X size={12} />
+                              </button>
+                            )}
+                          </div>
+                        )
                       )}
                     </div>
                   )}

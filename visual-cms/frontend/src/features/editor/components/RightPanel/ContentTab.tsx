@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { updateNode, updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
 import { Input } from '@/shared/components/Input'
 import { ImageUpload } from './ImageUpload'
+import { MediaLanguageSection } from '@/features/media/MediaLanguageSection'
 import { resolveMediaUrl, type MediaAsset } from '@/shared/api/mediaApi'
 import { LinkSettings } from './LinkSettings'
 import { AttributesEditor } from './AttributesEditor'
@@ -93,6 +94,14 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
   const isVideoElement = node.tagName === 'video'
   const isIframeElement = node.tagName === 'iframe'
   const isHtmlCodeElement = node.elementType === 'html-code'
+  // Узел с медиа: для него показываем «Языки и экраны» (варианты медиа по
+  // языкам/брейкпоинтам) прямо здесь — рядом с выбором исходного файла.
+  const isMediaNode =
+    isImageElement ||
+    isVideoElement ||
+    node.elementType === 'image' ||
+    !!node.styles?.properties?.backgroundImage ||
+    !!node.attributes?.['data-slide-video']
 
   // Local state for HTML code editor with debounced save
   const [htmlCode, setHtmlCode] = useState(node.content || '')
@@ -508,6 +517,14 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Медиа по языкам и экранам — здесь же, где выбирается исходный файл */}
+      {isMediaNode && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-gray-700">Языки и экраны</h4>
+          <MediaLanguageSection node={node} pageId={pageId} />
         </div>
       )}
 

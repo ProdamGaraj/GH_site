@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { configureStore } from '@reduxjs/toolkit'
+import type { AppDispatch } from '@/app/store'
 
 // Мокаем API до импорта слайса (editorSlice импортирует blockApi/pageApi).
 const createMock = vi.fn()
@@ -14,6 +15,11 @@ import type { BlockNode } from '@/shared/types'
 
 const makeStore = () => configureStore({ reducer: { editor: editorReducer } })
 
+// Thunk типизирован полным RootState приложения, тестовый store содержит только
+// editor-слайс — приводим dispatch (рантайм идентичен, thunk читает лишь editor).
+const thunkDispatch = (store: ReturnType<typeof makeStore>) =>
+  store.dispatch as unknown as AppDispatch
+
 const node = (overrides: Partial<BlockNode> = {}): BlockNode =>
   ({
     id: 'n1',
@@ -23,7 +29,7 @@ const node = (overrides: Partial<BlockNode> = {}): BlockNode =>
     styles: { properties: {} },
     attributes: {},
     metadata: { name: 'Промо' },
-    children: [{ id: 'c1', tagName: 'p', content: 'текст', children: [], styles: { properties: {} }, attributes: {}, metadata: {} } as BlockNode],
+    children: [{ id: 'c1', tagName: 'p', elementType: 'text', content: 'текст', children: [], styles: { properties: {} }, attributes: {}, metadata: {} } as BlockNode],
     ...overrides,
   }) as BlockNode
 
@@ -51,7 +57,7 @@ describe('convertNodeToLinkedBlock', () => {
     const store = makeStore()
     store.dispatch(loadRootNode(root(node())))
 
-    const res = await store.dispatch(convertNodeToLinkedBlock({ nodeId: 'n1', pageId: 'page-1' })).unwrap()
+    const res = await thunkDispatch(store)(convertNodeToLinkedBlock({ nodeId: 'n1', pageId: 'page-1' })).unwrap()
 
     expect(res).toEqual({ blockId: 'lib-new', created: true })
     // блок создан из структуры узла, имя сохранено
@@ -75,7 +81,7 @@ describe('convertNodeToLinkedBlock', () => {
     const n = node({ metadata: { name: 'Промо', styleOverrides: { x: 1 } } as any })
     store.dispatch(loadRootNode(root(n)))
 
-    await store.dispatch(convertNodeToLinkedBlock({ nodeId: 'n1', pageId: 'page-1' })).unwrap()
+    await thunkDispatch(store)(convertNodeToLinkedBlock({ nodeId: 'n1', pageId: 'page-1' })).unwrap()
 
     const created = createMock.mock.calls[0][0]
     expect(created.structure.metadata.linkedBlockId).toBeUndefined()
@@ -86,7 +92,7 @@ describe('convertNodeToLinkedBlock', () => {
     const store = makeStore()
     store.dispatch(loadRootNode(root(node({ metadata: { name: 'Промо', linkedBlockId: 'lib-existing' } }))))
 
-    const res = await store.dispatch(convertNodeToLinkedBlock({ nodeId: 'n1', pageId: 'page-1' })).unwrap()
+    const res = await thunkDispatch(store)(convertNodeToLinkedBlock({ nodeId: 'n1', pageId: 'page-1' })).unwrap()
 
     expect(res).toEqual({ blockId: 'lib-existing', created: false })
     expect(createMock).not.toHaveBeenCalled()
@@ -98,7 +104,7 @@ describe('convertNodeToLinkedBlock', () => {
     store.dispatch(loadRootNode(root(node())))
 
     await expect(
-      store.dispatch(convertNodeToLinkedBlock({ nodeId: 'n1', pageId: undefined })).unwrap()
+      thunkDispatch(store)(convertNodeToLinkedBlock({ nodeId: 'n1', pageId: undefined })).unwrap()
     ).rejects.toThrow(/сохраните страницу/i)
     expect(createMock).not.toHaveBeenCalled()
   })
@@ -108,7 +114,7 @@ describe('convertNodeToLinkedBlock', () => {
     store.dispatch(loadRootNode(root(node())))
 
     await expect(
-      store.dispatch(convertNodeToLinkedBlock({ nodeId: 'missing', pageId: 'page-1' })).unwrap()
+      thunkDispatch(store)(convertNodeToLinkedBlock({ nodeId: 'missing', pageId: 'page-1' })).unwrap()
     ).rejects.toThrow(/узел не найден/i)
     expect(createMock).not.toHaveBeenCalled()
   })

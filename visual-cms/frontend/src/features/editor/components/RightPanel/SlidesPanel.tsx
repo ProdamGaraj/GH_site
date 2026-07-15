@@ -26,9 +26,15 @@ import {
   arrayMove,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { Plus, Upload } from 'lucide-react'
+import { Plus, Upload, Languages } from 'lucide-react'
 import { Button } from '@/shared/components/Button'
 import { pageApi, type PageVariable, type PageVariablesEnvelope } from '@/shared/api'
+import { usePageTranslations } from '@/features/translations/usePageTranslations'
+import {
+  saveTranslation,
+  deleteTranslation,
+  updateTranslationLocally,
+} from '@/features/translations/translationsSlice'
 import { MediaPicker } from '@/features/media/MediaPicker'
 import type { MediaAsset } from '@/shared/api/mediaApi'
 import { buildMediaSlideNode } from '@/features/editor/utils/slideMediaHelper'
@@ -199,9 +205,9 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
   const [error, setError] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  // Контекст MediaPicker: {slideId, sourceField, bpId?} — какое поле какого слайда правим
-  // (bpId — для пер-брейкпоинтного адаптив-варианта).
-  const [pickerCtx, setPickerCtx] = useState<{ slideId: string; sourceField: string; bpId?: string } | null>(null)
+  // Контекст MediaPicker: {slideId, sourceField, bpId?, lang?} — какое поле какого слайда правим
+  // (bpId — пер-брейкпоинтный адаптив-вариант; lang — языковой вариант-перевод).
+  const [pickerCtx, setPickerCtx] = useState<{ slideId: string; sourceField: string; bpId?: string; lang?: boolean } | null>(null)
   const [staticPickerOpen, setStaticPickerOpen] = useState(false)
   // Отдельный MediaPicker для добавления слайда-фотографии (только картинка во весь слайд).
   const [photoPickerOpen, setPhotoPickerOpen] = useState(false)
@@ -215,6 +221,14 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
     () => getMapperSchema(binding?.config?.inputConfig?.fieldMappings),
     [binding]
   )
+
+  // Языковые варианты медиа слайдов — pagevar-переводы страницы
+  // (nodeId="pagevar:<var>", field="media:<index>:<sourceField>").
+  const { isPage, nonDefaultLangs, activeLocale, activeLang, translationMap, setLocale } =
+    usePageTranslations(pageId)
+  const localeEnabled = isPage && nonDefaultLangs.length > 0
+  const effectiveLocale = localeEnabled ? activeLocale : null
+  const varNodeId = `pagevar:${variableName}`
 
   // Подгружаем data-settings + siteId при открытии панели на карусель-узле.
   // Только для repeat-режима (static-режим не работает с page-variables).
@@ -312,7 +326,7 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
           <h3 className="font-semibold text-gray-900">Слайды карусели</h3>
           <p className="text-xs text-gray-500">Управляются как обычные блоки в треке.</p>
         </div>
-        <StaticSlidesPanel track={track} />
+        <StaticSlidesPanel track={track} pageId={pageId} />
         <CarouselAutoplaySection carouselRoot={node} />
         <CarouselControlsPicker carouselRoot={node} />
         <CarouselOverlaysSection carouselRoot={node} />
@@ -570,6 +584,26 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
 
       {binding && schema.length > 0 && (
         <>
+          {/* Языковые варианты медиа слайдов — вместо панели «Переводы» */}
+          {localeEnabled && (
+            <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded">
+              <Languages size={12} className="text-blue-600 shrink-0" />
+              <span className="text-[10px] font-semibold text-gray-500 uppercase">Медиа · язык</span>
+              <select
+                value={activeLocale || ''}
+                onChange={e => setLocale(e.target.value || null)}
+                className="ml-auto px-2 py-0.5 text-xs border border-gray-300 rounded bg-white text-gray-800"
+              >
+                <option value="">— базовый —</option>
+                {nonDefaultLangs.map(l => (
+                  <option key={l.code} value={l.code}>
+                    {l.flag || '🌐'} {l.nativeName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext
               items={[
@@ -593,6 +627,29 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
                 ))}
                 {slides.map((s, i) => {
                   const id = s._id as string
+                  // Перевод привязан к ИНДЕКСУ слайда в массиве переменной (i),
+                  // не к display-индексу со static-слайдами.
+                  const lang = effectiveLocale
+                    ? {
+                        label: `${activeLang?.flag || '🌐'} ${activeLang?.nativeName || effectiveLocale}`,
+                        read: (sf: string) => translationMap[varNodeId]?.[`media:${i}:${sf}`] || '',
+                        write: (sf: string, value: string) =>
+                          dispatch(updateTranslationLocally({ nodeId: varNodeId, field: `media:${i}:${sf}`, value })),
+                        commit: (sf: string, value: string) => {
+                          const field = `media:${i}:${sf}`
+                          if (value) {
+                            dispatch(saveTranslation({ pageId, locale: effectiveLocale, nodeId: varNodeId, field, value }))
+                          } else {
+                            dispatch(deleteTranslation({ pageId, locale: effectiveLocale, nodeId: varNodeId, field }))
+                          }
+                        },
+                        pick: (sf: string) => setPickerCtx({ slideId: id, sourceField: sf, lang: true }),
+                        // Индексная привязка: пока порядок/состав не сохранён, правка опасна.
+                        disabledReason: dirty
+                          ? 'Сначала сохраните слайды — языковой вариант привязан к номеру слайда.'
+                          : undefined,
+                      }
+                    : undefined
                   return (
                     <GenericSlideRow
                       key={id}
@@ -606,6 +663,7 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
                       onDuplicate={() => duplicateSlide(id)}
                       onPickMedia={(sourceField, bpId) => setPickerCtx({ slideId: id, sourceField, bpId })}
                       breakpoints={breakpoints}
+                      lang={lang}
                     />
                   )
                 })}
@@ -671,6 +729,17 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
         title="Выберите медиафайл"
         onClose={() => setPickerCtx(null)}
         onSelect={asset => {
+          if (pickerCtx?.lang) {
+            // Языковой вариант — пишем перевод pagevar, не сам слайд.
+            const idx = slides.findIndex(s => s._id === pickerCtx.slideId)
+            if (idx !== -1 && effectiveLocale) {
+              const field = `media:${idx}:${pickerCtx.sourceField}`
+              dispatch(updateTranslationLocally({ nodeId: varNodeId, field, value: asset.url }))
+              dispatch(saveTranslation({ pageId, locale: effectiveLocale, nodeId: varNodeId, field, value: asset.url }))
+            }
+            setPickerCtx(null)
+            return
+          }
           if (pickerCtx) {
             const target = slides.find(s => s._id === pickerCtx.slideId)
             if (target) {

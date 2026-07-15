@@ -23,9 +23,10 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Link2, Trash2, Copy, Plus, MousePointerClick, Film, Upload } from 'lucide-react'
+import { GripVertical, Link2, Trash2, Copy, Plus, MousePointerClick, Film, Upload, Languages } from 'lucide-react'
 import { Button } from '@/shared/components/Button'
 import { MediaPicker } from '@/features/media/MediaPicker'
+import { MediaLanguageSection } from '@/features/media/MediaLanguageSection'
 import type { MediaAsset } from '@/shared/api/mediaApi'
 import type { BlockNode, Block } from '@/shared/types'
 import { generateId } from '@/shared/utils'
@@ -45,6 +46,8 @@ import {
 interface StaticSlidesPanelProps {
   /** Track-узел карусели — его children и есть слайды. */
   track: BlockNode
+  /** id страницы — для языковых вариантов медиа слайдов (в блоке отсутствует). */
+  pageId?: string
 }
 
 /**
@@ -54,7 +57,7 @@ interface StaticSlidesPanelProps {
  * перестановка drag-n-drop, удаление, дублирование. Сами слайды редактируются
  * как обычные ноды через основной редактор (клик "→" выделяет в дереве).
  */
-export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) => {
+export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track, pageId }) => {
   const dispatch = useAppDispatch()
   const selected = useAppSelector(selectSelectedNode)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -200,6 +203,7 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track }) =
                 index={i}
                 selected={slide.id === selected?.id}
                 videoUrl={slide.attributes?.['data-slide-video'] || ''}
+                pageId={pageId}
                 onSelect={() => handleSelect(slide)}
                 onDelete={() => handleDelete(slide)}
                 onDuplicate={() => handleDuplicate(slide, i)}
@@ -261,6 +265,7 @@ interface SlideRowProps {
   index: number
   selected: boolean
   videoUrl: string
+  pageId?: string
   onSelect: () => void
   onDelete: () => void
   onDuplicate: () => void
@@ -272,6 +277,7 @@ const SlideRow: React.FC<SlideRowProps> = ({
   index,
   selected,
   videoUrl,
+  pageId,
   onSelect,
   onDelete,
   onDuplicate,
@@ -290,6 +296,7 @@ const SlideRow: React.FC<SlideRowProps> = ({
   const childCount = slide.children?.length ?? 0
   const hasVideo = !!videoUrl
   const [showVideo, setShowVideo] = useState(hasVideo)
+  const [showLang, setShowLang] = useState(false)
   const [videoDraft, setVideoDraft] = useState(videoUrl)
 
   // Синхронизируем черновик при внешней смене значения (дубликат/переключение).
@@ -343,6 +350,14 @@ const SlideRow: React.FC<SlideRowProps> = ({
         >
           <Film size={13} className={hasVideo ? 'text-purple-600' : 'text-gray-400'} />
         </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowLang((v) => !v)}
+          title="Медиа слайда по языкам и экранам"
+        >
+          <Languages size={13} className={showLang ? 'text-blue-600' : 'text-gray-400'} />
+        </Button>
         <Button variant="ghost" size="sm" onClick={onDuplicate} title="Дублировать">
           <Copy size={13} />
         </Button>
@@ -379,6 +394,13 @@ const SlideRow: React.FC<SlideRowProps> = ({
               <Trash2 size={12} className="text-red-500" />
             </button>
           )}
+        </div>
+      )}
+
+      {/* Медиа слайда по языкам/экранам (фон + видео) — здесь, а не в «Переводах» */}
+      {showLang && (
+        <div className="px-2 pb-2">
+          <MediaLanguageSection node={slide} pageId={pageId} />
         </div>
       )}
     </div>

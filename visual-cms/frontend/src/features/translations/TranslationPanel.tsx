@@ -25,8 +25,7 @@ import {
   selectTranslationsIoBusy,
   selectTranslationImportReport,
 } from './translationsSlice'
-import { selectRootNode, selectSelectedNode, setActiveRightPanel, updateNode, selectBreakpoints } from '@/features/editor/editorSlice'
-import { ResponsiveMediaMatrix } from '@/features/media/ResponsiveMediaMatrix'
+import { selectRootNode, selectSelectedNode, setActiveRightPanel, updateNode } from '@/features/editor/editorSlice'
 import { Button } from '@/shared/components/Button'
 import {
   Globe, ChevronDown, Check, Search, Image, Type, Link,
@@ -35,8 +34,6 @@ import {
   Download, Upload, AlertTriangle
 } from 'lucide-react'
 import type { TranslationEntry } from '@/shared/types/translation'
-import { MediaPicker } from '@/features/media/MediaPicker'
-import type { MediaKind } from '@/shared/api/mediaApi'
 import { pageApi } from '@/shared/api'
 
 // --- Language Binding types ---
@@ -128,12 +125,6 @@ function getFieldCategory(field: string): FieldCategory {
   if (field.startsWith('meta:')) return 'meta'
   if (field.startsWith(VAR_MEDIA_PREFIX) || MEDIA_FIELDS.includes(field)) return 'media'
   return 'text'
-}
-
-/** Тип медиатеки для пикера по полю: видео-слайд/src/переменная — любой файл, остальное — картинка. */
-function mediaKindForField(field: string): MediaKind | 'any' {
-  if (field.startsWith(VAR_MEDIA_PREFIX) || field === 'data-slide-video' || field === 'src') return 'any'
-  return 'image'
 }
 
 /** camelCase → "Camel Case" для подписи поля слайда. */
@@ -384,7 +375,6 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
   const progress = useAppSelector(selectTranslationProgress)
   const selectedNode = useAppSelector(selectSelectedNode)
   const rootNode = useAppSelector(selectRootNode)
-  const breakpoints = useAppSelector(selectBreakpoints)
   const ioBusy = useAppSelector(selectTranslationsIoBusy)
   const importReport = useAppSelector(selectTranslationImportReport)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
@@ -394,10 +384,8 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
   const [showOnlySelected, setShowOnlySelected] = useState(false)
   const [editedValues, setEditedValues] = useState<Record<string, string>>({})
   const [showLangDropdown, setShowLangDropdown] = useState(false)
-  // Сайт страницы — для скоупа медиатеки в пикере.
+  // Сайт страницы — для экспорта/импорта XLSX.
   const [siteId, setSiteId] = useState<string | null>(null)
-  // Контекст пикера: какое медиа-поле какого узла выбираем для текущего языка.
-  const [pickerCtx, setPickerCtx] = useState<{ nodeId: string; field: string } | null>(null)
 
   // Load languages and source content on mount
   useEffect(() => {
@@ -411,7 +399,7 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
     }
   }, [dispatch, pageId])
 
-  // Подтягиваем siteId страницы для пикера медиатеки.
+  // Подтягиваем siteId страницы для экспорта/импорта.
   useEffect(() => {
     if (!pageId) return
     let cancelled = false
@@ -458,7 +446,9 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
 
   // Filter source content
   const filteredContent = useMemo(() => {
-    let items = sourceContent
+    // Медиа-поля (src/poster/фон/видео-слайда/pagevar-медиа) переводятся там,
+    // где выбирается исходное медиа: панель «Контент» и слайды карусели.
+    let items = sourceContent.filter(e => getFieldCategory(e.field) !== 'media')
 
     if (filterCategory !== 'all') {
       items = items.filter(e => getFieldCategory(e.field) === filterCategory)
@@ -495,18 +485,6 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
     setEditedValues(prev => ({ ...prev, [key]: value }))
     // Optimistic local update
     dispatch(updateTranslationLocally({ nodeId, field, value }))
-  }
-
-  // Выбор медиа из пикера: сразу сохраняем перевод (URL ассета) и снимаем «грязный» флаг поля.
-  const handlePickMedia = (nodeId: string, field: string, url: string) => {
-    if (!activeLocale) return
-    dispatch(updateTranslationLocally({ nodeId, field, value: url }))
-    dispatch(saveTranslation({ pageId, locale: activeLocale, nodeId, field, value: url }))
-    setEditedValues(prev => {
-      const next = { ...prev }
-      delete next[`${nodeId}::${field}`]
-      return next
-    })
   }
 
   const handleSaveOne = useCallback(async (nodeId: string, field: string) => {
@@ -564,16 +542,6 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
     if (file && siteId) dispatch(importSiteTranslations({ siteId, file }))
     e.target.value = '' // позволяем повторно выбрать тот же файл
   }
-
-  // Матрица адаптивного медиа — для выбранного медиа-узла (img, video или узел с фоном).
-  const mediaNode =
-    selectedNode &&
-    ((selectedNode.tagName || '').toLowerCase() === 'img' ||
-      (selectedNode.tagName || '').toLowerCase() === 'video' ||
-      (selectedNode as { elementType?: string }).elementType === 'image' ||
-      !!(selectedNode as { styles?: { properties?: { backgroundImage?: string } } }).styles?.properties?.backgroundImage)
-      ? selectedNode
-      : null
 
   if (languages.length === 0 || nonDefaultLangs.length === 0) {
     return (
@@ -745,7 +713,7 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
         </div>
         
         <div className="flex items-center gap-1 flex-wrap">
-          {(['all', 'text', 'media', 'meta'] as FieldCategory[]).map(cat => (
+          {(['all', 'text', 'meta'] as FieldCategory[]).map(cat => (
             <button
               key={cat}
               onClick={() => setFilterCategory(cat)}
@@ -755,7 +723,7 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
                   : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
               }`}
             >
-              {cat === 'all' ? 'Все' : cat === 'text' ? 'Тексты' : cat === 'media' ? 'Медиа' : 'Мета'}
+              {cat === 'all' ? 'Все' : cat === 'text' ? 'Тексты' : 'Мета'}
             </button>
           ))}
           
@@ -772,6 +740,11 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
             <span className="ml-1">Выбранный</span>
           </button>
         </div>
+
+        <p className="text-[10px] text-gray-400 leading-snug">
+          Медиа (картинки, видео, фоны) переводится в месте выбора файла: раздел
+          «Языки и экраны» панели «Контент» и настройки слайдов карусели.
+        </p>
       </div>
 
       {/* Language Binding Section — assign data-lang-* attributes to selected element */}
@@ -797,22 +770,6 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
           </div>
         )}
       </div>
-
-      {/* Матрица адаптивного медиа «экран × язык» для выбранного медиа-узла */}
-      {mediaNode && (
-        <ResponsiveMediaMatrix
-          key={mediaNode.id}
-          node={mediaNode}
-          rootNode={rootNode}
-          pageId={pageId}
-          siteId={siteId}
-          breakpoints={breakpoints}
-          defaultLang={defaultLang}
-          activeLang={activeLang}
-          activeLocale={activeLocale}
-          translationMap={translationMap}
-        />
-      )}
 
       {/* Content: Translation entries */}
       <div className="flex-1 overflow-y-auto">
@@ -845,52 +802,23 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
                     const key = `${nodeId}::${entry.field}`
                     const currentTranslation = editedValues[key] ?? translationMap[nodeId]?.[entry.field] ?? ''
                     const isEdited = key in editedValues
-                    const isMediaField = getFieldCategory(entry.field) === 'media'
-                    
+
                     return (
                       <div key={key} className="space-y-1">
                         <div className="flex items-center gap-1">
                           <span className="text-gray-400">
-                            {FIELD_ICON[entry.field] || (isMediaField ? <Image size={12} /> : <Type size={12} />)}
+                            {FIELD_ICON[entry.field] || <Type size={12} />}
                           </span>
                           <span className="text-[10px] text-gray-500">{fieldLabel(entry.field)}</span>
                         </div>
-                        
+
                         {/* Source (original) */}
                         <div className="text-[11px] text-gray-400 bg-gray-50 rounded px-2 py-1 break-words">
-                          {isMediaField ? (
-                            <div className="flex items-center gap-1">
-                              <Image size={10} />
-                              <span className="truncate">{truncate(entry.value, 60)}</span>
-                            </div>
-                          ) : (
-                            truncate(entry.value, 120)
-                          )}
+                          {truncate(entry.value, 120)}
                         </div>
-                        
+
                         {/* Translation input */}
-                        {isMediaField ? (
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="text"
-                              value={currentTranslation}
-                              onChange={(e) => handleEditValue(nodeId, entry.field, e.target.value)}
-                              onBlur={() => isEdited && handleSaveOne(nodeId, entry.field)}
-                              placeholder={`URL ${fieldLabel(entry.field)}...`}
-                              className={`flex-1 min-w-0 text-xs border rounded px-2 py-1.5 focus:border-blue-400 focus:outline-none text-gray-900 placeholder-gray-400 ${
-                                isEdited ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-white'
-                              }`}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setPickerCtx({ nodeId, field: entry.field })}
-                              title="Выбрать из медиатеки"
-                              className="shrink-0 p-1.5 rounded border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-blue-600 transition-colors"
-                            >
-                              <Image size={14} />
-                            </button>
-                          </div>
-                        ) : entry.value.length > 80 ? (
+                        {entry.value.length > 80 ? (
                           <textarea
                             value={currentTranslation}
                             onChange={(e) => handleEditValue(nodeId, entry.field, e.target.value)}
@@ -962,18 +890,6 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
         </div>
       )}
 
-      {/* Пикер медиатеки для медиа-полей перевода (src/poster/og:image/фон/видео-слайда) */}
-      <MediaPicker
-        open={pickerCtx !== null}
-        kind={pickerCtx ? mediaKindForField(pickerCtx.field) : 'any'}
-        siteId={siteId}
-        title="Выберите файл для языка"
-        onClose={() => setPickerCtx(null)}
-        onSelect={(asset) => {
-          if (pickerCtx) handlePickMedia(pickerCtx.nodeId, pickerCtx.field, asset.url)
-          setPickerCtx(null)
-        }}
-      />
     </div>
   )
 }
