@@ -18,6 +18,8 @@ import { SitePagesPage } from '@/pages/SitePagesPage'
 import { CollectionsPage } from '@/pages/CollectionsPage'
 import { CollectionEditor } from '@/pages/CollectionEditor'
 import { MediaLibraryPage } from '@/pages/MediaLibraryPage'
+import { EstatePage } from '@/pages/EstatePage'
+import { EstateEditorPage } from '@/pages/EstateEditorPage'
 import { Login } from '@/pages/Login'
 import { RequireAuth } from '@/widgets/auth/RequireAuth'
 
@@ -75,6 +77,14 @@ export const router = createBrowserRouter([
       {
         path: 'collections',
         element: <CollectionsPage />,
+      },
+      {
+        path: 'estate',
+        element: <EstatePage />,
+      },
+      {
+        path: 'estate/:id',
+        element: <EstateEditorPage />,
       },
       {
         path: 'collections/:id',

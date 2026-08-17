@@ -16,6 +16,11 @@ export default defineConfig(({ mode }) => {
     .map((h) => h.trim())
     .filter(Boolean)
 
+  // Токен записи estate-service инжектится ПРОКСИ (server-side), не браузером —
+  // чтобы не светить его в клиенте. Значение из окружения контейнера frontend.
+  const estateToken =
+    process.env.ESTATE_WRITE_TOKEN || env.ESTATE_WRITE_TOKEN || 'dev-estate-write-token-change-me'
+
   return {
     // The CMS is served under this path prefix by nginx on the shared domain
     // (<domain>/visual_cms/). `base` must match so every asset URL, the HMR
@@ -47,6 +52,14 @@ export default defineConfig(({ mode }) => {
           target: 'http://minio:9000/cms-media',
           changeOrigin: true,
           rewrite: (p) => p.replace(/^\/media/, ''),
+        },
+        // Модуль ЖК (estate-service). Прокси добавляет X-Estate-Token к запросам
+        // записи (на проде — nginx location /estate-api/ + auth_request к CMS).
+        '/estate-api': {
+          target: 'http://estate-service:5100',
+          changeOrigin: true,
+          rewrite: (p) => p.replace(/^\/estate-api/, ''),
+          headers: { 'X-Estate-Token': estateToken },
         },
       },
     },

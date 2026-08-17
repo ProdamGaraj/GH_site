@@ -12,6 +12,10 @@ services:
     # работает в локальном dev, через port-forward и через https-туннели
     # (Dev Tunnels / ngrok / Cloudflare Tunnel). Задавать абсолютный URL
     # нельзя — он зашьётся в бандл и сломает доступ с другого хоста.
+    environment:
+      # Токен записи estate-service — инжектится vite-прокси /estate-api
+      # (server-side, не попадает в браузер). Должен совпадать с estate-service.
+      - ESTATE_WRITE_TOKEN=dev-estate-write-token-change-me
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -45,7 +49,8 @@ services:
       # SSRF allowlist: доверенные внутренние хосты, которые резолвятся в
       # приватные IP и иначе блокируются ssrfGuard (см. B4 в KNOWN_ISSUES).
       # Точное совпадение hostname, lowercase, через запятую.
-      - SSRF_ALLOWED_HOSTS=api.macrocrm.gh.uz
+      # estate-service — внутренний модуль ЖК, DataSource ходит к нему server-fetch.
+      - SSRF_ALLOWED_HOSTS=api.macrocrm.gh.uz,estate-service
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -57,6 +62,27 @@ services:
       - minio
     command: npm run dev
   
+  # Модуль ЖК: отдельный сервис + отдельная БД `estate` (создаётся автоматически
+  # на старте — см. estate-service/src/config/ensureDatabase.ts). CMS обращается
+  # к нему через DataSource(rest-api) на http://estate-service:5100.
+  estate-service:
+    build: ./estate-service
+    ports:
+      - "5100:5100"
+    environment:
+      - NODE_ENV=development
+      - PORT=5100
+      - DATABASE_URL=postgresql://cms_user:cms_password@postgres:5432/estate
+      # Токен для write-эндпоинтов (админка CMS). На проде переопределить.
+      - ESTATE_WRITE_TOKEN=dev-estate-write-token-change-me
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+    volumes:
+      - ./estate-service:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+    command: npm run dev
+
   postgres:
     image: postgres:15-alpine
     environment:

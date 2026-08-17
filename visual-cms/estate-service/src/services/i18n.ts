@@ -1,0 +1,409 @@
+/**
+ * Overlay-переводы + языковые производные для estate-сущностей.
+ *
+ * Модель как в CMS: базовые значения = ru, оверрайды uz/en лежат строками в
+ * estate_translations и накладываются при чтении. Нет строки (или пустая) →
+ * фолбэк на ru.
+ *
+ * Всё здесь — чистые функции (без БД), покрываются unit-тестами.
+ */
+
+export type Locale = 'ru' | 'uz' | 'en'
+export const DEFAULT_LOCALE: Locale = 'ru'
+export const SUPPORTED_LOCALES: Locale[] = ['ru', 'uz', 'en']
+
+export function normalizeLocale(input?: string | null): Locale {
+  const l = (input || '').toLowerCase()
+  return (SUPPORTED_LOCALES as string[]).includes(l) ? (l as Locale) : DEFAULT_LOCALE
+}
+
+// --- Реестры переводимых полей (kind: string | json) ---
+type FieldKind = 'string' | 'json'
+type FieldMap = Record<string, FieldKind>
+
+export const COMPLEX_TR_FIELDS: FieldMap = {
+  name: 'string',
+  className: 'string',
+  intro: 'string',
+  about: 'string',
+  aboutExtra: 'string',
+  locationText: 'string',
+  yardEyebrow: 'string',
+  yardTitle: 'string',
+  yardText: 'string',
+  yardFeatures: 'json',
+  stats: 'json',
+}
+export const HOUSE_TR_FIELDS: FieldMap = {
+  name: 'string',
+  floors: 'string',
+  deadline: 'string',
+  className: 'string',
+}
+export const APARTMENT_TR_FIELDS: FieldMap = {
+  apartmentClass: 'string',
+  badges: 'json',
+  deadline: 'string',
+  offerLabel: 'string',
+}
+
+// --- Входные структуры (совпадают с полями TypeORM-сущностей) ---
+export interface TrRow {
+  entityType: string
+  entityId: string
+  locale: string
+  field: string
+  value: string
+}
+
+export interface ComplexRow {
+  id: string
+  slug: string
+  order: number
+  status: string
+  name: string
+  className: string
+  intro: string
+  about: string
+  aboutExtra: string
+  locationText: string
+  yardEyebrow: string
+  yardTitle: string
+  yardText: string
+  yardFeatures: string[]
+  stats: Array<{ value: string; label: string }>
+  logo: string
+  logoClass: string
+  media: string
+  aboutVideo: string
+  mapUrl: string
+  mapImage: string
+  heroImages: string[]
+  gallery: string[]
+  hallGallery: string[]
+  yardGallery: string[]
+}
+
+export interface HouseRow {
+  id: string
+  complexId: string
+  order: number
+  name: string
+  floors: string
+  deadline: string
+  className: string
+  entrances?: number | null
+}
+
+export interface ApartmentRow {
+  id: string
+  houseId: string
+  order: number
+  rooms: number
+  areaM2: string | number
+  price: string | number
+  oldPrice?: string | number | null
+  entrance?: number | null
+  apartmentClass: string
+  badges: string[]
+  floor: string
+  number: string
+  deadline: string
+  offerLabel: string
+  status: string
+  planImage: string
+}
+
+// --- Overlay ---
+function safeJsonParse<T>(value: string, fallback: T): T {
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return fallback
+  }
+}
+
+/**
+ * Индекс переводов: entityType|entityId|locale|field -> value.
+ * Собирается один раз на запрос, чтобы наложение было O(1), без .find по массиву.
+ */
+export function indexTranslations(rows: TrRow[]): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const r of rows) {
+    map.set(`${r.entityType}|${r.entityId}|${r.locale}|${r.field}`, r.value)
+  }
+  return map
+}
+
+/**
+ * Накладывает оверлей нужного языка на базовую (ru) сущность.
+ * locale === ru → возвращает base без изменений.
+ * Пустое значение оверрайда трактуется как «нет перевода» → фолбэк на ru.
+ */
+export function applyOverlay<T extends Record<string, any>>(
+  base: T,
+  entityType: string,
+  entityId: string,
+  locale: Locale,
+  fields: FieldMap,
+  index: Map<string, string>
+): T {
+  if (locale === DEFAULT_LOCALE) return base
+  const out: any = { ...base }
+  for (const field of Object.keys(fields)) {
+    const value = index.get(`${entityType}|${entityId}|${locale}|${field}`)
+    if (value === undefined || value === '') continue // фолбэк на ru
+    out[field] = fields[field] === 'json' ? safeJsonParse(value, base[field]) : value
+  }
+  return out
+}
+
+// --- Языковые производные (title / meta / price) ---
+const WORDS: Record<Locale, { floor: string; entrance: string; numberPrefix: string }> = {
+  ru: { floor: 'этаж', entrance: 'подъезд', numberPrefix: '№' },
+  uz: { floor: 'qavat', entrance: 'kirish', numberPrefix: '№' },
+  en: { floor: 'floor', entrance: 'entrance', numberPrefix: 'No.' },
+}
+
+export function toNumber(v: string | number | null | undefined): number {
+  if (v === null || v === undefined || v === '') return 0
+  const n = typeof v === 'number' ? v : Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+/** Площадь без лишних нулей: 114.00 -> "114", 78.81 -> "78.81". */
+export function formatArea(v: string | number): string {
+  return String(toNumber(v))
+}
+
+/** Группировка разрядов пробелами: 1354320000 -> "1 354 320 000". */
+export function groupThousands(n: number): string {
+  return Math.round(n)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+}
+
+/** "1 354 320 000 UZS" (пусто/0 → ''). */
+export function formatPrice(v: string | number | null | undefined): string {
+  const n = toNumber(v)
+  if (n <= 0) return ''
+  return `${groupThousands(n)} UZS`
+}
+
+/** Подпись планировки: ru "4-комн. 114 м²", uz "4 xonali 114 m²", en "4-room 114 m²". */
+export function apartmentTitle(rooms: number, area: string | number, locale: Locale): string {
+  const a = formatArea(area)
+  if (locale === 'uz') return `${rooms} xonali ${a} m²`
+  if (locale === 'en') return `${rooms}-room ${a} m²`
+  return `${rooms}-комн. ${a} м²`
+}
+
+/** Мета-строка карточки: "№ 102 | 8/9 этаж | 2 подъезд | 1 кв. 2028". */
+export function apartmentMeta(a: ApartmentRow, locale: Locale): string {
+  const w = WORDS[locale]
+  const parts: string[] = []
+  if (a.number) parts.push(`${w.numberPrefix} ${a.number}`)
+  if (a.floor) {
+    parts.push(locale === 'en' ? `${w.floor} ${a.floor}` : `${a.floor} ${w.floor}`)
+  }
+  if (a.entrance !== null && a.entrance !== undefined) {
+    parts.push(locale === 'en' ? `${w.entrance} ${a.entrance}` : `${a.entrance} ${w.entrance}`)
+  }
+  if (a.deadline) parts.push(a.deadline)
+  return parts.join(' | ')
+}
+
+// --- DTO выхода ---
+export interface ApartmentDTO {
+  id: string
+  rooms: number
+  areaM2: number
+  title: string
+  price: number
+  oldPrice: number | null
+  priceFormatted: string
+  oldPriceFormatted: string
+  apartmentClass: string
+  badges: string[]
+  planImage: string
+  floor: string
+  entrance: number | null
+  number: string
+  deadline: string
+  offerLabel: string
+  status: string
+  meta: string
+}
+
+export interface HouseDTO {
+  id: string
+  name: string
+  floors: string
+  entrances: number | null
+  deadline: string
+  className: string
+  apartments: ApartmentDTO[]
+}
+
+export interface ComplexDetailDTO {
+  slug: string
+  status: string
+  name: string
+  className: string
+  intro: string
+  about: string
+  aboutExtra: string
+  aboutVideo: string
+  locationText: string
+  mapUrl: string
+  mapImage: string
+  logo: string
+  logoClass: string
+  media: string
+  heroImages: string[]
+  gallery: string[]
+  hallGallery: string[]
+  yard: {
+    eyebrow: string
+    title: string
+    text: string
+    features: string[]
+    gallery: string[]
+  }
+  stats: Array<{ value: string; label: string }>
+  houses: HouseDTO[]
+  apartments: ApartmentDTO[]
+}
+
+export interface ComplexListItemDTO {
+  slug: string
+  name: string
+  className: string
+  intro: string
+  cardImage: string
+  status: string
+  order: number
+}
+
+// --- Сборщики ответа ---
+export function buildApartmentDTO(
+  apartment: ApartmentRow,
+  locale: Locale,
+  index: Map<string, string>
+): ApartmentDTO {
+  const a = applyOverlay(apartment, 'apartment', apartment.id, locale, APARTMENT_TR_FIELDS, index)
+  const price = toNumber(a.price)
+  const oldPrice = a.oldPrice === null || a.oldPrice === undefined ? null : toNumber(a.oldPrice)
+  return {
+    id: a.id,
+    rooms: a.rooms,
+    areaM2: toNumber(a.areaM2),
+    title: apartmentTitle(a.rooms, a.areaM2, locale),
+    price,
+    oldPrice,
+    priceFormatted: formatPrice(price),
+    oldPriceFormatted: oldPrice ? formatPrice(oldPrice) : '',
+    apartmentClass: a.apartmentClass,
+    badges: Array.isArray(a.badges) ? a.badges : [],
+    planImage: a.planImage,
+    floor: a.floor,
+    entrance: a.entrance ?? null,
+    number: a.number,
+    deadline: a.deadline,
+    offerLabel: a.offerLabel,
+    status: a.status,
+    meta: apartmentMeta(a, locale),
+  }
+}
+
+export function buildComplexDetail(
+  complex: ComplexRow,
+  houses: HouseRow[],
+  apartments: ApartmentRow[],
+  translations: TrRow[],
+  locale: Locale
+): ComplexDetailDTO {
+  const index = indexTranslations(translations)
+  const c = applyOverlay(complex, 'complex', complex.id, locale, COMPLEX_TR_FIELDS, index)
+
+  const byHouse = new Map<string, ApartmentRow[]>()
+  for (const apt of apartments) {
+    const list = byHouse.get(apt.houseId) || []
+    list.push(apt)
+    byHouse.set(apt.houseId, list)
+  }
+  const sortByOrder = <T extends { order: number }>(arr: T[]) =>
+    [...arr].sort((x, y) => x.order - y.order)
+
+  // DTO квартир строим один раз, переиспользуем в домах и в плоском списке.
+  const aptDtoById = new Map<string, ApartmentDTO>()
+  for (const apt of apartments) {
+    aptDtoById.set(apt.id, buildApartmentDTO(apt, locale, index))
+  }
+
+  const houseDTOs: HouseDTO[] = sortByOrder(houses).map((house) => {
+    const h = applyOverlay(house, 'house', house.id, locale, HOUSE_TR_FIELDS, index)
+    const apts = sortByOrder(byHouse.get(house.id) || []).map((apt) => aptDtoById.get(apt.id)!)
+    return {
+      id: h.id,
+      name: h.name,
+      floors: h.floors,
+      entrances: h.entrances ?? null,
+      deadline: h.deadline,
+      className: h.className,
+      apartments: apts,
+    }
+  })
+
+  // Плоский список всех квартир для repeater «Выбрать»: сортировка по
+  // ГЛОБАЛЬНОМУ order (грид не сгруппирован по домам, карточки идут вперемешку).
+  const flatApartments = sortByOrder(apartments).map((apt) => aptDtoById.get(apt.id)!)
+
+  return {
+    slug: c.slug,
+    status: c.status,
+    name: c.name,
+    className: c.className,
+    intro: c.intro,
+    about: c.about,
+    aboutExtra: c.aboutExtra,
+    aboutVideo: c.aboutVideo,
+    locationText: c.locationText,
+    mapUrl: c.mapUrl,
+    mapImage: c.mapImage,
+    logo: c.logo,
+    logoClass: c.logoClass,
+    media: c.media,
+    heroImages: Array.isArray(c.heroImages) ? c.heroImages : [],
+    gallery: Array.isArray(c.gallery) ? c.gallery : [],
+    hallGallery: Array.isArray(c.hallGallery) ? c.hallGallery : [],
+    yard: {
+      eyebrow: c.yardEyebrow,
+      title: c.yardTitle,
+      text: c.yardText,
+      features: Array.isArray(c.yardFeatures) ? c.yardFeatures : [],
+      gallery: Array.isArray(c.yardGallery) ? c.yardGallery : [],
+    },
+    stats: Array.isArray(c.stats) ? c.stats : [],
+    houses: houseDTOs,
+    apartments: flatApartments,
+  }
+}
+
+export function buildComplexListItem(
+  complex: ComplexRow,
+  translations: TrRow[],
+  locale: Locale
+): ComplexListItemDTO {
+  const index = indexTranslations(translations)
+  const c = applyOverlay(complex, 'complex', complex.id, locale, COMPLEX_TR_FIELDS, index)
+  return {
+    slug: c.slug,
+    name: c.name,
+    className: c.className,
+    intro: c.intro,
+    cardImage: c.media || (Array.isArray(c.heroImages) && c.heroImages[0]) || '',
+    status: c.status,
+    order: c.order,
+  }
+}
