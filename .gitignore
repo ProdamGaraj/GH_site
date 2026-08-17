@@ -1,30 +1,71 @@
-visual-cms/docs/data-binding-system-spec.md
-visual-cms/public-site/*
-node_modules/*
-Интеграция с сайтом _ Документация MACRO.html
-lol.html
+# ============================================================
+#  Root .gitignore — GH_site
+# ============================================================
+
+# --- Dependencies ---
+node_modules/
+**/node_modules/
+
+# --- Lockfiles (по решению владельца в гите не держим) ---
+package-lock.json
+**/package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# --- Build outputs ---
+dist/
+build/
+**/dist/
+**/build/
+
+# --- Env / editor ---
+.vscode/launch.json
+
+# --- Logs / backups / bak ---
+*.log
+*.bak
+visual-cms/backups/
+
+# --- Ad-hoc SQL (скретч-запросы). Миграции — исходники, НЕ игнорировать. ---
+*.sql
+!**/migrations/*.sql
+
+# --- Ad-hoc TXT ---
+*.txt
+
+# --- Скретч-дампы CMS (разовые выгрузки структуры/биндингов) ---
+visual-cms/bindings.json
+visual-cms/section-structure.json
+visual-cms/page-struct-full.json
+visual-cms/template-block.json
+visual-cms/template-struct.json
+visual-cms/gh-latest.html
+visual-cms/hero.json
 .tmp_binding_update.json
 .tmp_residential_structure.json
 api_resp.json
-.vscode/launch.json
-visual-cms/backups/visual_cms_20260429-102421.sql
-visual-cms/backups/visual_cms_20260429-102428.dump
-visual-cms/scripts/diagnose-transforms.sql
-visual-cms/backend/scripts/*
-*.sql
-visual-cms/hero.json
+lol.html
+
+# --- Разовые скрипты/утилиты ---
 strip-html.js
 inspect-hero.js
 visual-cms/scripts/*
-*.txt
-CLAUDE.md
-
+visual-cms/backend/scripts/*
 visual-cms/backend/fix_rce.js
 visual-cms/backend/fix_rce2.js
 visual-cms/backend/fix_rce3.js
+
+# jest.config.js бэкенда намеренно не в гите (генерится/локальный)
 visual-cms/backend/jest.config.js
+
+# --- Сгенерированная статика / крупные бинарники / исходный сайт ---
+visual-cms/public-site/*
 test.html
-Сайт Голден хаус/*
 gh-export/*
 gh-export.rar
+Сайт Голден хаус/*
+Интеграция с сайтом _ Документация MACRO.html
 
+# --- Прочее ---
+visual-cms/docs/data-binding-system-spec.md
+CLAUDE.md
