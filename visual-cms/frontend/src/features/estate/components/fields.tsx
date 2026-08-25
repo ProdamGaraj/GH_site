@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { cn } from '@/shared/utils'
 import type { Locale, StatItem } from '../types'
 import { LOCALES, LOCALE_LABELS } from '../types'
@@ -95,17 +95,39 @@ export const StringListField: React.FC<{
   onChange: (v: string[]) => void
   hint?: string
   rows?: number
-}> = ({ label, value, onChange, hint, rows = 3 }) => (
-  <div>
-    <Label hint={hint || 'по одному в строке'}>{label}</Label>
-    <textarea
-      className={inputCls}
-      rows={rows}
-      value={(value || []).join('\n')}
-      onChange={(e) => onChange(e.target.value.split('\n').map((s) => s.trim()).filter(Boolean))}
-    />
-  </div>
-)
+}> = ({ label, value, onChange, hint, rows = 3 }) => {
+  // Локальный raw-text: переносы и пустые строки живут во время ввода. Если
+  // контролировать textarea напрямую массивом, `filter(Boolean)` срезает пустую
+  // новую строку сразу при Enter → перенос «не работает». В родителя отдаём уже
+  // нормализованный массив (trim + без пустых).
+  const [text, setText] = useState<string>((value || []).join('\n'))
+
+  // Синхронизация при ВНЕШНЕМ изменении value (не от нашего ввода): сравниваем
+  // нормализованные версии, чтобы не перебивать текущий набор текста.
+  useEffect(() => {
+    const external = (value || []).join('\n')
+    const mine = text.split('\n').map((s) => s.trim()).filter(Boolean).join('\n')
+    if (external !== mine) setText(external)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value])
+
+  const handleChange = (v: string) => {
+    setText(v)
+    onChange(v.split('\n').map((s) => s.trim()).filter(Boolean))
+  }
+
+  return (
+    <div>
+      <Label hint={hint || 'по одному в строке'}>{label}</Label>
+      <textarea
+        className={inputCls}
+        rows={rows}
+        value={text}
+        onChange={(e) => handleChange(e.target.value)}
+      />
+    </div>
+  )
+}
 
 /** Список пар value/label (stats). */
 export const StatsField: React.FC<{
