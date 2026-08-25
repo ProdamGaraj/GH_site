@@ -17,6 +17,7 @@ import {
   requireAuth,
 } from './middleware'
 import { cacheService } from './services/CacheService'
+import { readCookie, AUTH_COOKIE_NAME } from './config/auth'
 
 dotenv.config()
 
@@ -30,10 +31,21 @@ app.use(requestTiming)
 app.use(compressionHint)
 app.use(queryOptimization)
 
-// Rate limiting
+// Rate limiting.
+//  - Ключ по СЕССИИ (JWT-cookie), а не по IP: за одним nginx/офисным NAT все
+//    пользователи иначе делят один bucket и упираются в лимит (ложный 429 →
+//    сорванный вход и «самовыход»). Аноним — по IP.
+//  - /api/auth/* исключены из общего лимита (у /login свой loginLimiter),
+//    чтобы сатурация трафиком редактора не блокировала вход/проверку сессии.
+//  - Лимит и окно — через env (RATE_LIMIT_MAX / RATE_LIMIT_WINDOW_MS).
 app.use(rateLimit({
-  windowMs: 60000, // 1 minute
-  maxRequests: 100, // 100 requests per minute
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000,
+  maxRequests: Number(process.env.RATE_LIMIT_MAX) || 600,
+  skip: (req) => req.path.startsWith('/api/auth/'),
+  keyGenerator: (req) => {
+    const token = readCookie(req, AUTH_COOKIE_NAME)
+    return token ? `u:${token.slice(-32)}` : `ip:${req.ip || 'unknown'}`
+  },
 }))
 
 // Security middleware - CORS with specific origins

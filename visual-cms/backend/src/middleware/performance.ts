@@ -14,6 +14,7 @@ interface RateLimitConfig {
   windowMs: number      // Time window in ms
   maxRequests: number   // Max requests per window
   keyGenerator?: (req: Request) => string
+  skip?: (req: Request) => boolean   // если true — запрос не учитывается и не режется
 }
 
 interface RequestTimingInfo {
@@ -207,6 +208,7 @@ export function rateLimit(config: RateLimitConfig) {
     windowMs = 60000,
     maxRequests = 100,
     keyGenerator = (req: Request) => req.ip || 'unknown',
+    skip,
   } = config
 
   // Cleanup expired entries periodically
@@ -220,6 +222,10 @@ export function rateLimit(config: RateLimitConfig) {
   }, windowMs)
 
   return function(req: Request, res: Response, next: NextFunction): void {
+    if (skip?.(req)) {
+      next()
+      return
+    }
     const key = keyGenerator(req)
     const now = Date.now()
 
