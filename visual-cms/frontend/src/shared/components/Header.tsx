@@ -1,6 +1,6 @@
 ﻿import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Home, FileText, Box, Database, Settings, Menu, BarChart3, Globe, Layers, Image as ImageIcon } from 'lucide-react'
+import { Home, FileText, Box, Database, Settings, Menu, BarChart3, Globe, Layers, Image as ImageIcon, Building2 } from 'lucide-react'
 import { LogoutButton } from '@/features/auth/LogoutButton'
 
 interface HeaderProps {
@@ -17,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({ showActions, centerActions, righ
     { path: '/', icon: Home, label: 'Главная' },
     { path: '/sites', icon: Globe, label: 'Сайты' },
     { path: '/collections', icon: Layers, label: 'Коллекции' },
+    { path: '/estate', icon: Building2, label: 'ЖК' },
     { path: '/pages', icon: FileText, label: 'Страницы' },
     { path: '/blocks', icon: Box, label: 'Блоки' },
     { path: '/media', icon: ImageIcon, label: 'Медиа' },
