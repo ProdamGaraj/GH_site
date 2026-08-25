@@ -59,7 +59,11 @@ export const EstateEditor: React.FC = () => {
         <LocaleTabs active={locale} onChange={setLocale} />
       </div>
 
-      <ComplexForm key={`complex-${version}`} complex={complex} locale={locale} />
+      {/* Стабильный ключ по id: операции с домами (reload + version++) НЕ
+          перемонтируют форму комплекса, иначе несохранённые правки проекта
+          затираются серверными данными. Комплекс правится только своей кнопкой
+          «Сохранить ЖК». */}
+      <ComplexForm key={`complex-${complex.id}`} complex={complex} locale={locale} />
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
