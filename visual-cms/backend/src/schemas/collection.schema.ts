@@ -129,6 +129,23 @@ export const updateCollectionSchema = z.object({
   additionalSources: z.array(additionalSourceSchema).optional(),
 })
 
+// POST /api/collections/provision-estate
+// Идемпотентный провижн связки estate-service → Collection: создаёт/находит
+// DataSource(rest-api) на estate-service и Collection на выбранный шаблон+сайт.
+export const provisionEstateSchema = z.object({
+  siteId: z.string().uuid('Invalid site ID'),
+  templatePageId: z.string().uuid('Invalid template page ID'),
+  basePath: z.string()
+    .min(1)
+    .max(255)
+    .regex(/^\/[a-z0-9\-\/]*$/, 'Base path must start with / and contain only lowercase, numbers, hyphens')
+    .optional()
+    .default('/complex'),
+  estateBaseUrl: z.string().url('Invalid estate base URL').optional().default('http://estate-service:5100'),
+  name: z.string().min(1).max(255).optional().default('Проекты (ЖК)'),
+  dataSourceName: z.string().min(1).max(255).optional().default('Estate — Комплексы'),
+})
+
 // POST /api/collections/:id/overrides
 export const createOverrideSchema = z.object({
   apiItemId: z.string().min(1, 'API item ID is required').max(255),

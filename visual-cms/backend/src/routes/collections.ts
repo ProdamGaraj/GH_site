@@ -6,9 +6,13 @@ import {
   updateCollectionSchema,
   createOverrideSchema,
   updateOverrideSchema,
+  provisionEstateSchema,
 } from '../schemas/collection.schema'
 
 const router = Router()
+
+// Провижн связки estate-service → Collection (до '/:id', чтобы не перехватывался)
+router.post('/provision-estate', validate(provisionEstateSchema), CollectionController.provisionEstate)
 
 // CRUD коллекций
 router.get('/', CollectionController.getAll)

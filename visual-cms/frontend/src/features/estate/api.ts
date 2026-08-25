@@ -1,4 +1,5 @@
 import { apiFetch, ApiError } from '@/shared/api/http'
+import { api } from '@/shared/api'
 import type { ComplexDetail, ComplexListItem } from './types'
 
 /**
@@ -76,4 +77,19 @@ export const estateApi = {
 
   deleteApartment: (id: string) =>
     apiFetch(`${BASE}/apartments/${id}`, { method: 'DELETE' }).then((r) => json<{ ok: boolean }>(r)),
+}
+
+export interface ProvisionResult {
+  dataSourceId: string
+  collectionId: string
+  created: { dataSource: boolean; collection: boolean }
+}
+
+/**
+ * Провижн связки estate → Collection. Это CMS-эндпоинт (не estate-service),
+ * поэтому идёт через общий api-клиент (/api), а не через прокси /estate-api.
+ */
+export const estateCmsApi = {
+  provisionCollection: (body: { siteId: string; templatePageId: string; basePath?: string }) =>
+    api.post<ProvisionResult>('/collections/provision-estate', body),
 }

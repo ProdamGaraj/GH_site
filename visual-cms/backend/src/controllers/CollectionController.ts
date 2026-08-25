@@ -144,6 +144,97 @@ export class CollectionController {
     res.json({ message: 'Collection deleted' })
   })
 
+  // ─── Провижн связки estate-service → Collection ──────────────
+
+  /**
+   * POST /api/collections/provision-estate
+   * Идемпотентно создаёт/обновляет:
+   *  1. DataSource(rest-api) → estate-service `/api/complexes?full=1&lang={{lang}}`
+   *     ({{lang}} подставляет DeployService при мультиязычном деплое);
+   *  2. Collection на выбранные сайт + страницу-шаблон с фиксированной раскладкой
+   *     полей estate (arrayPath=items, slugField=slug, titleField=name, apiIdField=slug).
+   * Повторный вызов не плодит дубли — матч DataSource по имени, Collection по
+   * (siteId, dataSourceId, basePath).
+   */
+  provisionEstate = asyncHandler(async (req: Request, res: Response) => {
+    const { siteId, templatePageId, basePath, estateBaseUrl, name, dataSourceName } = req.body
+
+    const [site, templatePage] = await Promise.all([
+      AppDataSource.getRepository(Site).findOne({ where: { id: siteId } }),
+      this.getPageRepository().findOne({ where: { id: templatePageId } }),
+    ])
+    if (!site) throw new ValidationError('Site not found')
+    if (!templatePage) throw new ValidationError('Template page not found')
+
+    const dsRepo = this.getDataSourceRepository()
+    const url = `${String(estateBaseUrl).replace(/\/+$/, '')}/api/complexes?full=1&lang={{lang}}`
+
+    // 1. DataSource — find-or-create по имени, URL держим в актуальном состоянии
+    let dataSource = await dsRepo.findOne({ where: { name: dataSourceName } })
+    let dataSourceCreated = false
+    if (!dataSource) {
+      dataSource = dsRepo.create({
+        name: dataSourceName,
+        type: 'rest-api',
+        status: 'active',
+        config: { url, method: 'GET' },
+      })
+      await dsRepo.save(dataSource)
+      dataSourceCreated = true
+    } else {
+      const cfg = (dataSource.config || {}) as Record<string, unknown>
+      if (cfg.url !== url) {
+        dataSource.config = { ...cfg, url, method: cfg.method || 'GET' }
+        await dsRepo.save(dataSource)
+      }
+    }
+
+    // 2. Collection — find-or-create по (siteId, dataSourceId, basePath)
+    const repo = this.getRepository()
+    let collection = await repo.findOne({ where: { siteId, dataSourceId: dataSource.id, basePath } })
+    let collectionCreated = false
+    if (!collection) {
+      await this.checkBasePathConflict(siteId, basePath)
+      collection = repo.create({
+        siteId,
+        name,
+        dataSourceId: dataSource.id,
+        arrayPath: 'items',
+        templatePageId,
+        basePath,
+        slugField: 'slug',
+        titleField: 'name',
+        apiIdField: 'slug',
+        isActive: true,
+      })
+      await repo.save(collection)
+      collectionCreated = true
+    } else {
+      // Идемпотентно синхронизируем шаблон/имя/раскладку полей estate
+      Object.assign(collection, {
+        name,
+        templatePageId,
+        arrayPath: 'items',
+        slugField: 'slug',
+        titleField: 'name',
+        apiIdField: 'slug',
+      })
+      await repo.save(collection)
+    }
+
+    // Помечаем страницу как шаблон (как в create)
+    templatePage.isTemplate = true
+    await this.getPageRepository().save(templatePage)
+
+    await cacheService.invalidateByTag('collections')
+
+    res.status(collectionCreated ? 201 : 200).json({
+      dataSourceId: dataSource.id,
+      collectionId: collection.id,
+      created: { dataSource: dataSourceCreated, collection: collectionCreated },
+    })
+  })
+
   // ─── Элементы коллекции (из API) ─────────────────────────────
 
   getItems = asyncHandler(async (req: Request, res: Response) => {

@@ -18,7 +18,7 @@ import { DataBinding } from '../models/DataBinding'
 import { DataSource as DataSourceEntity } from '../models/DataSource'
 import { PageDataConfig } from './DataBindingGenerator'
 import type { BlockNode } from '../types/blockNode'
-import { translationService, applyVariableMediaTranslations } from './TranslationService'
+import { translationService, applyVariableMediaTranslations, type TranslationMap } from './TranslationService'
 import { languageService } from './LanguageService'
 import { MacroV2Client } from './MacroV2Client'
 import { logger } from './Logger'
@@ -696,12 +696,16 @@ export class DeployService {
         return { success: false, message: 'Коллекция не привязана к сайту', deployedPages: [], errors: ['No site'] }
       }
 
+      // Язык по умолчанию — подставляется в плейсхолдер {{lang}} источника при
+      // дефолтной генерации (не-дефолтные языки обрабатывает deployCollectionTranslations).
+      const defaultLangCode = (await languageService.getActive()).find(l => l.isDefault)?.code
+
       // 2. Загрузить элементы из API
       let items: any[] = []
       // Начальный контекст extract из основного ответа (mainExtract)
       const mainExtractedValues: Record<string, unknown> = {}
       try {
-        const { items: fetchedItems, raw } = await this.fetchCollectionApiData(collection)
+        const { items: fetchedItems, raw } = await this.fetchCollectionApiData(collection, defaultLangCode)
         items = fetchedItems
         // Применяем mainExtract — значения доступны в additionalSources как {{extract.name}}
         if (collection.mainExtract) {
@@ -795,41 +799,20 @@ export class DeployService {
       }
 
       for (const item of items) {
-        const itemId = String(item.id || item._id || '')
-        // Прокидываем статистику в item; enrichItemForCollections подхватит её и положит в __stats
-        if (statsByItemId[itemId]) {
-          ;(item as any).__stats = statsByItemId[itemId]
-        }
-        const rawSlug = this.getNestedValue(item, collection.slugField)
-        const itemTitle = this.getNestedValue(item, collection.titleField) || collection.name
+        const { itemId, itemTitle, baseSlug } = this.computeItemBase(collection, item)
 
-        // Slug всегда нормализуется через slugify — единый формат URL независимо от источника
-        let itemSlug = this.slugify(String(rawSlug || itemTitle || '')) || itemId
-
-        // Определить override (match по id, fallback по slug)
-        const override = overridesByItemId.get(itemId) || overridesBySlug.get(itemSlug)
+        // Определить override (match по id, fallback по base-slug)
+        const override = overridesByItemId.get(itemId) || overridesBySlug.get(baseSlug)
 
         // Override может задать кастомный slug для файла — тоже нормализуем
-        if (override?.apiItemSlug) {
-          itemSlug = this.slugify(override.apiItemSlug) || itemSlug
-        }
-
-        // Проверка slug-конфликтов внутри коллекции
-        if (usedSlugs.has(itemSlug)) {
-          let suffix = 2
-          while (usedSlugs.has(`${itemSlug}-${suffix}`)) suffix++
-          itemSlug = `${itemSlug}-${suffix}`
-          errors.push(`Slug conflict: "${itemSlug}" — added suffix`)
-        }
-        usedSlugs.add(itemSlug)
+        let itemSlug = override?.apiItemSlug ? (this.slugify(override.apiItemSlug) || baseSlug) : baseSlug
+        itemSlug = this.ensureUniqueSlug(itemSlug, usedSlugs, errors)
 
         try {
-          let pageStructure: any
-          let pageDataConfig: PageDataConfig | undefined
-          let pageMetadata: { title: string; description: string; keywords: string[] }
+          let html: string
 
           if (override) {
-            // Кастомная страница
+            // Кастомная страница (только на языке по умолчанию)
             const customPage = customPagesMap.get(override.customPageId)
             if (!customPage || !customPage.structure) {
               errors.push(`Custom page for "${itemTitle}" (${override.customPageId}) has no structure, skipping`)
@@ -837,56 +820,30 @@ export class DeployService {
             }
             let customStructure = await linkedBlocksService.updateLinkedBlocks(customPage.structure)
             customStructure = await this.injectLibraryTemplates(customStructure, customPage.id)
-            pageStructure = customStructure
-            pageDataConfig = await this.preparePageDataConfig(customPage.id, customStructure)
-            pageMetadata = customPage.metadata || { title: itemTitle, description: '', keywords: [] }
+            const pageDataConfig = await this.preparePageDataConfig(customPage.id, customStructure)
+            const pageMetadata = customPage.metadata || { title: itemTitle, description: '', keywords: [] }
+            html = await this.generatePageHtml(customStructure, {
+              metadata: pageMetadata,
+              slug: itemSlug,
+              dataConfig: pageDataConfig,
+              navigation: resolvedNav,
+              analyticsPageId: override.customPageId,
+              ...this.siteAssetOptions(collection.site),
+            })
           } else {
-            // Дополнительные источники: фетчим и прикрепляем к item ДО подстановки,
-            // чтобы данные были доступны как {{item.<itemKey>.field}} в шаблоне.
-            // Источники выполняются по порядку; extract-значения предыдущих доступны
-            // в последующих через {{extract.name}}.
-            if (collection.additionalSources?.length) {
-              const extractedValues: Record<string, unknown> = { ...mainExtractedValues }
-              for (const source of collection.additionalSources) {
-                try {
-                  const data = await this.fetchAdditionalSourceForItem(source, item, extractedValues)
-                  // extract считаем по полному ответу (для цепочки {{extract.name}})
-                  if (source.extract) {
-                    for (const [name, dotPath] of Object.entries(source.extract)) {
-                      extractedValues[name] = this.resolveExtractPath(data, dotPath)
-                    }
-                  }
-                  // JOIN: при необходимости берём только совпадающий по ключу элемент
-                  if (source.itemKey) (item as any)[source.itemKey] = this.applyAdditionalSourceJoin(data, source, item)
-                } catch (srcErr: any) {
-                  errors.push(`Additional source "${source.itemKey}" failed for "${itemTitle}": ${srcErr.message}`)
-                  if (source.itemKey) (item as any)[source.itemKey] = null
-                }
-              }
-            }
-
-            // Авто-шаблон с контекстом элемента — подставляем данные в структуру
-            pageStructure = this.substituteItemData(templateStructure, item)
-            pageDataConfig = this.injectCollectionContext(templateDataConfig, collection, item, itemId)
-            const enriched = this.enrichItemForCollections(item)
-            const metaCtx = { item: enriched, $: enriched }
-            pageMetadata = {
-              title: this.replaceTemplateVars(templatePage.metadata?.title || itemTitle, metaCtx),
-              description: this.replaceTemplateVars(templatePage.metadata?.description || '', metaCtx),
-              keywords: templatePage.metadata?.keywords || [],
-            }
+            // Авто-шаблон с контекстом элемента (общий рендер для всех языков)
+            html = await this.renderCollectionTemplateItem({
+              collection, item, itemId, itemTitle, itemSlug,
+              templatePageId: templatePage.id,
+              templateStructure,
+              templateDataConfig,
+              metaTitleTpl: templatePage.metadata?.title || '',
+              metaDescTpl: templatePage.metadata?.description || '',
+              metaKeywords: templatePage.metadata?.keywords || [],
+              resolvedNav, mainExtractedValues, statsByItemId, errors,
+              site: collection.site,
+            })
           }
-
-          // Генерируем HTML. Для аналитики: кастомная страница — её id,
-          // авто-шаблон — id страницы-шаблона (slug у трекера свой на каждый item).
-          const html = await this.generatePageHtml(pageStructure, {
-            metadata: pageMetadata,
-            slug: itemSlug,
-            dataConfig: pageDataConfig,
-            navigation: resolvedNav,
-            analyticsPageId: override ? override.customPageId : templatePage.id,
-            ...this.siteAssetOptions(collection.site),
-          })
 
           // Записываем файл (чистый URL без .html: <basePath>/<slug>/index.html → /<basePath>/<slug>)
           const filePath = path.join(collectionDir, itemSlug, 'index.html')
@@ -900,9 +857,18 @@ export class DeployService {
         }
       }
 
+      // 7. Мультиязычные версии страниц коллекции (если у шаблона есть переводы).
+      // Для коллекций без переводов шаблона — no-op (поведение по умолчанию неизменно).
+      await this.deployCollectionTranslations({
+        collection, templatePage, templateStructure, templateDataConfig,
+        overridesByItemId, overridesBySlug, resolvedNav,
+        mainExtractedValues, statsByItemId, siteDir, defaultItems: items,
+        deployedPages, errors,
+      })
+
       return {
         success: errors.filter(e => !e.includes('using cached data')).length === 0,
-        message: `Коллекция "${collection.name}": опубликовано ${deployedPages.length}/${items.length} страниц`,
+        message: `Коллекция "${collection.name}": опубликовано ${deployedPages.length} страниц`,
         deployedPages,
         errors,
       }
@@ -913,11 +879,235 @@ export class DeployService {
   }
 
   /**
+   * Базовые атрибуты элемента коллекции: id, заголовок (по titleField, fallback —
+   * имя коллекции) и нормализованный base-slug (до применения override/уникальности).
+   */
+  private computeItemBase(
+    collection: Collection,
+    item: any
+  ): { itemId: string; itemTitle: string; baseSlug: string } {
+    const itemId = String(item.id || item._id || '')
+    const rawSlug = this.getNestedValue(item, collection.slugField)
+    const itemTitle = this.getNestedValue(item, collection.titleField) || collection.name
+    const baseSlug = this.slugify(String(rawSlug || itemTitle || '')) || itemId
+    return { itemId, itemTitle, baseSlug }
+  }
+
+  /**
+   * Гарантирует уникальность slug в пределах набора (добавляет суффикс -2, -3, …).
+   * Мутирует usedSlugs (добавляет итоговый slug) и пишет предупреждение при конфликте.
+   */
+  private ensureUniqueSlug(slug: string, usedSlugs: Set<string>, errors: string[]): string {
+    if (!usedSlugs.has(slug)) {
+      usedSlugs.add(slug)
+      return slug
+    }
+    let suffix = 2
+    while (usedSlugs.has(`${slug}-${suffix}`)) suffix++
+    const unique = `${slug}-${suffix}`
+    usedSlugs.add(unique)
+    errors.push(`Slug conflict: "${slug}" → "${unique}"`)
+    return unique
+  }
+
+  /**
+   * Рендер одной страницы элемента по авто-шаблону. Общий путь для генерации на
+   * языке по умолчанию и для мультиязычных версий (структура/data-config/метаданные
+   * передаются уже локализованными; lang/direction/translationMap/availableLanguages
+   * задаются для не-дефолтных языков).
+   */
+  private async renderCollectionTemplateItem(p: {
+    collection: Collection
+    item: any
+    itemId: string
+    itemTitle: string
+    itemSlug: string
+    templatePageId: string
+    templateStructure: any
+    templateDataConfig?: PageDataConfig
+    metaTitleTpl: string
+    metaDescTpl: string
+    metaKeywords: string[]
+    resolvedNav: ResolvedNavItem[]
+    mainExtractedValues: Record<string, unknown>
+    statsByItemId: Record<string, unknown>
+    errors: string[]
+    site?: Site | null
+    lang?: string
+    direction?: string
+    availableLanguages?: GeneratePageOptions['availableLanguages']
+    translationMap?: TranslationMap
+  }): Promise<string> {
+    const { collection, item, itemId, itemTitle } = p
+
+    // Статистика проекта (Macro v2) — enrichItemForCollections положит в __stats
+    if (p.statsByItemId[itemId]) {
+      ;(item as any).__stats = p.statsByItemId[itemId]
+    }
+
+    // Дополнительные источники: фетчим и прикрепляем к item ДО подстановки,
+    // чтобы данные были доступны как {{item.<itemKey>.field}} в шаблоне.
+    if (collection.additionalSources?.length) {
+      const extractedValues: Record<string, unknown> = { ...p.mainExtractedValues }
+      for (const source of collection.additionalSources) {
+        try {
+          const data = await this.fetchAdditionalSourceForItem(source, item, extractedValues)
+          if (source.extract) {
+            for (const [name, dotPath] of Object.entries(source.extract)) {
+              extractedValues[name] = this.resolveExtractPath(data, dotPath)
+            }
+          }
+          if (source.itemKey) (item as any)[source.itemKey] = this.applyAdditionalSourceJoin(data, source, item)
+        } catch (srcErr: any) {
+          p.errors.push(`Additional source "${source.itemKey}" failed for "${itemTitle}": ${srcErr.message}`)
+          if (source.itemKey) (item as any)[source.itemKey] = null
+        }
+      }
+    }
+
+    const pageStructure = this.substituteItemData(p.templateStructure, item)
+    const pageDataConfig = this.injectCollectionContext(p.templateDataConfig, collection, item, itemId)
+    const enriched = this.enrichItemForCollections(item)
+    const metaCtx = { item: enriched, $: enriched }
+    const metadata = {
+      title: this.replaceTemplateVars(p.metaTitleTpl || itemTitle, metaCtx),
+      description: this.replaceTemplateVars(p.metaDescTpl || '', metaCtx),
+      keywords: p.metaKeywords,
+    }
+
+    return this.generatePageHtml(pageStructure, {
+      metadata,
+      slug: p.itemSlug,
+      dataConfig: pageDataConfig,
+      navigation: p.resolvedNav,
+      analyticsPageId: p.templatePageId,
+      lang: p.lang,
+      direction: p.direction,
+      availableLanguages: p.availableLanguages,
+      translationMap: p.translationMap,
+      ...this.siteAssetOptions(p.site),
+    })
+  }
+
+  /**
+   * Генерирует не-дефолтные языковые версии страниц коллекции. Данные берутся из
+   * источника с подстановкой {{lang}} (fallback на данные языка по умолчанию при
+   * сбое), статика шаблона переводится translationMap страницы-шаблона. Файлы —
+   * в /<lang>/<basePath>/<slug>/index.html. Кастомные страницы (override) остаются
+   * только на языке по умолчанию. Если у шаблона нет переводов — метод ничего не
+   * делает (поведение по умолчанию для существующих коллекций неизменно).
+   */
+  private async deployCollectionTranslations(p: {
+    collection: Collection
+    templatePage: Page
+    templateStructure: any
+    templateDataConfig?: PageDataConfig
+    overridesByItemId: Map<string, CollectionOverride>
+    overridesBySlug: Map<string, CollectionOverride>
+    resolvedNav: ResolvedNavItem[]
+    mainExtractedValues: Record<string, unknown>
+    statsByItemId: Record<string, unknown>
+    siteDir: string
+    defaultItems: any[]
+    deployedPages: string[]
+    errors: string[]
+  }): Promise<void> {
+    const { collection, templatePage } = p
+
+    const languages = await languageService.getActive()
+    const translationLocales = await translationService.getPageLocales(templatePage.id)
+    if (translationLocales.length === 0) return
+
+    const availableLanguages = languages
+      .filter(l => l.isActive && (l.isDefault || translationLocales.includes(l.code)))
+      .map(l => ({
+        code: l.code,
+        name: l.nativeName,
+        flag: l.flag || '🌐',
+        isDefault: l.isDefault,
+        direction: l.direction,
+      }))
+
+    for (const lang of languages) {
+      if (lang.isDefault || !lang.isActive) continue
+      if (!translationLocales.includes(lang.code)) continue
+
+      try {
+        // Данные на языке (fallback на данные языка по умолчанию при сбое)
+        let langItems = p.defaultItems
+        try {
+          const { items } = await this.fetchCollectionApiData(collection, lang.code)
+          langItems = applyCollectionTransforms(items, collection.transforms)
+        } catch (fetchErr: any) {
+          p.errors.push(`Collection "${collection.name}" [${lang.code}]: data fetch failed (${fetchErr.message}), using default-language data`)
+        }
+
+        const translationMap = await translationService.getTranslationMap(templatePage.id, lang.code)
+        const { structure: translatedStructure, metadata: translatedMeta } =
+          translationService.applyTranslations(
+            p.templateStructure,
+            translationMap,
+            templatePage.metadata || { title: templatePage.name, description: '', keywords: [] }
+          )
+        const translatedDataConfig = p.templateDataConfig
+          ? { ...p.templateDataConfig, variables: applyVariableMediaTranslations(p.templateDataConfig.variables, translationMap) }
+          : undefined
+
+        const basePathClean = collection.basePath.replace(/^\/|\/$/g, '')
+        const langCollectionDir = path.join(p.siteDir, lang.code, basePathClean)
+        if (langCollectionDir !== p.siteDir && fs.existsSync(langCollectionDir)) {
+          fs.rmSync(langCollectionDir, { recursive: true, force: true })
+        }
+        this.ensureDirectoryExists(langCollectionDir)
+
+        const usedSlugs = new Set<string>()
+        for (const item of langItems) {
+          const { itemId, itemTitle, baseSlug } = this.computeItemBase(collection, item)
+          // Кастомные страницы (override) — только на языке по умолчанию
+          if (p.overridesByItemId.get(itemId) || p.overridesBySlug.get(baseSlug)) continue
+          const itemSlug = this.ensureUniqueSlug(baseSlug, usedSlugs, p.errors)
+
+          try {
+            const html = await this.renderCollectionTemplateItem({
+              collection, item, itemId, itemTitle, itemSlug,
+              templatePageId: templatePage.id,
+              templateStructure: translatedStructure,
+              templateDataConfig: translatedDataConfig,
+              metaTitleTpl: translatedMeta?.title || '',
+              metaDescTpl: translatedMeta?.description || '',
+              metaKeywords: translatedMeta?.keywords || [],
+              resolvedNav: p.resolvedNav,
+              mainExtractedValues: p.mainExtractedValues,
+              statsByItemId: p.statsByItemId,
+              errors: p.errors,
+              site: collection.site,
+              lang: lang.code,
+              direction: lang.direction,
+              availableLanguages,
+              translationMap,
+            })
+            const filePath = path.join(langCollectionDir, itemSlug, 'index.html')
+            this.ensureDirectoryExists(path.dirname(filePath))
+            fs.writeFileSync(filePath, html, 'utf-8')
+            p.deployedPages.push(`${lang.code}/${basePathClean}/${itemSlug}`)
+            logger.info(`Collection "${collection.name}": deployed [${lang.code}] ${itemSlug}`)
+          } catch (itemErr: any) {
+            p.errors.push(`Collection "${collection.name}" [${lang.code}] "${itemTitle}": ${itemErr.message}`)
+          }
+        }
+      } catch (langErr: any) {
+        p.errors.push(`Collection "${collection.name}" [${lang.code}]: ${langErr.message}`)
+      }
+    }
+  }
+
+  /**
    * Строит FetchConfig + AuthConfig для основного запроса коллекции (с учётом endpointConfig).
    * Вынесено отдельно, чтобы переиспользовать в fetchCollectionApiData и previewCollectionRequest.
    */
   private async buildCollectionFetchConfig(
-    collection: Collection
+    collection: Collection,
+    lang?: string
   ): Promise<{ fetchConfig: FetchConfig; authConfig?: AuthConfig }> {
     const ds = collection.dataSource
     if (!ds) throw new Error('Data source not loaded')
@@ -950,17 +1140,41 @@ export class DeployService {
       }
     }
 
+    if (lang) this.applyLangPlaceholder(fetchConfig, lang)
+
     return { fetchConfig, authConfig }
   }
 
   /**
+   * Подставляет код языка на место плейсхолдера {{lang}} в URL и queryParams
+   * источника коллекции. Позволяет одному DataSource обслуживать все языки при
+   * мультиязычном деплое коллекций. Если плейсхолдера нет — no-op (существующие
+   * коллекции не затрагиваются).
+   */
+  private applyLangPlaceholder(fetchConfig: FetchConfig, lang: string): void {
+    const re = /\{\{\s*lang\s*\}\}/g
+    if (typeof fetchConfig.url === 'string') {
+      fetchConfig.url = fetchConfig.url.replace(re, lang)
+    }
+    if (fetchConfig.queryParams) {
+      const qp: Record<string, string> = {}
+      for (const [k, v] of Object.entries(fetchConfig.queryParams)) {
+        qp[k] = typeof v === 'string' ? v.replace(re, lang) : (v as string)
+      }
+      fetchConfig.queryParams = qp
+    }
+  }
+
+  /**
    * Загружает данные из data source коллекции с учётом endpointConfig.
+   * `lang` подставляется в плейсхолдер {{lang}} источника (мультиязычный деплой).
    * Возвращает items (по arrayPath) и raw-ответ (для mainExtract).
    */
   private async fetchCollectionApiData(
-    collection: Collection
+    collection: Collection,
+    lang?: string
   ): Promise<{ items: any[]; raw: unknown }> {
-    const { fetchConfig, authConfig } = await this.buildCollectionFetchConfig(collection)
+    const { fetchConfig, authConfig } = await this.buildCollectionFetchConfig(collection, lang)
 
     const result = await secureDataSourceService.fetchData(fetchConfig, authConfig)
     if (!result.success) {
@@ -997,8 +1211,9 @@ export class DeployService {
     const warnings: string[] = []
 
     // --- Шаг 1: основной запрос ---
+    const previewLang = (await languageService.getActive()).find(l => l.isDefault)?.code
     const { fetchConfig: mainConfig, authConfig: mainAuth } =
-      await this.buildCollectionFetchConfig(collection)
+      await this.buildCollectionFetchConfig(collection, previewLang)
     const mainStep: CollectionRequestPreviewStep = {
       kind: 'main',
       label: 'Основной запрос',
