@@ -38,11 +38,18 @@ export const Login: React.FC = () => {
     return () => clearTimeout(id)
   }, [cooldown])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (submitting || cooldown > 0) return
+    // Читаем значения из DOM формы, а не из state: браузерное автозаполнение /
+    // менеджер паролей заполняют поля, не всегда вызывая onChange, поэтому state
+    // может отставать (иначе кнопка казалась disabled и «срабатывала с 3-го раза»).
+    const form = e.currentTarget
+    const u = (form.elements.namedItem('username') as HTMLInputElement | null)?.value ?? username
+    const p = (form.elements.namedItem('password') as HTMLInputElement | null)?.value ?? password
+    if (!u || !p) return
     setSubmitting(true)
-    const result = await dispatch(login({ username, password }))
+    const result = await dispatch(login({ username: u, password: p }))
     setSubmitting(false)
     if (login.fulfilled.match(result)) {
       navigate(from, { replace: true })
@@ -62,7 +69,9 @@ export const Login: React.FC = () => {
     )
   }
 
-  const disabled = submitting || !username || !password || cooldown > 0
+  // Кнопку НЕ гейтим по state полей (см. handleSubmit: автозаполнение может не
+  // синхронизировать state). Пустые поля ловит required + submit-guard.
+  const disabled = submitting || cooldown > 0
 
   return (
     <div className="h-screen flex items-center justify-center bg-gray-50">
@@ -81,6 +90,7 @@ export const Login: React.FC = () => {
           </label>
           <input
             id="username"
+            name="username"
             type="text"
             autoComplete="username"
             value={username}
@@ -98,6 +108,7 @@ export const Login: React.FC = () => {
           <div className="relative">
             <input
               id="password"
+              name="password"
               type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
               value={password}
