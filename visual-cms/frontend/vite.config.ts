@@ -11,10 +11,17 @@ export default defineConfig(({ mode }) => {
   // VITE_-prefixed: it's server config, not client-exposed, so we read the full
   // env via loadEnv(..., '').
   const env = loadEnv(mode, process.cwd(), '')
-  const allowedHosts = (env.ALLOWED_HOSTS ?? '')
-    .split(',')
-    .map((h) => h.trim())
-    .filter(Boolean)
+  // Базовый allowlist: домен проекта и все поддомены (gh.uz, test_analytics.gh.uz…)
+  // работают в ЛЮБОМ mode, чтобы host-check Vite не блокировал прод/тест-домен при
+  // запуске без per-env оверрайда (напр. базовый `docker compose up`).
+  // Ведущая точка = wildcard поддоменов. Доп. хосты — через ALLOWED_HOSTS (.env.<mode>).
+  const allowedHosts = [
+    '.gh.uz',
+    ...(env.ALLOWED_HOSTS ?? '')
+      .split(',')
+      .map((h) => h.trim())
+      .filter(Boolean),
+  ]
 
   // Токен записи estate-service инжектится ПРОКСИ (server-side), не браузером —
   // чтобы не светить его в клиенте. Значение из окружения контейнера frontend.
