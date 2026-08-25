@@ -136,9 +136,10 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
     }
   }, [canEditInline, isLocked, node.content])
 
-  // Handle inline edit input - MUST be before conditional return
+  // Handle inline edit input - MUST be before conditional return.
+  // innerText (не textContent): сохраняет переносы строк (<br>/<div> → \n).
   const handleInlineInput = useCallback((e: React.FormEvent<HTMLElement>) => {
-    setEditText(e.currentTarget.textContent || '')
+    setEditText(e.currentTarget.innerText || '')
   }, [])
 
   // Save inline edit - MUST be before conditional return
@@ -152,9 +153,11 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
     setIsInlineEditing(false)
   }, [dispatch, editText, node.content, node.id])
 
-  // Handle inline edit keyboard events - MUST be before conditional return
+  // Handle inline edit keyboard events - MUST be before conditional return.
+  // Enter вставляет перенос строки (обычное поведение contentEditable). Коммит —
+  // по blur (клик вне) или Ctrl/Cmd+Enter; Escape — отмена редактирования.
   const handleInlineKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       saveInlineEdit()
     }
@@ -243,6 +246,12 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
                 ? computedStyles.position
                 : ('relative' as const),
           }
+        : {}),
+      // Переносы строк в текстовом контенте: если content содержит \n — показываем
+      // их (иначе HTML/канвас схлопывают пробелы). Только при наличии \n и если
+      // пользователь не задал white-space явно — layout прочих элементов не меняем.
+      ...(typeof node.content === 'string' && node.content.includes('\n') && !computedStyles.whiteSpace
+        ? { whiteSpace: 'pre-wrap' as const }
         : {}),
     },
     className: cn(

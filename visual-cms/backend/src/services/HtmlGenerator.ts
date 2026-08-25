@@ -331,7 +331,17 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
     if (!node) return ''
 
     const tagName = node.tagName || 'div'
-    const styles = this.renderStyles(node.styles?.properties || {})
+    // Переносы строк в текстовом контенте: паритет с редактором (CanvasRenderer).
+    // Если content содержит \n — включаем white-space:pre-wrap, иначе браузер
+    // схлопнет переносы в пробел. pre/textarea переносы и так сохраняют; явно
+    // заданный пользователем white-space не трогаем.
+    const styleProps = node.styles?.properties || {}
+    const contentHasNewline = typeof node.content === 'string' && /\r?\n/.test(node.content)
+    const stylePropsFinal =
+      contentHasNewline && !['pre', 'textarea'].includes(tagName) && !(styleProps as any).whiteSpace
+        ? { ...styleProps, whiteSpace: 'pre-wrap' }
+        : styleProps
+    const styles = this.renderStyles(stylePropsFinal)
     let attributes = this.renderAttributes(
       this.normalizeLinkAttributes(tagName, this.normalizeMediaAttributes(tagName, node.attributes || {}))
     )
