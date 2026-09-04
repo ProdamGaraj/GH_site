@@ -243,6 +243,24 @@ export function buildLocationLabels(rows: unknown): LocationLabelDTO[] {
     }))
 }
 
+/**
+ * Уникальные непустые значения поля в порядке первого появления.
+ * Нужны фильтрам страницы: чипсы «Срок сдачи» и «Класс жилья» разворачиваются
+ * из этих списков через _repeat, а не хардкодятся в вёрстке — у каждого ЖК
+ * свой набор сроков и классов.
+ */
+export function distinctValues<T>(rows: T[], pick: (row: T) => string): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const row of rows) {
+    const value = (pick(row) || '').trim()
+    if (!value || seen.has(value)) continue
+    seen.add(value)
+    out.push(value)
+  }
+  return out
+}
+
 /** Подпись планировки: ru "4-комн. 114 м²", uz "4 xonali 114 m²", en "4-room 114 m²". */
 export function apartmentTitle(rooms: number, area: string | number, locale: Locale): string {
   const a = formatArea(area)
@@ -349,6 +367,10 @@ export interface ComplexDetailDTO {
   stats: Array<{ value: string; label: string }>
   houses: HouseDTO[]
   apartments: ApartmentDTO[]
+  /** Уникальные сроки сдачи по квартирам — чипсы фильтра. */
+  deadlines: string[]
+  /** Уникальные классы квартир — чипсы фильтра. */
+  apartmentClasses: string[]
 }
 
 export interface ComplexListItemDTO {
@@ -475,6 +497,8 @@ export function buildComplexDetail(
     stats: Array.isArray(c.stats) ? c.stats : [],
     houses: houseDTOs,
     apartments: flatApartments,
+    deadlines: distinctValues(flatApartments, (a) => a.deadline),
+    apartmentClasses: distinctValues(flatApartments, (a) => a.apartmentClass),
   }
 }
 

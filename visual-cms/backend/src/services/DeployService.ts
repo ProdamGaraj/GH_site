@@ -1781,7 +1781,19 @@ export class DeployService {
   private replaceTemplateVars(str: string, ctx: { item: any; $: any }): string {
     // {{item.field.subfield}} — берёт из item
     // {{$.field}} — берёт из текущего элемента массива (внутри _repeat)
-    return str.replace(/\{\{(item|\$)\.([a-zA-Z0-9_.]+)\}\}/g, (_match, scope: string, fieldPath: string) => {
+    // {{$}}       — сам элемент массива, когда он примитив. Без этой формы
+    //               _repeat по массиву строк (heroImages, gallery, hallGallery,
+    //               yardFeatures, badges) отрендерить нечем: у строки нет полей.
+    return str.replace(/\{\{(item|\$)(?:\.([a-zA-Z0-9_.]+))?\}\}/g, (match, scope: string, fieldPath?: string) => {
+      if (!fieldPath) {
+        // {{item}} без пути смысла не имеет — оставляем как есть, чтобы опечатка
+        // была видна в вёрстке, а не молча превратилась в пустоту.
+        if (scope !== '$') return match
+        const self = ctx.$
+        // Объект в {{$}} подставить нечем — "[object Object]" в вёрстке хуже пустоты.
+        if (self === undefined || self === null || typeof self === 'object') return ''
+        return String(self)
+      }
       const root = scope === '$' ? ctx.$ : ctx.item
       const value = this.getNestedValue(root, fieldPath)
       return value !== undefined && value !== null ? String(value) : ''

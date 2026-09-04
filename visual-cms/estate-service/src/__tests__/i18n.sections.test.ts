@@ -10,6 +10,7 @@ import {
   buildComplexDetail,
   buildApartmentDTO,
   buildComplexListItem,
+  distinctValues,
   indexTranslations,
   ComplexRow,
   ApartmentRow,
@@ -162,5 +163,41 @@ describe('externalId в DTO', () => {
   })
   it('присутствует и в списочном DTO — лёгкий источник каталога не теряет ключ', () => {
     expect(buildComplexListItem({ ...baseComplex, externalId: 7 }, [], 'ru').externalId).toBe(7)
+  })
+})
+
+describe('списки значений для чипсов фильтра', () => {
+  const apts: ApartmentRow[] = [
+    { ...baseApartment, id: 'a1', deadline: '1 кв. 2028', apartmentClass: 'Бизнес' },
+    { ...baseApartment, id: 'a2', order: 1, deadline: '2 кв. 2029', apartmentClass: 'Бизнес' },
+    { ...baseApartment, id: 'a3', order: 2, deadline: '1 кв. 2028', apartmentClass: 'Комфорт' },
+    { ...baseApartment, id: 'a4', order: 3, deadline: '', apartmentClass: '  ' },
+  ]
+  const houses = [{ id: 'h1', complexId: 'c1', order: 0, name: 'К1', floors: '9', deadline: '', className: '', entrances: 1 }]
+  const withApts = apts.map((a) => ({ ...a, houseId: 'h1' }))
+
+  it('дедуплицирует и сохраняет порядок первого появления', () => {
+    const dto = buildComplexDetail(baseComplex, houses, withApts, [], 'ru')
+    expect(dto.deadlines).toEqual(['1 кв. 2028', '2 кв. 2029'])
+    expect(dto.apartmentClasses).toEqual(['Бизнес', 'Комфорт'])
+  })
+  it('отбрасывает пустые значения и строки из пробелов', () => {
+    const dto = buildComplexDetail(baseComplex, houses, withApts, [], 'ru')
+    expect(dto.deadlines).not.toContain('')
+    expect(dto.apartmentClasses.some((c) => c.trim() === '')).toBe(false)
+  })
+  it('без квартир — пустые списки, чипсы не рендерятся', () => {
+    const dto = buildComplexDetail(baseComplex, [], [], [], 'ru')
+    expect(dto.deadlines).toEqual([])
+    expect(dto.apartmentClasses).toEqual([])
+  })
+})
+
+describe('distinctValues', () => {
+  it('обрезает пробелы по краям и считает такие значения одинаковыми', () => {
+    expect(distinctValues([{ v: ' Бизнес ' }, { v: 'Бизнес' }], (r) => r.v)).toEqual(['Бизнес'])
+  })
+  it('пустой вход — пустой выход', () => {
+    expect(distinctValues([], (r: { v: string }) => r.v)).toEqual([])
   })
 })

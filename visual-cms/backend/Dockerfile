@@ -8,6 +8,13 @@ WORKDIR /app
 #  - vips-dev: sharp (обработка изображений).
 RUN apk add --no-cache python3 make g++ vips-dev
 
+# Заголовки Node для node-gyp берём из самого образа (/usr/local/include/node),
+# а не тянем с unofficial-builds.nodejs.org. Без этого fallback-компиляция
+# бесполезна в сети без внешнего egress: prebuild-install уходит в таймаут,
+# node-gyp следом падает на резолве хоста (getaddrinfo EAI_AGAIN), и весь
+# npm install валится на better-sqlite3.
+ENV npm_config_nodedir=/usr/local
+
 COPY package*.json ./
 RUN npm install
 
