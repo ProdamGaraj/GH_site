@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "test": "jest",
     "lint": "eslint src --ext .ts",
-    "seed:dostlik": "ts-node src/scripts/seed-dostlik.ts"
+    "seed:dostlik": "ts-node src/scripts/seed-dostlik.ts",
+    "seed:design": "ts-node src/scripts/seed-design-projects.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

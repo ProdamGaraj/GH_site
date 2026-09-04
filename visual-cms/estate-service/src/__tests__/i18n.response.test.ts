@@ -9,6 +9,7 @@ import {
 
 const complex: ComplexRow = {
   id: 'c1',
+  externalId: 1042,
   slug: 'assalom-dostlik',
   order: 0,
   status: 'active',
@@ -16,8 +17,17 @@ const complex: ComplexRow = {
   className: 'Комфорт+',
   intro: 'ru intro',
   about: 'ru about',
+  aboutTitle: 'О проекте',
   aboutExtra: 'ru extra',
+  hallTitle: 'Дизайнерские холлы',
+  hallText: 'ru hall text',
+  address: 'г. Ташкент, квартал Golden House',
+  locationTitle: 'Территория большой жизни',
   locationText: 'ru location',
+  locationLabels: [
+    { label: 'Golden House', accent: true, top: '46%', left: '58%' },
+    { label: 'Парк', top: '31%', left: '17%' },
+  ],
   yardEyebrow: 'Двор',
   yardTitle: 'Дворовое пространство',
   yardText: 'ru yard text',
@@ -29,6 +39,7 @@ const complex: ComplexRow = {
   aboutVideo: 'about.mp4',
   mapUrl: 'https://map',
   mapImage: '',
+  panoramaUrl: 'https://pano',
   heroImages: ['h1.jpg', 'h2.jpg'],
   gallery: [],
   hallGallery: ['hall1.jpg'],
@@ -115,6 +126,7 @@ describe('buildComplexListItem', () => {
     const item = buildComplexListItem(complex, [], 'ru')
     expect(item).toEqual({
       slug: 'assalom-dostlik',
+      externalId: 1042,
       name: 'Assalom Doʼstlik',
       className: 'Комфорт+',
       intro: 'ru intro',

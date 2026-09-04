@@ -23,6 +23,15 @@ export class Complex {
   @PrimaryGeneratedColumn('uuid')
   id!: string
 
+  /**
+   * Числовой ID проекта во внешней системе (CRM). По нему на деплое тянутся
+   * квартиры отдельным источником: {{item.externalId}} в запросе.
+   * null — проект не сопоставлен с CRM.
+   */
+  @Index({ unique: true })
+  @Column({ type: 'int', nullable: true })
+  externalId!: number | null
+
   /** URL-идентификатор: slug страницы проекта (assalom-dostlik). Уникален. */
   @Index({ unique: true })
   @Column({ length: 160 })
@@ -50,11 +59,38 @@ export class Complex {
   @Column({ type: 'text', default: '' })
   about!: string
 
+  /** Заголовок секции «О проекте» (был захардкожен в блоке CMS). */
+  @Column({ length: 200, default: '' })
+  aboutTitle!: string
+
   @Column({ type: 'text', default: '' })
   aboutExtra!: string
 
+  // Hall (дизайнерские холлы)
+  @Column({ length: 200, default: '' })
+  hallTitle!: string
+
+  @Column({ type: 'text', default: '' })
+  hallText!: string
+
+  /** Адрес под названием ЖК в секции «Выбрать». */
+  @Column({ length: 300, default: '' })
+  address!: string
+
+  // Location (расположение)
+  @Column({ length: 200, default: '' })
+  locationTitle!: string
+
   @Column({ type: 'text', default: '' })
   locationText!: string
+
+  /**
+   * Подписи на карте проекта: [{label, accent, top, left}].
+   * top/left — CSS-проценты ('46%'): метка указывает на место конкретной
+   * карты, поэтому координаты — часть данных проекта, а не вёрстки.
+   */
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  locationLabels!: Array<{ label: string; accent?: boolean; top: string; left: string }>
 
   // Yard (дворовое пространство) — плоские поля для простого оверлея
   @Column({ length: 120, default: '' })
@@ -92,6 +128,10 @@ export class Complex {
 
   @Column({ length: 500, default: '' })
   mapImage!: string
+
+  /** Ссылка на панораму 360° (кнопка в секции «Расположение»). */
+  @Column({ length: 500, default: '' })
+  panoramaUrl!: string
 
   @Column({ type: 'jsonb', default: () => "'[]'" })
   heroImages!: string[]

@@ -26,8 +26,14 @@ export const COMPLEX_TR_FIELDS: FieldMap = {
   className: 'string',
   intro: 'string',
   about: 'string',
+  aboutTitle: 'string',
   aboutExtra: 'string',
+  hallTitle: 'string',
+  hallText: 'string',
+  address: 'string',
+  locationTitle: 'string',
   locationText: 'string',
+  locationLabels: 'json',
   yardEyebrow: 'string',
   yardTitle: 'string',
   yardText: 'string',
@@ -56,8 +62,17 @@ export interface TrRow {
   value: string
 }
 
+/** Подпись на карте проекта, как лежит в БД. */
+export interface LocationLabelRow {
+  label: string
+  accent?: boolean
+  top: string
+  left: string
+}
+
 export interface ComplexRow {
   id: string
+  externalId: number | null
   slug: string
   order: number
   status: string
@@ -65,8 +80,14 @@ export interface ComplexRow {
   className: string
   intro: string
   about: string
+  aboutTitle: string
   aboutExtra: string
+  hallTitle: string
+  hallText: string
+  address: string
+  locationTitle: string
   locationText: string
+  locationLabels: LocationLabelRow[]
   yardEyebrow: string
   yardTitle: string
   yardText: string
@@ -78,6 +99,7 @@ export interface ComplexRow {
   aboutVideo: string
   mapUrl: string
   mapImage: string
+  panoramaUrl: string
   heroImages: string[]
   gallery: string[]
   hallGallery: string[]
@@ -190,6 +212,37 @@ export function formatPrice(v: string | number | null | undefined): string {
   return `${groupThousands(n)} UZS`
 }
 
+/**
+ * Одиночное опциональное значение → массив на 0 или 1 элемент.
+ *
+ * Шаблон CMS рендерит опциональные картинки и плашки через repeater (_repeat):
+ * пустой массив = узел вообще не создаётся, и остаётся CSS-заглушка секции.
+ * Прямая привязка пустой строки дала бы url("") или пустую стилизованную
+ * плашку — видимый дефект. Движок шаблонов не умеет условий, поэтому
+ * «условность» выражается длиной массива.
+ */
+export function optionalOne<K extends string>(key: K, value: string | null | undefined): Array<Record<K, string>> {
+  const v = (value || '').trim()
+  return v ? ([{ [key]: v }] as Array<Record<K, string>>) : []
+}
+
+/**
+ * Подписи карты для шаблона: accent → готовый CSS-класс, координаты как есть.
+ * Класс собирается здесь, чтобы шаблон просто привязал class={{$.className}}
+ * (условий в движке нет).
+ */
+export function buildLocationLabels(rows: unknown): LocationLabelDTO[] {
+  if (!Array.isArray(rows)) return []
+  return rows
+    .filter((r): r is LocationLabelRow => !!r && typeof r === 'object' && typeof (r as any).label === 'string')
+    .map((r) => ({
+      label: r.label,
+      className: r.accent ? 'map-label accent' : 'map-label',
+      top: r.top || '50%',
+      left: r.left || '50%',
+    }))
+}
+
 /** Подпись планировки: ru "4-комн. 114 м²", uz "4 xonali 114 m²", en "4-room 114 m²". */
 export function apartmentTitle(rooms: number, area: string | number, locale: Locale): string {
   const a = formatArea(area)
@@ -214,6 +267,14 @@ export function apartmentMeta(a: ApartmentRow, locale: Locale): string {
 }
 
 // --- DTO выхода ---
+/** Подпись карты для шаблона: className уже собран из accent. */
+export interface LocationLabelDTO {
+  label: string
+  className: string
+  top: string
+  left: string
+}
+
 export interface ApartmentDTO {
   id: string
   rooms: number
@@ -233,6 +294,10 @@ export interface ApartmentDTO {
   offerLabel: string
   status: string
   meta: string
+  /** offerLabel как массив 0..1 — для условного рендера плашки в шаблоне. */
+  offers: Array<{ label: string }>
+  /** planImage как массив 0..1 — иначе пустой url() затрёт CSS-заглушку. */
+  planImages: Array<{ image: string }>
 }
 
 export interface HouseDTO {
@@ -247,16 +312,27 @@ export interface HouseDTO {
 
 export interface ComplexDetailDTO {
   slug: string
+  /** Числовой ID проекта в CRM: {{item.externalId}} в доп.источнике квартир. */
+  externalId: number | null
   status: string
   name: string
   className: string
   intro: string
   about: string
+  aboutTitle: string
   aboutExtra: string
   aboutVideo: string
+  hallTitle: string
+  hallText: string
+  address: string
+  locationTitle: string
   locationText: string
+  locationLabels: LocationLabelDTO[]
   mapUrl: string
   mapImage: string
+  panoramaUrl: string
+  /** mapImage как массив 0..1 — оверлей поверх CSS-карты только при наличии. */
+  mapImages: Array<{ image: string }>
   logo: string
   logoClass: string
   media: string
@@ -277,6 +353,7 @@ export interface ComplexDetailDTO {
 
 export interface ComplexListItemDTO {
   slug: string
+  externalId: number | null
   name: string
   className: string
   intro: string
@@ -313,6 +390,8 @@ export function buildApartmentDTO(
     offerLabel: a.offerLabel,
     status: a.status,
     meta: apartmentMeta(a, locale),
+    offers: optionalOne('label', a.offerLabel),
+    planImages: optionalOne('image', a.planImage),
   }
 }
 
@@ -361,16 +440,25 @@ export function buildComplexDetail(
 
   return {
     slug: c.slug,
+    externalId: c.externalId ?? null,
     status: c.status,
     name: c.name,
     className: c.className,
     intro: c.intro,
     about: c.about,
+    aboutTitle: c.aboutTitle,
     aboutExtra: c.aboutExtra,
     aboutVideo: c.aboutVideo,
+    hallTitle: c.hallTitle,
+    hallText: c.hallText,
+    address: c.address,
+    locationTitle: c.locationTitle,
     locationText: c.locationText,
+    locationLabels: buildLocationLabels(c.locationLabels),
     mapUrl: c.mapUrl,
     mapImage: c.mapImage,
+    panoramaUrl: c.panoramaUrl,
+    mapImages: optionalOne('image', c.mapImage),
     logo: c.logo,
     logoClass: c.logoClass,
     media: c.media,
@@ -399,6 +487,7 @@ export function buildComplexListItem(
   const c = applyOverlay(complex, 'complex', complex.id, locale, COMPLEX_TR_FIELDS, index)
   return {
     slug: c.slug,
+    externalId: c.externalId ?? null,
     name: c.name,
     className: c.className,
     intro: c.intro,

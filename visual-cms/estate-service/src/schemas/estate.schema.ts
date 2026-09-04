@@ -6,17 +6,32 @@ const translationsSchema = z.record(z.record(z.unknown())).optional()
 
 const statsItemSchema = z.object({ value: z.string(), label: z.string() })
 
+/** Подпись на карте проекта. top/left — CSS-проценты ('46%'). */
+const locationLabelSchema = z.object({
+  label: z.string().max(120),
+  accent: z.boolean().optional(),
+  top: z.string().max(20),
+  left: z.string().max(20),
+})
+
 // --- Complex ---
 const complexBase = {
   slug: z.string().min(1).max(160).regex(/^[a-z0-9-]+$/, 'slug: только a-z, 0-9, дефис'),
   order: z.number().int().optional(),
+  externalId: z.number().int().positive().nullable().optional(),
   status: z.enum(['active', 'sold_out']).optional(),
   name: z.string().min(1).max(200),
   className: z.string().max(60).optional(),
   intro: z.string().optional(),
   about: z.string().optional(),
+  aboutTitle: z.string().max(200).optional(),
   aboutExtra: z.string().optional(),
+  hallTitle: z.string().max(200).optional(),
+  hallText: z.string().optional(),
+  address: z.string().max(300).optional(),
+  locationTitle: z.string().max(200).optional(),
   locationText: z.string().optional(),
+  locationLabels: z.array(locationLabelSchema).optional(),
   yardEyebrow: z.string().max(120).optional(),
   yardTitle: z.string().max(200).optional(),
   yardText: z.string().optional(),
@@ -28,6 +43,7 @@ const complexBase = {
   aboutVideo: z.string().max(500).optional(),
   mapUrl: z.string().max(500).optional(),
   mapImage: z.string().max(500).optional(),
+  panoramaUrl: z.string().max(500).optional(),
   heroImages: z.array(z.string()).optional(),
   gallery: z.array(z.string()).optional(),
   hallGallery: z.array(z.string()).optional(),
