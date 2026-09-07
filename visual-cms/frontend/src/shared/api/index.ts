@@ -1,5 +1,6 @@
 ﻿import { getApiBaseUrl } from './baseUrl'
 import { apiFetch, ApiError } from './http'
+import { describeHttpFailure } from './errorMessages'
 
 const API_BASE_URL = getApiBaseUrl()
 
@@ -52,8 +53,10 @@ class ApiClient {
     const response = await apiFetch(url, config)
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Network error' }))
-      let message = error.message || `HTTP error ${response.status}`
+      // Тело может быть не JSON: страницу 502 рисует nginx, когда бэкенд лежит.
+      // Тогда причину называем по статусу, а не выдаём это за сетевую ошибку.
+      const error = await response.json().catch(() => ({} as { message?: string; details?: any; retryAfter?: number }))
+      let message = error.message || describeHttpFailure(response.status)
       // Include field-level validation errors in the message
       if (error.details?.errors) {
         const fields = Object.entries(error.details.errors)

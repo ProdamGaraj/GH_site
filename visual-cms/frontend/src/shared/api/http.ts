@@ -12,6 +12,8 @@
  * НЕ использовать для запросов к ВНЕШНИМ доменам (нельзя слать наши cookie).
  */
 
+import { describeNetworkFailure, NETWORK_FAILURE_STATUS } from './errorMessages'
+
 export const CSRF_COOKIE_NAME = 'vcms_csrf'
 export const CSRF_HEADER_NAME = 'X-CSRF-Token'
 
@@ -66,11 +68,19 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
     }
   }
 
-  const response = await fetch(input, {
-    ...init,
-    credentials: 'include',
-    headers,
-  })
+  // Отказ самого fetch (нет сети, не резолвится хост) — единственный случай,
+  // который стоит звать сетевой ошибкой. Заворачиваем в ApiError, чтобы вызывающий
+  // код получил читаемый текст, а не «Failed to fetch».
+  let response: Response
+  try {
+    response = await fetch(input, {
+      ...init,
+      credentials: 'include',
+      headers,
+    })
+  } catch (err) {
+    throw new ApiError(describeNetworkFailure(err), NETWORK_FAILURE_STATUS)
+  }
 
   if (response.status === 401) {
     onUnauthorized?.()
