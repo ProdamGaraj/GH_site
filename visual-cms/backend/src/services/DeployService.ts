@@ -1694,28 +1694,7 @@ export class DeployService {
       return
     }
 
-    // Подстановка в content
-    if (typeof node.content === 'string') {
-      node.content = this.replaceTemplateVars(node.content, ctx)
-    }
-
-    // Подстановка в attributes (src, href, alt, title, etc.)
-    if (node.attributes && typeof node.attributes === 'object') {
-      for (const key of Object.keys(node.attributes)) {
-        if (typeof node.attributes[key] === 'string') {
-          node.attributes[key] = this.replaceTemplateVars(node.attributes[key], ctx)
-        }
-      }
-    }
-
-    // Подстановка в styles.properties (backgroundImage url и т.д.)
-    if (node.styles?.properties && typeof node.styles.properties === 'object') {
-      for (const key of Object.keys(node.styles.properties)) {
-        if (typeof node.styles.properties[key] === 'string') {
-          node.styles.properties[key] = this.replaceTemplateVars(node.styles.properties[key], ctx)
-        }
-      }
-    }
+    this.substituteOwnValues(node, ctx)
 
     // Рекурсия по children
     if (Array.isArray(node.children)) {
@@ -1741,9 +1720,40 @@ export class DeployService {
    * клонирует его N раз по массиву из source с учётом offset/limit,
    * подставляя в каждой копии {{$.field}}.
    */
+  /**
+   * Подстановка плейсхолдеров в собственные значения узла: content, attributes
+   * (src, href, alt…) и styles.properties (backgroundImage, CSS-переменные).
+   * Без рекурсии по детям — её ведут вызывающие.
+   */
+  private substituteOwnValues(node: any, ctx: { item: any; $: any }): void {
+    if (typeof node.content === 'string') {
+      node.content = this.replaceTemplateVars(node.content, ctx)
+    }
+    if (node.attributes && typeof node.attributes === 'object') {
+      for (const key of Object.keys(node.attributes)) {
+        if (typeof node.attributes[key] === 'string') {
+          node.attributes[key] = this.replaceTemplateVars(node.attributes[key], ctx)
+        }
+      }
+    }
+    if (node.styles?.properties && typeof node.styles.properties === 'object') {
+      for (const key of Object.keys(node.styles.properties)) {
+        if (typeof node.styles.properties[key] === 'string') {
+          node.styles.properties[key] = this.replaceTemplateVars(node.styles.properties[key], ctx)
+        }
+      }
+    }
+  }
+
   private expandRepeaterNode(node: any, ctx: { item: any; $: any }): void {
     const cfg = node._repeat as { source: string; offset?: number; limit?: number }
     delete node._repeat
+
+    // Собственные атрибуты и стили контейнера-повторителя тоже подставляем:
+    // раньше метод сразу уходил в разворот детей, и {{item.*}} на самом узле
+    // молча утекал в вёрстку литералом (например url("{{item.heroImages.0}}")
+    // на слайдере). Дети получат свою подстановку ниже, с собственным $.
+    this.substituteOwnValues(node, ctx)
 
     // source может начинаться с 'item.' или '$.'
     let arr: any

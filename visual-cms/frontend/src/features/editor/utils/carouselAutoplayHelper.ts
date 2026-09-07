@@ -18,3 +18,46 @@ export function readAutoplayMs(node: BlockNode): number {
   const n = raw ? parseInt(raw, 10) : 0
   return Number.isFinite(n) && n > 0 ? n : 0
 }
+
+/**
+ * Тип перехода между слайдами (читает CarouselRuntime):
+ *   data-carousel-effect="<id>"   — вид перехода, отсутствие = 'slide';
+ *   data-carousel-duration="<ms>" — длительность, отсутствие = дефолт эффекта.
+ */
+export const EFFECT_ATTR = 'data-carousel-effect'
+export const DURATION_ATTR = 'data-carousel-duration'
+
+export interface CarouselEffect {
+  id: string
+  label: string
+  hint: string
+  /** Длительность рантайма по умолчанию, мс. Показываем её как placeholder. */
+  defaultMs: number
+}
+
+/** Порядок = порядок в выпадающем списке: сначала привычные, потом мгновенный. */
+export const CAROUSEL_EFFECTS: CarouselEffect[] = [
+  { id: 'slide', label: 'Сдвиг по горизонтали', hint: 'Слайды едут влево-вправо', defaultMs: 500 },
+  { id: 'slide-vertical', label: 'Сдвиг по вертикали', hint: 'Слайды едут вверх-вниз', defaultMs: 500 },
+  { id: 'fade', label: 'Перетекание', hint: 'Слайды плавно проступают друг сквозь друга', defaultMs: 600 },
+  { id: 'zoom', label: 'Наплыв с отдалением', hint: 'Новый слайд проступает, уменьшаясь до масштаба', defaultMs: 600 },
+  { id: 'zoom-out', label: 'Наплыв с приближением', hint: 'Новый слайд проступает, вырастая до масштаба', defaultMs: 600 },
+  { id: 'none', label: 'Без анимации', hint: 'Мгновенная смена кадра', defaultMs: 0 },
+]
+
+export const DEFAULT_EFFECT_ID = 'slide'
+
+/** Текущий эффект узла. Неизвестное значение трактуем как дефолт — так же, как рантайм. */
+export function readEffect(node: BlockNode): CarouselEffect {
+  const raw = node.attributes?.[EFFECT_ATTR]
+  return CAROUSEL_EFFECTS.find((e) => e.id === raw)
+    || CAROUSEL_EFFECTS.find((e) => e.id === DEFAULT_EFFECT_ID)!
+}
+
+/** Заданная вручную длительность в мс, либо null — тогда действует дефолт эффекта. */
+export function readDurationMs(node: BlockNode): number | null {
+  const raw = node.attributes?.[DURATION_ATTR]
+  if (raw === undefined || raw === '') return null
+  const n = parseInt(raw, 10)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}

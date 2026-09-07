@@ -23,7 +23,7 @@ const svc = deployService as any
 const substitute = (structure: unknown, item: unknown) => svc.substituteItemData(structure, item)
 
 /** Узел-повторитель: первый ребёнок — шаблон копии. */
-const repeater = (source: string, template: unknown, extra: Record<string, unknown> = {}) => ({
+const repeater = (source: string, template: unknown, extra: Record<string, unknown> = {}): any => ({
   id: 'rep', tagName: 'div', children: [template], _repeat: { source, ...extra },
 })
 const text = (content: string, attributes: Record<string, string> = {}) => ({
@@ -123,5 +123,35 @@ describe('вложенные повторители', () => {
     const rendered = out.children[0]
     expect(rendered.children[0].content).toBe('1-комн. — Harizma')
     expect(rendered.children[1].children.map((c: any) => c.content)).toEqual(['Акция', 'Ипотека'])
+  })
+})
+
+describe('собственные значения узла-повторителя', () => {
+  it('подставляет attributes и styles самого контейнера, а не только детей', () => {
+    const rep = repeater('item.heroImages', text('{{$}}'))
+    rep.attributes = { 'data-count': '{{item.name}}' }
+    rep.styles = { properties: { backgroundImage: 'url("{{item.heroImages.0}}")' } }
+    const out = substitute(rep, { name: 'Harizma', heroImages: ['/a.jpg', '/b.jpg'] })
+    expect(out.attributes['data-count']).toBe('Harizma')
+    expect(out.styles.properties.backgroundImage).toBe('url("/a.jpg")')
+    expect(out.children.map((c: any) => c.content)).toEqual(['/a.jpg', '/b.jpg'])
+  })
+
+  it('подставляет их и когда источник не массив — узел остаётся без детей, но без плейсхолдеров', () => {
+    const rep = repeater('item.nothing', text('{{$}}'))
+    rep.attributes = { title: '{{item.name}}' }
+    const out = substitute(rep, { name: 'Harizma' })
+    expect(out.attributes.title).toBe('Harizma')
+    expect(out.children).toEqual([])
+  })
+
+  it('внутри вложенного повторителя контейнер видит свой $', () => {
+    const inner = repeater('$.badges', text('{{$}}'))
+    inner.attributes = { 'data-for': '{{$.title}}' }
+    const out = substitute(repeater('item.apartments', inner), {
+      apartments: [{ title: '1-комн.', badges: ['Акция'] }],
+    })
+    expect(out.children[0].attributes['data-for']).toBe('1-комн.')
+    expect(out.children[0].children.map((c: any) => c.content)).toEqual(['Акция'])
   })
 })

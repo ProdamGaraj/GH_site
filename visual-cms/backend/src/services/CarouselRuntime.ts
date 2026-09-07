@@ -21,6 +21,18 @@
  *                                       если найдена — клонируется по числу слайдов;
  *                                       если в dots уже есть готовые элементы — используем их
  *   [data-carousel-active-class]      — на корне; класс активной точки (default: "active")
+ *   [data-carousel-effect]            — тип перехода (default: "slide"):
+ *                                       slide          — горизонтальный сдвиг трека
+ *                                       slide-vertical — вертикальный сдвиг трека
+ *                                       fade           — перетекание прозрачностью
+ *                                       zoom           — наплыв с уменьшением масштаба
+ *                                       zoom-out       — наплыв с увеличением масштаба
+ *                                       none           — мгновенная смена
+ *                                       Неизвестное значение трактуется как "slide".
+ *   [data-carousel-duration]          — длительность перехода, мс (по умолчанию зависит
+ *                                       от эффекта: 500 для сдвига, 600 для наплыва, 0 для none)
+ *   [data-carousel-slide-active-class]— класс активного слайда для stacked-эффектов
+ *                                       (default: "is-active"); за него цепляется CSS вёрстки
  *
  * Layout: track становится display:flex с width = N*100%, каждый слайд flex:0 0 100%.
  * Анимация через CSS transition на transform, либо JS scroll fallback.
@@ -32,6 +44,26 @@ export function generateCarouselRuntime(): string {
 (function(){
   'use strict';
   var ACTIVE_CLASS_DEFAULT = 'active';
+  var SLIDE_ACTIVE_CLASS_DEFAULT = 'is-active';
+  var EFFECT_DEFAULT = 'slide';
+
+  // Реестр типов перехода. stacked = слайды лежат друг на друге (переход рисуется
+  // прозрачностью/трансформом), иначе двигается сам трек.
+  // hidden/shown — стили неактивного и активного слайда, между ними и идёт анимация.
+  var EFFECTS = {
+    'slide':          { stacked: false, duration: 500 },
+    'slide-vertical': { stacked: false, duration: 500 },
+    'fade':           { stacked: true,  duration: 600,
+                        hidden: { opacity: '0' }, shown: { opacity: '1' } },
+    'zoom':           { stacked: true,  duration: 600,
+                        hidden: { opacity: '0', transform: 'scale(1.06)' },
+                        shown:  { opacity: '1', transform: 'scale(1)' } },
+    'zoom-out':       { stacked: true,  duration: 600,
+                        hidden: { opacity: '0', transform: 'scale(0.94)' },
+                        shown:  { opacity: '1', transform: 'scale(1)' } },
+    'none':           { stacked: true,  duration: 0,
+                        hidden: { opacity: '0' }, shown: { opacity: '1' } }
+  };
 
   function init(root) {
     if (root.__carouselInit) return;
@@ -45,6 +77,17 @@ export function generateCarouselRuntime(): string {
     // «Смотреть видео до конца»: при автоплее видео-слайд листается не по таймеру, а по 'ended'.
     var videoWait = root.getAttribute('data-carousel-video-wait') === 'true';
     var activeClass = root.getAttribute('data-carousel-active-class') || ACTIVE_CLASS_DEFAULT;
+
+    // Тип перехода. 'slide'/'slide-vertical' двигают трек; остальные кладут слайды
+    // друг на друга и меняют прозрачность/масштаб. Неизвестное значение — как 'slide':
+    // опечатка в атрибуте не должна ронять карусель.
+    var effect = root.getAttribute('data-carousel-effect') || EFFECT_DEFAULT;
+    if (!EFFECTS[effect]) effect = EFFECT_DEFAULT;
+    var stacked = EFFECTS[effect].stacked;
+    var vertical = effect === 'slide-vertical';
+    var slideActiveClass = root.getAttribute('data-carousel-slide-active-class') || SLIDE_ACTIVE_CLASS_DEFAULT;
+    var duration = parseInt(root.getAttribute('data-carousel-duration') || '', 10);
+    if (!isFinite(duration) || duration < 0) duration = EFFECTS[effect].duration;
 
     var prevBtn = root.querySelector('[data-carousel-prev]');
     var nextBtn = root.querySelector('[data-carousel-next]');
@@ -62,16 +105,48 @@ export function generateCarouselRuntime(): string {
       return marked.length ? marked : visible;
     }
 
+    // Раскладка для stacked-эффектов: слайды друг на друге, трек не двигается.
+    // Если вёрстка уже позиционирует слайды абсолютно (так сделан герой в дизайне),
+    // не трогаем позиционирование — иначе сломаем чужой CSS. Если слайды в потоке,
+    // первый оставляем в потоке (он держит габарит), остальные накладываем поверх.
+    function applyStackedLayout(n) {
+      track.style.display = 'block';
+      track.style.width = '';
+      track.style.transform = '';
+      track.style.transition = '';
+      var already = window.getComputedStyle(state.slides[0]).position === 'absolute';
+      if (!already && window.getComputedStyle(track).position === 'static') {
+        track.style.position = 'relative';
+      }
+      for (var i = 0; i < n; i++) {
+        var s = state.slides[i];
+        s.style.flex = '';
+        s.style.minWidth = '';
+        s.style.maxWidth = '';
+        if (!already) {
+          s.style.position = i === 0 ? 'relative' : 'absolute';
+          if (i > 0) { s.style.top = '0'; s.style.left = '0'; s.style.width = '100%'; s.style.height = '100%'; }
+        }
+        s.style.transition = duration > 0
+          ? ('opacity ' + duration + 'ms ease, transform ' + duration + 'ms ease')
+          : 'none';
+      }
+      var holder = track.parentElement && track.parentElement !== root ? track.parentElement : root;
+      holder.style.overflow = 'hidden';
+    }
+
     function applyTrackLayout() {
       var n = state.slides.length;
       if (n === 0) return;
+      if (stacked) { applyStackedLayout(n); return; }
       track.style.display = 'flex';
-      track.style.width = (n * 100) + '%';
-      track.style.transition = 'transform 0.5s ease';
+      if (vertical) track.style.flexDirection = 'column';
+      track.style[vertical ? 'height' : 'width'] = (n * 100) + '%';
+      track.style.transition = 'transform ' + duration + 'ms ease';
       for (var i = 0; i < n; i++) {
         var s = state.slides[i];
         s.style.flex = '0 0 ' + (100 / n) + '%';
-        s.style.width = (100 / n) + '%';
+        s.style[vertical ? 'height' : 'width'] = (100 / n) + '%';
         // Очищаем конкурирующие inline-свойства, которые могли прийти из БД
         // (особенно у hybrid-static-слайдов): min-width/max-width в flex-item
         // резолвятся ОТ track-width (= n*100% viewport), что растягивает слайд
@@ -237,12 +312,34 @@ export function generateCarouselRuntime(): string {
       if (v) { try { v.pause(); } catch(e){} }
     }
 
+    // Показ активного слайда для stacked-эффектов: активному снимаем hidden-стиль,
+    // остальным ставим. Класс на слайде выставляем всегда — за него цепляется CSS
+    // вёрстки (в дизайне это .complex-hero-slide.is-active).
+    function renderStacked() {
+      var spec = EFFECTS[effect];
+      for (var i = 0; i < state.slides.length; i++) {
+        var s = state.slides[i];
+        var isActive = i === state.index;
+        var style = isActive ? (spec.shown || {}) : (spec.hidden || {});
+        s.classList.toggle(slideActiveClass, isActive);
+        for (var prop in style) {
+          if (!Object.prototype.hasOwnProperty.call(style, prop)) continue;
+          s.style[prop] = style[prop];
+        }
+        s.style.zIndex = isActive ? '1' : '0';
+      }
+    }
+
     function update() {
       var n = state.slides.length;
       if (n === 0) return;
-      // translate в процентах от track (track имеет width = n*100%)
-      var pct = -(state.index * (100 / n));
-      track.style.transform = 'translateX(' + pct + '%)';
+      if (stacked) {
+        renderStacked();
+      } else {
+        // translate в процентах от track (track имеет width/height = n*100%)
+        var pct = -(state.index * (100 / n));
+        track.style.transform = (vertical ? 'translateY(' : 'translateX(') + pct + '%)';
+      }
       for (var i = 0; i < state.dots.length; i++) {
         var dot = state.dots[i];
         if (i === state.index) {

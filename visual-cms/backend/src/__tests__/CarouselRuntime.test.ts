@@ -308,3 +308,215 @@ describe('CarouselRuntime', () => {
     })
   })
 })
+
+// ─────────────────────────────────────────────────────────────
+// Типы перехода (data-carousel-effect)
+// ─────────────────────────────────────────────────────────────
+
+const buildEffectBody = (effect: string, slidesCount = 3, extraRootAttrs = ''): string => {
+  const slides = Array.from({ length: slidesCount }).map((_, i) =>
+    `<div data-carousel-slide="true" data-element-id="slide-${i}">Slide ${i}</div>`
+  ).join('')
+  return `
+    <div data-carousel="true" data-carousel-autoplay="0" data-carousel-effect="${effect}"
+         ${extraRootAttrs} data-element-id="root">
+      <div data-carousel-track="true" data-element-id="track">${slides}</div>
+      <button data-carousel-prev="true">prev</button>
+      <button data-carousel-next="true">next</button>
+    </div>
+  `
+}
+const slidesOf = () =>
+  Array.from(document.querySelectorAll<HTMLElement>('[data-carousel-slide="true"]'))
+const clickNext = () =>
+  document.querySelector<HTMLElement>('[data-carousel-next]')!.click()
+
+describe('CarouselRuntime — типы перехода', () => {
+  afterEach(() => { document.body.innerHTML = '' })
+
+  describe('slide (по умолчанию) не изменился', () => {
+    it('без атрибута эффекта раскладка остаётся flex-треком', async () => {
+      await boot(buildBody(3))
+      expect(trackEl().style.display).toBe('flex')
+      expect(trackEl().style.width).toBe('300%')
+    })
+    it('листание двигает трек по горизонтали', async () => {
+      await boot(buildEffectBody('slide'))
+      clickNext()
+      expect(trackEl().style.transform).toContain('translateX')
+    })
+  })
+
+  describe('slide-vertical', () => {
+    it('трек становится колонкой и тянется по высоте', async () => {
+      await boot(buildEffectBody('slide-vertical'))
+      expect(trackEl().style.flexDirection).toBe('column')
+      expect(trackEl().style.height).toBe('300%')
+    })
+    it('листание двигает трек по вертикали', async () => {
+      await boot(buildEffectBody('slide-vertical'))
+      clickNext()
+      expect(trackEl().style.transform).toContain('translateY')
+    })
+  })
+
+  describe('fade', () => {
+    it('трек не растягивается и не двигается', async () => {
+      await boot(buildEffectBody('fade'))
+      expect(trackEl().style.display).toBe('block');
+      expect(trackEl().style.transform).toBe('')
+      expect(trackEl().style.width).toBe('')
+    })
+    it('активен только один слайд, у остальных нулевая прозрачность', async () => {
+      await boot(buildEffectBody('fade'))
+      const s = slidesOf()
+      expect(s[0].style.opacity).toBe('1')
+      expect(s[1].style.opacity).toBe('0')
+      expect(s[2].style.opacity).toBe('0')
+    })
+    it('класс активного слайда переезжает при листании', async () => {
+      await boot(buildEffectBody('fade'))
+      expect(slidesOf()[0].classList.contains('is-active')).toBe(true)
+      clickNext()
+      expect(slidesOf()[0].classList.contains('is-active')).toBe(false)
+      expect(slidesOf()[1].classList.contains('is-active')).toBe(true)
+      expect(slidesOf()[1].style.opacity).toBe('1')
+    })
+    it('активный слайд лежит выше остальных', async () => {
+      await boot(buildEffectBody('fade'))
+      expect(slidesOf()[0].style.zIndex).toBe('1')
+      expect(slidesOf()[1].style.zIndex).toBe('0')
+    })
+    it('слайдам назначается transition с длительностью эффекта', async () => {
+      await boot(buildEffectBody('fade'))
+      expect(slidesOf()[0].style.transition).toContain('600ms')
+    })
+    it('класс активного слайда переопределяется атрибутом', async () => {
+      await boot(buildEffectBody('fade', 3, 'data-carousel-slide-active-class="current"'))
+      expect(slidesOf()[0].classList.contains('current')).toBe(true)
+      expect(slidesOf()[0].classList.contains('is-active')).toBe(false)
+    })
+  })
+
+  describe('zoom', () => {
+    it('неактивные слайды масштабируются, активный возвращается к единице', async () => {
+      await boot(buildEffectBody('zoom'))
+      expect(slidesOf()[0].style.transform).toBe('scale(1)')
+      expect(slidesOf()[1].style.transform).toBe('scale(1.06)')
+    })
+    it('zoom-out уводит неактивные в меньший масштаб', async () => {
+      await boot(buildEffectBody('zoom-out'))
+      expect(slidesOf()[1].style.transform).toBe('scale(0.94)')
+    })
+  })
+
+  describe('none', () => {
+    it('переход мгновенный — transition отключён', async () => {
+      await boot(buildEffectBody('none'))
+      expect(slidesOf()[0].style.transition).toBe('none')
+    })
+  })
+
+  describe('устойчивость к неверным значениям', () => {
+    it('неизвестный эффект ведёт себя как slide, а не роняет карусель', async () => {
+      await boot(buildEffectBody('черипусеньки'))
+      expect(trackEl().style.display).toBe('flex')
+      clickNext()
+      expect(trackEl().style.transform).toContain('translateX')
+    })
+    it('своя длительность из data-carousel-duration', async () => {
+      await boot(buildEffectBody('fade', 3, 'data-carousel-duration="1200"'))
+      expect(slidesOf()[0].style.transition).toContain('1200ms')
+    })
+    it('отрицательная длительность игнорируется в пользу дефолта эффекта', async () => {
+      await boot(buildEffectBody('fade', 3, 'data-carousel-duration="-5"'))
+      expect(slidesOf()[0].style.transition).toContain('600ms')
+    })
+  })
+
+  describe('счётчик и стрелки работают одинаково во всех режимах', () => {
+    it('fade: prev с первого слайда уводит на последний при loop', async () => {
+      await boot(buildEffectBody('fade'))
+      document.querySelector<HTMLElement>('[data-carousel-prev]')!.click()
+      expect(slidesOf()[2].classList.contains('is-active')).toBe(true)
+    })
+  })
+})
+
+describe('CarouselRuntime — галерея внутри медиа-карточки', () => {
+  afterEach(() => { document.body.innerHTML = '' })
+
+  // Форма из блока «двор»: корень — сама карточка, трек лежит отдельным слоем,
+  // слайды уже позиционированы абсолютно вёрсткой.
+  const galleryBody = (n = 3) => {
+    const slides = Array.from({ length: n }).map((_, i) =>
+      `<div class="gallery-slide" data-carousel-slide="true"
+            style="position:absolute;top:0;left:0;width:100%;height:100%;background-image:url('/media/y${i}.jpg')"></div>`
+    ).join('')
+    return `
+      <div class="media-card gallery-media" data-carousel="true" data-carousel-effect="fade"
+           data-carousel-autoplay="0" style="position:relative">
+        <div class="gallery-track" data-carousel-track="true"
+             style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:0">${slides}</div>
+        <button class="expand-button" type="button">⛶</button>
+        <button class="side-arrow left" data-carousel-prev="true" type="button">‹</button>
+        <button class="side-arrow right" data-carousel-next="true" type="button">›</button>
+      </div>
+    `
+  }
+  const gSlides = () =>
+    Array.from(document.querySelectorAll<HTMLElement>('.gallery-slide'))
+
+  it('не перетирает абсолютное позиционирование, заданное вёрсткой', async () => {
+    await boot(galleryBody())
+    for (const s of gSlides()) {
+      expect(s.style.position).toBe('absolute')
+      expect(s.style.height).toBe('100%')
+    }
+  })
+
+  it('не превращает трек во flex — иначе слои карточки разъедутся', async () => {
+    await boot(galleryBody())
+    const track = document.querySelector<HTMLElement>('.gallery-track')!
+    expect(track.style.display).toBe('block')
+    expect(track.style.transform).toBe('')
+  })
+
+  it('трек остаётся отдельным слоем: z-index не перебивается', async () => {
+    await boot(galleryBody())
+    expect(document.querySelector<HTMLElement>('.gallery-track')!.style.zIndex).toBe('0')
+  })
+
+  it('первый кадр показан, остальные скрыты', async () => {
+    await boot(galleryBody())
+    expect(gSlides().map((s) => s.style.opacity)).toEqual(['1', '0', '0'])
+  })
+
+  it('стрелки листают кадры', async () => {
+    await boot(galleryBody())
+    document.querySelector<HTMLElement>('.side-arrow.right')!.click()
+    expect(gSlides().map((s) => s.style.opacity)).toEqual(['0', '1', '0'])
+    document.querySelector<HTMLElement>('.side-arrow.left')!.click()
+    expect(gSlides().map((s) => s.style.opacity)).toEqual(['1', '0', '0'])
+  })
+
+  it('активный кадр помечен классом — по нему лайтбокс находит текущий индекс', async () => {
+    await boot(galleryBody())
+    document.querySelector<HTMLElement>('.side-arrow.right')!.click()
+    const active = gSlides().findIndex((s) => s.classList.contains('is-active'))
+    expect(active).toBe(1)
+  })
+
+  it('фон кадра сохраняется — из него лайтбокс собирает список ссылок', async () => {
+    await boot(galleryBody())
+    const urls = gSlides().map((s) => (s.style.backgroundImage.match(/url\(["']?(.*?)["']?\)/) || [])[1])
+    expect(urls).toEqual(['/media/y0.jpg', '/media/y1.jpg', '/media/y2.jpg'])
+  })
+
+  it('один кадр — карусель не падает', async () => {
+    await boot(galleryBody(1))
+    expect(gSlides()[0].style.opacity).toBe('1')
+    document.querySelector<HTMLElement>('.side-arrow.right')!.click()
+    expect(gSlides()[0].style.opacity).toBe('1')
+  })
+})
