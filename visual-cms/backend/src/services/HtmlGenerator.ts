@@ -4,6 +4,7 @@
 import { styleGenerator } from './StyleGenerator'
 import { generateDataBindingRuntime, type PageDataConfig } from './DataBindingGenerator'
 import { generateCarouselRuntime } from './CarouselRuntime'
+import { generateComplexOverlays } from './ComplexOverlaysRuntime'
 import { generateResponsiveMediaRuntime } from './ResponsiveMediaRuntime'
 import { generateActiveLinkRuntime } from './ActiveLinkRuntime'
 import {
@@ -206,6 +207,7 @@ ${dataConfig ? generateDataBindingRuntime(dataConfig) : ''}
   })())};</script>
 ${generateResponsiveMediaRuntime()}
 ${generateCarouselRuntime()}
+${generateComplexOverlays(bodyContent)}
 ${generateActiveLinkRuntime()}
 ${options.analyticsPageId ? `  <script src="/api/analytics/tracker.js" data-page-id="${options.analyticsPageId}" defer></script>\n` : ''}
 ${authoredJs}${scripts ? `<script>\n${scripts}\n</script>` : ''}
