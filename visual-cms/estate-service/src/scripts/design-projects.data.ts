@@ -103,6 +103,10 @@ const M = {
   ozmakonBusinessHall4: '/media/38477f21-6134-4fb6-9ef7-bdacea3ad031.png',
   ozmakonBusinessHall5: '/media/fd57183d-8e8d-4f2f-965d-cb99c32b135f.png',
   ozmakonBusinessMap: '/media/182d8b06-623d-4a75-9a2d-3e99f23f1d37.png',
+  ozmakonBusinessHero1: '/media/5258ca8d-096f-43fd-8fd4-bcfde2c39817.jpg',
+  ozmakonBusinessHero2: '/media/42ad0407-d481-4b41-a795-b017981de977.jpg',
+  ozmakonBusinessYard3: '/media/495740c6-f300-4f39-b37b-10cf03278ecb.jpg',
+  ozmakonBusinessWide: '/media/4be0a691-58e1-4d2b-8cb1-6bf81e36e209.jpg',
   ozmakonCard: '/media/43278838-d571-477e-b565-ed9aebe60812.jpg',
   ozmahalCard: '/media/40e7e690-b2a6-454b-bfaf-fffa29050612.jpg',
   ozmahalWide: '/media/898b3159-d535-4a34-86cc-5003bb7c2407.jpg',
@@ -164,18 +168,15 @@ const BASE_COMPLEXES: ComplexSeed[] = [
     stats: [],
     logo: M.ozmakonBusinessLogo,
     logoClass: '',
-    media: M.ozmakonBusinessCard,
+    media: M.ozmakonBusinessWide,
     aboutVideo: M.ozmakonBusinessVideo,
     mapUrl: 'https://yandex.uz/maps/10335/tashkent/house/farg_ona_yo_li_50/YkAYdA5pS0YHQFprfX54cXVqYw==/?ll=69.300287%2C41.290709&z=18',
     mapImage: M.ozmakonBusinessMap,
     panoramaUrl: '',
-    // heroImages дизайна (ozmakon-business-hero-1/2.jpg) в медиатеку не загружены —
-    // до загрузки герой берёт карточку каталога, чтобы секция не осталась пустой.
-    heroImages: [M.ozmakonBusinessCard],
+    heroImages: [M.ozmakonBusinessHero1, M.ozmakonBusinessHero2],
     gallery: [],
     hallGallery: [M.ozmakonBusinessHall1, M.ozmakonBusinessHall2, M.ozmakonBusinessHall3, M.ozmakonBusinessHall4, M.ozmakonBusinessHall5],
-    // yard-3.jpg отсутствует в медиатеке — в галерее два кадра из трёх.
-    yardGallery: [M.ozmakonBusinessYard1, M.ozmakonBusinessYard2],
+    yardGallery: [M.ozmakonBusinessYard1, M.ozmakonBusinessYard2, M.ozmakonBusinessYard3],
     houses: [],
   },
   {
@@ -360,10 +361,6 @@ export const COMPLEXES: ComplexSeed[] = BASE_COMPLEXES.map((complex) => {
 export const GAPS: DataGap[] = [
   { slug: '*', field: 'externalId',
     reason: 'числовые ID в CRM в дизайне отсутствуют — проставить вручную, без них запрос квартир уйдёт без фильтра' },
-  { slug: 'ozmakon-business', field: 'heroImages',
-    reason: 'hero-1.jpg и hero-2.jpg (12 и 13 МБ) не загружены в медиатеку CMS — временно карточка каталога' },
-  { slug: 'ozmakon-business', field: 'yardGallery',
-    reason: 'yard-3.jpg (13 МБ) не загружен в медиатеку — 2 кадра из 3' },
   { slug: 'ozmahal', field: 'весь контент секций',
     reason: 'лист «O`zMahal» в книге заказчика пуст; есть только карточка каталога' },
   { slug: '*', field: 'медиа из книги',
