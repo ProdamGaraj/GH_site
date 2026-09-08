@@ -22,6 +22,7 @@ import { Apartment } from '../models/Apartment'
 import { EstateTranslation } from '../models/EstateTranslation'
 import { logger } from '../services/Logger'
 import { COMPLEXES, GAPS, ComplexSeed } from './design-projects.data'
+import { COMPLEX_TR_FIELDS } from '../services/i18n'
 
 /** Удаляет ЖК со slug вместе с переводами всех его сущностей. */
 async function removeExisting(m: typeof AppDataSource.manager, slug: string): Promise<void> {
@@ -39,11 +40,42 @@ async function removeExisting(m: typeof AppDataSource.manager, slug: string): Pr
   await m.getRepository(Complex).delete({ id: prev.id })
 }
 
+/**
+ * Оверлей-переводы комплекса. jsonb-поля (stats, yardFeatures) кладём строкой
+ * JSON — так их ждёт applyOverlay в services/i18n. Поля, которых нет в реестре
+ * переводимых, пропускаем: иначе оверлей их всё равно не наложит.
+ */
+async function insertTranslations(
+  m: typeof AppDataSource.manager,
+  complexId: string,
+  translations: ComplexSeed['translations']
+): Promise<number> {
+  if (!translations) return 0
+  const rows: Array<Partial<EstateTranslation>> = []
+  for (const [locale, fields] of Object.entries(translations)) {
+    for (const [field, value] of Object.entries(fields as Record<string, unknown>)) {
+      if (value === undefined || value === null || value === '') continue
+      if (!COMPLEX_TR_FIELDS[field]) continue
+      rows.push({
+        entityType: 'complex',
+        entityId: complexId,
+        locale,
+        field,
+        value: typeof value === 'string' ? value : JSON.stringify(value),
+      })
+    }
+  }
+  if (rows.length) await m.getRepository(EstateTranslation).save(rows)
+  return rows.length
+}
+
 async function insertComplex(m: typeof AppDataSource.manager, seed: ComplexSeed): Promise<void> {
-  const { houses, ...complexFields } = seed
+  const { houses, translations, ...complexFields } = seed
   const complex = await m.getRepository(Complex).save(
     m.getRepository(Complex).create(complexFields)
   )
+  const translated = await insertTranslations(m, complex.id, translations)
+  if (translated) logger.info('Translations written', { slug: seed.slug, rows: translated })
 
   for (const houseSeed of houses) {
     const { apartments, ...houseFields } = houseSeed

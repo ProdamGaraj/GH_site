@@ -16,9 +16,9 @@ const allMedia = (c: ComplexSeed): string[] => [
 ]
 
 describe('состав набора', () => {
-  it('содержит четыре проекта, названных заказчиком', () => {
+  it('содержит проекты из книги заказчика плюс каталожный O-zMakon', () => {
     expect(COMPLEXES.map((c) => c.slug).sort()).toEqual(
-      ['assalom-dostlik', 'harizma', 'ozmakon', 'ozmakon-business']
+      ['assalom-dostlik', 'harizma', 'ozmahal', 'ozmakon', 'ozmakon-business']
     )
   })
   it('slug уникальны — иначе сид перезатрёт сам себя', () => {

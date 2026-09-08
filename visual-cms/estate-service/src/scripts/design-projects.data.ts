@@ -15,6 +15,8 @@
  * Чистый модуль без БД: покрывается тестами, используется seed-design-projects.
  */
 
+import { PROJECT_CONTENT, ProjectTexts } from './design-projects.content'
+
 /** Пропуск в исходных данных: что именно и почему отсутствует. */
 export interface DataGap {
   /** Slug проекта либо '*', если пропуск общий для всех. */
@@ -84,6 +86,8 @@ export interface ComplexSeed {
   hallGallery: string[]
   yardGallery: string[]
   houses: HouseSeed[]
+  /** Оверлей-переводы: локаль → поля. Пишутся в estate_translations. */
+  translations?: Record<string, ProjectTexts>
 }
 
 // --- Медиатека CMS: имя файла дизайна → URL ассета ---
@@ -100,6 +104,8 @@ const M = {
   ozmakonBusinessHall5: '/media/fd57183d-8e8d-4f2f-965d-cb99c32b135f.png',
   ozmakonBusinessMap: '/media/182d8b06-623d-4a75-9a2d-3e99f23f1d37.png',
   ozmakonCard: '/media/43278838-d571-477e-b565-ed9aebe60812.jpg',
+  ozmahalCard: '/media/40e7e690-b2a6-454b-bfaf-fffa29050612.jpg',
+  ozmahalWide: '/media/898b3159-d535-4a34-86cc-5003bb7c2407.jpg',
   dostlikCard: '/media/d65851c0-0bcf-4901-87d7-4d91c77738c3.jpg',
   dostlikWide: '/media/a4eca737-ac2d-4c21-aa39-8d0b5eaa13c4.jpg',
   dostlikLogo: '/media/28f073f7-fac7-44cb-b769-f49786311d57.png',
@@ -132,7 +138,7 @@ const DOSTLIK_APARTMENTS: ApartmentSeed[] = [
     deadline: '1 кв. 2028', offerLabel: '', planImage: '' },
 ]
 
-export const COMPLEXES: ComplexSeed[] = [
+const BASE_COMPLEXES: ComplexSeed[] = [
   {
     slug: 'ozmakon-business',
     externalId: null,
@@ -260,9 +266,44 @@ export const COMPLEXES: ComplexSeed[] = [
     houses: [],
   },
   {
+    slug: 'ozmahal',
+    externalId: null,
+    order: 4,
+    status: 'active',
+    name: "O'zMahal",
+    className: 'Бизнес',
+    intro: 'Квартальная застройка с комфортными дворами, коммерцией на первых этажах и сильной средой района.',
+    about: "O'zMahal представляет бизнес-сегмент Golden House: продуманные планировки, благоустроенные дворы, надежные инженерные решения и сценарии для комфортной городской жизни.",
+    aboutTitle: 'О проекте',
+    aboutExtra: '',
+    hallTitle: '',
+    hallText: '',
+    address: '',
+    locationTitle: 'Территория большой жизни',
+    locationText: 'Проект расположен в городской среде с удобным доступом к транспорту, сервисам, образовательным и коммерческим объектам.',
+    locationLabels: [],
+    yardEyebrow: '',
+    yardTitle: '',
+    yardText: '',
+    yardFeatures: [],
+    stats: [],
+    logo: '',
+    logoClass: '',
+    media: M.ozmahalWide,
+    aboutVideo: '',
+    mapUrl: '',
+    mapImage: '',
+    panoramaUrl: '',
+    heroImages: [M.ozmahalCard, M.ozmahalWide],
+    gallery: [],
+    hallGallery: [],
+    yardGallery: [],
+    houses: [],
+  },
+  {
     slug: 'ozmakon',
     externalId: null,
-    order: 3,
+    order: 5,
     status: 'sold_out',
     name: "O'zMakon",
     className: 'Бизнес',
@@ -297,6 +338,22 @@ export const COMPLEXES: ComplexSeed[] = [
 ]
 
 /**
+ * Итоговый набор: базовое описание (медиа, структура, порядок) перекрывается
+ * текстами из книги заказчика. Книга — источник истины по копирайту, поэтому
+ * побеждает она; поля, которых в книге нет (адрес, метки карты, медиа),
+ * остаются из базового описания.
+ */
+export const COMPLEXES: ComplexSeed[] = BASE_COMPLEXES.map((complex) => {
+  const content = PROJECT_CONTENT[complex.slug]
+  if (!content) return complex
+  return {
+    ...complex,
+    ...content.ru,
+    translations: Object.keys(content.uz).length ? { uz: content.uz } : undefined,
+  }
+})
+
+/**
  * Пропуски в исходных данных. Печатается сидом после записи, чтобы список
  * «что дозаполнить руками» не терялся в коде.
  */
@@ -307,10 +364,10 @@ export const GAPS: DataGap[] = [
     reason: 'hero-1.jpg и hero-2.jpg (12 и 13 МБ) не загружены в медиатеку CMS — временно карточка каталога' },
   { slug: 'ozmakon-business', field: 'yardGallery',
     reason: 'yard-3.jpg (13 МБ) не загружен в медиатеку — 2 кадра из 3' },
-  { slug: 'ozmakon-business', field: 'stats',
-    reason: 'в дизайне нет — страница падала на дефолтные «9 и 16 / 3 м / 85+»' },
-  { slug: 'ozmakon-business', field: 'hallText',
-    reason: 'в дизайне нет текста секции холлов, только галерея' },
+  { slug: 'ozmahal', field: 'весь контент секций',
+    reason: 'лист «O`zMahal» в книге заказчика пуст; есть только карточка каталога' },
+  { slug: '*', field: 'медиа из книги',
+    reason: 'в колонке «Материал» ссылки на папки Google Drive — файлы туда не выгружены, медиа взято из медиатеки CMS' },
   { slug: 'ozmakon-business', field: 'houses / apartments',
     reason: 'квартир и корпусов в дизайне нет; демо-карточки принадлежат Do’stlik' },
   { slug: 'assalom-dostlik', field: 'yardGallery / yardFeatures',
@@ -320,7 +377,7 @@ export const GAPS: DataGap[] = [
   { slug: 'assalom-dostlik', field: 'apartments[].planImage',
     reason: 'планировок в дизайне нет — карточки показывают CSS-заглушку' },
   { slug: 'harizma', field: 'весь контент секций',
-    reason: 'в дизайне только карточка каталога: имя, класс, интро. Тексты about/hall/yard/адрес отсутствуют' },
+    reason: 'лист «Harizma» в книге заказчика пуст; в дизайне только карточка каталога' },
   { slug: 'harizma', field: 'медиа',
     reason: 'есть только project-harizma-card.jpg и project-harizma.jpg' },
   { slug: 'harizma', field: 'houses / apartments', reason: 'в дизайне нет' },
