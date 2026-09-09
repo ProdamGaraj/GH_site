@@ -18,7 +18,7 @@ const locationLabelSchema = z.object({
 const complexBase = {
   slug: z.string().min(1).max(160).regex(/^[a-z0-9-]+$/, 'slug: только a-z, 0-9, дефис'),
   order: z.number().int().optional(),
-  externalId: z.number().int().positive().nullable().optional(),
+  externalHouseId: z.number().int().positive().nullable().optional(),
   status: z.enum(['active', 'sold_out']).optional(),
   name: z.string().min(1).max(200),
   className: z.string().max(60).optional(),

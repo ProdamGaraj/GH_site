@@ -48,7 +48,7 @@ describe('MacroV2Client.fetchComplexStats', () => {
   it('throws on non-2xx with status and body snippet', async () => {
     const { fn } = makeFetch([{ status: 401, body: { error: 'unauthorized' } }])
     const c = new MacroV2Client({ baseUrl: 'https://api.x', token: 't', fetchImpl: fn })
-    await expect(c.fetchComplexStats([1])).rejects.toThrow(/MacroV2 401/)
+    await expect(c.fetchComplexStats([1])).rejects.toThrow(/MacroCRM 401/)
   })
 
   it('skips items without a valid id', async () => {

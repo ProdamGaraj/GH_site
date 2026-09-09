@@ -53,6 +53,17 @@ export const APARTMENT_TR_FIELDS: FieldMap = {
   offerLabel: 'string',
 }
 
+/**
+ * Переводимые поля типа планировки.
+ *
+ * Только имя: картинки, площади и цены языка не имеют. Имена вида «К2-54.65-6»
+ * обычно и не переводят, но реестр это допускает — заказчик может завести
+ * человеческое название планировки на каждом языке.
+ */
+export const PLANTYPE_TR_FIELDS: FieldMap = {
+  planName: 'string',
+}
+
 // --- Входные структуры (совпадают с полями TypeORM-сущностей) ---
 export interface TrRow {
   entityType: string
@@ -72,7 +83,7 @@ export interface LocationLabelRow {
 
 export interface ComplexRow {
   id: string
-  externalId: number | null
+  externalHouseId: number | null
   slug: string
   order: number
   status: string
@@ -181,10 +192,27 @@ export function applyOverlay<T extends Record<string, any>>(
 }
 
 // --- Языковые производные (title / meta / price) ---
-const WORDS: Record<Locale, { floor: string; entrance: string; numberPrefix: string }> = {
-  ru: { floor: 'этаж', entrance: 'подъезд', numberPrefix: '№' },
-  uz: { floor: 'qavat', entrance: 'kirish', numberPrefix: '№' },
-  en: { floor: 'floor', entrance: 'entrance', numberPrefix: 'No.' },
+const WORDS: Record<
+  Locale,
+  { floor: string; entrance: string; numberPrefix: string; floors: string; from: string }
+> = {
+  ru: { floor: 'этаж', entrance: 'подъезд', numberPrefix: '№', floors: 'этажи', from: 'от' },
+  uz: { floor: 'qavat', entrance: 'kirish', numberPrefix: '№', floors: 'qavatlar', from: 'dan' },
+  en: { floor: 'floor', entrance: 'entrance', numberPrefix: 'No.', floors: 'floors', from: 'from' },
+}
+
+/** Слово «квартира» с числом: 1 квартира, 3 квартиры, 12 квартир. */
+const APARTMENT_WORD: Record<Locale, (n: number) => string> = {
+  ru: (n) => {
+    const mod100 = n % 100
+    const mod10 = n % 10
+    if (mod100 >= 11 && mod100 <= 14) return 'квартир'
+    if (mod10 === 1) return 'квартира'
+    if (mod10 >= 2 && mod10 <= 4) return 'квартиры'
+    return 'квартир'
+  },
+  uz: () => 'xonadon',
+  en: (n) => (n === 1 ? 'apartment' : 'apartments'),
 }
 
 export function toNumber(v: string | number | null | undefined): number {
@@ -261,6 +289,18 @@ export function distinctValues<T>(rows: T[], pick: (row: T) => string): string[]
   return out
 }
 
+/** Заголовок секции планировок. */
+const PLAN_SECTION_TITLE: Record<Locale, string> = {
+  ru: 'Планировки',
+  uz: 'Rejalar',
+  en: 'Floor plans',
+}
+
+/** Уникальные числа по возрастанию, строками — чипсы рендерятся текстом. */
+export function distinctSortedNumbers(values: number[]): string[] {
+  return [...new Set(values)].sort((a, b) => a - b).map(String)
+}
+
 /** Подпись планировки: ru "4-комн. 114 м²", uz "4 xonali 114 m²", en "4-room 114 m²". */
 export function apartmentTitle(rooms: number, area: string | number, locale: Locale): string {
   const a = formatArea(area)
@@ -282,6 +322,46 @@ export function apartmentMeta(a: ApartmentRow, locale: Locale): string {
   }
   if (a.deadline) parts.push(a.deadline)
   return parts.join(' | ')
+}
+
+/**
+ * Диапазон площади: «55.64 – 56.12 м²», а при совпадении границ — «56.12 м²».
+ *
+ * Один planName накрывает квартиры, отличающиеся на сотые доли метра, поэтому
+ * показывать одно число было бы враньём. Но и «56.12 – 56.12» — мусор.
+ */
+export function formatAreaRange(min: string | number, max: string | number, locale: Locale): string {
+  const unit = locale === 'ru' ? 'м²' : 'm²'
+  const a = formatArea(min)
+  const b = formatArea(max)
+  return a === b ? `${a} ${unit}` : `${a} – ${b} ${unit}`
+}
+
+/** «от 1 153 779 562 UZS». Пустая строка, если цены нет — плашку рисовать не из чего. */
+export function formatPriceFrom(value: string | number | null | undefined, locale: Locale): string {
+  const formatted = formatPrice(value)
+  if (!formatted) return ''
+  return locale === 'uz' ? `${formatted} dan` : `${WORDS[locale].from} ${formatted}`
+}
+
+/** «12 квартир» / «1 квартира». */
+export function formatApartmentsCount(count: number, locale: Locale): string {
+  if (count <= 0) return ''
+  return `${count} ${APARTMENT_WORD[locale](count)}`
+}
+
+/**
+ * «этажи 3–16» по списку этажей.
+ *
+ * Список может быть дырявым (3, 4, 7, 12) — показываем границы, а не
+ * перечисление: на карточке важен размах, а не полный перечень.
+ */
+export function formatFloorsRange(floors: number[], locale: Locale): string {
+  if (!Array.isArray(floors) || floors.length === 0) return ''
+  const min = Math.min(...floors)
+  const max = Math.max(...floors)
+  const word = WORDS[locale].floors
+  return min === max ? `${min} ${WORDS[locale].floor}` : `${word} ${min}–${max}`
 }
 
 // --- DTO выхода ---
@@ -330,8 +410,8 @@ export interface HouseDTO {
 
 export interface ComplexDetailDTO {
   slug: string
-  /** Числовой ID проекта в CRM: {{item.externalId}} в доп.источнике квартир. */
-  externalId: number | null
+  /** ID дома в MacroCRM: {{item.externalHouseId}} в доп.источнике квартир. */
+  externalHouseId: number | null
   status: string
   name: string
   className: string
@@ -371,11 +451,101 @@ export interface ComplexDetailDTO {
   deadlines: string[]
   /** Уникальные классы квартир — чипсы фильтра. */
   apartmentClasses: string[]
+  /** Типы планировок — карточки «Выбрать планировку». */
+  planTypes: PlanTypeDTO[]
+  /** Комнатности планировок — чипсы фильтра. У каждого проекта свой набор. */
+  planRooms: string[]
+  /** Виды из окон, встречающиеся в проекте, — чипсы фильтра. */
+  planViews: string[]
+  /**
+   * Секция «Планировки» как массив 0..1.
+   *
+   * До первого синка с CRM планировок нет, и секция должна не существовать, а
+   * не висеть пустой панелью фильтра. Условий в движке шаблонов нет, поэтому
+   * «условность» выражается длиной массива — тот же приём, что у обложек.
+   */
+  planSections: Array<{ title: string }>
+}
+
+/** Строка plan_types как её отдаёт TypeORM. */
+export interface PlanTypeRow {
+  id: string
+  signature: string
+  planName: string
+  images: Array<{ title: string; url: string; thumbUrl: string }>
+  panoUrl: string
+  rooms: number
+  isStudio: boolean
+  areaMin: string | number
+  areaMax: string | number
+  priceMin: string | number
+  priceMax: string | number
+  apartmentsCount: number
+  floors: number[]
+  entrances: number[]
+  windowViews: string[]
+  order: number
+}
+
+/**
+ * Тип планировки для карточки на странице проекта.
+ *
+ * Карточка показывает планировку, а фильтруется по данным квартир этого типа —
+ * отсюда два набора полей: готовые подписи для показа и числа с готовыми
+ * строками-множествами для data-атрибутов фильтра. Собирать эти строки в
+ * шаблоне нечем: движок не умеет ни join, ни условий.
+ */
+export interface PlanTypeDTO {
+  id: string
+  planName: string
+  rooms: number
+  isStudio: boolean
+
+  /** «2-комн. 55.64 – 56.12 м²» — заголовок карточки. */
+  title: string
+  areaLabel: string
+  priceLabel: string
+  countLabel: string
+  floorsLabel: string
+
+  /** Первая картинка — для карточки; массив — для модалки со всеми ракурсами. */
+  image: string
+  /**
+   * Обложка карточки массивом 0..1.
+   *
+   * Тот же приём, что у planImages квартиры: пустая строка в url() затёрла бы
+   * CSS-заглушку, а условий в движке шаблонов нет — «условность» выражается
+   * длиной массива.
+   */
+  cover: Array<{ image: string }>
+  images: Array<{ title: string; url: string; thumbUrl: string }>
+  /** Ссылки на все ракурсы через «|» — их читает модалка планировки. */
+  imagesAttr: string
+  /** 3D-тур как массив 0..1: условий в движке шаблонов нет. */
+  panorama: Array<{ url: string }>
+
+  apartmentsCount: number
+  areaMin: number
+  areaMax: number
+  priceMin: number
+  priceMax: number
+  /** Границы этажей — чтобы этаж фильтровался диапазоном, а не двумя десятками чипсов. */
+  floorMin: number | null
+  floorMax: number | null
+
+  /** Наборы для фильтра, готовыми строками: «3,4,7» и «двор|бульвар». */
+  floorsAttr: string
+  entrancesAttr: string
+  windowViewsAttr: string
+
+  floors: number[]
+  entrances: number[]
+  windowViews: string[]
 }
 
 export interface ComplexListItemDTO {
   slug: string
-  externalId: number | null
+  externalHouseId: number | null
   name: string
   className: string
   intro: string
@@ -417,12 +587,69 @@ export function buildApartmentDTO(
   }
 }
 
+/**
+ * Тип планировки в форму карточки.
+ *
+ * planName переводимый: имена вида «К2-54.65-6» на узбекской версии остаются
+ * как есть, но заказчик может завести перевод — реестр PLANTYPE_TR_FIELDS это
+ * допускает.
+ */
+export function buildPlanTypeDTO(
+  planType: PlanTypeRow,
+  locale: Locale,
+  index: Map<string, string>
+): PlanTypeDTO {
+  const p = applyOverlay(planType, 'planType', planType.id, locale, PLANTYPE_TR_FIELDS, index)
+  const images = Array.isArray(p.images) ? p.images : []
+  const floors = Array.isArray(p.floors) ? p.floors : []
+  const entrances = Array.isArray(p.entrances) ? p.entrances : []
+  const windowViews = Array.isArray(p.windowViews) ? p.windowViews : []
+  const areaMin = toNumber(p.areaMin)
+  const areaMax = toNumber(p.areaMax)
+
+  return {
+    id: p.id,
+    planName: p.planName,
+    rooms: p.rooms,
+    isStudio: p.isStudio,
+
+    title: apartmentTitle(p.rooms, areaMax, locale),
+    areaLabel: formatAreaRange(areaMin, areaMax, locale),
+    priceLabel: formatPriceFrom(p.priceMin, locale),
+    countLabel: formatApartmentsCount(p.apartmentsCount, locale),
+    floorsLabel: formatFloorsRange(floors, locale),
+
+    image: images[0]?.url ?? '',
+    cover: optionalOne('image', images[0]?.url),
+    images,
+    imagesAttr: images.map((image) => image.url).join('|'),
+    panorama: p.panoUrl ? [{ url: p.panoUrl }] : [],
+
+    apartmentsCount: p.apartmentsCount,
+    areaMin,
+    areaMax,
+    priceMin: toNumber(p.priceMin),
+    priceMax: toNumber(p.priceMax),
+    floorMin: floors.length ? Math.min(...floors) : null,
+    floorMax: floors.length ? Math.max(...floors) : null,
+
+    floorsAttr: floors.join(','),
+    entrancesAttr: entrances.join(','),
+    windowViewsAttr: windowViews.join('|'),
+
+    floors,
+    entrances,
+    windowViews,
+  }
+}
+
 export function buildComplexDetail(
   complex: ComplexRow,
   houses: HouseRow[],
   apartments: ApartmentRow[],
   translations: TrRow[],
-  locale: Locale
+  locale: Locale,
+  planTypes: PlanTypeRow[] = []
 ): ComplexDetailDTO {
   const index = indexTranslations(translations)
   const c = applyOverlay(complex, 'complex', complex.id, locale, COMPLEX_TR_FIELDS, index)
@@ -460,9 +687,15 @@ export function buildComplexDetail(
   // ГЛОБАЛЬНОМУ order (грид не сгруппирован по домам, карточки идут вперемешку).
   const flatApartments = sortByOrder(apartments).map((apt) => aptDtoById.get(apt.id)!)
 
+  // Типы без квартир не показываем: строка живёт ради переводов, но карточка
+  // «0 квартир» на странице — мусор.
+  const planTypeDTOs = sortByOrder(planTypes.filter((p) => p.apartmentsCount > 0)).map(
+    (planType) => buildPlanTypeDTO(planType, locale, index)
+  )
+
   return {
     slug: c.slug,
-    externalId: c.externalId ?? null,
+    externalHouseId: c.externalHouseId ?? null,
     status: c.status,
     name: c.name,
     className: c.className,
@@ -499,6 +732,17 @@ export function buildComplexDetail(
     apartments: flatApartments,
     deadlines: distinctValues(flatApartments, (a) => a.deadline),
     apartmentClasses: distinctValues(flatApartments, (a) => a.apartmentClass),
+    // Типы без квартир не показываем: строка живёт ради переводов, но карточка
+    // «0 квартир» на странице — мусор.
+    planTypes: planTypeDTOs,
+    // Чипсы разворачиваются из этих списков через _repeat, а не хардкодятся:
+    // у каждого проекта своя комнатность и свои виды из окон.
+    planRooms: distinctSortedNumbers(planTypeDTOs.map((p) => p.rooms)),
+    planViews: distinctValues(
+      planTypeDTOs.flatMap((p) => p.windowViews),
+      (view) => view
+    ),
+    planSections: planTypeDTOs.length > 0 ? [{ title: PLAN_SECTION_TITLE[locale] }] : [],
   }
 }
 
@@ -511,7 +755,7 @@ export function buildComplexListItem(
   const c = applyOverlay(complex, 'complex', complex.id, locale, COMPLEX_TR_FIELDS, index)
   return {
     slug: c.slug,
-    externalId: c.externalId ?? null,
+    externalHouseId: c.externalHouseId ?? null,
     name: c.name,
     className: c.className,
     intro: c.intro,

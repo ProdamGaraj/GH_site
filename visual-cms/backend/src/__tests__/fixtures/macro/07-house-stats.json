@@ -1,0 +1,95 @@
+{
+ "data": [
+  {
+   "id": 5139395,
+   "title": "O'z Makon Business",
+   "stats": {
+    "categories": {
+     "comm": {
+      "minPrice": 367200581,
+      "maxPrice": 2947087305,
+      "minArea": 26.11,
+      "maxArea": 104.02,
+      "countOnSale": 16
+     },
+     "flat": {
+      "minPrice": 845861909,
+      "maxPrice": 5149638080,
+      "minArea": 34.87,
+      "maxArea": 233.84,
+      "countOnSale": 149,
+      "rooms": {
+       "1": {
+        "minPrice": 845861909,
+        "maxPrice": 1086978817,
+        "minArea": 34.87,
+        "maxArea": 43.87,
+        "countOnSale": 31
+       },
+       "2": {
+        "minPrice": 1118487933,
+        "maxPrice": 1964197595,
+        "minArea": 48.41,
+        "maxArea": 68.86,
+        "countOnSale": 77
+       },
+       "3": {
+        "minPrice": 1567877677,
+        "maxPrice": 2276739641,
+        "minArea": 70.05,
+        "maxArea": 88.95,
+        "countOnSale": 39
+       },
+       "4": {
+        "minPrice": 4321998065,
+        "maxPrice": 5149638080,
+        "minArea": 191.43,
+        "maxArea": 233.84,
+        "countOnSale": 2
+       }
+      }
+     },
+     "garage": {
+      "minPrice": 152262222,
+      "maxPrice": 217904722,
+      "minArea": 13.25,
+      "maxArea": 16.8,
+      "countOnSale": 82
+     }
+    }
+   }
+  },
+  {
+   "id": 5622025,
+   "title": "Ассалом Дустлик-4",
+   "stats": {
+    "categories": {
+     "flat": {
+      "minPrice": 459160279,
+      "maxPrice": 973029245,
+      "minArea": 21.08,
+      "maxArea": 52.14,
+      "countOnSale": 190,
+      "rooms": {
+       "1": {
+        "minPrice": 459160279,
+        "maxPrice": 764512026,
+        "minArea": 21.08,
+        "maxArea": 37.87,
+        "countOnSale": 65
+       },
+       "2": {
+        "minPrice": 705897787,
+        "maxPrice": 973029245,
+        "minArea": 39.78,
+        "maxArea": 52.14,
+        "countOnSale": 125
+       }
+      }
+     }
+    }
+   }
+  }
+ ],
+ "meta": null
+}

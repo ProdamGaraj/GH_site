@@ -4,6 +4,7 @@ import { AppDataSource } from '../config/database'
 import { Complex } from '../models/Complex'
 import { House } from '../models/House'
 import { Apartment } from '../models/Apartment'
+import { PlanType } from '../models/PlanType'
 import { EstateTranslation } from '../models/EstateTranslation'
 import { logger } from '../services/Logger'
 import {
@@ -70,6 +71,13 @@ export class ComplexController {
             order: { order: 'ASC' },
           })
         : []
+    const planTypes =
+      houseIds.length > 0
+        ? await AppDataSource.getRepository(PlanType).find({
+            where: { houseId: In(houseIds) },
+            order: { order: 'ASC' },
+          })
+        : []
     const translations = (await AppDataSource.getRepository(EstateTranslation).find({
       where: { locale },
     })) as unknown as TrRow[]
@@ -86,11 +94,25 @@ export class ComplexController {
       list.push(a)
       aptsByHouse.set(a.houseId, list)
     }
+    const plansByHouse = new Map<string, PlanType[]>()
+    for (const p of planTypes) {
+      const list = plansByHouse.get(p.houseId) || []
+      list.push(p)
+      plansByHouse.set(p.houseId, list)
+    }
 
     return complexes.map((c) => {
       const cHouses = housesByComplex.get(c.id) || []
       const cApts = cHouses.flatMap((h) => aptsByHouse.get(h.id) || [])
-      return buildComplexDetail(c as any, cHouses as any, cApts as any, translations, locale)
+      const cPlans = cHouses.flatMap((h) => plansByHouse.get(h.id) || [])
+      return buildComplexDetail(
+        c as any,
+        cHouses as any,
+        cApts as any,
+        translations,
+        locale,
+        cPlans as any
+      )
     })
   }
 
@@ -119,8 +141,21 @@ export class ComplexController {
             })
           : []
 
+      const planTypes =
+        houseIds.length > 0
+          ? await AppDataSource.getRepository(PlanType).find({
+              where: { houseId: In(houseIds) },
+              order: { order: 'ASC' },
+            })
+          : []
+
       // Переводы для всех сущностей этого ЖК одним запросом.
-      const entityIds = [complex.id, ...houseIds, ...apartments.map((a) => a.id)]
+      const entityIds = [
+        complex.id,
+        ...houseIds,
+        ...apartments.map((a) => a.id),
+        ...planTypes.map((p) => p.id),
+      ]
       const translations = await AppDataSource.getRepository(EstateTranslation).find({
         where: { entityId: In(entityIds), locale },
       })
@@ -130,7 +165,8 @@ export class ComplexController {
         houses as any,
         apartments as any,
         translations as unknown as TrRow[],
-        locale
+        locale,
+        planTypes as any
       )
       res.json(dto)
     } catch (err) {

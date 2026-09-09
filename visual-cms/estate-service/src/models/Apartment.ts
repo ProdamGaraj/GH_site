@@ -8,6 +8,7 @@ import {
   Index,
 } from 'typeorm'
 import { House } from './House'
+import { PlanType } from './PlanType'
 
 /**
  * Квартира / планировка внутри дома.
@@ -27,6 +28,31 @@ export class Apartment {
 
   @ManyToOne(() => House, (house) => house.apartments, { onDelete: 'CASCADE' })
   house!: House
+
+  /** ID объекта продажи в MacroCRM. По нему идёт upsert синка. */
+  @Index({ unique: true })
+  @Column({ type: 'int', nullable: true })
+  externalId!: number | null
+
+  /** Тип планировки. null — планировка в CRM не заведена. */
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  planTypeId!: string | null
+
+  @ManyToOne(() => PlanType, (planType) => planType.apartments, { onDelete: 'SET NULL' })
+  planType!: PlanType | null
+
+  /**
+   * dateModified из CRM. Если не поменялся с прошлого прогона — планировку
+   * повторно не запрашиваем: это единственное, что удерживает второй синк
+   * от повторного обхода всех 339 квартир.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  dateModified!: Date | null
+
+  /** Когда последний раз ходили в getFlatPlans по этой квартире. */
+  @Column({ type: 'timestamptz', nullable: true })
+  planProbedAt!: Date | null
 
   @Column({ type: 'int', default: 0 })
   order!: number
@@ -48,6 +74,15 @@ export class Apartment {
 
   @Column({ type: 'int', nullable: true })
   entrance?: number | null
+
+  /**
+   * Этаж числом — для фильтрации и агрегатов.
+   *
+   * Поле floor ниже остаётся строкой «8/9»: оно переводимое и показывается
+   * как есть. Сортировать и сравнивать по нему нельзя, отсюда второе поле.
+   */
+  @Column({ type: 'int', nullable: true })
+  floorNumber!: number | null
 
   // --- Строковые/переводимые ---
   /** Класс квартиры (первый бейдж): Бизнес / Комфорт+ … */
@@ -73,6 +108,10 @@ export class Apartment {
   /** Плашка предложения: "Акция" / "Последняя планировка". Переводимо. */
   @Column({ length: 80, default: '' })
   offerLabel!: string
+
+  /** Вид из окон: «двор», «бульвар», «ТРЦ Альфраганус». Заполнен у всех. */
+  @Column({ length: 120, default: '' })
+  windowView!: string
 
   @Column({ length: 20, default: 'available' })
   status!: string

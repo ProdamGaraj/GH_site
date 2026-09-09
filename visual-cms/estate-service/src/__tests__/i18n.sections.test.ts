@@ -18,7 +18,7 @@ import {
 } from '../services/i18n'
 
 const baseComplex: ComplexRow = {
-  id: 'c1', externalId: 4210, slug: 'harizma', order: 0, status: 'active',
+  id: 'c1', externalHouseId: 4210, slug: 'harizma', order: 0, status: 'active',
   name: 'Harizma', className: 'Комфорт', intro: 'intro',
   about: 'about', aboutTitle: 'О проекте', aboutExtra: 'extra',
   hallTitle: 'Дизайнерские холлы', hallText: 'hall text',
@@ -154,15 +154,15 @@ describe('offerLabel остаётся в DTO для обратной совме�
   })
 })
 
-describe('externalId в DTO', () => {
-  it('проходит в детальный DTO — плейсхолдер {{item.externalId}} получает значение', () => {
-    expect(buildComplexDetail({ ...baseComplex, externalId: 4210 }, [], [], [], 'ru').externalId).toBe(4210)
+describe('externalHouseId в DTO', () => {
+  it('проходит в детальный DTO — плейсхолдер {{item.externalHouseId}} получает значение', () => {
+    expect(buildComplexDetail({ ...baseComplex, externalHouseId: 4210 }, [], [], [], 'ru').externalHouseId).toBe(4210)
   })
   it('не сопоставленный проект отдаёт null, а не 0 или пустую строку', () => {
-    expect(buildComplexDetail({ ...baseComplex, externalId: null }, [], [], [], 'ru').externalId).toBeNull()
+    expect(buildComplexDetail({ ...baseComplex, externalHouseId: null }, [], [], [], 'ru').externalHouseId).toBeNull()
   })
   it('присутствует и в списочном DTO — лёгкий источник каталога не теряет ключ', () => {
-    expect(buildComplexListItem({ ...baseComplex, externalId: 7 }, [], 'ru').externalId).toBe(7)
+    expect(buildComplexListItem({ ...baseComplex, externalHouseId: 7 }, [], 'ru').externalHouseId).toBe(7)
   })
 })
 

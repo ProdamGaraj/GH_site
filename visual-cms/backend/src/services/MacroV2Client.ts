@@ -14,6 +14,8 @@
  * Rate limit: 100 req/min на ключ (sliding_window).
  */
 
+import { MacroHttp, type MacroHttpOptions } from './MacroHttp'
+
 export interface ComplexStatsRoomBucket {
   minPrice: number
   maxPrice: number
@@ -34,30 +36,14 @@ export interface ComplexStatsRaw {
   }
 }
 
-export interface MacroV2ClientOptions {
-  baseUrl: string
-  token: string
-  /** Таймаут одного HTTP-запроса в мс. По умолчанию 30 секунд. */
-  timeoutMs?: number
-  /** Кастомный fetch (для тестов). */
-  fetchImpl?: typeof fetch
-}
-
-const DEFAULT_TIMEOUT_MS = 30000
+/** Опции клиента статистики — те же, что у транспорта MacroHttp. */
+export type MacroV2ClientOptions = MacroHttpOptions
 
 export class MacroV2Client {
-  private readonly baseUrl: string
-  private readonly token: string
-  private readonly timeoutMs: number
-  private readonly fetchImpl: typeof fetch
+  private readonly http: MacroHttp
 
   constructor(opts: MacroV2ClientOptions) {
-    if (!opts.baseUrl) throw new Error('MacroV2Client: baseUrl is required')
-    if (!opts.token) throw new Error('MacroV2Client: token is required')
-    this.baseUrl = opts.baseUrl.replace(/\/+$/, '')
-    this.token = opts.token
-    this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS
-    this.fetchImpl = opts.fetchImpl ?? fetch
+    this.http = new MacroHttp(opts)
   }
 
   /**
@@ -66,13 +52,13 @@ export class MacroV2Client {
    * Возвращаем массив "как есть" (нормализация id, защита от мусора).
    */
   async fetchComplexStats(complexIds: number[]): Promise<ComplexStatsRaw[]> {
-    const url = `${this.baseUrl}/estateComplexes/listStats`
+    const url = '/estateComplexes/listStats'
     const body: Record<string, unknown> = {}
     if (Array.isArray(complexIds) && complexIds.length > 0) {
       body.complexIds = complexIds
     }
 
-    const json = await this.postJson<{ data?: any[] }>(url, body)
+    const json = await this.http.post<{ data?: any[] }>(url, body)
     const items = Array.isArray(json?.data) ? json.data : []
     const out: ComplexStatsRaw[] = []
     for (const raw of items) {
@@ -87,27 +73,4 @@ export class MacroV2Client {
     return out
   }
 
-  private async postJson<T>(url: string, body: unknown): Promise<T> {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs)
-    try {
-      const res = await this.fetchImpl(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      })
-      if (!res.ok) {
-        const text = await res.text().catch(() => '')
-        throw new Error(`MacroV2 ${res.status} ${res.statusText}: ${text.slice(0, 300)}`)
-      }
-      return (await res.json()) as T
-    } finally {
-      clearTimeout(timer)
-    }
-  }
 }

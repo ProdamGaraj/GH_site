@@ -14,6 +14,7 @@
  */
 
 import type { ComplexStatsRaw, ComplexStatsCategory, ComplexStatsRoomBucket } from './MacroV2Client'
+import { priceFromMinorUnits, areaOrNull } from './macroUnits'
 
 export interface ProjectStats {
   count: number
@@ -38,8 +39,6 @@ export interface ProjectRoomStats {
   price_min: number | null
   price_max: number | null
 }
-
-const PRICE_DIVISOR = 100 // копейки → рубли / тийины → сомы / etc
 
 export function mapComplexStats(raw: ComplexStatsRaw, currency: string | null = null): ProjectStats {
   const empty: ProjectStats = {
@@ -79,10 +78,10 @@ export function mapComplexStats(raw: ComplexStatsRaw, currency: string | null = 
   return {
     count,
     hasStudios,
-    area_min: numOrNull(flat.minArea),
-    area_max: numOrNull(flat.maxArea),
-    price_min: priceOrNull(flat.minPrice),
-    price_max: priceOrNull(flat.maxPrice),
+    area_min: areaOrNull(flat.minArea),
+    area_max: areaOrNull(flat.maxArea),
+    price_min: priceFromMinorUnits(flat.minPrice),
+    price_max: priceFromMinorUnits(flat.maxPrice),
     rooms_max: roomsMax,
     currency,
     byRooms: Object.keys(byRooms).length > 0 ? byRooms : undefined,
@@ -92,10 +91,10 @@ export function mapComplexStats(raw: ComplexStatsRaw, currency: string | null = 
 function mapRoomBucket(b: ComplexStatsRoomBucket): ProjectRoomStats {
   return {
     count: numOrZero(b.countOnSale),
-    area_min: numOrNull(b.minArea),
-    area_max: numOrNull(b.maxArea),
-    price_min: priceOrNull(b.minPrice),
-    price_max: priceOrNull(b.maxPrice),
+    area_min: areaOrNull(b.minArea),
+    area_max: areaOrNull(b.maxArea),
+    price_min: priceFromMinorUnits(b.minPrice),
+    price_max: priceFromMinorUnits(b.maxPrice),
   }
 }
 
@@ -104,17 +103,3 @@ function numOrZero(v: unknown): number {
   return Number.isFinite(n) ? n : 0
 }
 
-function numOrNull(v: unknown): number | null {
-  const n = Number(v)
-  return Number.isFinite(n) && n > 0 ? round2(n) : null
-}
-
-function priceOrNull(v: unknown): number | null {
-  const n = Number(v)
-  if (!Number.isFinite(n) || n <= 0) return null
-  return Math.round(n / PRICE_DIVISOR)
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
-}

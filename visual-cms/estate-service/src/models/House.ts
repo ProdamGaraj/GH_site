@@ -29,6 +29,15 @@ export class House {
   @ManyToOne(() => Complex, (complex) => complex.houses, { onDelete: 'CASCADE' })
   complex!: Complex
 
+  /**
+   * ID дома в MacroCRM. Квартиры из CRM привязаны к houseId, а у нас висят на
+   * House через FK — синк по этому полю находит или заводит дом, не трогая
+   * заведённые руками.
+   */
+  @Index({ unique: true })
+  @Column({ type: 'int', nullable: true })
+  externalId!: number | null
+
   @Column({ type: 'int', default: 0 })
   order!: number
 

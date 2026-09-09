@@ -9,7 +9,7 @@ import {
 
 const complex: ComplexRow = {
   id: 'c1',
-  externalId: 1042,
+  externalHouseId: 1042,
   slug: 'assalom-dostlik',
   order: 0,
   status: 'active',
@@ -126,7 +126,7 @@ describe('buildComplexListItem', () => {
     const item = buildComplexListItem(complex, [], 'ru')
     expect(item).toEqual({
       slug: 'assalom-dostlik',
-      externalId: 1042,
+      externalHouseId: 1042,
       name: 'Assalom Doʼstlik',
       className: 'Комфорт+',
       intro: 'ru intro',

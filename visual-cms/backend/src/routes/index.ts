@@ -17,6 +17,7 @@ import mockRouter from './mock'
 import formsRouter from './forms'
 import analyticsRouter from './analytics'
 import languagesRouter from './languages'
+import macroSyncRouter from './macroSync'
 import translationsRouter from './translations'
 import collectionsRouter from './collections'
 import mediaRouter from './media'
@@ -44,6 +45,7 @@ router.use('/preview', previewRouter)
 router.use('/mock', mockRouter)
 router.use('/forms', formsRouter)
 router.use('/languages', languagesRouter)
+router.use('/macro-sync', macroSyncRouter)
 router.use('/translations', translationsRouter)
 router.use('/media', mediaRouter)
 

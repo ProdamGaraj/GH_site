@@ -1,0 +1,511 @@
+{
+  "_": "Секция «Выбрать планировку» для страницы проекта: панель фильтра и сетка карточек. Отсюда же берётся разметка при заливке в блок CMS — правки делаются здесь, а не в холсте редактора. Внешний repeat по planSections делает секцию условной: до первого синка планировок нет, и пустая панель фильтра на странице не нужна.",
+  "id": "plan-section-slot",
+  "tagName": "div",
+  "attributes": {
+    "class": "plan-section-slot"
+  },
+  "_repeat": {
+    "source": "item.planSections"
+  },
+  "children": [
+    {
+      "id": "plan-section",
+      "tagName": "div",
+      "attributes": {
+        "class": "plan-filter-section",
+        "data-filter-root": "true"
+      },
+      "children": [
+        {
+          "id": "plan-section-title",
+          "tagName": "h2",
+          "attributes": {
+            "class": "section-title"
+          },
+          "content": "{{$.title}}"
+        },
+        {
+          "id": "plan-filters",
+          "tagName": "div",
+          "attributes": {
+            "class": "filter-panel plan-filter-panel"
+          },
+          "children": [
+            {
+              "id": "plan-filter-rooms",
+              "tagName": "div",
+              "attributes": {
+                "class": "filter-group"
+              },
+              "children": [
+                {
+                  "id": "plan-filter-rooms-label",
+                  "tagName": "span",
+                  "attributes": {
+                    "class": "filter-label"
+                  },
+                  "content": "Комнат"
+                },
+                {
+                  "id": "plan-filter-rooms-row",
+                  "tagName": "div",
+                  "attributes": {
+                    "class": "chip-row"
+                  },
+                  "children": [
+                    {
+                      "id": "plan-chip-rooms-all",
+                      "tagName": "button",
+                      "attributes": {
+                        "class": "chip is-active",
+                        "type": "button",
+                        "data-filter-chip": "true",
+                        "data-filter-field": "rooms",
+                        "data-filter-value": ""
+                      },
+                      "content": "Все"
+                    },
+                    {
+                      "id": "plan-chip-rooms",
+                      "tagName": "div",
+                      "attributes": {
+                        "class": "chip-slot"
+                      },
+                      "_repeat": {
+                        "source": "item.planRooms"
+                      },
+                      "children": [
+                        {
+                          "id": "plan-chip-rooms-item",
+                          "tagName": "button",
+                          "attributes": {
+                            "class": "chip",
+                            "type": "button",
+                            "data-filter-chip": "true",
+                            "data-filter-field": "rooms",
+                            "data-filter-value": "{{$}}"
+                          },
+                          "content": "{{$}}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "plan-filter-views",
+              "tagName": "div",
+              "attributes": {
+                "class": "filter-group"
+              },
+              "children": [
+                {
+                  "id": "plan-filter-views-label",
+                  "tagName": "span",
+                  "attributes": {
+                    "class": "filter-label"
+                  },
+                  "content": "Вид из окон"
+                },
+                {
+                  "id": "plan-filter-views-row",
+                  "tagName": "div",
+                  "attributes": {
+                    "class": "chip-row"
+                  },
+                  "children": [
+                    {
+                      "id": "plan-chip-views-all",
+                      "tagName": "button",
+                      "attributes": {
+                        "class": "chip is-active",
+                        "type": "button",
+                        "data-filter-chip": "true",
+                        "data-filter-field": "views",
+                        "data-filter-op": "set",
+                        "data-filter-value": ""
+                      },
+                      "content": "Все"
+                    },
+                    {
+                      "id": "plan-chip-views",
+                      "tagName": "div",
+                      "attributes": {
+                        "class": "chip-slot"
+                      },
+                      "_repeat": {
+                        "source": "item.planViews"
+                      },
+                      "children": [
+                        {
+                          "id": "plan-chip-views-item",
+                          "tagName": "button",
+                          "attributes": {
+                            "class": "chip",
+                            "type": "button",
+                            "data-filter-chip": "true",
+                            "data-filter-field": "views",
+                            "data-filter-op": "set",
+                            "data-filter-multiple": "true",
+                            "data-filter-value": "{{$}}"
+                          },
+                          "content": "{{$}}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "plan-filter-price",
+              "tagName": "div",
+              "attributes": {
+                "class": "filter-group"
+              },
+              "children": [
+                {
+                  "id": "plan-filter-price-label",
+                  "tagName": "span",
+                  "attributes": {
+                    "class": "filter-label"
+                  },
+                  "content": "Цена, UZS"
+                },
+                {
+                  "id": "plan-filter-price-row",
+                  "tagName": "div",
+                  "attributes": {
+                    "class": "range-box"
+                  },
+                  "children": [
+                    {
+                      "id": "plan-price-min",
+                      "tagName": "input",
+                      "attributes": {
+                        "type": "number",
+                        "placeholder": "от",
+                        "data-filter-field": "price",
+                        "data-filter-bound": "min"
+                      }
+                    },
+                    {
+                      "id": "plan-price-max",
+                      "tagName": "input",
+                      "attributes": {
+                        "type": "number",
+                        "placeholder": "до",
+                        "data-filter-field": "price",
+                        "data-filter-bound": "max"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "plan-filter-area",
+              "tagName": "div",
+              "attributes": {
+                "class": "filter-group"
+              },
+              "children": [
+                {
+                  "id": "plan-filter-area-label",
+                  "tagName": "span",
+                  "attributes": {
+                    "class": "filter-label"
+                  },
+                  "content": "Площадь, м²"
+                },
+                {
+                  "id": "plan-filter-area-row",
+                  "tagName": "div",
+                  "attributes": {
+                    "class": "range-box"
+                  },
+                  "children": [
+                    {
+                      "id": "plan-area-min",
+                      "tagName": "input",
+                      "attributes": {
+                        "type": "number",
+                        "placeholder": "от",
+                        "data-filter-field": "area",
+                        "data-filter-bound": "min"
+                      }
+                    },
+                    {
+                      "id": "plan-area-max",
+                      "tagName": "input",
+                      "attributes": {
+                        "type": "number",
+                        "placeholder": "до",
+                        "data-filter-field": "area",
+                        "data-filter-bound": "max"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "plan-filter-floor",
+              "tagName": "div",
+              "attributes": {
+                "class": "filter-group"
+              },
+              "children": [
+                {
+                  "id": "plan-filter-floor-label",
+                  "tagName": "span",
+                  "attributes": {
+                    "class": "filter-label"
+                  },
+                  "content": "Этаж"
+                },
+                {
+                  "id": "plan-filter-floor-row",
+                  "tagName": "div",
+                  "attributes": {
+                    "class": "range-box"
+                  },
+                  "children": [
+                    {
+                      "id": "plan-floor-min",
+                      "tagName": "input",
+                      "attributes": {
+                        "type": "number",
+                        "placeholder": "от",
+                        "data-filter-field": "floor",
+                        "data-filter-bound": "min"
+                      }
+                    },
+                    {
+                      "id": "plan-floor-max",
+                      "tagName": "input",
+                      "attributes": {
+                        "type": "number",
+                        "placeholder": "до",
+                        "data-filter-field": "floor",
+                        "data-filter-bound": "max"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "plan-filter-actions",
+              "tagName": "div",
+              "attributes": {
+                "class": "panel-actions"
+              },
+              "children": [
+                {
+                  "id": "plan-filter-summary",
+                  "tagName": "span",
+                  "attributes": {
+                    "class": "filter-summary"
+                  },
+                  "children": [
+                    {
+                      "id": "plan-filter-count",
+                      "tagName": "span",
+                      "attributes": {
+                        "data-filter-count": "true"
+                      },
+                      "content": "0"
+                    },
+                    {
+                      "id": "plan-filter-count-word",
+                      "tagName": "span",
+                      "content": " планировок"
+                    }
+                  ]
+                },
+                {
+                  "id": "plan-filter-reset",
+                  "tagName": "button",
+                  "attributes": {
+                    "class": "filter-reset",
+                    "type": "button",
+                    "data-filter-reset": "true"
+                  },
+                  "content": "Сбросить"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "plan-empty",
+          "tagName": "p",
+          "attributes": {
+            "class": "plan-empty",
+            "data-filter-empty": "true",
+            "hidden": "true"
+          },
+          "content": "По выбранным условиям планировок нет"
+        },
+        {
+          "id": "plan-grid",
+          "tagName": "div",
+          "attributes": {
+            "class": "apartments-grid",
+            "aria-label": "Планировки"
+          },
+          "_repeat": {
+            "source": "item.planTypes"
+          },
+          "children": [
+            {
+              "id": "plan-card",
+              "tagName": "article",
+              "attributes": {
+                "class": "apartment-card",
+                "data-filter-item": "true",
+                "data-rooms": "{{$.rooms}}",
+                "data-price-min": "{{$.priceMin}}",
+                "data-price-max": "{{$.priceMax}}",
+                "data-area-min": "{{$.areaMin}}",
+                "data-area-max": "{{$.areaMax}}",
+                "data-floor-min": "{{$.floorMin}}",
+                "data-floor-max": "{{$.floorMax}}",
+                "data-floors": "{{$.floorsAttr}}",
+                "data-entrances": "{{$.entrancesAttr}}",
+                "data-views": "{{$.windowViewsAttr}}",
+                "data-plan-images": "{{$.imagesAttr}}",
+                "data-plan-name": "{{$.planName}}"
+              },
+              "children": [
+                {
+                  "id": "plan-card-body",
+                  "tagName": "div",
+                  "attributes": {
+                    "class": "apartment-card-body"
+                  },
+                  "children": [
+                    {
+                      "id": "plan-card-title",
+                      "tagName": "h3",
+                      "content": "{{$.title}}"
+                    },
+                    {
+                      "id": "plan-card-badges",
+                      "tagName": "div",
+                      "attributes": {
+                        "class": "apartment-badges"
+                      },
+                      "children": [
+                        {
+                          "id": "plan-card-name",
+                          "tagName": "span",
+                          "attributes": {
+                            "data-apartment-class": "true"
+                          },
+                          "content": "{{$.planName}}"
+                        },
+                        {
+                          "id": "plan-card-count",
+                          "tagName": "span",
+                          "content": "{{$.countLabel}}"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "plan-card-visual",
+                      "tagName": "div",
+                      "attributes": {
+                        "class": "plan-visual"
+                      },
+                      "_repeat": {
+                        "source": "$.cover"
+                      },
+                      "children": [
+                        {
+                          "id": "plan-card-image",
+                          "tagName": "div",
+                          "attributes": {
+                            "aria-hidden": "true"
+                          },
+                          "styles": {
+                            "properties": {
+                              "background-image": "url(\"{{$.image}}\")",
+                              "background-size": "contain",
+                              "background-position": "center",
+                              "background-repeat": "no-repeat"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "id": "plan-card-price",
+                      "tagName": "div",
+                      "attributes": {
+                        "class": "apartment-price"
+                      },
+                      "children": [
+                        {
+                          "id": "plan-card-price-value",
+                          "tagName": "span",
+                          "content": "{{$.priceLabel}}"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "plan-card-meta",
+                      "tagName": "div",
+                      "attributes": {
+                        "class": "apartment-meta"
+                      },
+                      "children": [
+                        {
+                          "id": "plan-card-area",
+                          "tagName": "span",
+                          "content": "{{$.areaLabel}}"
+                        },
+                        {
+                          "id": "plan-card-br",
+                          "tagName": "br"
+                        },
+                        {
+                          "id": "plan-card-floors",
+                          "tagName": "span",
+                          "content": "{{$.floorsLabel}}"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "plan-card-tour-slot",
+                  "tagName": "div",
+                  "_repeat": {
+                    "source": "$.panorama"
+                  },
+                  "children": [
+                    {
+                      "id": "plan-card-tour",
+                      "tagName": "a",
+                      "attributes": {
+                        "class": "apartment-offer plan-tour",
+                        "target": "_blank",
+                        "rel": "noopener",
+                        "href": "{{$.url}}"
+                      },
+                      "content": "3D-тур"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -24,13 +24,17 @@ export class Complex {
   id!: string
 
   /**
-   * Числовой ID проекта во внешней системе (CRM). По нему на деплое тянутся
-   * квартиры отдельным источником: {{item.externalId}} в запросе.
-   * null — проект не сопоставлен с CRM.
+   * ID ДОМА в MacroCRM (houseId), а не ЖК.
+   *
+   * У нас «комплекс» соответствует дому в CRM: квартира 5139781 приходит с
+   * houseId 5139395 и complexId 5139393, и 5139395 — это наш ozmakon-business.
+   * Поэтому квартиры тянутся запросом с houseIds, а не complexIds.
+   *
+   * null — проект не сопоставлен с CRM, синк его пропускает.
    */
   @Index({ unique: true })
   @Column({ type: 'int', nullable: true })
-  externalId!: number | null
+  externalHouseId!: number | null
 
   /** URL-идентификатор: slug страницы проекта (assalom-dostlik). Уникален. */
   @Index({ unique: true })

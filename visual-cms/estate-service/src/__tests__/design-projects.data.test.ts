@@ -125,20 +125,27 @@ describe('реестр пропусков', () => {
   })
 })
 
-describe('externalId — ключ для запроса квартир из CRM', () => {
+describe('externalHouseId — ключ для запроса квартир из CRM', () => {
   it('либо null, либо положительное целое', () => {
     for (const c of COMPLEXES) {
-      if (c.externalId === null) continue
-      expect(Number.isInteger(c.externalId)).toBe(true)
-      expect(c.externalId).toBeGreaterThan(0)
+      if (c.externalHouseId === null) continue
+      expect(Number.isInteger(c.externalHouseId)).toBe(true)
+      expect(c.externalHouseId).toBeGreaterThan(0)
     }
   })
   it('заданные значения уникальны — иначе квартиры разъедутся не по тем страницам', () => {
-    const ids = COMPLEXES.map((c) => c.externalId).filter((x): x is number => x !== null)
+    const ids = COMPLEXES.map((c) => c.externalHouseId).filter((x): x is number => x !== null)
     expect(new Set(ids).size).toBe(ids.length)
   })
-  it('пока не сопоставлен ни один проект — и это отмечено в реестре пропусков', () => {
-    expect(COMPLEXES.every((c) => c.externalId === null)).toBe(true)
-    expect(GAPS.some((g) => g.field === 'externalId')).toBe(true)
+  it('у публикуемых проектов ID проставлены, у остальных отмечены как пропуск', () => {
+    const PUBLISHED = ['ozmakon-business', 'assalom-dostlik']
+    for (const c of COMPLEXES) {
+      if (PUBLISHED.includes(c.slug)) {
+        expect(c.externalHouseId).not.toBeNull()
+      } else {
+        expect(c.externalHouseId).toBeNull()
+        expect(GAPS.some((g) => g.slug === c.slug && g.field === 'externalHouseId')).toBe(true)
+      }
+    }
   })
 })

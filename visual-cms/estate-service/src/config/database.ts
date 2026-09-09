@@ -2,6 +2,7 @@ import { DataSource } from 'typeorm'
 import { Complex } from '../models/Complex'
 import { House } from '../models/House'
 import { Apartment } from '../models/Apartment'
+import { PlanType } from '../models/PlanType'
 import { EstateTranslation } from '../models/EstateTranslation'
 
 /**
@@ -14,7 +15,7 @@ export const AppDataSource = new DataSource({
   url: process.env.DATABASE_URL,
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
-  entities: [Complex, House, Apartment, EstateTranslation],
+  entities: [Complex, House, Apartment, PlanType, EstateTranslation],
   migrations: [],
   subscribers: [],
 })

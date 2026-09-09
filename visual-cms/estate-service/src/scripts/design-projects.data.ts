@@ -54,7 +54,7 @@ export interface HouseSeed {
 export interface ComplexSeed {
   slug: string
   /** Числовой ID проекта в CRM. null — сопоставление неизвестно из дизайна. */
-  externalId: number | null
+  externalHouseId: number | null
   order: number
   status: 'active' | 'sold_out'
   name: string
@@ -145,7 +145,7 @@ const DOSTLIK_APARTMENTS: ApartmentSeed[] = [
 const BASE_COMPLEXES: ComplexSeed[] = [
   {
     slug: 'ozmakon-business',
-    externalId: null,
+    externalHouseId: 5139395,
     order: 0,
     status: 'active',
     name: "O'zMakon Business",
@@ -181,7 +181,7 @@ const BASE_COMPLEXES: ComplexSeed[] = [
   },
   {
     slug: 'assalom-dostlik',
-    externalId: null,
+    externalHouseId: 5622025,
     order: 1,
     status: 'active',
     name: "Assalom Do'stlik",
@@ -233,7 +233,7 @@ const BASE_COMPLEXES: ComplexSeed[] = [
   },
   {
     slug: 'harizma',
-    externalId: null,
+    externalHouseId: null,
     order: 2,
     status: 'active',
     name: 'Harizma',
@@ -268,7 +268,7 @@ const BASE_COMPLEXES: ComplexSeed[] = [
   },
   {
     slug: 'ozmahal',
-    externalId: null,
+    externalHouseId: null,
     order: 4,
     status: 'active',
     name: "O'zMahal",
@@ -303,7 +303,7 @@ const BASE_COMPLEXES: ComplexSeed[] = [
   },
   {
     slug: 'ozmakon',
-    externalId: null,
+    externalHouseId: null,
     order: 5,
     status: 'sold_out',
     name: "O'zMakon",
@@ -359,8 +359,9 @@ export const COMPLEXES: ComplexSeed[] = BASE_COMPLEXES.map((complex) => {
  * «что дозаполнить руками» не терялся в коде.
  */
 export const GAPS: DataGap[] = [
-  { slug: '*', field: 'externalId',
-    reason: 'числовые ID в CRM в дизайне отсутствуют — проставить вручную, без них запрос квартир уйдёт без фильтра' },
+  { slug: 'harizma', field: 'externalHouseId', reason: 'ID в CRM не сообщён' },
+  { slug: 'ozmahal', field: 'externalHouseId', reason: 'ID в CRM не сообщён' },
+  { slug: 'ozmakon', field: 'externalHouseId', reason: 'ID в CRM не сообщён' },
   { slug: 'ozmahal', field: 'весь контент секций',
     reason: 'лист «O`zMahal» в книге заказчика пуст; есть только карточка каталога' },
   { slug: '*', field: 'медиа из книги',
