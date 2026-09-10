@@ -57,8 +57,23 @@ describe('конфигурация из окружения', () => {
     expect(config.estateBaseUrl).toBe('http://localhost:5100')
   })
 
-  it('AppId необязателен — часть методов работает без него', () => {
+  it('AppId необязателен — у ключей нового формата он зашит внутрь', () => {
     expect(readSyncConfig({ MACRO_TOKEN: 'a', ESTATE_WRITE_TOKEN: 'b' })!.macroAppId).toBe('')
+  })
+
+  it('проверка сертификата по умолчанию включена', () => {
+    expect(readSyncConfig(FULL_ENV)!.allowExpiredCertificate).toBe(false)
+  })
+
+  it('отключается только явным MACRO_INSECURE_TLS=1', () => {
+    expect(readSyncConfig({ ...FULL_ENV, MACRO_INSECURE_TLS: '1' })!.allowExpiredCertificate)
+      .toBe(true)
+    // Любое другое значение — не выключатель: «true», «yes» и прочее должны
+    // оставлять проверку на месте, чтобы её нельзя было снять опечаткой.
+    for (const value of ['true', 'yes', '0', '']) {
+      expect(readSyncConfig({ ...FULL_ENV, MACRO_INSECURE_TLS: value })!.allowExpiredCertificate)
+        .toBe(false)
+    }
   })
 })
 

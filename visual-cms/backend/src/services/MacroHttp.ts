@@ -1,9 +1,9 @@
 /**
  * Транспорт к MacroCRM API v2.
  *
- * Все методы API — POST, даже читающие. Авторизация — Bearer JWT, плюс
- * необязательный заголовок AppId. Ответ всегда { data, meta }, где meta.next —
- * курсор следующей страницы или null.
+ * Все методы API — POST, даже читающие. Авторизация — Bearer JWT; заголовок
+ * AppId нужен только старым ключам, у новых он зашит внутрь ключа. Ответ всегда
+ * { data, meta }, где meta.next — курсор следующей страницы или null.
  *
  * Лимит на ключ — 100 запросов в минуту (sliding window). Синк планировок
  * обходит сотни квартир подряд, поэтому темп держится здесь, а не в каждом
@@ -14,10 +14,17 @@
  * ретраев, написанный по месту, разошёлся бы с первым молча.
  */
 
+import { insecureFetch } from './macroInsecureFetch'
+
 export interface MacroHttpOptions {
   baseUrl: string
   token: string
-  /** Заголовок AppId. Часть методов работает и без него. */
+  /**
+   * Заголовок AppId.
+   *
+   * Ключам нового формата не нужен — AppId зашит внутрь самого ключа. Пустое
+   * значение означает «не слать заголовок вовсе», а не «слать пустым».
+   */
   appId?: string
   /** Таймаут одного HTTP-запроса, мс. По умолчанию 30 секунд. */
   timeoutMs?: number
@@ -31,6 +38,14 @@ export interface MacroHttpOptions {
   /** Стартовая пауза перед повтором, мс. Дальше удваивается. */
   retryBackoffMs?: number
   fetchImpl?: typeof fetch
+  /**
+   * Не проверять TLS-сертификат Macro.
+   *
+   * Заплатка: сертификат api.macrocrm.gh.uz истёк 25.09.2025. Отключение
+   * касается только запросов этого клиента — см. macroInsecureFetch. Явный
+   * fetchImpl (тесты) имеет приоритет и флагом не подменяется.
+   */
+  allowExpiredCertificate?: boolean
   /** Подменяется в тестах, чтобы не ждать по-настоящему. */
   sleepImpl?: (ms: number) => Promise<void>
   /** Подменяется в тестах вместе со sleepImpl, иначе паузы не отсчитываются. */
@@ -90,7 +105,8 @@ export class MacroHttp {
     this.minIntervalMs = opts.minIntervalMs ?? DEFAULT_MIN_INTERVAL_MS
     this.maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES
     this.retryBackoffMs = opts.retryBackoffMs ?? DEFAULT_RETRY_BACKOFF_MS
-    this.fetchImpl = opts.fetchImpl ?? fetch
+    this.fetchImpl =
+      opts.fetchImpl ?? (opts.allowExpiredCertificate ? insecureFetch : fetch)
     this.sleep = opts.sleepImpl ?? ((ms) => new Promise((r) => setTimeout(r, ms)))
     this.now = opts.nowImpl ?? Date.now
   }

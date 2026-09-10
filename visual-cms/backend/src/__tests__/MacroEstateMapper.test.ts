@@ -1,7 +1,7 @@
 /**
  * Маппер объектов продажи MacroCRM.
  *
- * Половина проверок идёт на фикстуре из живой CRM (100 квартир дома 5139395):
+ * Половина проверок идёт на фикстуре из живой CRM (336 квартир двух домов):
  * синтетика показала бы зелёное и ничего не доказала — весь смысл маппера
  * в том, чтобы пережить настоящую пустоту настоящих данных.
  */
@@ -183,13 +183,13 @@ describe('пустота в данных', () => {
 })
 
 describe('пачка на живой выдаче', () => {
-  it('фикстура на месте и не пуста', () => {
-    expect(FIXTURE.length).toBe(100)
+  it('фикстура на месте: 336 квартир в продаже по двум домам', () => {
+    expect(FIXTURE.length).toBe(336)
   })
 
-  it('разбираются все сто квартир без отбраковки', () => {
+  it('разбираются все без отбраковки', () => {
     const { apartments, skipped } = mapApartments(FIXTURE, { floorsCount: 15 })
-    expect(apartments).toHaveLength(100)
+    expect(apartments).toHaveLength(336)
     expect(skipped).toHaveLength(0)
   })
 
@@ -198,25 +198,28 @@ describe('пачка на живой выдаче', () => {
     for (const a of apartments) {
       expect(a.areaM2).toBeGreaterThan(0)
       expect(a.externalId).toBeGreaterThan(0)
-      expect(a.externalHouseId).toBe(5139395)
+      expect([5139395, 5622025]).toContain(a.externalHouseId)
     }
   })
 
-  it('все сто в продаже — статус available', () => {
+  it('вся выдача в продаже — статус available', () => {
     const { apartments } = mapApartments(FIXTURE)
     expect(apartments.every((a) => a.status === 'available')).toBe(true)
   })
 
-  it('вид из окон заполнен у всех и берётся из данных, а не выдумывается', () => {
+  it('вид из окон берётся из данных, а не выдумывается', () => {
     const { apartments } = mapApartments(FIXTURE)
     const views = new Set(apartments.map((a) => a.windowView))
-    expect(views.has('')).toBe(false)
     expect(views.has('двор')).toBe(true)
+    expect(views.has('бульвар')).toBe(true)
+    // Во втором доме поле заполнено не у всех — маппер отдаёт пустую строку,
+    // а не выдумывает значение.
+    expect(apartments.filter((a) => a.windowView !== '').length).toBeGreaterThan(100)
   })
 
   it('пустые в CRM поля не превращаются в мусор', () => {
     const { apartments } = mapApartments(FIXTURE)
-    // riser, section и titleImage пусты у всех ста — мы их и не читаем,
+    // riser, section и titleImage пусты во всей выдаче — мы их и не читаем,
     // а panoUrl заполнен примерно у половины.
     const withPano = apartments.filter((a) => a.panoUrl !== '')
     expect(withPano.length).toBeGreaterThan(0)

@@ -94,9 +94,18 @@ describe('подпись типа', () => {
       .toBe(buildSignature(plan('К2-54.65-6', [REAL_URL_RESIGNED])))
   })
 
-  it('разные наборы файлов при одном имени дают разные подписи', () => {
+  it('разные наборы файлов при одном имени НЕ расходятся', () => {
+    // Проверено на живой выдаче: внутри одного имени CRM держит тот же чертёж,
+    // переэкспортированный под каждую площадь. Включи файлы в ключ — и один
+    // тип развалится на четыре. См. PlanTypeGrouper.fixtures.test.ts.
     const a = buildSignature(plan('К2-54.65-6', ['https://a/1/x.jpg']))
     const b = buildSignature(plan('К2-54.65-6', ['https://a/2/y.jpg']))
+    expect(a).toBe(b)
+  })
+
+  it('безымянные планировки всё-таки различаются по файлам', () => {
+    const a = buildSignature(plan('', ['https://a/1/x.jpg']))
+    const b = buildSignature(plan('', ['https://a/2/y.jpg']))
     expect(a).not.toBe(b)
   })
 
@@ -250,9 +259,8 @@ describe('группировка', () => {
 })
 
 describe('на живой выдаче', () => {
-  it('сто квартир с одной планировкой на площадь дают ожидаемое число типов', () => {
+  it('в худшем случае — своё имя на каждую площадь — типов столько же, сколько имён', () => {
     const { apartments } = mapApartments(FIXTURE, { floorsCount: 15 })
-    // Худший случай: каждая уникальная пара (комнатность, площадь) — свой тип.
     const probes: PlanProbe[] = apartments.map((a) => ({
       estateId: a.externalId,
       plan: plan(`План-${a.rooms}-${a.areaM2}`, [`https://a/${a.rooms}${a.areaM2}/p.jpg`]),
@@ -260,10 +268,11 @@ describe('на живой выдаче', () => {
     const { planTypes, unassigned } = groupPlanTypes(apartments, probes)
 
     expect(unassigned).toHaveLength(0)
-    expect(planTypes.length).toBe(57)
+    const names = new Set(apartments.map((a) => `${a.externalHouseId}-${a.rooms}-${a.areaM2}`))
+    expect(planTypes.length).toBe(names.size)
     // Ни одна квартира не потерялась при группировке.
     const total = planTypes.reduce((sum, p) => sum + p.apartmentsCount, 0)
-    expect(total).toBe(100)
+    expect(total).toBe(apartments.length)
   })
 
   it('когда planName группирует крупнее, типов становится меньше квартир', () => {
@@ -275,7 +284,10 @@ describe('на живой выдаче', () => {
     }))
     const { planTypes } = groupPlanTypes(apartments, probes)
 
-    expect(planTypes.length).toBe(new Set(apartments.map((a) => a.rooms)).size)
+    // Одно имя на комнатность, но дом входит в ключ. Перемножать комнатности
+    // на дома нельзя: во втором доме есть не все комнатности.
+    const pairs = new Set(apartments.map((a) => `${a.externalHouseId}-${a.rooms}`))
+    expect(planTypes.length).toBe(pairs.size)
     for (const planType of planTypes) {
       expect(planType.areaMax).toBeGreaterThanOrEqual(planType.areaMin)
       expect(planType.floors.length).toBeGreaterThan(0)

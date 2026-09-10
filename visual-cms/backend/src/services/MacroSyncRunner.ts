@@ -32,6 +32,13 @@ export interface MacroSyncConfig {
   /** Куда складывать картинки планировок в медиатеке. */
   mediaSiteId?: string | null
   mediaFolderId?: string | null
+  /**
+   * Не проверять TLS-сертификат Macro.
+   *
+   * Сертификат api.macrocrm.gh.uz истёк 25.09.2025, и без этого синк не
+   * соединяется. Заплатка до продления сертификата; выключено по умолчанию.
+   */
+  allowExpiredCertificate: boolean
 }
 
 export interface StartOptions {
@@ -72,6 +79,7 @@ export function readSyncConfig(env: NodeJS.ProcessEnv = process.env): MacroSyncC
       .filter(Boolean),
     mediaSiteId: env.MACRO_SYNC_MEDIA_SITE_ID || null,
     mediaFolderId: env.MACRO_SYNC_MEDIA_FOLDER_ID || null,
+    allowExpiredCertificate: env.MACRO_INSECURE_TLS === '1',
   }
 }
 
@@ -157,10 +165,18 @@ export class MacroSyncRunner {
     const alreadyProbed = new Set(resumed?.cursor?.probedExternalIds ?? [])
     const probedThisRun: number[] = [...alreadyProbed]
 
+    if (this.config.allowExpiredCertificate) {
+      logger.warn(
+        'Синхронизация идёт без проверки TLS-сертификата Macro (MACRO_INSECURE_TLS=1). ' +
+          'Сертификат api.macrocrm.gh.uz истёк 25.09.2025 — это заплатка, а не решение.'
+      )
+    }
+
     const http = new MacroHttp({
       baseUrl: this.config.macroBaseUrl,
       token: this.config.macroToken,
       appId: this.config.macroAppId,
+      allowExpiredCertificate: this.config.allowExpiredCertificate,
     })
     const service = new MacroSyncService({
       client: new MacroSellClient(http),

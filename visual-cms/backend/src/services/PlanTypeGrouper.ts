@@ -99,10 +99,42 @@ export function filesKey(files: MacroPlanFile[]): string {
 /** Максимальная длина колонки signature. */
 const SIGNATURE_MAX = 200
 
+/**
+ * Ключ типа — имя планировки, и только оно.
+ *
+ * Набор файлов в ключ НЕ входит, хотя это и кажется естественным. На живых
+ * данных дома 5139395 внутри одного имени лежат разные наборы файлов, но это
+ * один и тот же чертёж, переэкспортированный под каждую площадь:
+ *
+ *   planirovka_k3-76_64-5-77.96.jpg
+ *   planirovka_k3-76_64-5-77.9.jpg
+ *   planirovka_k3-76_64-5-77.01.jpg
+ *
+ * Базовое имя общее, меняется только штамп площади. Включив файлы в ключ, мы
+ * получили бы 134 типа вместо 105 — то есть разбили бы обратно ровно то, что
+ * собирались склеить.
+ *
+ * Файлы остаются запасным ключом для планировок без имени: у таких группировать
+ * больше не по чему.
+ */
 export function buildSignature(plan: MacroFlatPlan): string {
-  const name = plan.planName.trim() || 'unnamed'
-  const signature = `${name}|${filesKey(plan.files)}`
+  const name = plan.planName.trim()
+  const signature = name || `unnamed|${filesKey(plan.files)}`
   return signature.length <= SIGNATURE_MAX ? signature : signature.slice(0, SIGNATURE_MAX)
+}
+
+/**
+ * Какой набор файлов показывать, когда внутри типа их несколько.
+ *
+ * Берём самый полный: у одних вариантов только основной чертёж, у других есть
+ * и план с мебелью, и дополнительный ракурс. Показать три картинки лучше, чем
+ * одну. При равенстве — первый по алфавиту, чтобы выбор не плавал между
+ * прогонами и импортёр картинок не качал каждый раз новое.
+ */
+function richestPlan(plans: MacroFlatPlan[]): MacroFlatPlan {
+  return [...plans].sort(
+    (a, b) => b.files.length - a.files.length || filesKey(a.files).localeCompare(filesKey(b.files))
+  )[0]
 }
 
 function uniqueSorted(values: number[]): number[] {
@@ -132,7 +164,7 @@ export function groupPlanTypes(
     if (probe.plan) planByEstateId.set(probe.estateId, probe.plan)
   }
 
-  const buckets = new Map<string, { plan: MacroFlatPlan; items: ApartmentPayload[] }>()
+  const buckets = new Map<string, { plans: MacroFlatPlan[]; items: ApartmentPayload[] }>()
   const unassigned: ApartmentPayload[] = []
 
   for (const apartment of apartments) {
@@ -145,12 +177,17 @@ export function groupPlanTypes(
     // разные чертежи, и уникальный индекс в базе стоит на паре (дом, ключ).
     const key = `${apartment.externalHouseId}::${buildSignature(plan)}`
     const bucket = buckets.get(key)
-    if (bucket) bucket.items.push(apartment)
-    else buckets.set(key, { plan, items: [apartment] })
+    if (bucket) {
+      bucket.items.push(apartment)
+      bucket.plans.push(plan)
+    } else {
+      buckets.set(key, { plans: [plan], items: [apartment] })
+    }
   }
 
   const planTypes: PlanTypePayload[] = []
-  for (const { plan, items } of buckets.values()) {
+  for (const { plans, items } of buckets.values()) {
+    const plan = richestPlan(plans)
     const areas = items.map((a) => a.areaM2)
     const prices = items.map((a) => a.price).filter((p) => p > 0)
     const floors = items.map((a) => a.floorNumber).filter((f): f is number => f !== null)

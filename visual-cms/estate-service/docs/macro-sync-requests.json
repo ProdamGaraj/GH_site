@@ -1,6 +1,6 @@
 {
   "_": "Запросы к MacroCRM v2, необходимые для синхронизации квартир и планировок.",
-  "_скрипт": "Всё это делает docs/macro-fetch.js — пагинация, темп под лимит, выборка образцов, обезличивание. Запуск: MACRO_TOKEN=... MACRO_APP_ID=... node macro-fetch.js [--all-plans]",
+  "_скрипт": "Всё это делает docs/macro-fetch.js — пагинация, темп под лимит, выборка образцов, обезличивание. Запуск: MACRO_TOKEN=... node macro-fetch.js [--all-plans]",
   "_порядок": "Выполнять сверху вниз. 01-04 — разведка и фикстуры, 05 — полный обход планировок, 06-07 — опционально.",
   "_куда_класть_ответы": "visual-cms/backend/src/__tests__/fixtures/macro/<saveAs>",
   "_обезличивание": "Перед коммитом фикстур вырезать поля exportUrl и specialNotes — там рабочие ссылки в CRM с токенами.",
@@ -10,7 +10,7 @@
     "method": "Все методы — POST, даже читающие. GET не поддерживается.",
     "headers": {
       "Authorization": "Bearer <MACRO_TOKEN>",
-      "AppId": "<MACRO_APP_ID>",
+      "_AppId": "Ключам нового формата не нужен: AppId зашит внутрь самого ключа. Слать заголовок надо только со старым ключом.",
       "Content-Type": "application/json",
       "Accept": "application/json"
     },
@@ -24597,7 +24597,7 @@
 
   ],
 
-  "curlШаблон": "curl -sS -X POST 'https://api.macrocrm.gh.uz/v2<path>' -H 'Authorization: Bearer <MACRO_TOKEN>' -H 'AppId: <MACRO_APP_ID>' -H 'Content-Type: application/json' -d '<body>' -o <saveAs>",
+  "curlШаблон": "curl -sS -X POST 'https://api.macrocrm.gh.uz/v2<path>' -H 'Authorization: Bearer <MACRO_TOKEN>' -H 'Content-Type: application/json' -d '<body>' -o <saveAs>",
 
   "минимумДляРаботы": ["01-houses", "02-apartments", "04-flatplans-sample"],
   "_заметка": "Без 05 группировщик пишется, но проверяется только синтетикой."}

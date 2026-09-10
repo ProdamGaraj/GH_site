@@ -53,7 +53,8 @@ services:
       - SSRF_ALLOWED_HOSTS=api.macrocrm.gh.uz,estate-service
       # --- Синхронизация с MacroCRM ---
       # Без MACRO_TOKEN и ESTATE_WRITE_TOKEN кнопка синхронизации отдаёт 503.
-      # Токен CRM и AppId выдаёт Macro; держать их только в окружении.
+      # Токен CRM выдаёт Macro; держать только в окружении. MACRO_APP_ID нужен
+      # лишь старым ключам — у новых AppId зашит внутрь самого ключа.
       - MACRO_BASE_URL=https://api.macrocrm.gh.uz/v2
       - MACRO_TOKEN=${MACRO_TOKEN:-}
       - MACRO_APP_ID=${MACRO_APP_ID:-}
@@ -63,6 +64,10 @@ services:
       # Коллекции, которые пересобрать после успешного прогона (через запятую).
       # Без них база обновится, а страницы останутся прежними до публикации.
       - MACRO_SYNC_COLLECTIONS=${MACRO_SYNC_COLLECTIONS:-}
+      # Заплатка: сертификат api.macrocrm.gh.uz истёк 25.09.2025, и без этого
+      # синк не соединяется. Отключение действует ТОЛЬКО на запросы к Macro
+      # (см. macroInsecureFetch), не на весь процесс. Убрать после продления.
+      - MACRO_INSECURE_TLS=${MACRO_INSECURE_TLS:-}
       # Куда класть картинки планировок в медиатеке.
       - MACRO_SYNC_MEDIA_SITE_ID=${MACRO_SYNC_MEDIA_SITE_ID:-}
       - MACRO_SYNC_MEDIA_FOLDER_ID=${MACRO_SYNC_MEDIA_FOLDER_ID:-}

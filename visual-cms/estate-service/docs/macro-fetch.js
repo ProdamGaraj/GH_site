@@ -7,8 +7,11 @@
  * файлов рабочие ссылки в CRM.
  *
  * Запуск:
- *   MACRO_TOKEN=... MACRO_APP_ID=... node macro-fetch.js
- *   MACRO_TOKEN=... MACRO_APP_ID=... node macro-fetch.js --all-plans
+ *   MACRO_TOKEN=... node macro-fetch.js
+ *   MACRO_TOKEN=... node macro-fetch.js --all-plans
+ *
+ * У ключей нового формата AppId зашит внутрь самого ключа, отдельным заголовком
+ * его слать не надо. MACRO_APP_ID остаётся на случай старого ключа.
  *
  * Без --all-plans берётся выборка планировок (~20 вызовов, полминуты).
  * С --all-plans обходятся все квартиры в продаже (~339 вызовов, ~4 минуты) —
@@ -18,8 +21,9 @@ const fs = require('fs')
 const path = require('path')
 
 const BASE = process.env.MACRO_BASE_URL || 'https://api.macrocrm.gh.uz/v2'
-const TOKEN = process.env.MACRO_TOKEN
-const APP_ID = process.env.MACRO_APP_ID
+const TOKEN = (process.env.MACRO_TOKEN || '').replace(/^Bearer\s+/i, '')
+// Пусто у ключей нового формата — тогда заголовок AppId просто не шлётся.
+const APP_ID = process.env.MACRO_APP_ID || ''
 // Синк живёт в backend CMS, туда же и фикстуры.
 const OUT = path.join(__dirname, '..', '..', 'backend', 'src', '__tests__', 'fixtures', 'macro')
 const HOUSE_IDS = [5139395, 5622025]
@@ -30,9 +34,25 @@ const GAP_MS = 667
 /** Сколько образцов планировок брать, когда не запрошен полный обход. */
 const SAMPLE_SIZE = 20
 
-if (!TOKEN || !APP_ID) {
-  console.error('Нужны MACRO_TOKEN и MACRO_APP_ID в переменных окружения.')
+if (!TOKEN) {
+  console.error('Нужен MACRO_TOKEN в переменных окружения.')
   process.exit(1)
+}
+
+/*
+ * Пропуск проверки TLS-сертификата — по явному MACRO_INSECURE_TLS=1.
+ *
+ * Сертификат api.macrocrm.gh.uz истёк 25.09.2025, и без пропуска соединения не
+ * будет вовсе. Область риска ограничена: скрипт разовый, читающий, ходит
+ * только в этот один хост, а сам хост внутренний (резолвится в 172.16.0.199).
+ *
+ * По умолчанию выключено, и включать это в синке на стенде НЕ НАДО: там тот же
+ * процесс ходит и в другие места. Настоящее решение — продлить сертификат.
+ */
+if (process.env.MACRO_INSECURE_TLS === '1') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+  console.warn('ВНИМАНИЕ: проверка TLS-сертификата отключена (MACRO_INSECURE_TLS=1).')
+  console.warn('Сертификат api.macrocrm.gh.uz истёк 25.09.2025 — это заплатка, не решение.\n')
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -54,7 +74,8 @@ async function post(pathname, body, attempt = 0) {
     method: 'POST',
     headers: {
       'Authorization': 'Bearer ' + TOKEN,
-      'AppId': APP_ID,
+      // Ключи нового формата несут AppId внутри себя — заголовок лишний.
+      ...(APP_ID ? { 'AppId': APP_ID } : {}),
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     },
@@ -243,5 +264,13 @@ async function main() {
 
 main().catch((err) => {
   console.error('\nОШИБКА: ' + (err.message || err))
+  // «fetch failed» само по себе не говорит ничего: настоящая причина —
+  // отказ DNS, отказ соединения или просроченный сертификат — лежит в cause.
+  let cause = err.cause
+  while (cause) {
+    console.error('  причина: ' + [cause.code, cause.syscall, cause.hostname, cause.message]
+      .filter(Boolean).join(' '))
+    cause = cause.cause
+  }
   process.exit(1)
 })
