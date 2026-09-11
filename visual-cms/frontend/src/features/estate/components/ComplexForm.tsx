@@ -73,6 +73,12 @@ export const ComplexForm: React.FC<{ complex: ComplexDetail; locale: Locale }> =
             onChange={(v) => setForm((f) => ({ ...f, status: v }))}
           />
           <NumberField label="Порядок" value={form.order} onChange={(v) => setForm((f) => ({ ...f, order: v ?? 0 }))} />
+          <NumberField
+            label="ID дома в MacroCRM"
+            hint="Без него синхронизация обходит проект стороной"
+            value={form.externalHouseId ?? null}
+            onChange={(v) => setForm((f) => ({ ...f, externalHouseId: v ?? null }))}
+          />
         </div>
       )}
 

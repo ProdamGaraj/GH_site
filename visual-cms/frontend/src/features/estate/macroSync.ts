@@ -132,7 +132,10 @@ export function summarize(run: MacroSyncRun): string {
   if (run.apiCalls > 0) parts.push(`запросов ${run.apiCalls}`)
 
   const summary = parts.join(', ')
-  return run.status === 'partial' && run.error ? `${summary} — ${run.error}` : summary
+  // Текст ошибки показываем при любом статусе, где он есть. Прогон, который
+  // ничего не сделал и при этом называется успешным, уже один раз спрятал от
+  // пользователя единственное, что надо было исправить.
+  return run.error ? `${summary} — ${run.error}` : summary
 }
 
 /**

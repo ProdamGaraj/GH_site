@@ -44,6 +44,9 @@ export class AdminController {
           className: c.className,
           status: c.status,
           order: c.order,
+          // Без этого поля в списке не видно, какие проекты вообще участвуют
+          // в синхронизации с CRM, — а пустое значение её молча отключает.
+          externalHouseId: c.externalHouseId ?? null,
         }))
       )
     } catch (err) {

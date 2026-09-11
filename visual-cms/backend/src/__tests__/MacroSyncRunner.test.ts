@@ -162,14 +162,22 @@ describe('возобновление прогона', () => {
 })
 
 describe('прогон без домов', () => {
-  it('завершается сразу и говорит почему', async () => {
+  it('помечается провалившимся, а не успешным — это недонастройка', async () => {
     const runner = makeRunner()
     const rows = withFakeRepo(runner, [])
     ;(runner as any).discoverHouses = async () => []
 
     const run = await runner.run({ trigger: 'manual' })
-    expect(run.status).toBe('ok')
-    expect(rows[0].error).toMatch(/externalHouseId/)
+    expect(run.status).toBe('failed')
+  })
+
+  it('объясняет, что именно заполнить', async () => {
+    const runner = makeRunner()
+    const rows = withFakeRepo(runner, [])
+    ;(runner as any).discoverHouses = async () => []
+
+    await runner.run({ trigger: 'manual' })
+    expect(rows[0].error).toMatch(/ID дома в MacroCRM/)
   })
 
   it('в CRM при этом не ходит', async () => {

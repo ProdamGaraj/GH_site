@@ -19,6 +19,8 @@ export interface ComplexListItem {
   className: string
   status: string
   order: number
+  /** ID дома в MacroCRM; null — проект не синхронизируется. */
+  externalHouseId: number | null
 }
 
 export interface Apartment {
@@ -59,6 +61,13 @@ export interface ComplexDetail {
   slug: string
   order: number
   status: string
+  /**
+   * ID ДОМА в MacroCRM (houseId), не ЖК.
+   *
+   * По нему синхронизация тянет квартиры и планировки. Пусто — проект
+   * синхронизация обходит стороной.
+   */
+  externalHouseId: number | null
   name: string
   className: string
   intro: string

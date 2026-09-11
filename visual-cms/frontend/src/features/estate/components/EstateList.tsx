@@ -132,6 +132,16 @@ export const EstateList: React.FC = () => {
                 {item.status === 'sold_out' && (
                   <span className="ml-2 text-xs px-2 py-0.5 bg-gray-200 rounded">Sold out</span>
                 )}
+                {/* Пустой ID дома молча выключает проект из синхронизации —
+                    без пометки это видно только по нулям в журнале прогона. */}
+                {item.externalHouseId === null && (
+                  <span
+                    className="ml-2 text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded"
+                    title="Не заполнен ID дома в MacroCRM — синхронизация обходит проект стороной"
+                  >
+                    без CRM
+                  </span>
+                )}
               </Link>
               <button onClick={() => remove(item)} className="text-red-500 hover:text-red-700">
                 <Trash2 size={16} />

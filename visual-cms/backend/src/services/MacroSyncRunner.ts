@@ -151,14 +151,19 @@ export class MacroSyncRunner {
         })
       ))
 
+    // Нечего синхронизировать — это не успех, а недонастройка: у проектов не
+    // заполнен externalHouseId. Отметить такой прогон успешным значит спрятать
+    // от пользователя единственное, что ему надо исправить.
     if (houseIds.length === 0) {
       return this.finish(run, {
-        status: 'ok',
+        status: 'failed',
         apartmentsSeen: 0,
         plansProbed: 0,
         planTypesUpserted: 0,
         imagesDownloaded: 0,
-        error: 'Ни одного проекта с заполненным externalHouseId — синхронизировать нечего',
+        error:
+          'Ни одного проекта с ID дома в MacroCRM. Откройте ЖК и заполните поле ' +
+          '«ID дома в MacroCRM» — без него синхронизировать нечего.',
       })
     }
 
