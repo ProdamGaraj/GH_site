@@ -5,6 +5,7 @@ import type { ComplexListItem } from '../types'
 import { estateApi } from '../api'
 import { ApiError } from '@/shared/api/http'
 import { ProvisionCollectionModal } from './ProvisionCollectionModal'
+import { MacroSyncPanel } from './MacroSyncPanel'
 
 /** Список ЖК + создание нового. */
 export const EstateList: React.FC = () => {
@@ -53,6 +54,10 @@ export const EstateList: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
+      {/* Прогон синка меняет квартиры и планировки — по его окончании список
+          перечитываем, иначе счётчики на карточках останутся вчерашними. */}
+      <MacroSyncPanel onFinished={load} />
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <Building2 size={24} /> Жилые комплексы
