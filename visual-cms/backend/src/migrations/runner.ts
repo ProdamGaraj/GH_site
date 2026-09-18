@@ -8,7 +8,10 @@ import { logger } from '../services/Logger'
  * Каждый .sql файл должен использовать IF NOT EXISTS / IF NOT EXISTS
  * для безопасного повторного запуска.
  * 
- * Отслеживает применённые миграции в таблице _applied_migrations.
+ * Отслеживает применённые миграции в таблице _applied_migrations — ПО ИМЕНИ
+ * ФАЙЛА. Отсюда правило: применённый файл больше не редактируется. Дописанный
+ * в него ALTER не выполнится никогда, а колонка в сущности появится — и первый
+ * же SELECT упадёт с «column does not exist». Новое изменение — новый файл.
  */
 export async function runSafeMigrations(dataSource: DataSource): Promise<void> {
   const queryRunner = dataSource.createQueryRunner()

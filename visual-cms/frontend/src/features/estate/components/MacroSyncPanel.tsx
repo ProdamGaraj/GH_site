@@ -136,7 +136,9 @@ export const MacroSyncPanel: React.FC<{ onFinished?: () => void }> = ({ onFinish
         </div>
       </div>
 
-      {disabledReason && !state?.running && (
+      {/* Когда статус не доехал, «Проверяем настройки…» рядом с красной
+          ошибкой только путает: причина уже названа ниже. */}
+      {disabledReason && !state?.running && !(error && !state) && (
         <div className="px-4 pb-3 -mt-1 text-sm text-amber-700 flex items-start gap-2">
           <AlertTriangle size={16} className="shrink-0 mt-0.5" />
           <span>{disabledReason}</span>

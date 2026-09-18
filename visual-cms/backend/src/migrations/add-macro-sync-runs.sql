@@ -24,9 +24,3 @@ CREATE TABLE IF NOT EXISTS macro_sync_runs (
 
 CREATE INDEX IF NOT EXISTS idx_macro_sync_runs_started
   ON macro_sync_runs ("startedAt" DESC);
-
--- Скачанных картинок мало не значит «мало картинок»: почти все могли уже
--- лежать в медиатеке с прошлого прогона. Считаем переиспользованные и
--- несостоявшиеся отдельно, иначе по журналу не отличить норму от поломки.
-ALTER TABLE macro_sync_runs ADD COLUMN IF NOT EXISTS "imagesReused" integer NOT NULL DEFAULT 0;
-ALTER TABLE macro_sync_runs ADD COLUMN IF NOT EXISTS "imagesFailed" integer NOT NULL DEFAULT 0;
