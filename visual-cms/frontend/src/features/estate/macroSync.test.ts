@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
   canStart,
+  pollInterval,
+  POLL_INTERVAL_MS,
+  RETRY_INTERVAL_MS,
   whyDisabled,
   startLabel,
   formatDuration,
@@ -187,6 +190,17 @@ describe('опрос журнала', () => {
 
   it('не идёт — не опрашиваем: состояние меняется только по кнопке', () => {
     expect(shouldPoll(state())).toBe(false)
-    expect(shouldPoll(null)).toBe(false)
+  })
+
+  it('состояние не загрузилось — повторяем', () => {
+    // Бэкенд мог перезапускаться и отдать 502. Без повтора панель осталась бы
+    // с ошибкой навсегда, пока не перезагрузят вкладку.
+    expect(shouldPoll(null)).toBe(true)
+  })
+
+  it('повтор после сбоя реже, чем слежение за прогоном', () => {
+    expect(pollInterval(null)).toBe(RETRY_INTERVAL_MS)
+    expect(pollInterval(state({ running: true }))).toBe(POLL_INTERVAL_MS)
+    expect(RETRY_INTERVAL_MS).toBeGreaterThan(POLL_INTERVAL_MS)
   })
 })

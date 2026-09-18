@@ -10,9 +10,9 @@ import {
   formatDuration,
   summarize,
   shouldPoll,
+  pollInterval,
   STATUS_CLASS,
   STATUS_LABEL,
-  POLL_INTERVAL_MS,
   type MacroSyncState,
 } from '../macroSync'
 
@@ -38,6 +38,9 @@ export const MacroSyncPanel: React.FC<{ onFinished?: () => void }> = ({ onFinish
     try {
       const next = await macroSyncApi.status()
       setState(next)
+      // Достучались — прежняя ошибка больше не актуальна. Иначе красная строка
+      // висела бы поверх живых данных.
+      setError(null)
       if (wasRunning.current && !next.running) onFinished?.()
       wasRunning.current = next.running
     } catch (e: any) {
@@ -49,11 +52,12 @@ export const MacroSyncPanel: React.FC<{ onFinished?: () => void }> = ({ onFinish
     load()
   }, [load])
 
-  // Пока прогон идёт — опрашиваем, чтобы счётчики шевелились. Когда не идёт,
-  // состояние меняется только по кнопке, и опрашивать незачем.
+  // Опрашиваем, пока идёт прогон (нужны живые счётчики) и пока состояние ни
+  // разу не загрузилось: бэкенд может перезапускаться, и без повтора панель
+  // застыла бы с ошибкой до перезагрузки вкладки.
   useEffect(() => {
     if (!shouldPoll(state)) return
-    const timer = setInterval(load, POLL_INTERVAL_MS)
+    const timer = setInterval(load, pollInterval(state))
     return () => clearInterval(timer)
   }, [state, load])
 

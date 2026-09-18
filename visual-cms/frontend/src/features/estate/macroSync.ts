@@ -162,6 +162,24 @@ export function summarize(run: MacroSyncRun): string {
  */
 export const POLL_INTERVAL_MS = 5000
 
+/**
+ * Повтор после неудачной загрузки — реже: если бэкенд перезапускается, ждать
+ * его дольше нормально, а долбить каждые пять секунд незачем.
+ */
+export const RETRY_INTERVAL_MS = 10000
+
+/**
+ * Опрашивать ли состояние.
+ *
+ * Два случая: идёт прогон (нужны живые счётчики) и состояние ни разу не
+ * загрузилось. Второй важнее: бэкенд может перезапускаться, отдать 502 — и без
+ * повтора панель останется с ошибкой навсегда, пока не перезагрузят вкладку.
+ */
 export function shouldPoll(state: MacroSyncState | null): boolean {
-  return state?.running === true
+  return state === null || state.running === true
+}
+
+/** Промежуток до следующего опроса. */
+export function pollInterval(state: MacroSyncState | null): number {
+  return state === null ? RETRY_INTERVAL_MS : POLL_INTERVAL_MS
 }
