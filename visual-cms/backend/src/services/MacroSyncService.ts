@@ -42,7 +42,12 @@ export interface HouseSyncOutcome {
   planTypes: number
   probed: number
   skippedProbes: number
+  /** Скачано из CRM в этом доме. */
   imagesDownloaded: number
+  /** Уже лежало в медиатеке — качать не пришлось. */
+  imagesReused: number
+  /** Не удалось перенести: такой ракурс просто не попадёт на карточку. */
+  imagesFailed: number
   unassigned: number
   result: SyncHouseResult | null
   error: string | null
@@ -109,6 +114,8 @@ export class MacroSyncService {
           probed: 0,
           skippedProbes: 0,
           imagesDownloaded: 0,
+          imagesReused: 0,
+          imagesFailed: 0,
           unassigned: 0,
           result: null,
           error: message,
@@ -128,6 +135,10 @@ export class MacroSyncService {
     if (skipped.length > 0) {
       logger.warn(`Дом ${externalHouseId}: пропущено объектов ${skipped.length}`)
     }
+
+    // Импортёр общий на весь прогон, поэтому его счётчики накопительные.
+    // Берём разницу: иначе при двух домах цифры сложатся сами с собой.
+    const before = this.importer.getStats()
 
     const state = await this.estate.getHouseState(externalHouseId)
     const probes = await this.probePlans(apartments, state.known)
@@ -168,13 +179,17 @@ export class MacroSyncService {
       apartments: this.toApartmentPayloads(apartments, withImages, probes.probedIds),
     })
 
+    const after = this.importer.getStats()
+
     return {
       externalHouseId,
       apartments: apartments.length,
       planTypes: withImages.length,
       probed: probes.probedIds.size,
       skippedProbes: apartments.length - probes.targets,
-      imagesDownloaded: this.importer.getStats().downloaded,
+      imagesDownloaded: after.downloaded - before.downloaded,
+      imagesReused: after.reused - before.reused,
+      imagesFailed: after.failed - before.failed,
       unassigned: unassigned.length,
       result,
       error: null,
@@ -348,6 +363,8 @@ export function summarizeRun(outcomes: HouseSyncOutcome[]) {
     plansProbed: outcomes.reduce((n, o) => n + o.probed, 0),
     planTypesUpserted: outcomes.reduce((n, o) => n + o.planTypes, 0),
     imagesDownloaded: outcomes.reduce((n, o) => n + o.imagesDownloaded, 0),
+    imagesReused: outcomes.reduce((n, o) => n + o.imagesReused, 0),
+    imagesFailed: outcomes.reduce((n, o) => n + o.imagesFailed, 0),
     error: failed.length > 0 ? failed.map((o) => `${o.externalHouseId}: ${o.error}`).join('; ') : null,
   } as const
 }

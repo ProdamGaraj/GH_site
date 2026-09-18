@@ -17,6 +17,10 @@ export interface MacroSyncRun {
   plansProbed: number
   planTypesUpserted: number
   imagesDownloaded: number
+  /** Уже лежало в медиатеке. Может быть больше скачанного на порядок. */
+  imagesReused: number
+  /** Не перенеслось: ракурс не попадёт на карточку. */
+  imagesFailed: number
   apiCalls: number
   error: string | null
   startedAt: string
@@ -128,7 +132,19 @@ export function summarize(run: MacroSyncRun): string {
     `${run.planTypesUpserted} планировок`,
   ]
   if (run.plansProbed > 0) parts.push(`опрошено ${run.plansProbed}`)
-  if (run.imagesDownloaded > 0) parts.push(`картинок ${run.imagesDownloaded}`)
+
+  // «Картинок 17» само по себе не отличает норму от поломки: почти все могли
+  // уже лежать в медиатеке с прошлого прогона. Поэтому показываем всего,
+  // а новые — уточнением.
+  const images = (run.imagesDownloaded ?? 0) + (run.imagesReused ?? 0)
+  if (images > 0) {
+    parts.push(
+      run.imagesDownloaded > 0 && run.imagesReused > 0
+        ? `картинок ${images} (новых ${run.imagesDownloaded})`
+        : `картинок ${images}`
+    )
+  }
+  if ((run.imagesFailed ?? 0) > 0) parts.push(`не перенеслось ${run.imagesFailed}`)
   if (run.apiCalls > 0) parts.push(`запросов ${run.apiCalls}`)
 
   const summary = parts.join(', ')

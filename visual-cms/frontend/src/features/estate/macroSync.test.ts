@@ -21,7 +21,9 @@ function run(over: Partial<MacroSyncRun> = {}): MacroSyncRun {
     apartmentsSeen: 336,
     plansProbed: 336,
     planTypesUpserted: 105,
-    imagesDownloaded: 187,
+    imagesDownloaded: 17,
+    imagesReused: 170,
+    imagesFailed: 0,
     apiCalls: 354,
     error: null,
     startedAt: '2026-09-11T10:00:00.000Z',
@@ -123,8 +125,29 @@ describe('итог прогона', () => {
     const text = summarize(run())
     expect(text).toContain('336 квартир')
     expect(text).toContain('105 планировок')
-    expect(text).toContain('картинок 187')
     expect(text).toContain('запросов 354')
+  })
+
+  it('картинки считаются все, а новые — уточнением', () => {
+    // «Картинок 17» читается как «картинок мало», хотя 170 просто уже лежали
+    // в медиатеке с прошлого прогона.
+    expect(summarize(run())).toContain('картинок 187 (новых 17)')
+  })
+
+  it('когда качать было нечего, скобок нет', () => {
+    const text = summarize(run({ imagesDownloaded: 0, imagesReused: 187 }))
+    expect(text).toContain('картинок 187')
+    expect(text).not.toContain('новых')
+  })
+
+  it('первый прогон показывает просто число', () => {
+    const text = summarize(run({ imagesDownloaded: 187, imagesReused: 0 }))
+    expect(text).toContain('картинок 187')
+    expect(text).not.toContain('новых')
+  })
+
+  it('непереносившиеся картинки видно — иначе ракурсы пропадут молча', () => {
+    expect(summarize(run({ imagesFailed: 4 }))).toContain('не перенеслось 4')
   })
 
   it('упавший показывает причину, а не нули', () => {
@@ -150,7 +173,9 @@ describe('итог прогона', () => {
   })
 
   it('нулевые счётчики в строку не лезут', () => {
-    const text = summarize(run({ plansProbed: 0, imagesDownloaded: 0, apiCalls: 0 }))
+    const text = summarize(
+      run({ plansProbed: 0, imagesDownloaded: 0, imagesReused: 0, apiCalls: 0 })
+    )
     expect(text).toBe('336 квартир, 105 планировок')
   })
 })

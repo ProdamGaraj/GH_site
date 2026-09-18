@@ -59,6 +59,14 @@ export class MacroSyncRun {
   @Column({ type: 'int', default: 0 })
   imagesDownloaded!: number
 
+  /** Картинки, уже лежавшие в медиатеке: их не качали повторно. */
+  @Column({ type: 'int', default: 0 })
+  imagesReused!: number
+
+  /** Картинки, которые не удалось перенести: ракурс не попадёт на карточку. */
+  @Column({ type: 'int', default: 0 })
+  imagesFailed!: number
+
   /** Запросов к MacroCRM. По этому числу видно, не упёрлись ли в лимит. */
   @Column({ type: 'int', default: 0 })
   apiCalls!: number

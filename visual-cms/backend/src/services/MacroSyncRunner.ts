@@ -258,6 +258,8 @@ export class MacroSyncRunner {
       plansProbed: number
       planTypesUpserted: number
       imagesDownloaded: number
+      imagesReused?: number
+      imagesFailed?: number
       error: string | null
     },
     apiCalls = 0
@@ -268,6 +270,8 @@ export class MacroSyncRunner {
       plansProbed: summary.plansProbed,
       planTypesUpserted: summary.planTypesUpserted,
       imagesDownloaded: summary.imagesDownloaded,
+      imagesReused: summary.imagesReused ?? 0,
+      imagesFailed: summary.imagesFailed ?? 0,
       apiCalls,
       error: summary.error,
       finishedAt: new Date(),
