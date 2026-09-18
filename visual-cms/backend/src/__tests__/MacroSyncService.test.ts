@@ -72,11 +72,11 @@ function json(body: any, status = 200) {
 }
 
 /** Мок estate-service: помнит последнюю выгрузку. */
-function makeEstate(known: KnownApartment[] = []) {
+function makeEstate(known: KnownApartment[] = [], planTypes: any[] = []) {
   const sent: any[] = []
   const api = {
     listSyncableComplexes: jest.fn(async () => []),
-    getHouseState: jest.fn(async () => known),
+    getHouseState: jest.fn(async () => ({ known, planTypes })),
     syncHouse: jest.fn(async (payload: any) => {
       sent.push(payload)
       return {
@@ -191,10 +191,12 @@ describe('повторный прогон', () => {
       externalId: a.id,
       dateModified: new Date(a.dateModified).toISOString(),
       probedAt: '2026-09-01T00:00:00.000Z',
+      planSignature: 'План-0',
     }))
+    const existing = [{ signature: 'План-0', planName: 'План-0', images: [{ title: '', url: 'https://cms/k1', thumbUrl: '' }], panoUrl: '' }]
 
     const { client, planCalls } = makeMacro({ apartments })
-    const { api, sent } = makeEstate(known)
+    const { api, sent } = makeEstate(known, existing)
     const outcome = await new MacroSyncService({ client, estate: api, importer: makeImporter() })
       .syncHouse(HOUSE)
 
@@ -211,6 +213,7 @@ describe('повторный прогон', () => {
       externalId: a.id,
       dateModified: new Date(a.dateModified).toISOString(),
       probedAt: '2026-09-01T00:00:00.000Z',
+      planSignature: null,
     }))
     const { client } = makeMacro({ apartments })
     const { api, sent } = makeEstate(known)
@@ -225,12 +228,148 @@ describe('повторный прогон', () => {
       externalId: a.id,
       dateModified: i === 0 ? '2020-01-01T00:00:00.000Z' : new Date(a.dateModified).toISOString(),
       probedAt: '2026-09-01T00:00:00.000Z',
+      planSignature: null,
     }))
     const { client, planCalls } = makeMacro({ apartments })
     const { api } = makeEstate(known)
     await new MacroSyncService({ client, estate: api, importer: makeImporter() }).syncHouse(HOUSE)
 
     expect(planCalls).toEqual([apartments[0].id])
+  })
+})
+
+describe('инкрементальный прогон не стирает прошлый', () => {
+  /**
+   * Дефект, пойманный на боевом стенде: первый прогон разложил 336 квартир по
+   * 105 типам, второй опросил одну — и отправил остальные 335 без планировки,
+   * потому что группировка видела только свежие опросы. Типы обнулились,
+   * страница опустела.
+   */
+  const apartments = FIXTURE.slice(0, 10)
+  const known: KnownApartment[] = apartments.map((a: any, i: number) => ({
+    externalId: a.id,
+    dateModified: new Date(a.dateModified).toISOString(),
+    probedAt: '2026-09-01T00:00:00.000Z',
+    planSignature: i < 5 ? 'План-0' : 'План-1',
+  }))
+  const existing = [
+    { signature: 'План-0', planName: 'План-0', images: [{ title: 'Main image', url: 'https://cms/media/p0.jpg', thumbUrl: '' }], panoUrl: '' },
+    { signature: 'План-1', planName: 'План-1', images: [{ title: 'Main image', url: 'https://cms/media/p1.jpg', thumbUrl: '' }], panoUrl: 'https://tour/1' },
+  ]
+
+  it('типы сохраняются, даже когда не опрошено ничего', async () => {
+    const { client, planCalls } = makeMacro({ apartments })
+    const { api, sent } = makeEstate(known, existing)
+    const outcome = await new MacroSyncService({ client, estate: api, importer: makeImporter() })
+      .syncHouse(HOUSE)
+
+    expect(planCalls).toHaveLength(0)
+    expect(outcome.planTypes).toBe(2)
+    expect(sent[0].planTypes.map((p: any) => p.signature).sort()).toEqual(['План-0', 'План-1'])
+  })
+
+  it('привязки квартир восстанавливаются из состояния дома', async () => {
+    const { client } = makeMacro({ apartments })
+    const { api, sent } = makeEstate(known, existing)
+    await new MacroSyncService({ client, estate: api, importer: makeImporter() }).syncHouse(HOUSE)
+
+    expect(sent[0].apartments.every((a: any) => a.planSignature !== null)).toBe(true)
+    expect(sent[0].apartments.filter((a: any) => a.planSignature === 'План-0')).toHaveLength(5)
+  })
+
+  it('картинки восстановленных типов не качаются заново', async () => {
+    const { client } = makeMacro({ apartments })
+    const { api, sent } = makeEstate(known, existing)
+    const importer = makeImporter()
+    await new MacroSyncService({ client, estate: api, importer }).syncHouse(HOUSE)
+
+    // Они уже в медиатеке: «перенос» означал бы скачать их из собственного
+    // хранилища и положить туда же копию — на каждом прогоне.
+    expect(importer.getStats().downloaded).toBe(0)
+    const urls = sent[0].planTypes.flatMap((p: any) => p.images.map((i: any) => i.url))
+    expect(urls).toContain('https://cms/media/p0.jpg')
+  })
+
+  it('агрегаты считаются по всем квартирам типа, а не по опрошенным', async () => {
+    const { client } = makeMacro({ apartments })
+    const { api, sent } = makeEstate(known, existing)
+    await new MacroSyncService({ client, estate: api, importer: makeImporter() }).syncHouse(HOUSE)
+
+    const total = sent[0].planTypes.reduce((n: number, p: any) => n + p.apartmentsCount, 0)
+    expect(total).toBe(apartments.length)
+  })
+
+  it('3D-тур восстановленного типа не теряется', async () => {
+    const { client } = makeMacro({ apartments })
+    const { api, sent } = makeEstate(known, existing)
+    await new MacroSyncService({ client, estate: api, importer: makeImporter() }).syncHouse(HOUSE)
+
+    const withTour = sent[0].planTypes.find((p: any) => p.signature === 'План-1')
+    expect(withTour.images[0].url).toBe('https://cms/media/p1.jpg')
+  })
+
+  it('свежий опрос перекрывает сохранённое, а не дублирует тип', async () => {
+    // Первая квартира изменилась в CRM — её опросят заново.
+    const changed = known.map((k, i) => (i === 0 ? { ...k, dateModified: '2020-01-01T00:00:00.000Z' } : k))
+    const { client, planCalls } = makeMacro({ apartments, planPer: 5 })
+    const { api, sent } = makeEstate(changed, existing)
+    await new MacroSyncService({ client, estate: api, importer: makeImporter() }).syncHouse(HOUSE)
+
+    expect(planCalls).toHaveLength(1)
+    expect(sent[0].planTypes).toHaveLength(2)
+    expect(sent[0].apartments).toHaveLength(10)
+  })
+
+  it('квартира без сохранённой привязки остаётся без планировки, а не выдумывает её', async () => {
+    const orphan = known.map((k) => ({ ...k, planSignature: null }))
+    const { client } = makeMacro({ apartments })
+    const { api, sent } = makeEstate(orphan, [])
+    const outcome = await new MacroSyncService({ client, estate: api, importer: makeImporter() })
+      .syncHouse(HOUSE)
+
+    expect(outcome.unassigned).toBe(10)
+    expect(sent[0].planTypes).toHaveLength(0)
+  })
+})
+
+describe('полная пересборка', () => {
+  it('опрашивает всех, игнорируя прошлые отметки', async () => {
+    // Путь восстановления: отметка об опросе стоит, а привязки потеряны —
+    // обычный прогон такие квартиры пропустит навсегда.
+    const apartments = FIXTURE.slice(0, 6)
+    const known: KnownApartment[] = apartments.map((a: any) => ({
+      externalId: a.id,
+      dateModified: new Date(a.dateModified).toISOString(),
+      probedAt: '2026-09-01T00:00:00.000Z',
+      planSignature: null,
+    }))
+    const { client, planCalls } = makeMacro({ apartments, planPer: 3 })
+    const { api, sent } = makeEstate(known)
+    await new MacroSyncService({
+      client,
+      estate: api,
+      importer: makeImporter(),
+      forceFullProbe: true,
+    }).syncHouse(HOUSE)
+
+    expect(planCalls).toHaveLength(6)
+    expect(sent[0].planTypes).toHaveLength(2)
+  })
+
+  it('курсор уважается и при полной пересборке — рестарт не стоит второго круга', async () => {
+    const apartments = FIXTURE.slice(0, 6)
+    const done = new Set<number>(apartments.slice(0, 4).map((a: any) => a.id))
+    const { client, planCalls } = makeMacro({ apartments })
+    const { api } = makeEstate()
+    await new MacroSyncService({
+      client,
+      estate: api,
+      importer: makeImporter(),
+      forceFullProbe: true,
+      alreadyProbed: done,
+    }).syncHouse(HOUSE)
+
+    expect(planCalls).toHaveLength(2)
   })
 })
 
@@ -291,7 +430,7 @@ describe('сбои', () => {
   it('сбой одного дома не отменяет второй', async () => {
     const { client } = makeMacro()
     const estate = {
-      getHouseState: jest.fn(async () => []),
+      getHouseState: jest.fn(async () => ({ known: [], planTypes: [] })),
       syncHouse: jest.fn(async (payload: any) => {
         if (payload.externalHouseId === 1) throw new Error('estate-service 500')
         return { apartmentsCreated: 1, apartmentsUpdated: 0, apartmentsGone: 0, planTypesCreated: 1, planTypesUpdated: 0, planTypesEmpty: 0 }

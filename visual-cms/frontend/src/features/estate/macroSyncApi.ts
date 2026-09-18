@@ -18,10 +18,14 @@ export const macroSyncApi = {
    * время значит поймать таймаут прокси, поэтому бэкенд отвечает 202, а ход
    * дела смотрится опросом статуса.
    */
-  start: (options: { resume?: boolean } = {}) =>
+  start: (options: { resume?: boolean; full?: boolean } = {}) =>
     api.post<{ started: boolean; resumedFrom: string | null }>('/macro-sync/run', {
       trigger: 'manual',
       resume: options.resume === true,
+      // Полная пересборка опрашивает планировки всех квартир заново. Нужна,
+      // когда привязки потерялись: обычный прогон такие квартиры пропустит,
+      // потому что отметка об опросе у них уже стоит.
+      full: options.full === true,
     }),
 
   run: (id: string) => api.get<MacroSyncRun>(`/macro-sync/runs/${id}`),

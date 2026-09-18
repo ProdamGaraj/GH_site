@@ -30,11 +30,13 @@ import type { SyncHouseBody } from '../schemas/sync.schema'
  */
 export class SyncController {
   /**
-   * Что уже известно о квартирах дома: когда их меняли в CRM и когда мы
-   * последний раз ходили за планировкой.
+   * Что уже известно о доме: квартиры и собранные ранее типы планировок.
    *
-   * Синк живёт в backend CMS и без этого ответа не может отобрать, кого
-   * опрашивать: пришлось бы каждый прогон обходить все 339 квартир заново.
+   * Синк живёт в backend CMS и без этого ответа не может ни отобрать, кого
+   * опрашивать, ни собрать полную картину. Второе важнее первого: опрос
+   * инкрементальный, и прогон, знающий только свежеопрошенные квартиры,
+   * отправит остальные без планировки — то есть сотрёт работу предыдущего.
+   * Поэтому отдаём и подпись типа у каждой квартиры, и сами типы целиком.
    */
   static async houseState(req: Request, res: Response): Promise<void> {
     const externalHouseId = Number(req.params.externalHouseId)
@@ -49,14 +51,18 @@ export class SyncController {
       })
       // Дома ещё нет — это первый прогон, а не ошибка.
       if (!house) {
-        res.json({ externalHouseId, known: [] })
+        res.json({ externalHouseId, known: [], planTypes: [] })
         return
       }
 
       const apartments = await AppDataSource.getRepository(Apartment).find({
         where: { houseId: house.id },
-        select: ['externalId', 'dateModified', 'planProbedAt'],
+        select: ['externalId', 'dateModified', 'planProbedAt', 'planTypeId'],
       })
+      const planTypes = await AppDataSource.getRepository(PlanType).find({
+        where: { houseId: house.id },
+      })
+      const signatureById = new Map(planTypes.map((p) => [p.id, p.signature]))
 
       res.json({
         externalHouseId,
@@ -66,7 +72,18 @@ export class SyncController {
             externalId: a.externalId,
             dateModified: a.dateModified ? a.dateModified.toISOString() : null,
             probedAt: a.planProbedAt ? a.planProbedAt.toISOString() : null,
+            // По этой подписи синк восстановит привязку квартиры, которую
+            // в текущем прогоне не опрашивал.
+            planSignature: a.planTypeId ? signatureById.get(a.planTypeId) ?? null : null,
           })),
+        // Картинки здесь уже наши, перенесённые в медиатеку: повторно
+        // импортировать их не нужно и нельзя.
+        planTypes: planTypes.map((p) => ({
+          signature: p.signature,
+          planName: p.planName,
+          images: Array.isArray(p.images) ? p.images : [],
+          panoUrl: p.panoUrl,
+        })),
       })
     } catch (err) {
       logger.error('House state failed', err instanceof Error ? err : undefined)

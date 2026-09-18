@@ -28,7 +28,12 @@ import {
   type PlanTypePayload,
 } from './PlanTypeGrouper'
 import { PlanImageImporter } from './PlanImageImporter'
-import type { EstateSyncApi, KnownApartment, SyncHouseResult } from './EstateSyncApi'
+import type {
+  EstateSyncApi,
+  HouseState,
+  KnownApartment,
+  SyncHouseResult,
+} from './EstateSyncApi'
 import { logger } from './Logger'
 
 export interface HouseSyncOutcome {
@@ -52,6 +57,14 @@ export interface MacroSyncOptions {
   alreadyProbed?: Set<number>
   /** Вызывается после каждой опрошенной квартиры: сюда пишется курсор. */
   onProbe?: (externalId: number) => void | Promise<void>
+  /**
+   * Опросить все квартиры заново, не глядя на прошлые отметки.
+   *
+   * Нужен для восстановления: если связи квартир с типами потерялись, отметка
+   * об опросе осталась, и обычный прогон такие квартиры пропустит навсегда.
+   * Стоит полного обхода, поэтому по умолчанию выключен.
+   */
+  forceFullProbe?: boolean
 }
 
 export class MacroSyncService {
@@ -60,6 +73,7 @@ export class MacroSyncService {
   private readonly importer: PlanImageImporter
   private readonly alreadyProbed: Set<number>
   private readonly onProbe?: (externalId: number) => void | Promise<void>
+  private readonly forceFullProbe: boolean
 
   constructor(opts: MacroSyncOptions) {
     this.client = opts.client
@@ -67,6 +81,7 @@ export class MacroSyncService {
     this.importer = opts.importer ?? new PlanImageImporter()
     this.alreadyProbed = opts.alreadyProbed ?? new Set()
     this.onProbe = opts.onProbe
+    this.forceFullProbe = opts.forceFullProbe === true
   }
 
   get apiCalls(): number {
@@ -114,11 +129,17 @@ export class MacroSyncService {
       logger.warn(`Дом ${externalHouseId}: пропущено объектов ${skipped.length}`)
     }
 
-    const known = await this.estate.getHouseState(externalHouseId)
-    const probes = await this.probePlans(apartments, known)
+    const state = await this.estate.getHouseState(externalHouseId)
+    const probes = await this.probePlans(apartments, state.known)
 
-    const { planTypes, unassigned } = groupPlanTypes(apartments, probes.results)
-    const withImages = await this.importImages(planTypes)
+    // Опрос инкрементальный, а выгрузка — полная замена. Поэтому группируем по
+    // ВСЕМ квартирам: свежеопрошенные берут планировку из ответа CRM, остальные
+    // — из типа, к которому уже привязаны. Иначе прогон, опросивший одну
+    // квартиру, отправил бы остальные 335 без планировки и стёр бы работу
+    // предыдущего прогона. Ровно это и случилось на первом боевом запуске.
+    const full = this.completeProbes(apartments, state, probes.results)
+    const { planTypes, unassigned } = groupPlanTypes(apartments, full.probes)
+    const withImages = await this.importImages(planTypes, full.reusedSignatures)
 
     const result = await this.estate.syncHouse({
       externalHouseId,
@@ -181,7 +202,10 @@ export class MacroSyncService {
     apartments: ApartmentPayload[],
     known: KnownApartment[]
   ): Promise<{ results: PlanProbe[]; probedIds: Set<number>; targets: number }> {
-    const targets = selectProbeTargets(apartments, known).filter(
+    // Полная пересборка игнорирует прошлые отметки, но не курсор: продолжать
+    // прерванный обход надо и здесь, иначе рестарт стоит второго полного круга.
+    const selected = this.forceFullProbe ? apartments : selectProbeTargets(apartments, known)
+    const targets = selected.filter(
       (apartment) => !this.alreadyProbed.has(apartment.externalId)
     )
 
@@ -204,15 +228,67 @@ export class MacroSyncService {
   }
 
   /**
+   * Достраивает результаты опроса до полной картины.
+   *
+   * Квартире, которую в этом прогоне не опрашивали, планировку берём из типа,
+   * к которому она уже привязана: подпись приходит в состоянии дома, а сам тип
+   * — оттуда же целиком. Тип, восстановленный из базы, помечаем: его картинки
+   * уже в медиатеке, и переносить их повторно не надо.
+   */
+  private completeProbes(
+    apartments: ApartmentPayload[],
+    state: HouseState,
+    probed: PlanProbe[]
+  ): { probes: PlanProbe[]; reusedSignatures: Set<string> } {
+    const known = new Map(state.known.map((k) => [k.externalId, k]))
+    const bySignature = new Map(state.planTypes.map((p) => [p.signature, p]))
+    const probedIds = new Set(probed.map((p) => p.estateId))
+    const reusedSignatures = new Set<string>()
+
+    const probes: PlanProbe[] = [...probed]
+    for (const apartment of apartments) {
+      if (probedIds.has(apartment.externalId)) continue
+
+      const signature = known.get(apartment.externalId)?.planSignature
+      if (!signature) continue
+      const existing = bySignature.get(signature)
+      if (!existing) continue
+
+      reusedSignatures.add(signature)
+      probes.push({
+        estateId: apartment.externalId,
+        plan: {
+          estateId: apartment.externalId,
+          planName: existing.planName,
+          files: existing.images,
+        },
+      })
+    }
+
+    return { probes, reusedSignatures }
+  }
+
+  /**
    * Переносит картинки типов в медиатеку.
    *
    * Тип без единой перенесённой картинки остаётся: у него есть имя, площадь и
    * квартиры, и показать карточку без чертежа лучше, чем потерять планировку
    * из выдачи целиком.
+   *
+   * Типы, восстановленные из базы, пропускаем: их картинки уже наши, и
+   * «перенос» означал бы скачать их из собственной медиатеки и положить туда
+   * же копию — на каждом прогоне.
    */
-  private async importImages(planTypes: PlanTypePayload[]): Promise<PlanTypePayload[]> {
+  private async importImages(
+    planTypes: PlanTypePayload[],
+    reusedSignatures: Set<string>
+  ): Promise<PlanTypePayload[]> {
     const out: PlanTypePayload[] = []
     for (const planType of planTypes) {
+      if (reusedSignatures.has(planType.signature)) {
+        out.push(planType)
+        continue
+      }
       const images = await this.importer.importFiles(planType.images)
       out.push({ ...planType, images })
     }

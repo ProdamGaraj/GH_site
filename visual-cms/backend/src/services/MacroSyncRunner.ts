@@ -48,6 +48,8 @@ export interface StartOptions {
   externalHouseIds?: number[]
   /** Продолжить прерванный прогон вместо нового. */
   resumeRunId?: string
+  /** Опросить все планировки заново, игнорируя прошлые отметки. */
+  full?: boolean
 }
 
 /** Как часто курсор сбрасывается в базу: каждые N опрошенных квартир. */
@@ -191,6 +193,7 @@ export class MacroSyncRunner {
         folderId: this.config.mediaFolderId,
       }),
       alreadyProbed,
+      forceFullProbe: options.full === true,
       onProbe: async (externalId) => {
         probedThisRun.push(externalId)
         if (probedThisRun.length % CURSOR_FLUSH_EVERY === 0) {

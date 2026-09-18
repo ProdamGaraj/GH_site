@@ -57,11 +57,18 @@ export const MacroSyncPanel: React.FC<{ onFinished?: () => void }> = ({ onFinish
     return () => clearInterval(timer)
   }, [state, load])
 
-  const start = async () => {
+  const start = async (full = false) => {
+    if (full && !confirm(
+      'Опросить планировки всех квартир заново? Это займёт несколько минут ' +
+      'и нужно только если привязки потерялись.'
+    )) return
+
     setBusy(true)
     setError(null)
     try {
-      await macroSyncApi.start({ resume: Boolean(state?.resumable) })
+      // Полная пересборка и продолжение прерванного прогона — разные вещи:
+      // продолжать при full нечего, обход начинается сначала.
+      await macroSyncApi.start(full ? { full: true } : { resume: Boolean(state?.resumable) })
       await load()
     } catch (e: any) {
       setError(e?.message || 'Не удалось запустить синхронизацию')
@@ -105,18 +112,28 @@ export const MacroSyncPanel: React.FC<{ onFinished?: () => void }> = ({ onFinish
           )}
         </div>
 
-        <button
-          onClick={start}
-          disabled={!enabled}
-          title={disabledReason || undefined}
-          className={`shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
-            ${enabled
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
-        >
-          <RefreshCw size={16} className={state?.running ? 'animate-spin' : undefined} />
-          {startLabel(state)}
-        </button>
+        <div className="shrink-0 flex flex-col items-end gap-1">
+          <button
+            onClick={() => start(false)}
+            disabled={!enabled}
+            title={disabledReason || undefined}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
+              ${enabled
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+          >
+            <RefreshCw size={16} className={state?.running ? 'animate-spin' : undefined} />
+            {startLabel(state)}
+          </button>
+          <button
+            onClick={() => start(true)}
+            disabled={!enabled}
+            title="Опросить планировки всех квартир заново"
+            className={`text-xs ${enabled ? 'text-gray-500 hover:text-gray-700' : 'text-gray-300 cursor-not-allowed'}`}
+          >
+            Полная пересборка
+          </button>
+        </div>
       </div>
 
       {disabledReason && !state?.running && (

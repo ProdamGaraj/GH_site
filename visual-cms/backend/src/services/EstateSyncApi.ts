@@ -20,6 +20,27 @@ export interface KnownApartment {
   externalId: number
   dateModified: string | null
   probedAt: string | null
+  /**
+   * Подпись типа планировки, уже привязанного к квартире.
+   *
+   * По ней восстанавливается связь для квартир, которые в текущем прогоне не
+   * опрашивались. Без этого прогон отправил бы их без планировки и стёр работу
+   * предыдущего.
+   */
+  planSignature: string | null
+}
+
+/** Тип планировки, собранный прошлыми прогонами. Картинки уже в медиатеке. */
+export interface KnownPlanType {
+  signature: string
+  planName: string
+  images: Array<{ title: string; url: string; thumbUrl: string }>
+  panoUrl: string
+}
+
+export interface HouseState {
+  known: KnownApartment[]
+  planTypes: KnownPlanType[]
 }
 
 export interface SyncHousePayload {
@@ -85,12 +106,15 @@ export class EstateSyncApi {
       .filter((item) => item.slug !== '' && item.externalHouseId !== null)
   }
 
-  async getHouseState(externalHouseId: number): Promise<KnownApartment[]> {
-    const json = await this.request<{ known?: KnownApartment[] }>(
+  async getHouseState(externalHouseId: number): Promise<HouseState> {
+    const json = await this.request<Partial<HouseState>>(
       'GET',
       `/api/admin/sync/house/${externalHouseId}/state`
     )
-    return Array.isArray(json?.known) ? json.known : []
+    return {
+      known: Array.isArray(json?.known) ? json.known : [],
+      planTypes: Array.isArray(json?.planTypes) ? json.planTypes : [],
+    }
   }
 
   async syncHouse(payload: SyncHousePayload): Promise<SyncHouseResult> {

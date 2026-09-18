@@ -54,7 +54,11 @@ router.get(
 /**
  * POST /api/macro-sync/run — запустить прогон.
  *
- * body: { externalHouseIds?: number[], resume?: boolean, wait?: boolean }
+ * body: { externalHouseIds?: number[], resume?: boolean, full?: boolean, wait?: boolean }
+ *
+ * full — полная пересборка: опрашивает планировки всех квартир заново. Нужна,
+ * когда связи потерялись: обычный прогон такие квартиры пропустит, потому что
+ * отметка об опросе у них уже стоит.
  */
 router.post(
   '/run',
@@ -82,6 +86,7 @@ router.post(
         ? req.body.externalHouseIds.filter((id: unknown) => Number.isInteger(id))
         : undefined,
       resumeRunId: resume?.id,
+      full: req.body?.full === true,
     }
 
     if (req.body?.wait === true) {
