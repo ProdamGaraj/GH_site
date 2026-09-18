@@ -36,6 +36,9 @@ import type {
 } from './EstateSyncApi'
 import { logger } from './Logger'
 
+/** Корневая папка медиатеки для чертежей. Внутри — по папке на проект. */
+export const PLAN_FOLDER_ROOT = 'Планировки'
+
 export interface HouseSyncOutcome {
   externalHouseId: number
   apartments: number
@@ -150,7 +153,11 @@ export class MacroSyncService {
     // предыдущего прогона. Ровно это и случилось на первом боевом запуске.
     const full = this.completeProbes(apartments, state, probes.results)
     const { planTypes, unassigned } = groupPlanTypes(apartments, full.probes)
-    const withImages = await this.importImages(planTypes, full.reusedSignatures)
+    const withImages = await this.importImages(
+      planTypes,
+      full.reusedSignatures,
+      house?.name ?? String(externalHouseId)
+    )
 
     const result = await this.estate.syncHouse({
       externalHouseId,
@@ -296,15 +303,20 @@ export class MacroSyncService {
    */
   private async importImages(
     planTypes: PlanTypePayload[],
-    reusedSignatures: Set<string>
+    reusedSignatures: Set<string>,
+    projectName: string
   ): Promise<PlanTypePayload[]> {
+    // Папка на проект внутри общей: иначе сотни чертежей двух домов сваливаются
+    // в одну кучу, и найти нужный в медиатеке невозможно.
+    const folderPath = [PLAN_FOLDER_ROOT, projectName]
+
     const out: PlanTypePayload[] = []
     for (const planType of planTypes) {
       if (reusedSignatures.has(planType.signature)) {
         out.push(planType)
         continue
       }
-      const images = await this.importer.importFiles(planType.images)
+      const images = await this.importer.importFiles(planType.images, folderPath)
       out.push({ ...planType, images })
     }
     return out

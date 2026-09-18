@@ -39,16 +39,29 @@ export interface MediaLibrary {
   upload(input: any): Promise<any>
   list(filter: any): Promise<{ items: any[] }>
   toDto(asset: any): any
+  /** Нужен, чтобы переложить уже загруженный файл в правильную папку. */
+  update?(id: string, patch: { folderId?: string | null }): Promise<any>
+}
+
+/** Дерево папок медиатеки. Импортёр создаёт в нём папку проекта. */
+export interface MediaFolders {
+  list(filter: { siteId?: string | null; includeGlobal?: boolean }): Promise<
+    Array<{ id: string; name: string; parentId?: string | null; siteId?: string | null }>
+  >
+  create(input: { siteId?: string | null; parentId?: string | null; name: string }): Promise<{
+    id: string
+  }>
 }
 
 export interface PlanImageImporterOptions {
   /** Сайт, в чью медиатеку класть. null — глобальная. */
   siteId?: string | null
-  /** Папка медиатеки. */
+  /** Папка медиатеки. Задана — используется как есть, подпапки не создаются. */
   folderId?: string | null
   fetchImpl?: typeof fetch
   /** Подменяется в тестах. */
   media?: MediaLibrary
+  folders?: MediaFolders
 }
 
 export interface ImportedImage {
@@ -61,6 +74,8 @@ export interface ImportStats {
   downloaded: number
   reused: number
   failed: number
+  /** Файлы, переложенные в правильную папку. */
+  moved: number
 }
 
 /**
@@ -85,21 +100,32 @@ function fileNameFrom(url: string): string {
   return last || 'plan.jpg'
 }
 
+const sameName = (a: string, b: string): boolean =>
+  a.trim().toLowerCase() === b.trim().toLowerCase()
+
 export class PlanImageImporter {
   private readonly siteId: string | null
-  private readonly folderId: string | null
+  private readonly fixedFolderId: string | null
   private readonly fetchImpl: typeof fetch
   private readonly mediaOverride: MediaLibrary | null
+  private readonly foldersOverride: MediaFolders | null
 
   /** Перенесённое в этом прогоне: ключ файла к нашему URL. */
   private readonly cache = new Map<string, ImportedImage>()
-  private stats: ImportStats = { downloaded: 0, reused: 0, failed: 0 }
+  /** Разрешённые пути папок: «Планировки/O'z Makon» к id. */
+  private readonly folderCache = new Map<string, string | null>()
+  private stats: ImportStats = { downloaded: 0, reused: 0, failed: 0, moved: 0 }
 
   constructor(opts: PlanImageImporterOptions = {}) {
     this.siteId = opts.siteId ?? null
-    this.folderId = opts.folderId ?? null
+    this.fixedFolderId = opts.folderId ?? null
     this.fetchImpl = opts.fetchImpl ?? fetch
     this.mediaOverride = opts.media ?? null
+    this.foldersOverride = opts.folders ?? null
+  }
+
+  getStats(): ImportStats {
+    return { ...this.stats }
   }
 
   /**
@@ -112,27 +138,86 @@ export class PlanImageImporter {
     return require('./MediaService').mediaService as MediaLibrary
   }
 
-  getStats(): ImportStats {
-    return { ...this.stats }
+  private get folders(): MediaFolders {
+    if (this.foldersOverride) return this.foldersOverride
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('./MediaFolderService').mediaFolderService as MediaFolders
   }
 
   /**
    * Переносит файлы одной планировки.
    *
+   * `folderPath` — куда класть: например ['Планировки', "O'z Makon Business"].
+   * Папки создаются при необходимости и ищутся по имени. Если задан явный
+   * folderId, путь игнорируется.
+   *
    * Файл, который не удалось перенести, ВЫПАДАЕТ из результата, а не остаётся
    * ссылкой на CRM: протухшая ссылка на странице выглядит как сломанная
    * картинка, отсутствующая — просто как один ракурс вместо трёх.
    */
-  async importFiles(files: MacroPlanFile[]): Promise<ImportedImage[]> {
+  async importFiles(files: MacroPlanFile[], folderPath: string[] = []): Promise<ImportedImage[]> {
+    const folderId = await this.resolveFolder(folderPath)
     const out: ImportedImage[] = []
     for (const file of files) {
-      const imported = await this.importOne(file)
+      const imported = await this.importOne(file, folderId)
       if (imported) out.push(imported)
     }
     return out
   }
 
-  private async importOne(file: MacroPlanFile): Promise<ImportedImage | null> {
+  /**
+   * Находит или создаёт папку по пути имён.
+   *
+   * Сопоставление по имени, а не по id: id автосозданной папки нигде не
+   * хранится. Поэтому переименование такой папки в интерфейсе приведёт к тому,
+   * что следующий прогон заведёт рядом новую со старым именем.
+   */
+  private async resolveFolder(path: string[]): Promise<string | null> {
+    if (this.fixedFolderId) return this.fixedFolderId
+    const clean = path.map((part) => (part || '').trim()).filter(Boolean)
+    if (clean.length === 0) return null
+
+    const cacheKey = clean.join('/')
+    const cached = this.folderCache.get(cacheKey)
+    if (cached !== undefined) return cached
+
+    try {
+      const existing = await this.folders.list({ siteId: this.siteId, includeGlobal: true })
+      let parentId: string | null = null
+      for (const name of clean) {
+        const hit = existing.find(
+          (f) => sameName(f.name, name) && (f.parentId ?? null) === parentId
+        )
+        if (hit) {
+          parentId = hit.id
+          continue
+        }
+        const created = await this.folders.create({
+          siteId: this.siteId,
+          parentId,
+          name,
+        })
+        existing.push({ id: created.id, name, parentId })
+        parentId = created.id
+      }
+      this.folderCache.set(cacheKey, parentId)
+      return parentId
+    } catch (err) {
+      // Папка — удобство, а не условие работы: не смогли разложить, положим
+      // в корень, но синк из-за этого срывать не будем.
+      logger.warn('Не удалось разложить планировки по папкам', {
+        path: cacheKey,
+        error: err instanceof Error ? err.message : String(err),
+      })
+      this.folderCache.set(cacheKey, null)
+      return null
+    }
+  }
+
+  private async importOne(
+    file: MacroPlanFile,
+    folderId: string | null
+  ): Promise<ImportedImage | null> {
     const key = stableFileKey(file.url)
 
     const cached = this.cache.get(key)
@@ -142,14 +227,14 @@ export class PlanImageImporter {
     }
 
     try {
-      const existing = await this.findExisting(key)
+      const existing = await this.findExisting(key, folderId)
       if (existing) {
         this.cache.set(key, existing)
         this.stats.reused++
         return { ...existing, title: file.title || existing.title }
       }
 
-      const uploaded = await this.download(file, key)
+      const uploaded = await this.download(file, key, folderId)
       this.cache.set(key, uploaded)
       this.stats.downloaded++
       return { ...uploaded, title: file.title || uploaded.title }
@@ -163,8 +248,14 @@ export class PlanImageImporter {
     }
   }
 
-  /** Ищет уже перенесённый файл по точному совпадению title. */
-  private async findExisting(key: string): Promise<ImportedImage | null> {
+  /**
+   * Ищет уже перенесённый файл по точному совпадению title.
+   *
+   * Заодно перекладывает найденный в нужную папку: первые прогоны шли без
+   * папки и свалили всё в корень медиатеки, а разбирать сотни файлов руками —
+   * не работа для человека.
+   */
+  private async findExisting(key: string, folderId: string | null): Promise<ImportedImage | null> {
     const title = PLAN_TITLE_PREFIX + key
     const found = await this.media.list({
       siteId: this.siteId,
@@ -177,6 +268,20 @@ export class PlanImageImporter {
     // list уже отдаёт DTO, повторно прогонять через toDto не нужно.
     const match = (found.items ?? []).find((asset) => asset.title === title)
     if (!match) return null
+
+    if (folderId && (match.folderId ?? null) !== folderId && this.media.update) {
+      try {
+        await this.media.update(match.id, { folderId })
+        this.stats.moved++
+      } catch (err) {
+        // Не переложился — не повод терять картинку: она уже есть и работает.
+        logger.warn('Не удалось переложить планировку в папку', {
+          id: match.id,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+
     return {
       title: match.alt ?? '',
       url: match.optimizedUrl ?? match.url,
@@ -184,7 +289,11 @@ export class PlanImageImporter {
     }
   }
 
-  private async download(file: MacroPlanFile, key: string): Promise<ImportedImage> {
+  private async download(
+    file: MacroPlanFile,
+    key: string,
+    folderId: string | null
+  ): Promise<ImportedImage> {
     const res = await this.fetchImpl(file.url)
     if (!res.ok) throw new Error(`скачивание вернуло ${res.status}`)
 
@@ -205,7 +314,7 @@ export class PlanImageImporter {
         size: buffer.length,
       } as Express.Multer.File,
       siteId: this.siteId,
-      folderId: this.folderId,
+      folderId,
       title: PLAN_TITLE_PREFIX + key,
       alt: file.title || '',
       tags: [PLAN_TAG],

@@ -37,10 +37,16 @@ function makeMedia() {
         mimeType: input.file.mimetype,
         sizeBytes: input.file.size,
         storageKey: 'key-' + counter,
+        folderId: input.folderId ?? null,
         _uploadInput: input,
       }
       stored.push(asset)
       return asset as any
+    }),
+    update: jest.fn(async (id: string, patch: any) => {
+      const asset = stored.find((a) => a.id === id)
+      if (asset && patch.folderId !== undefined) asset.folderId = patch.folderId
+      return asset
     }),
     list: jest.fn(async (filter: any) => ({
       items: stored
@@ -62,6 +68,22 @@ function makeMedia() {
       optimizedUrl: `https://cms/media/${asset.storageKey}.opt.webp`,
       thumbnailUrl: `https://cms/media/${asset.storageKey}.thumb.webp`,
     })),
+  }
+}
+
+/** Мок дерева папок: помнит созданное, ищет по имени и родителю. */
+function makeFolders(initial: Array<{ id: string; name: string; parentId: string | null }> = []) {
+  const all = [...initial]
+  let n = 0
+  return {
+    all,
+    list: jest.fn(async () => all.map((f) => ({ ...f }))),
+    create: jest.fn(async (input: any) => {
+      n++
+      const folder = { id: 'folder-' + n, name: input.name, parentId: input.parentId ?? null }
+      all.push(folder)
+      return folder
+    }),
   }
 }
 
@@ -87,9 +109,10 @@ function makeImporter(
   fetchOverrides: Record<string, { status?: number; bytes?: number }> = {}
 ) {
   const media = makeMedia()
+  const folders = makeFolders()
   const { fn, requested } = makeFetch(fetchOverrides)
-  const importer = new PlanImageImporter({ media, fetchImpl: fn, siteId: 'site-1' })
-  return { importer, media, requested }
+  const importer = new PlanImageImporter({ media, folders, fetchImpl: fn, siteId: 'site-1' })
+  return { importer, media, folders, requested }
 }
 
 describe('перенос файлов', () => {
@@ -143,7 +166,7 @@ describe('дедупликация', () => {
     await importer.importFiles([file(URL_A), file(URL_A, 'другой ракурс')])
 
     expect(requested).toHaveLength(1)
-    expect(importer.getStats()).toEqual({ downloaded: 1, reused: 1, failed: 0 })
+    expect(importer.getStats()).toEqual({ downloaded: 1, reused: 1, failed: 0, moved: 0 })
   })
 
   it('перевыпущенная ссылка узнаётся как тот же файл', async () => {
@@ -165,7 +188,7 @@ describe('дедупликация', () => {
     const [image] = await importer.importFiles([file(URL_A_RESIGNED)])
 
     expect(second.requested).toHaveLength(0)
-    expect(importer.getStats()).toEqual({ downloaded: 0, reused: 1, failed: 0 })
+    expect(importer.getStats()).toEqual({ downloaded: 0, reused: 1, failed: 0, moved: 0 })
     expect(image.url).toMatch(/^https:\/\/cms\/media\//)
   })
 
@@ -201,7 +224,7 @@ describe('сбои', () => {
     const images = await importer.importFiles([file(URL_A), file(URL_B)])
 
     expect(images).toHaveLength(1)
-    expect(importer.getStats()).toEqual({ downloaded: 1, reused: 0, failed: 1 })
+    expect(importer.getStats()).toEqual({ downloaded: 1, reused: 0, failed: 1, moved: 0 })
   })
 
   it('битый файл не попадает на страницу ссылкой на CRM', async () => {
@@ -239,5 +262,159 @@ describe('сбои', () => {
     const { importer, requested } = makeImporter()
     expect(await importer.importFiles([])).toEqual([])
     expect(requested).toHaveLength(0)
+  })
+})
+
+describe('раскладка по папкам', () => {
+  it('создаёт папку проекта внутри общей и кладёт туда', async () => {
+    const { importer, media, folders } = makeImporter()
+    await importer.importFiles([file(URL_A)], ['Планировки', 'O`z Makon Business'])
+
+    expect(folders.create).toHaveBeenCalledTimes(2)
+    expect(folders.all.map((f) => f.name)).toEqual(['Планировки', 'O`z Makon Business'])
+    // Вложенность: вторая папка лежит в первой.
+    expect(folders.all[1].parentId).toBe(folders.all[0].id)
+    expect(media.stored[0].folderId).toBe(folders.all[1].id)
+  })
+
+  it('существующие папки переиспользует, а не плодит', async () => {
+    const media = makeMedia()
+    const folders = makeFolders([
+      { id: 'root-plans', name: 'Планировки', parentId: null },
+      { id: 'oz', name: 'O`z Makon Business', parentId: 'root-plans' },
+    ])
+    const { fn } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn })
+
+    await importer.importFiles([file(URL_A)], ['Планировки', 'O`z Makon Business'])
+
+    expect(folders.create).not.toHaveBeenCalled()
+    expect(media.stored[0].folderId).toBe('oz')
+  })
+
+  it('имя сравнивается без учёта регистра и пробелов по краям', async () => {
+    const media = makeMedia()
+    const folders = makeFolders([{ id: 'root-plans', name: 'планировки', parentId: null }])
+    const { fn } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn })
+
+    await importer.importFiles([file(URL_A)], ['  Планировки  ', 'Дом'])
+
+    expect(folders.create).toHaveBeenCalledTimes(1)
+    expect(folders.all).toHaveLength(2)
+  })
+
+  it('одинаковые имена в разных родителях не путаются', async () => {
+    const media = makeMedia()
+    const folders = makeFolders([
+      { id: 'a', name: 'Планировки', parentId: null },
+      { id: 'b', name: 'Дом', parentId: 'other' },
+    ])
+    const { fn } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn })
+
+    await importer.importFiles([file(URL_A)], ['Планировки', 'Дом'])
+
+    // «Дом» в чужом родителе не подошёл — создали свой.
+    expect(folders.create).toHaveBeenCalledTimes(1)
+    expect(media.stored[0].folderId).not.toBe('b')
+  })
+
+  it('путь разрешается один раз на прогон, а не на каждый файл', async () => {
+    const { importer, folders } = makeImporter()
+    await importer.importFiles([file(URL_A)], ['Планировки', 'Дом'])
+    await importer.importFiles([file(URL_B)], ['Планировки', 'Дом'])
+
+    expect(folders.list).toHaveBeenCalledTimes(1)
+  })
+
+  it('без пути кладёт в корень — поведение прежнее', async () => {
+    const { importer, media, folders } = makeImporter()
+    await importer.importFiles([file(URL_A)])
+
+    expect(folders.create).not.toHaveBeenCalled()
+    expect(media.stored[0].folderId).toBeNull()
+  })
+
+  it('явный folderId сильнее пути', async () => {
+    const media = makeMedia()
+    const folders = makeFolders()
+    const { fn } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn, folderId: 'fixed' })
+
+    await importer.importFiles([file(URL_A)], ['Планировки', 'Дом'])
+
+    expect(folders.create).not.toHaveBeenCalled()
+    expect(media.stored[0].folderId).toBe('fixed')
+  })
+
+  it('сбой дерева папок не срывает перенос — кладём в корень', async () => {
+    const media = makeMedia()
+    const folders = makeFolders()
+    folders.list = jest.fn(async (): Promise<any[]> => {
+      throw new Error('база недоступна')
+    })
+    const { fn } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn })
+
+    const images = await importer.importFiles([file(URL_A)], ['Планировки', 'Дом'])
+
+    expect(images).toHaveLength(1)
+    expect(media.stored[0].folderId).toBeNull()
+  })
+})
+
+describe('перекладывание уже загруженных', () => {
+  const seeded = (folderId: string | null) => ({
+    id: 'old',
+    title: PLAN_TITLE_PREFIX + '3707992/planirovka_k2.jpg',
+    alt: '',
+    storageKey: 'old-key',
+    folderId,
+  })
+
+  it('файл из корня переезжает в папку проекта', async () => {
+    // Первые прогоны шли без папки и свалили всё в корень медиатеки.
+    // Разбирать сотни файлов руками — не работа для человека.
+    const media = makeMedia()
+    media.stored.push(seeded(null))
+    const folders = makeFolders([{ id: 'oz', name: 'Дом', parentId: null }])
+    const { fn, requested } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn })
+
+    await importer.importFiles([file(URL_A)], ['Дом'])
+
+    expect(requested).toHaveLength(0)
+    expect(media.stored[0].folderId).toBe('oz')
+    expect(importer.getStats().moved).toBe(1)
+  })
+
+  it('файл уже в нужной папке не трогаем', async () => {
+    const media = makeMedia()
+    media.stored.push(seeded('oz'))
+    const folders = makeFolders([{ id: 'oz', name: 'Дом', parentId: null }])
+    const { fn } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn })
+
+    await importer.importFiles([file(URL_A)], ['Дом'])
+
+    expect(media.update).not.toHaveBeenCalled()
+    expect(importer.getStats().moved).toBe(0)
+  })
+
+  it('сбой перекладывания не теряет картинку — она уже работает', async () => {
+    const media = makeMedia()
+    media.stored.push(seeded(null))
+    media.update = jest.fn(async (_id: string, _patch: any) => {
+      throw new Error('нет прав')
+    })
+    const folders = makeFolders([{ id: 'oz', name: 'Дом', parentId: null }])
+    const { fn } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn })
+
+    const images = await importer.importFiles([file(URL_A)], ['Дом'])
+
+    expect(images).toHaveLength(1)
+    expect(importer.getStats().moved).toBe(0)
   })
 })
