@@ -73,6 +73,12 @@ export interface MediaLibraryProps {
   onSelect?: (asset: MediaAsset) => void
   /** When provided, list is filtered by this site (plus globals). */
   siteId?: string | null
+  /**
+   * Занять всю доступную высоту: прокручиваются дерево и сетка по отдельности,
+   * страница целиком не едет. Для встроенного использования (модалка выбора)
+   * не годится — там высоту задаёт maxHeight.
+   */
+  fillHeight?: boolean
   /** Показывать кнопку «ссылка на папку» в хлебных крошках. */
   shareableLinks?: boolean
   /** Папка, выбранная при открытии (например, из адреса страницы). */
@@ -94,6 +100,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
   siteId,
   maxHeight,
   readOnly = false,
+  fillHeight = false,
   shareableLinks = false,
   initialFolder,
   onFolderChange,
@@ -391,10 +398,21 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
   const folderPath = folderSel && folderSel !== 'root' ? getFolderPath(folders, folderSel) : []
 
   return (
-    <div className="flex gap-4 items-start">
+    <div
+      className={cn(
+        'flex gap-4',
+        // items-stretch, чтобы колонки тянулись на всю высоту и прокручивались
+        // каждая сама. min-h-0 обязателен: без него flex-потомок не может стать
+        // ниже своего содержимого, и прокрутка уезжает на страницу.
+        fillHeight ? 'h-full min-h-0 items-stretch' : 'items-start'
+      )}
+    >
       {/* Folder sidebar */}
       <aside
-        className="shrink-0 border border-gray-200 rounded bg-white p-2 overflow-y-auto"
+        className={cn(
+          'shrink-0 border border-gray-200 rounded bg-white p-2 overflow-y-auto',
+          fillHeight && 'min-h-0'
+        )}
         style={{ width: sidebarWidth, maxHeight: maxHeight ?? undefined }}
       >
         <MediaFolderTree
@@ -434,9 +452,9 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
       />
 
       {/* Main column */}
-      <div className="flex-1 min-w-0 flex flex-col gap-4">
+      <div className={cn('flex-1 min-w-0 flex flex-col gap-4', fillHeight && 'min-h-0')}>
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={cn('flex flex-wrap items-center gap-2', fillHeight && 'shrink-0')}>
           <div className="relative flex-1 min-w-[200px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -538,7 +556,12 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
 
         {/* Breadcrumbs */}
         {(folderSel === 'root' || folderPath.length > 0) && (
-          <div className="flex items-center flex-wrap gap-1 text-xs text-gray-500">
+          <div
+            className={cn(
+              'flex items-center flex-wrap gap-1 text-xs text-gray-500',
+              fillHeight && 'shrink-0'
+            )}
+          >
             <button type="button" onClick={() => selectFolder(null)} className="hover:text-primary-600">
               Все файлы
             </button>
@@ -590,9 +613,15 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
           onDrop={readOnly ? undefined : handleDrop}
           className={cn(
             'relative rounded border border-dashed border-gray-300 bg-white',
+            // В режиме полной высоты прокручивается именно сетка: панель
+            // инструментов, крошки и пагинация должны оставаться на виду.
+            fillHeight && 'flex-1 min-h-0 overflow-y-auto',
             dragActive && !readOnly && 'border-primary-500 bg-primary-50',
           )}
-          style={{ maxHeight, overflow: maxHeight ? 'auto' : undefined }}
+          style={{
+            maxHeight: fillHeight ? undefined : maxHeight,
+            overflow: !fillHeight && maxHeight ? 'auto' : undefined,
+          }}
         >
           {error && <div className="p-4 text-sm text-red-600">{error}</div>}
 
@@ -624,7 +653,12 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
 
         {/* Pager */}
         {total > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+          <div
+            className={cn(
+              'flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600',
+              fillHeight && 'shrink-0'
+            )}
+          >
             <div>Всего: {total}</div>
 
             <div className="flex items-center gap-4">

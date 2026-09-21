@@ -8,6 +8,11 @@ import type { FolderSelection } from '@/features/media/MediaFolderTree'
 /**
  * Страница медиатеки.
  *
+ * Раскладка в высоту экрана: прокручиваются дерево папок и сетка файлов, каждое
+ * само по себе, а страница целиком стоит на месте. Иначе при длинной выдаче
+ * панель инструментов и пагинация уезжают наверх, и до них приходится
+ * прокручивать всю сетку обратно.
+ *
  * Выбранная папка живёт в адресе: по такой ссылке коллега с доступом в панель
  * открывает ту же папку, а не корень. Держит её именно страница — сама
  * MediaLibrary используется ещё и внутри модалок выбора, где адрес ничего
@@ -29,20 +34,29 @@ export const MediaLibraryPage: React.FC = () => {
   return (
     <div className="h-screen flex flex-col">
       <Header />
-      <div className="flex-1 overflow-y-auto p-8">
-        <div className="mb-6">
+
+      {/*
+        min-h-0 на растущем потомке обязателен: без него flex-элемент не может
+        стать ниже своего содержимого, и прокрутка всё равно уезжает на страницу.
+      */}
+      <div className="flex-1 min-h-0 overflow-hidden p-8 flex flex-col gap-6">
+        <div className="shrink-0">
           <h1 className="text-3xl font-bold text-gray-900">Медиа-библиотека</h1>
           <p className="text-gray-600 mt-1">
             Все изображения, видео и документы (PDF, Office) сайта. Загружайте файлы здесь,
             а затем выбирайте их в блоках или вставляйте ссылку для скачивания.
           </p>
         </div>
-        <MediaLibrary
-          kind="any"
-          shareableLinks
-          initialFolder={folder}
-          onFolderChange={handleFolderChange}
-        />
+
+        <div className="flex-1 min-h-0">
+          <MediaLibrary
+            kind="any"
+            fillHeight
+            shareableLinks
+            initialFolder={folder}
+            onFolderChange={handleFolderChange}
+          />
+        </div>
       </div>
     </div>
   )
