@@ -27,6 +27,7 @@ function run(over: Partial<MacroSyncRun> = {}): MacroSyncRun {
     imagesDownloaded: 17,
     imagesReused: 170,
     imagesFailed: 0,
+    imagesMoved: 0,
     apiCalls: 354,
     error: null,
     startedAt: '2026-09-11T10:00:00.000Z',
@@ -147,6 +148,12 @@ describe('итог прогона', () => {
     const text = summarize(run({ imagesDownloaded: 187, imagesReused: 0 }))
     expect(text).toContain('картинок 187')
     expect(text).not.toContain('новых')
+  })
+
+  it('перекладывание по папкам видно в строке', () => {
+    // Импортёр его считал, но до панели число не доезжало: отличить «не
+    // переложилось» от «переложилось молча» было нечем.
+    expect(summarize(run({ imagesMoved: 187 }))).toContain('разложено по папкам 187')
   })
 
   it('непереносившиеся картинки видно — иначе ракурсы пропадут молча', () => {

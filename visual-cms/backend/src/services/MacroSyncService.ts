@@ -51,6 +51,8 @@ export interface HouseSyncOutcome {
   imagesReused: number
   /** Не удалось перенести: такой ракурс просто не попадёт на карточку. */
   imagesFailed: number
+  /** Переложено в папку проекта. */
+  imagesMoved: number
   unassigned: number
   result: SyncHouseResult | null
   error: string | null
@@ -119,6 +121,7 @@ export class MacroSyncService {
           imagesDownloaded: 0,
           imagesReused: 0,
           imagesFailed: 0,
+          imagesMoved: 0,
           unassigned: 0,
           result: null,
           error: message,
@@ -153,11 +156,8 @@ export class MacroSyncService {
     // предыдущего прогона. Ровно это и случилось на первом боевом запуске.
     const full = this.completeProbes(apartments, state, probes.results)
     const { planTypes, unassigned } = groupPlanTypes(apartments, full.probes)
-    const withImages = await this.importImages(
-      planTypes,
-      full.reusedSignatures,
-      house?.name ?? String(externalHouseId)
-    )
+    const folderName = house?.name ?? String(externalHouseId)
+    const withImages = await this.importImages(planTypes, full.reusedSignatures, folderName)
 
     const result = await this.estate.syncHouse({
       externalHouseId,
@@ -188,6 +188,19 @@ export class MacroSyncService {
 
     const after = this.importer.getStats()
 
+    // Одна строка, по которой видно, что вообще произошло с домом. Без неё
+    // диагностика сводится к догадкам по счётчикам в панели.
+    logger.info('Дом синхронизирован', {
+      дом: externalHouseId,
+      квартир: apartments.length,
+      типов: withImages.length,
+      восстановлено: full.reusedSignatures.size,
+      опрошено: probes.probedIds.size,
+      скачано: after.downloaded - before.downloaded,
+      переложено: after.moved - before.moved,
+      папка: folderName,
+    })
+
     return {
       externalHouseId,
       apartments: apartments.length,
@@ -197,6 +210,7 @@ export class MacroSyncService {
       imagesDownloaded: after.downloaded - before.downloaded,
       imagesReused: after.reused - before.reused,
       imagesFailed: after.failed - before.failed,
+      imagesMoved: after.moved - before.moved,
       unassigned: unassigned.length,
       result,
       error: null,
@@ -383,6 +397,7 @@ export function summarizeRun(outcomes: HouseSyncOutcome[]) {
     imagesDownloaded: outcomes.reduce((n, o) => n + o.imagesDownloaded, 0),
     imagesReused: outcomes.reduce((n, o) => n + o.imagesReused, 0),
     imagesFailed: outcomes.reduce((n, o) => n + o.imagesFailed, 0),
+    imagesMoved: outcomes.reduce((n, o) => n + o.imagesMoved, 0),
     error: failed.length > 0 ? failed.map((o) => `${o.externalHouseId}: ${o.error}`).join('; ') : null,
   } as const
 }

@@ -21,6 +21,8 @@ export interface MacroSyncRun {
   imagesReused: number
   /** Не перенеслось: ракурс не попадёт на карточку. */
   imagesFailed: number
+  /** Переложено в папку проекта. */
+  imagesMoved: number
   apiCalls: number
   error: string | null
   startedAt: string
@@ -144,6 +146,7 @@ export function summarize(run: MacroSyncRun): string {
         : `картинок ${images}`
     )
   }
+  if ((run.imagesMoved ?? 0) > 0) parts.push(`разложено по папкам ${run.imagesMoved}`)
   if ((run.imagesFailed ?? 0) > 0) parts.push(`не перенеслось ${run.imagesFailed}`)
   if (run.apiCalls > 0) parts.push(`запросов ${run.apiCalls}`)
 

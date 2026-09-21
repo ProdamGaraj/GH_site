@@ -67,6 +67,10 @@ export class MacroSyncRun {
   @Column({ type: 'int', default: 0 })
   imagesFailed!: number
 
+  /** Картинки, переложенные в папку проекта. */
+  @Column({ type: 'int', default: 0 })
+  imagesMoved!: number
+
   /** Запросов к MacroCRM. По этому числу видно, не упёрлись ли в лимит. */
   @Column({ type: 'int', default: 0 })
   apiCalls!: number

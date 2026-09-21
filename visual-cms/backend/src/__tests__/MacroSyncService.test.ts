@@ -460,7 +460,7 @@ describe('сводка прогона', () => {
   const ok = (id: number) => ({
     externalHouseId: id, apartments: 10, planTypes: 2, probed: 10,
     skippedProbes: 0, imagesDownloaded: 2, imagesReused: 1, imagesFailed: 0,
-    unassigned: 0, result: null, error: null,
+    imagesMoved: 0, unassigned: 0, result: null, error: null,
   })
   const bad = (id: number) => ({ ...ok(id), apartments: 0, planTypes: 0, probed: 0, error: 'упал' })
 

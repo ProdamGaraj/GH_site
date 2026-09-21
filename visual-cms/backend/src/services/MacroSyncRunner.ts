@@ -260,6 +260,7 @@ export class MacroSyncRunner {
       imagesDownloaded: number
       imagesReused?: number
       imagesFailed?: number
+      imagesMoved?: number
       error: string | null
     },
     apiCalls = 0
@@ -272,6 +273,7 @@ export class MacroSyncRunner {
       imagesDownloaded: summary.imagesDownloaded,
       imagesReused: summary.imagesReused ?? 0,
       imagesFailed: summary.imagesFailed ?? 0,
+      imagesMoved: summary.imagesMoved ?? 0,
       apiCalls,
       error: summary.error,
       finishedAt: new Date(),
