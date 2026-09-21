@@ -76,3 +76,23 @@ export function collectDescendantIds(folders: MediaFolder[], rootId: string): Se
   }
   return result
 }
+
+/**
+ * Раскрывает ветку до папки, оставляя всё прочее как есть.
+ *
+ * Нужно, когда папка выбрана не кликом, а извне — например, пришла ссылкой.
+ * Дерево показывало бы её свёрнутой, и человек не понимал бы, где находится.
+ *
+ * Возвращает ПРЕЖНИЙ набор, если добавлять нечего: иначе React увидит новый
+ * объект, перерисует дерево, эффект сработает снова — и так по кругу.
+ */
+export function expandToFolder<T extends string>(
+  expanded: Set<T>,
+  ancestors: T[]
+): Set<T> {
+  const missing = ancestors.filter((id) => !expanded.has(id))
+  if (missing.length === 0) return expanded
+  const next = new Set(expanded)
+  for (const id of missing) next.add(id)
+  return next
+}

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import type { MediaFolder } from '@/shared/api/mediaApi'
-import { buildFolderTree, flattenTree, getFolderPath, collectDescendantIds } from './folderTree'
+import { buildFolderTree, flattenTree, getFolderPath, collectDescendantIds,
+  expandToFolder,
+} from './folderTree'
 
 function folder(id: string, name: string, parentId: string | null = null): MediaFolder {
   return {
@@ -72,5 +74,29 @@ describe('folderTree', () => {
       expect([...collectDescendantIds(folders, 'b')].sort()).toEqual(['c'])
       expect([...collectDescendantIds(folders, 'c')]).toEqual([])
     })
+  })
+})
+
+describe('раскрытие ветки до папки', () => {
+  it('добавляет недостающих предков', () => {
+    const out = expandToFolder(new Set(['__root__']), ['__root__', 'a', 'b'])
+    expect([...out].sort()).toEqual(['__root__', 'a', 'b'])
+  })
+
+  it('уже раскрытое не трогает и НЕ создаёт новый набор', () => {
+    // Новый объект заставил бы React перерисовать дерево, эффект сработал бы
+    // снова — и так по кругу.
+    const prev = new Set(['__root__', 'a'])
+    expect(expandToFolder(prev, ['__root__', 'a'])).toBe(prev)
+  })
+
+  it('свёрнутое пользователем вручную не схлопывается', () => {
+    const out = expandToFolder(new Set(['x']), ['a'])
+    expect(out.has('x')).toBe(true)
+  })
+
+  it('пустой список предков ничего не меняет', () => {
+    const prev = new Set(['__root__'])
+    expect(expandToFolder(prev, [])).toBe(prev)
   })
 })

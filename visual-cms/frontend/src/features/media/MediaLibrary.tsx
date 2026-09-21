@@ -15,6 +15,14 @@ import { cn } from '@/shared/utils'
 import { MediaFolderTree, type FolderSelection } from './MediaFolderTree'
 import { MediaFolderPickerModal } from './MediaFolderPickerModal'
 import { getFolderPath } from './folderTree'
+import {
+  SIDEBAR_STORAGE_KEY,
+  readSidebarWidth,
+  widthAfterDrag,
+  SIDEBAR_MIN,
+  SIDEBAR_MAX,
+} from './sidebarWidth'
+import { buildFolderLink } from './mediaLinks'
 import { useProjectVariantWidths } from './useProjectVariantWidths'
 
 /** Копирование в буфер с fallback для незащищённого контекста (не https/localhost). */
@@ -57,6 +65,12 @@ export interface MediaLibraryProps {
   onSelect?: (asset: MediaAsset) => void
   /** When provided, list is filtered by this site (plus globals). */
   siteId?: string | null
+  /** Показывать кнопку «ссылка на папку» в хлебных крошках. */
+  shareableLinks?: boolean
+  /** Папка, выбранная при открытии (например, из адреса страницы). */
+  initialFolder?: FolderSelection
+  /** Сообщает наружу о смене папки — страница держит её в адресе. */
+  onFolderChange?: (folder: FolderSelection) => void
   /** Max grid height for embedded usage (e.g. picker modal). */
   maxHeight?: string
   /** Hide the upload area (read-only). */
@@ -72,6 +86,9 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
   siteId,
   maxHeight,
   readOnly = false,
+  shareableLinks = false,
+  initialFolder,
+  onFolderChange,
 }) => {
   const [items, setItems] = useState<MediaAsset[]>([])
   const [total, setTotal] = useState(0)
@@ -89,7 +106,110 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
   // Папки
   const [folders, setFolders] = useState<MediaFolder[]>([])
   const [folderCounts, setFolderCounts] = useState<MediaFolderCounts | undefined>(undefined)
-  const [folderSel, setFolderSel] = useState<FolderSelection>(null)
+  const [folderSel, setFolderSel] = useState<FolderSelection>(initialFolder ?? null)
+  const [linkCopied, setLinkCopied] = useState(false)
+
+  // Ширина колонки дерева: тянется мышью, переживает перезагрузку.
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try {
+      return readSidebarWidth(localStorage.getItem(SIDEBAR_STORAGE_KEY))
+    } catch {
+      // Приватный режим и запрет на хранилище — не повод падать.
+      return readSidebarWidth(null)
+    }
+  })
+  const [resizing, setResizing] = useState(false)
+
+  /**
+   * Смена папки в одном месте: и состояние, и страница, и адрес.
+   *
+   * Раньше выбор делался в трёх местах врассыпную (дерево, крошки, «Все
+   * файлы»), и любая новая реакция на смену папки требовала править все три.
+   */
+  const selectFolder = useCallback(
+    (sel: FolderSelection) => {
+      setFolderSel(sel)
+      setPage(1)
+      onFolderChange?.(sel)
+    },
+    [onFolderChange]
+  )
+
+  const persistWidth = useCallback((width: number) => {
+    try {
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, String(width))
+    } catch {
+      // Не сохранилось — ширина просто не переживёт перезагрузку.
+    }
+  }, [])
+
+  /**
+   * Тянем от НАЧАЛЬНЫХ значений, а не от текущей ширины на каждом шаге:
+   * иначе рывки мышью накапливают ошибку и колонка «уезжает» от курсора.
+   *
+   * Слушатели вешаются на документ, а не на ручку: курсор при быстром движении
+   * уходит за её пределы, и события мыши до неё уже не доходят.
+   */
+  const startResize = useCallback(
+    (event: React.MouseEvent) => {
+      event.preventDefault()
+      const startX = event.clientX
+      const startWidth = sidebarWidth
+      setResizing(true)
+
+      const onMove = (e: MouseEvent) => setSidebarWidth(widthAfterDrag(startWidth, startX, e.clientX))
+      const onUp = (e: MouseEvent) => {
+        const finalWidth = widthAfterDrag(startWidth, startX, e.clientX)
+        setSidebarWidth(finalWidth)
+        persistWidth(finalWidth)
+        setResizing(false)
+        document.removeEventListener('mousemove', onMove)
+        document.removeEventListener('mouseup', onUp)
+        document.body.style.userSelect = ''
+      }
+
+      // Без этого перетаскивание выделяет текст дерева и сетки.
+      document.body.style.userSelect = 'none'
+      document.addEventListener('mousemove', onMove)
+      document.addEventListener('mouseup', onUp)
+    },
+    [sidebarWidth, persistWidth]
+  )
+
+  /**
+   * Копирует ссылку на текущую папку.
+   *
+   * Ссылка строится от адреса страницы, поэтому работает у коллеги с доступом
+   * в панель: открывается та же медиатека с той же раскрытой папкой.
+   */
+  const copyFolderLink = useCallback(async () => {
+    const ok = await copyToClipboard(buildFolderLink(window.location.href, folderSel))
+    if (!ok) return
+    setLinkCopied(true)
+    window.setTimeout(() => setLinkCopied(false), 1500)
+  }, [folderSel])
+
+  const resetWidth = useCallback(() => {
+    const width = readSidebarWidth(null)
+    setSidebarWidth(width)
+    persistWidth(width)
+  }, [persistWidth])
+
+  /** Стрелками — та же ручка с клавиатуры: мышь есть не у всех и не всегда. */
+  const handleResizeKey = useCallback(
+    (event: React.KeyboardEvent) => {
+      const step = event.shiftKey ? 48 : 16
+      let next: number | null = null
+      if (event.key === 'ArrowLeft') next = widthAfterDrag(sidebarWidth, 0, -step)
+      if (event.key === 'ArrowRight') next = widthAfterDrag(sidebarWidth, 0, step)
+      if (next === null) return
+      event.preventDefault()
+      setSidebarWidth(next)
+      persistWidth(next)
+    },
+    [sidebarWidth, persistWidth]
+  )
+
   const [moveTarget, setMoveTarget] = useState<MediaAsset | null>(null)
   // Бамп — заставляет дерево перечитать файлы раскрытых папок после изменений.
   const [treeRefreshToken, setTreeRefreshToken] = useState(0)
@@ -231,23 +351,44 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
     <div className="flex gap-4 items-start">
       {/* Folder sidebar */}
       <aside
-        className="w-52 shrink-0 border border-gray-200 rounded bg-white p-2 overflow-y-auto"
-        style={{ maxHeight: maxHeight ?? undefined }}
+        className="shrink-0 border border-gray-200 rounded bg-white p-2 overflow-y-auto"
+        style={{ width: sidebarWidth, maxHeight: maxHeight ?? undefined }}
       >
         <MediaFolderTree
           folders={folders}
           counts={folderCounts}
           selected={folderSel}
-          onSelect={(sel) => {
-            setFolderSel(sel)
-            setPage(1)
-          }}
+          onSelect={selectFolder}
           onChanged={refreshAll}
           refreshToken={treeRefreshToken}
           siteId={siteId}
           readOnly={readOnly}
         />
       </aside>
+
+      {/*
+        Ручка ширины. Отдельный элемент, а не граница aside: по границе в один
+        пиксель попасть мышью тяжело, а невидимый запас по бокам делает захват
+        комфортным, не раздвигая раскладку.
+      */}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Ширина колонки папок"
+        aria-valuenow={sidebarWidth}
+        aria-valuemin={SIDEBAR_MIN}
+        aria-valuemax={SIDEBAR_MAX}
+        tabIndex={0}
+        onMouseDown={startResize}
+        onDoubleClick={resetWidth}
+        onKeyDown={handleResizeKey}
+        title="Потяните, чтобы изменить ширину. Двойной клик — вернуть по умолчанию"
+        className={cn(
+          'shrink-0 self-stretch w-1.5 -mx-0.5 cursor-col-resize rounded',
+          'hover:bg-primary-300 focus:outline-none focus:bg-primary-400',
+          resizing && 'bg-primary-400'
+        )}
+      />
 
       {/* Main column */}
       <div className="flex-1 min-w-0 flex flex-col gap-4">
@@ -355,7 +496,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
         {/* Breadcrumbs */}
         {(folderSel === 'root' || folderPath.length > 0) && (
           <div className="flex items-center flex-wrap gap-1 text-xs text-gray-500">
-            <button type="button" onClick={() => setFolderSel(null)} className="hover:text-primary-600">
+            <button type="button" onClick={() => selectFolder(null)} className="hover:text-primary-600">
               Все файлы
             </button>
             {folderSel === 'root' && (
@@ -370,12 +511,25 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
                 {idx === folderPath.length - 1 ? (
                   <span className="text-gray-700">{f.name}</span>
                 ) : (
-                  <button type="button" onClick={() => setFolderSel(f.id)} className="hover:text-primary-600">
+                  <button type="button" onClick={() => selectFolder(f.id)} className="hover:text-primary-600">
                     {f.name}
                   </button>
                 )}
               </React.Fragment>
             ))}
+
+            {shareableLinks && (
+              <button
+                type="button"
+                onClick={copyFolderLink}
+                title="Скопировать ссылку на эту папку"
+                className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200
+                  text-gray-500 hover:text-primary-600 hover:border-primary-300"
+              >
+                {linkCopied ? <Check size={12} /> : <Copy size={12} />}
+                {linkCopied ? 'Скопировано' : 'Ссылка'}
+              </button>
+            )}
           </div>
         )}
 

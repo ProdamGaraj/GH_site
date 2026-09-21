@@ -19,7 +19,13 @@ import {
   type MediaFolderCounts,
   type MediaAsset,
 } from '@/shared/api/mediaApi'
-import { buildFolderTree, collectDescendantIds, type FolderTreeNode } from './folderTree'
+import {
+  buildFolderTree,
+  collectDescendantIds,
+  expandToFolder,
+  getFolderPath,
+  type FolderTreeNode,
+} from './folderTree'
 import { FolderDeleteModal } from './FolderDeleteModal'
 import { cn } from '@/shared/utils'
 
@@ -73,6 +79,15 @@ export const MediaFolderTree: React.FC<MediaFolderTreeProps> = ({
 
   const expandedRef = useRef(expanded)
   expandedRef.current = expanded
+
+  // Папка могла быть выбрана не кликом, а извне — например, пришла ссылкой.
+  // Тогда ветку до неё надо раскрыть, иначе человек не поймёт, где находится.
+  useEffect(() => {
+    if (typeof selected !== 'string' || selected === 'root') return
+    const ancestors = getFolderPath(folders, selected).map((f) => f.id)
+    if (ancestors.length === 0) return
+    setExpanded((prev) => expandToFolder(prev, [ROOT_KEY, ...ancestors]))
+  }, [selected, folders])
 
   const createParentId = typeof selected === 'string' && selected !== 'root' ? selected : null
   const selectedFolder = createParentId ? folders.find((f) => f.id === createParentId) : null
