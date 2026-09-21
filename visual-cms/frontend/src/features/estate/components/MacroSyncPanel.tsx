@@ -11,9 +11,12 @@ import {
   summarize,
   shouldPoll,
   pollInterval,
+  isStarting,
+  showsRunning,
   STATUS_CLASS,
   STATUS_LABEL,
   type MacroSyncState,
+  type PendingStart,
 } from '../macroSync'
 
 /**
@@ -31,6 +34,8 @@ export const MacroSyncPanel: React.FC<{ onFinished?: () => void }> = ({ onFinish
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
+  // Нажали, но сервер прогон ещё не показывает — см. isStarting.
+  const [pending, setPending] = useState<PendingStart | null>(null)
   // Чтобы заметить переход «шёл» → «закончился» и обновить список ЖК.
   const wasRunning = useRef(false)
 
@@ -43,6 +48,8 @@ export const MacroSyncPanel: React.FC<{ onFinished?: () => void }> = ({ onFinish
       setError(null)
       if (wasRunning.current && !next.running) onFinished?.()
       wasRunning.current = next.running
+      // Сервер подтвердил прогон — дальше состояние ведёт он, а не нажатие.
+      setPending((prev) => (isStarting(prev, next, Date.now()) ? prev : null))
     } catch (e: any) {
       setError(e?.message || 'Не удалось получить состояние синхронизации')
     }
@@ -52,14 +59,17 @@ export const MacroSyncPanel: React.FC<{ onFinished?: () => void }> = ({ onFinish
     load()
   }, [load])
 
-  // Опрашиваем, пока идёт прогон (нужны живые счётчики) и пока состояние ни
-  // разу не загрузилось: бэкенд может перезапускаться, и без повтора панель
-  // застыла бы с ошибкой до перезагрузки вкладки.
+  const starting = isStarting(pending, state, Date.now())
+  const running = showsRunning(state, starting)
+
+  // Опрашиваем, пока идёт прогон (нужны живые счётчики), пока состояние ни разу
+  // не загрузилось (бэкенд мог перезапускаться) и пока ждём подтверждения
+  // только что запущенного прогона.
   useEffect(() => {
-    if (!shouldPoll(state)) return
-    const timer = setInterval(load, pollInterval(state))
+    if (!shouldPoll(state, starting)) return
+    const timer = setInterval(load, pollInterval(state, starting))
     return () => clearInterval(timer)
-  }, [state, load])
+  }, [state, starting, load])
 
   const start = async (full = false) => {
     if (full && !confirm(
@@ -73,6 +83,9 @@ export const MacroSyncPanel: React.FC<{ onFinished?: () => void }> = ({ onFinish
       // Полная пересборка и продолжение прерванного прогона — разные вещи:
       // продолжать при full нечего, обход начинается сначала.
       await macroSyncApi.start(full ? { full: true } : { resume: Boolean(state?.resumable) })
+      // Сервер ответил 202 и создаёт прогон в фоне. Показываем «идёт» сразу,
+      // не дожидаясь, пока он появится в журнале.
+      setPending({ at: Date.now(), previousRunId: state?.runs?.[0]?.id ?? null })
       await load()
     } catch (e: any) {
       setError(e?.message || 'Не удалось запустить синхронизацию')
@@ -81,8 +94,8 @@ export const MacroSyncPanel: React.FC<{ onFinished?: () => void }> = ({ onFinish
     }
   }
 
-  const disabledReason = whyDisabled(state, busy)
-  const enabled = canStart(state, busy)
+  const disabledReason = whyDisabled(state, busy, starting)
+  const enabled = canStart(state, busy, starting)
   const last = state?.runs?.[0]
   const rest = state?.runs?.slice(1) ?? []
 
@@ -126,8 +139,8 @@ export const MacroSyncPanel: React.FC<{ onFinished?: () => void }> = ({ onFinish
                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
           >
-            <RefreshCw size={16} className={state?.running ? 'animate-spin' : undefined} />
-            {startLabel(state)}
+            <RefreshCw size={16} className={running ? 'animate-spin' : undefined} />
+            {startLabel(state, starting)}
           </button>
           <button
             onClick={() => start(true)}
@@ -142,7 +155,7 @@ export const MacroSyncPanel: React.FC<{ onFinished?: () => void }> = ({ onFinish
 
       {/* Когда статус не доехал, «Проверяем настройки…» рядом с красной
           ошибкой только путает: причина уже названа ниже. */}
-      {disabledReason && !state?.running && !(error && !state) && (
+      {disabledReason && !running && !(error && !state) && (
         <div className="px-4 pb-3 -mt-1 text-sm text-amber-700 flex items-start gap-2">
           <AlertTriangle size={16} className="shrink-0 mt-0.5" />
           <span>{disabledReason}</span>

@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   canStart,
+  isStarting,
+  showsRunning,
+  PENDING_TIMEOUT_MS,
+  PENDING_POLL_MS,
   pollInterval,
   POLL_INTERVAL_MS,
   RETRY_INTERVAL_MS,
@@ -209,5 +213,58 @@ describe('опрос журнала', () => {
     expect(pollInterval(null)).toBe(RETRY_INTERVAL_MS)
     expect(pollInterval(state({ running: true }))).toBe(POLL_INTERVAL_MS)
     expect(RETRY_INTERVAL_MS).toBeGreaterThan(POLL_INTERVAL_MS)
+  })
+})
+
+describe('запуск до подтверждения сервером', () => {
+  /**
+   * Бэкенд отвечает 202 сразу, а строку прогона создаёт в фоне. Первый запрос
+   * статуса после нажатия успевал прийти раньше и возвращал running: false —
+   * панель считала, что ничего не идёт, и переставала опрашивать. Кнопка
+   * оживала только после перезагрузки страницы.
+   */
+  const NOW = 1_000_000
+  const pending = { at: NOW, previousRunId: 'r-old' }
+  const withRuns = (ids: string[], running = false) =>
+    state({ running, runs: ids.map((id) => ({ ...run(), id })) })
+
+  it('сразу после нажатия панель показывает «идёт»', () => {
+    expect(isStarting(pending, withRuns(['r-old']), NOW + 200)).toBe(true)
+    expect(showsRunning(withRuns(['r-old']), true)).toBe(true)
+    expect(startLabel(withRuns(['r-old']), true)).toMatch(/идёт/)
+  })
+
+  it('без нажатия ничего не выдумываем', () => {
+    expect(isStarting(null, withRuns(['r-old']), NOW)).toBe(false)
+  })
+
+  it('сервер подтвердил флагом running — ожидание снимается', () => {
+    expect(isStarting(pending, withRuns(['r-old'], true), NOW + 200)).toBe(false)
+  })
+
+  it('короткий прогон успел закончиться — новый id в журнале тоже подтверждение', () => {
+    // Иначе панель ждала бы running, которого уже не будет.
+    expect(isStarting(pending, withRuns(['r-new', 'r-old']), NOW + 200)).toBe(false)
+  })
+
+  it('терпение не бесконечно — иначе спиннер завис бы навсегда', () => {
+    expect(isStarting(pending, withRuns(['r-old']), NOW + PENDING_TIMEOUT_MS)).toBe(false)
+  })
+
+  it('пока ждём — кнопка недоступна и объясняет почему', () => {
+    expect(canStart(withRuns(['r-old']), false, true)).toBe(false)
+    expect(whyDisabled(withRuns(['r-old']), false, true)).toMatch(/запускается/i)
+  })
+
+  it('пока ждём — опрашиваем, и чаще обычного', () => {
+    expect(shouldPoll(withRuns(['r-old']), true)).toBe(true)
+    expect(pollInterval(withRuns(['r-old']), true)).toBe(PENDING_POLL_MS)
+    expect(PENDING_POLL_MS).toBeLessThan(pollInterval(state({ running: true })))
+  })
+
+  it('первый пустой журнал тоже подтверждается появлением прогона', () => {
+    const fresh = { at: NOW, previousRunId: null }
+    expect(isStarting(fresh, state({ runs: [] }), NOW + 200)).toBe(true)
+    expect(isStarting(fresh, withRuns(['r-new']), NOW + 200)).toBe(false)
   })
 })

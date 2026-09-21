@@ -56,19 +56,77 @@ export const STATUS_CLASS: Record<MacroSyncStatus, string> = {
 }
 
 /**
+ * Запуск принят, но сервер прогон ещё не показывает.
+ *
+ * Бэкенд отвечает 202 сразу, а строку прогона создаёт уже в фоне. Первый же
+ * запрос статуса после нажатия успевает прийти раньше и возвращает
+ * running: false — панель считала, что ничего не идёт, и переставала
+ * опрашивать. Кнопка оживала только после перезагрузки страницы.
+ *
+ * Поэтому нажатие само по себе переводит панель в состояние «идёт», пока
+ * сервер не подтвердит или не истечёт терпение.
+ */
+export interface PendingStart {
+  /** Время нажатия, мс. */
+  at: number
+  /** id последнего прогона на момент нажатия — по нему видно появление нового. */
+  previousRunId: string | null
+}
+
+/** Сколько ждём подтверждения от сервера, прежде чем снять «идёт». */
+export const PENDING_TIMEOUT_MS = 30000
+
+/** Опрос в ожидании подтверждения — частый: счёт идёт на секунды. */
+export const PENDING_POLL_MS = 1500
+
+/**
+ * Считать ли прогон запущенным, хотя сервер его ещё не показывает.
+ *
+ * Снимается, как только сервер подтвердил прогон — сам флагом running или
+ * появлением нового прогона в журнале (короткий прогон может завершиться
+ * между двумя опросами и running не показать вовсе).
+ */
+export function isStarting(
+  pending: PendingStart | null,
+  state: MacroSyncState | null,
+  now: number
+): boolean {
+  if (!pending) return false
+  if (now - pending.at >= PENDING_TIMEOUT_MS) return false
+  if (state?.running) return false
+  const newestId = state?.runs?.[0]?.id ?? null
+  if (newestId !== pending.previousRunId) return false
+  return true
+}
+
+/** Показывать ли панель как «идёт»: сервер подтвердил либо мы только нажали. */
+export function showsRunning(state: MacroSyncState | null, starting: boolean): boolean {
+  return state?.running === true || starting
+}
+
+/**
  * Можно ли запускать прогон.
  *
  * Два одновременных прогона поделили бы лимит MacroCRM в 100 запросов в минуту
  * пополам и оба упёрлись бы в 429, поэтому «идёт» блокирует кнопку.
  */
-export function canStart(state: MacroSyncState | null, busy: boolean): boolean {
-  if (!state || busy) return false
+export function canStart(
+  state: MacroSyncState | null,
+  busy: boolean,
+  starting = false
+): boolean {
+  if (!state || busy || starting) return false
   return state.configured && !state.running
 }
 
 /** Почему кнопка недоступна. Пустая строка — доступна. */
-export function whyDisabled(state: MacroSyncState | null, busy: boolean): string {
+export function whyDisabled(
+  state: MacroSyncState | null,
+  busy: boolean,
+  starting = false
+): string {
   if (busy) return 'Запускается…'
+  if (starting) return 'Прогон запускается…'
   if (!state) return 'Проверяем настройки…'
   if (!state.configured) {
     const names = state.missing.join(', ')
@@ -81,8 +139,8 @@ export function whyDisabled(state: MacroSyncState | null, busy: boolean): string
 }
 
 /** Подпись кнопки: продолжение прерванного прогона называется своим именем. */
-export function startLabel(state: MacroSyncState | null): string {
-  if (state?.running) return 'Синхронизация идёт…'
+export function startLabel(state: MacroSyncState | null, starting = false): string {
+  if (state?.running || starting) return 'Синхронизация идёт…'
   if (state?.resumable) return 'Продолжить синхронизацию'
   return 'Синхронизировать'
 }
@@ -178,11 +236,13 @@ export const RETRY_INTERVAL_MS = 10000
  * загрузилось. Второй важнее: бэкенд может перезапускаться, отдать 502 — и без
  * повтора панель останется с ошибкой навсегда, пока не перезагрузят вкладку.
  */
-export function shouldPoll(state: MacroSyncState | null): boolean {
-  return state === null || state.running === true
+export function shouldPoll(state: MacroSyncState | null, starting = false): boolean {
+  return state === null || state.running === true || starting
 }
 
 /** Промежуток до следующего опроса. */
-export function pollInterval(state: MacroSyncState | null): number {
+export function pollInterval(state: MacroSyncState | null, starting = false): number {
+  // Пока ждём подтверждения запуска — чаще: это секунды, а не минуты.
+  if (starting) return PENDING_POLL_MS
   return state === null ? RETRY_INTERVAL_MS : POLL_INTERVAL_MS
 }
