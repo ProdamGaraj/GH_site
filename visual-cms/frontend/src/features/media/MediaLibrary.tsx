@@ -23,6 +23,14 @@ import {
   SIDEBAR_MAX,
 } from './sidebarWidth'
 import { buildFolderLink } from './mediaLinks'
+import {
+  PAGE_SIZE_OPTIONS,
+  PAGE_SIZE_STORAGE_KEY,
+  readPageSize,
+  countPages,
+  clampPage,
+  pageAfterSizeChange,
+} from './pageSize'
 import { useProjectVariantWidths } from './useProjectVariantWidths'
 
 /** Копирование в буфер с fallback для незащищённого контекста (не https/localhost). */
@@ -77,7 +85,7 @@ export interface MediaLibraryProps {
   readOnly?: boolean
 }
 
-const PAGE_SIZE = 12
+// Размер страницы теперь настраивается пользователем — см. pageSize.ts.
 
 export const MediaLibrary: React.FC<MediaLibraryProps> = ({
   kind = 'any',
@@ -93,6 +101,14 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
   const [items, setItems] = useState<MediaAsset[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(() => {
+    try {
+      return readPageSize(localStorage.getItem(PAGE_SIZE_STORAGE_KEY))
+    } catch {
+      // Приватный режим и запрет на хранилище — не повод падать.
+      return readPageSize(null)
+    }
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -182,6 +198,26 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
    * Ссылка строится от адреса страницы, поэтому работает у коллеги с доступом
    * в панель: открывается та же медиатека с той же раскрытой папкой.
    */
+  /**
+   * Смена размера страницы.
+   *
+   * Номер пересчитывается по позиции первого файла на экране: человек смотрел
+   * на определённое место выдачи, и выкидывать его в начало при переключении
+   * «показывать по 48» — потеря контекста.
+   */
+  const changePageSize = useCallback(
+    (next: number) => {
+      setPage((current) => pageAfterSizeChange(current, pageSize, next))
+      setPageSize(next)
+      try {
+        localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(next))
+      } catch {
+        // Не сохранилось — настройка просто не переживёт перезагрузку.
+      }
+    },
+    [pageSize]
+  )
+
   const copyFolderLink = useCallback(async () => {
     const ok = await copyToClipboard(buildFolderLink(window.location.href, folderSel))
     if (!ok) return
@@ -246,7 +282,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
         folderId: folderSel === null ? undefined : folderSel,
         sort,
         page,
-        limit: PAGE_SIZE,
+        limit: pageSize,
       })
       setItems(resp.items)
       setTotal(resp.total)
@@ -255,7 +291,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
     } finally {
       setLoading(false)
     }
-  }, [activeKind, search, siteId, folderSel, sort, page])
+  }, [activeKind, search, siteId, folderSel, sort, page, pageSize])
 
   useEffect(() => {
     load()
@@ -344,7 +380,14 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
     [handleUploadFiles],
   )
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const totalPages = countPages(total, pageSize)
+
+  // Выдача могла укоротиться (сменили фильтр, удалили файлы) — тогда текущая
+  // страница оказывается за концом, и человек видит пустоту вместо файлов.
+  useEffect(() => {
+    const safe = clampPage(page, totalPages)
+    if (safe !== page) setPage(safe)
+  }, [page, totalPages])
   const folderPath = folderSel && folderSel !== 'root' ? getFolderPath(folders, folderSel) : []
 
   return (
@@ -580,28 +623,54 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
         </div>
 
         {/* Pager */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <div>
-              Всего: {total}. Стр. {page} из {totalPages}
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-3 py-1 border border-gray-300 rounded disabled:opacity-40"
-              >
-                ←
-              </button>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="px-3 py-1 border border-gray-300 rounded disabled:opacity-40"
-              >
-                →
-              </button>
+        {total > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+            <div>Всего: {total}</div>
+
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2">
+                <span className="text-gray-500">Показывать по</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => changePageSize(Number(e.target.value))}
+                  className="px-2 py-1 border border-gray-300 rounded bg-white
+                    focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  {PAGE_SIZE_OPTIONS.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {/*
+                Счётчик между стрелками, а не в другом конце строки: глаз ищет
+                номер там, где им управляют, и не бегает через всю ширину.
+              */}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label="Предыдущая страница"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => clampPage(p - 1, totalPages))}
+                  className="px-3 py-1 border border-gray-300 rounded disabled:opacity-40"
+                >
+                  ←
+                </button>
+                <span className="px-2 tabular-nums whitespace-nowrap">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Следующая страница"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => clampPage(p + 1, totalPages))}
+                  className="px-3 py-1 border border-gray-300 rounded disabled:opacity-40"
+                >
+                  →
+                </button>
+              </div>
             </div>
           </div>
         )}
