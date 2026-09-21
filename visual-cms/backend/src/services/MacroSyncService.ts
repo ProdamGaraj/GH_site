@@ -39,6 +39,19 @@ import { logger } from './Logger'
 /** Корневая папка медиатеки для чертежей. Внутри — по папке на проект. */
 export const PLAN_FOLDER_ROOT = 'Планировки'
 
+/**
+ * Наша ли это ссылка на медиа.
+ *
+ * Медиатека отдаёт адреса относительно домена (/media/<id>.jpg), MacroCRM —
+ * абсолютные и подписанные. Различить нужно затем, что подписанные истекают
+ * через трое суток: попав в базу, они превращаются в пропавшие чертежи.
+ */
+export function isOurMedia(url: string): boolean {
+  if (!url) return false
+  const prefix = process.env.PUBLIC_MEDIA_URL || '/media'
+  return url.startsWith(prefix) || url.startsWith('/')
+}
+
 export interface HouseSyncOutcome {
   externalHouseId: number
   apartments: number
@@ -157,7 +170,7 @@ export class MacroSyncService {
     const full = this.completeProbes(apartments, state, probes.results)
     const { planTypes, unassigned } = groupPlanTypes(apartments, full.probes)
     const folderName = house?.name ?? String(externalHouseId)
-    const withImages = await this.importImages(planTypes, full.reusedSignatures, folderName)
+    const withImages = await this.importImages(planTypes, folderName)
 
     const result = await this.estate.syncHouse({
       externalHouseId,
@@ -317,7 +330,6 @@ export class MacroSyncService {
    */
   private async importImages(
     planTypes: PlanTypePayload[],
-    reusedSignatures: Set<string>,
     projectName: string
   ): Promise<PlanTypePayload[]> {
     // Папка на проект внутри общей: иначе сотни чертежей двух домов сваливаются
@@ -326,9 +338,18 @@ export class MacroSyncService {
 
     const out: PlanTypePayload[] = []
     for (const planType of planTypes) {
-      if (reusedSignatures.has(planType.signature)) {
-        // Тип восстановлен из базы: качать нечего, но разложить по папкам надо.
-        // Первые прогоны шли без папок и свалили всё в корень медиатеки.
+      // Решаем ПО САМИМ ССЫЛКАМ, а не по тому, восстановлен ли тип из базы.
+      //
+      // Тип может быть смешанным: часть квартир опрошена заново, часть взята
+      // из базы. Его подпись при этом числится восстановленной, а представитель
+      // выбирается по богатству набора файлов — и вполне может оказаться свежим
+      // ответом CRM. Ориентируясь на подпись, мы пропускали такие мимо импорта
+      // и записывали в базу ПОДПИСАННЫЕ ССЫЛКИ MACRO. Они живут трое суток,
+      // после чего чертежи на странице просто исчезают.
+      const fromCrm = planType.images.filter((image) => !isOurMedia(image.url))
+      if (fromCrm.length === 0) {
+        // Все ссылки уже наши: качать нечего, но разложить по папкам надо —
+        // первые прогоны шли без папок и свалили всё в корень медиатеки.
         await this.importer.relocate(
           planType.images.map((image) => image.url),
           folderPath

@@ -5,7 +5,7 @@
  * что во втором прогоне вызовов планировок не остаётся. Ошибка здесь не падает
  * тестом функциональности — она проявляется как упирание в лимит на проде.
  */
-import { MacroSyncService, summarizeRun } from '../services/MacroSyncService'
+import { MacroSyncService, summarizeRun, isOurMedia } from '../services/MacroSyncService'
 import { MacroSellClient } from '../services/MacroSellClient'
 import { MacroHttp } from '../services/MacroHttp'
 import { PlanImageImporter } from '../services/PlanImageImporter'
@@ -253,8 +253,8 @@ describe('инкрементальный прогон не стирает про
     planSignature: i < 5 ? 'План-0' : 'План-1',
   }))
   const existing = [
-    { signature: 'План-0', planName: 'План-0', images: [{ title: 'Main image', url: 'https://cms/media/p0.jpg', thumbUrl: '' }], panoUrl: '' },
-    { signature: 'План-1', planName: 'План-1', images: [{ title: 'Main image', url: 'https://cms/media/p1.jpg', thumbUrl: '' }], panoUrl: 'https://tour/1' },
+    { signature: 'План-0', planName: 'План-0', images: [{ title: 'Main image', url: '/media/p0.jpg', thumbUrl: '' }], panoUrl: '' },
+    { signature: 'План-1', planName: 'План-1', images: [{ title: 'Main image', url: '/media/p1.jpg', thumbUrl: '' }], panoUrl: 'https://tour/1' },
   ]
 
   it('типы сохраняются, даже когда не опрошено ничего', async () => {
@@ -287,7 +287,7 @@ describe('инкрементальный прогон не стирает про
     // хранилища и положить туда же копию — на каждом прогоне.
     expect(importer.getStats().downloaded).toBe(0)
     const urls = sent[0].planTypes.flatMap((p: any) => p.images.map((i: any) => i.url))
-    expect(urls).toContain('https://cms/media/p0.jpg')
+    expect(urls).toContain('/media/p0.jpg')
   })
 
   it('агрегаты считаются по всем квартирам типа, а не по опрошенным', async () => {
@@ -305,7 +305,7 @@ describe('инкрементальный прогон не стирает про
     await new MacroSyncService({ client, estate: api, importer: makeImporter() }).syncHouse(HOUSE)
 
     const withTour = sent[0].planTypes.find((p: any) => p.signature === 'План-1')
-    expect(withTour.images[0].url).toBe('https://cms/media/p1.jpg')
+    expect(withTour.images[0].url).toBe('/media/p1.jpg')
   })
 
   it('свежий опрос перекрывает сохранённое, а не дублирует тип', async () => {
@@ -331,6 +331,80 @@ describe('инкрементальный прогон не стирает про
 
     expect(outcome.unassigned).toBe(10)
     expect(sent[0].planTypes).toHaveLength(0)
+  })
+})
+
+describe('ссылки CRM не попадают в базу', () => {
+  /**
+   * Дефект со стенда: у четырёх типов в базе лежали подписанные адреса
+   * macrocrm.gh.uz. Они живут трое суток, после чего чертежи на странице
+   * просто исчезают.
+   *
+   * Причина — смешанный тип: часть квартир опрошена заново, часть взята из
+   * базы. Подпись числилась восстановленной, импорт пропускался, а картинки
+   * при этом были свежими из CRM.
+   */
+  it('распознаёт наши адреса и чужие', () => {
+    expect(isOurMedia('/media/abc.jpg')).toBe(true)
+    expect(isOurMedia('/media/abc.opt.webp')).toBe(true)
+    expect(isOurMedia('https://macrocrm.gh.uz/estate/files/tmp/1/2/sig/p.jpg')).toBe(false)
+    expect(isOurMedia('')).toBe(false)
+  })
+
+  it('смешанный тип со свежими файлами CRM проходит импорт', async () => {
+    const apartments = FIXTURE.slice(0, 6)
+    // Первая квартира изменилась — её опросят, остальные восстановятся.
+    const known: KnownApartment[] = apartments.map((a: any, i: number) => ({
+      externalId: a.id,
+      dateModified: i === 0 ? '2020-01-01T00:00:00.000Z' : new Date(a.dateModified).toISOString(),
+      probedAt: '2026-09-01T00:00:00.000Z',
+      planSignature: 'План-0',
+    }))
+    const existing = [
+      {
+        signature: 'План-0',
+        planName: 'План-0',
+        // В базе один файл, а CRM отдаст два — представителем станет свежий.
+        images: [{ title: 'Main image', url: '/media/old.jpg', thumbUrl: '' }],
+        panoUrl: '',
+      },
+    ]
+
+    const { client } = makeMacro({ apartments, planPer: 6 })
+    const { api, sent } = makeEstate(known, existing)
+    await new MacroSyncService({ client, estate: api, importer: makeImporter() }).syncHouse(HOUSE)
+
+    for (const planType of sent[0].planTypes) {
+      for (const image of planType.images) {
+        expect(image.url).not.toContain('macrocrm')
+      }
+    }
+  })
+
+  it('тип целиком из базы импорт не проходит — качать нечего', async () => {
+    const apartments = FIXTURE.slice(0, 4)
+    const known: KnownApartment[] = apartments.map((a: any) => ({
+      externalId: a.id,
+      dateModified: new Date(a.dateModified).toISOString(),
+      probedAt: '2026-09-01T00:00:00.000Z',
+      planSignature: 'План-0',
+    }))
+    const existing = [
+      {
+        signature: 'План-0',
+        planName: 'План-0',
+        images: [{ title: 'Main image', url: '/media/ours.jpg', thumbUrl: '' }],
+        panoUrl: '',
+      },
+    ]
+
+    const { client } = makeMacro({ apartments })
+    const { api, sent } = makeEstate(known, existing)
+    const importer = makeImporter()
+    await new MacroSyncService({ client, estate: api, importer }).syncHouse(HOUSE)
+
+    expect(importer.getStats().downloaded).toBe(0)
+    expect(sent[0].planTypes[0].images[0].url).toBe('/media/ours.jpg')
   })
 })
 
