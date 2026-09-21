@@ -313,6 +313,12 @@ export class MacroSyncService {
     const out: PlanTypePayload[] = []
     for (const planType of planTypes) {
       if (reusedSignatures.has(planType.signature)) {
+        // Тип восстановлен из базы: качать нечего, но разложить по папкам надо.
+        // Первые прогоны шли без папок и свалили всё в корень медиатеки.
+        await this.importer.relocate(
+          planType.images.map((image) => image.url),
+          folderPath
+        )
         out.push(planType)
         continue
       }

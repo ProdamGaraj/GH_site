@@ -418,3 +418,145 @@ describe('перекладывание уже загруженных', () => {
     expect(importer.getStats().moved).toBe(0)
   })
 })
+
+describe('перекладывание по адресу', () => {
+  /**
+   * Путь для типов, восстановленных из базы: у них картинки — уже наши ссылки,
+   * и обычный импорт им не подходит. Именно этим случаем оказались все прогоны
+   * после первого, поэтому файлы и остались лежать в корне.
+   */
+  function withPlanAssets(assets: Array<{ id: string; url: string; folderId: string | null }>) {
+    const media = makeMedia()
+    for (const a of assets) {
+      media.stored.push({
+        id: a.id,
+        title: PLAN_TITLE_PREFIX + a.id,
+        alt: '',
+        storageKey: a.id,
+        folderId: a.folderId,
+        tags: [PLAN_TAG],
+        _url: a.url,
+      })
+    }
+    // list отдаёт url так же, как настоящая медиатека.
+    media.list = jest.fn(async (_filter: any) => ({
+      items: media.stored.map((a: any) => ({
+        ...a,
+        url: a._url ?? `https://cms/media/${a.storageKey}`,
+        optimizedUrl: null,
+        thumbnailUrl: null,
+      })),
+      total: media.stored.length,
+      page: 1,
+      limit: 30,
+      totalPages: 1,
+    }))
+    return media
+  }
+
+  it('файл из корня переезжает в папку проекта', async () => {
+    const media = withPlanAssets([{ id: 'a1', url: 'https://cms/media/a1.jpg', folderId: null }])
+    const folders = makeFolders([{ id: 'oz', name: 'Дом', parentId: null }])
+    const { fn, requested } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn })
+
+    const moved = await importer.relocate(['https://cms/media/a1.jpg'], ['Дом'])
+
+    expect(moved).toBe(1)
+    expect(requested).toHaveLength(0)
+    expect(media.stored[0].folderId).toBe('oz')
+    expect(importer.getStats().moved).toBe(1)
+  })
+
+  it('качать при этом ничего не надо — файл уже наш', async () => {
+    const media = withPlanAssets([{ id: 'a1', url: 'https://cms/media/a1.jpg', folderId: null }])
+    const folders = makeFolders([{ id: 'oz', name: 'Дом', parentId: null }])
+    const { fn, requested } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn })
+
+    await importer.relocate(['https://cms/media/a1.jpg'], ['Дом'])
+
+    expect(requested).toHaveLength(0)
+    expect(media.upload).not.toHaveBeenCalled()
+  })
+
+  it('файл уже в нужной папке не трогаем', async () => {
+    const media = withPlanAssets([{ id: 'a1', url: 'https://cms/media/a1.jpg', folderId: 'oz' }])
+    const folders = makeFolders([{ id: 'oz', name: 'Дом', parentId: null }])
+    const { fn } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn })
+
+    expect(await importer.relocate(['https://cms/media/a1.jpg'], ['Дом'])).toBe(0)
+    expect(media.update).not.toHaveBeenCalled()
+  })
+
+  it('несколько файлов — один запрос списка, а не по одному на файл', async () => {
+    const media = withPlanAssets([
+      { id: 'a1', url: 'https://cms/media/a1.jpg', folderId: null },
+      { id: 'a2', url: 'https://cms/media/a2.jpg', folderId: null },
+      { id: 'a3', url: 'https://cms/media/a3.jpg', folderId: null },
+    ])
+    const folders = makeFolders([{ id: 'oz', name: 'Дом', parentId: null }])
+    const { fn } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn })
+
+    const moved = await importer.relocate(
+      ['https://cms/media/a1.jpg', 'https://cms/media/a2.jpg', 'https://cms/media/a3.jpg'],
+      ['Дом']
+    )
+
+    expect(moved).toBe(3)
+    expect(media.list).toHaveBeenCalledTimes(1)
+  })
+
+  it('незнакомый адрес просто пропускается', async () => {
+    const media = withPlanAssets([{ id: 'a1', url: 'https://cms/media/a1.jpg', folderId: null }])
+    const folders = makeFolders([{ id: 'oz', name: 'Дом', parentId: null }])
+    const { fn } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn })
+
+    expect(await importer.relocate(['https://cms/media/чужой.jpg'], ['Дом'])).toBe(0)
+  })
+
+  it('пустые адреса не роняют перекладывание', async () => {
+    const media = withPlanAssets([{ id: 'a1', url: 'https://cms/media/a1.jpg', folderId: null }])
+    const folders = makeFolders([{ id: 'oz', name: 'Дом', parentId: null }])
+    const { fn } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn })
+
+    expect(await importer.relocate(['', 'https://cms/media/a1.jpg'], ['Дом'])).toBe(1)
+  })
+
+  it('без папки назначения ничего не двигаем', async () => {
+    const media = withPlanAssets([{ id: 'a1', url: 'https://cms/media/a1.jpg', folderId: null }])
+    const folders = makeFolders()
+    const { fn } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn })
+
+    expect(await importer.relocate(['https://cms/media/a1.jpg'], [])).toBe(0)
+    expect(media.update).not.toHaveBeenCalled()
+  })
+
+  it('сбой перекладывания одного файла не срывает остальные', async () => {
+    const media = withPlanAssets([
+      { id: 'a1', url: 'https://cms/media/a1.jpg', folderId: null },
+      { id: 'a2', url: 'https://cms/media/a2.jpg', folderId: null },
+    ])
+    media.update = jest.fn(async (id: string, _patch: any) => {
+      if (id === 'a1') throw new Error('нет прав')
+      const asset = media.stored.find((a: any) => a.id === id)
+      if (asset) asset.folderId = 'oz'
+      return asset
+    })
+    const folders = makeFolders([{ id: 'oz', name: 'Дом', parentId: null }])
+    const { fn } = makeFetch()
+    const importer = new PlanImageImporter({ media, folders, fetchImpl: fn })
+
+    const moved = await importer.relocate(
+      ['https://cms/media/a1.jpg', 'https://cms/media/a2.jpg'],
+      ['Дом']
+    )
+
+    expect(moved).toBe(1)
+  })
+})

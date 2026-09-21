@@ -25,6 +25,9 @@ export const PLAN_TITLE_PREFIX = 'macro-plan:'
 /** Метка в тегах — чтобы планировки было видно в медиатеке отдельной выборкой. */
 export const PLAN_TAG = 'macro-plan'
 
+/** Размер страницы при выгрузке ассетов планировок. Совпадает с потолком MediaService. */
+const PLAN_PAGE_SIZE = 100
+
 /** Разумный потолок на файл планировки: чертёж в 20 МБ — это ошибка выгрузки. */
 const MAX_FILE_BYTES = 20 * 1024 * 1024
 
@@ -114,6 +117,8 @@ export class PlanImageImporter {
   private readonly cache = new Map<string, ImportedImage>()
   /** Разрешённые пути папок: «Планировки/O'z Makon» к id. */
   private readonly folderCache = new Map<string, string | null>()
+  /** Все ассеты с меткой планировки, по адресу. Выгружаются один раз за прогон. */
+  private planAssets: Map<string, any> | null = null
   private stats: ImportStats = { downloaded: 0, reused: 0, failed: 0, moved: 0 }
 
   constructor(opts: PlanImageImporterOptions = {}) {
@@ -163,6 +168,70 @@ export class PlanImageImporter {
       if (imported) out.push(imported)
     }
     return out
+  }
+
+  /**
+   * Перекладывает уже перенесённые файлы в папку проекта по их адресам.
+   *
+   * Нужен для типов, восстановленных из базы: у них картинки — уже НАШИ ссылки,
+   * и обычный путь импорта им не подходит (по ключу из нашего же URL файл не
+   * найдётся, и импортёр скачал бы его из собственной медиатеки). Поэтому ищем
+   * по адресу среди ассетов с меткой планировки.
+   *
+   * Возвращает число переложенных.
+   */
+  async relocate(urls: string[], folderPath: string[]): Promise<number> {
+    const folderId = await this.resolveFolder(folderPath)
+    if (!folderId || !this.media.update) return 0
+
+    let moved = 0
+    for (const url of urls) {
+      if (!url) continue
+      try {
+        const asset = await this.findByUrl(url)
+        if (!asset || (asset.folderId ?? null) === folderId) continue
+        await this.media.update(asset.id, { folderId })
+        asset.folderId = folderId
+        this.stats.moved++
+        moved++
+      } catch (err) {
+        logger.warn('Не удалось переложить планировку в папку', {
+          url,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+    return moved
+  }
+
+  /**
+   * Ассет по нашему публичному адресу.
+   *
+   * Поиск в медиатеке идёт по имени файла и подписям, а не по URL, поэтому
+   * один раз выгружаем все ассеты с меткой планировки и складываем в карту.
+   */
+  private async findByUrl(url: string): Promise<any | null> {
+    if (!this.planAssets) {
+      this.planAssets = new Map<string, any>()
+      let page = 1
+      for (;;) {
+        const chunk = await this.media.list({
+          siteId: this.siteId,
+          includeGlobal: true,
+          tag: PLAN_TAG,
+          page,
+          limit: PLAN_PAGE_SIZE,
+        })
+        const items = chunk.items ?? []
+        for (const asset of items) {
+          if (asset.url) this.planAssets.set(asset.url, asset)
+          if (asset.optimizedUrl) this.planAssets.set(asset.optimizedUrl, asset)
+        }
+        if (items.length < PLAN_PAGE_SIZE) break
+        page++
+      }
+    }
+    return this.planAssets.get(url) ?? null
   }
 
   /**
