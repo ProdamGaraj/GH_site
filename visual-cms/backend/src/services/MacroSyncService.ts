@@ -171,7 +171,11 @@ export class MacroSyncService {
     const { planTypes, unassigned } = groupPlanTypes(apartments, full.probes)
     // Папка на проект внутри общей: иначе сотни чертежей двух домов сваливаются
     // в одну кучу, и найти нужный в медиатеке невозможно.
-    const folderPath = [PLAN_FOLDER_ROOT, house?.name ?? String(externalHouseId)]
+    // ?? здесь мало: Macro возвращает у части домов ПУСТОЕ имя, а пустая строка
+    // мимо ?? проходит. Путь ['Планировки', ''] схлопывался до ['Планировки'],
+    // и чертежи молча ложились в общую папку вместо папки проекта.
+    const projectName = (house?.name ?? '').trim() || String(externalHouseId)
+    const folderPath = [PLAN_FOLDER_ROOT, projectName]
     const withImages = await this.importImages(planTypes, folderPath)
 
     const result = await this.estate.syncHouse({

@@ -18,7 +18,9 @@ const HOUSE = 5139395
  * Мок MacroCRM: список квартир из фикстуры, планировка на каждую.
  * planPer — сколько квартир делят одну планировку.
  */
-function makeMacro(options: { apartments?: any[]; planPer?: number; failPlanFor?: number[] } = {}) {
+function makeMacro(
+  options: { apartments?: any[]; planPer?: number; failPlanFor?: number[]; houseName?: string } = {}
+) {
   const apartments = options.apartments ?? FIXTURE.slice(0, 10)
   const planPer = options.planPer ?? 5
   const failPlanFor = new Set(options.failPlanFor ?? [])
@@ -29,7 +31,17 @@ function makeMacro(options: { apartments?: any[]; planPer?: number; failPlanFor?
     const body = JSON.parse(String(init.body))
 
     if (path.endsWith('/estateHouses/list')) {
-      return json({ data: [{ id: HOUSE, complexId: 5139393, name: 'Дом', floorsCount: 15 }], meta: { next: null } })
+      return json({
+        data: [
+          {
+            id: HOUSE,
+            complexId: 5139393,
+            name: options.houseName !== undefined ? options.houseName : 'Дом',
+            floorsCount: 15,
+          },
+        ],
+        meta: { next: null },
+      })
     }
     if (path.endsWith('/estateSell/list')) {
       return json({ data: apartments, meta: { next: null } })
@@ -498,6 +510,61 @@ describe('опустевшие типы', () => {
     await new MacroSyncService({ client, estate: api, importer }).syncHouse(HOUSE)
 
     expect(sent[0].planTypes.map((p: any) => p.signature)).not.toContain('План-пустой')
+  })
+})
+
+describe('имя папки проекта', () => {
+  /**
+   * На стенде у дома 4667449 Macro вернула ПУСТОЕ имя. Оператор ?? пустую
+   * строку пропускает, путь ['Планировки', ''] схлопывался до ['Планировки'],
+   * и три чертежа молча легли в общую папку вместо папки проекта.
+   */
+  function spyFolders() {
+    const importer = makeImporter()
+    const paths: string[][] = []
+    jest.spyOn(importer, 'importFiles').mockImplementation(async (_files: any, path: string[] = []) => {
+      paths.push(path)
+      return [{ title: '', url: '/media/x.jpg', thumbUrl: '' }]
+    })
+    jest.spyOn(importer, 'relocate').mockImplementation(async (_urls: string[], path: string[]) => {
+      paths.push(path)
+      return 0
+    })
+    return { importer, paths }
+  }
+
+  afterEach(() => jest.restoreAllMocks())
+
+  it('обычное имя дома становится папкой проекта', async () => {
+    const { client } = makeMacro({ apartments: FIXTURE.slice(0, 4) })
+    const { api } = makeEstate()
+    const { importer, paths } = spyFolders()
+
+    await new MacroSyncService({ client, estate: api, importer }).syncHouse(HOUSE)
+
+    expect(paths.every((p) => p.length === 2)).toBe(true)
+    expect(paths[0]).toEqual(['Планировки', 'Дом'])
+  })
+
+  it('пустое имя подменяется номером дома, а не схлопывает путь', async () => {
+    const { client } = makeMacro({ apartments: FIXTURE.slice(0, 4), houseName: '' })
+    const { api } = makeEstate()
+    const { importer, paths } = spyFolders()
+
+    await new MacroSyncService({ client, estate: api, importer }).syncHouse(HOUSE)
+
+    expect(paths[0]).toEqual(['Планировки', String(HOUSE)])
+    expect(paths.every((p) => p.length === 2)).toBe(true)
+  })
+
+  it('имя из одних пробелов считается пустым', async () => {
+    const { client } = makeMacro({ apartments: FIXTURE.slice(0, 4), houseName: '   ' })
+    const { api } = makeEstate()
+    const { importer, paths } = spyFolders()
+
+    await new MacroSyncService({ client, estate: api, importer }).syncHouse(HOUSE)
+
+    expect(paths[0]).toEqual(['Планировки', String(HOUSE)])
   })
 })
 

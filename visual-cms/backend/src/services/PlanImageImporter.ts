@@ -244,6 +244,12 @@ export class PlanImageImporter {
   private async resolveFolder(path: string[]): Promise<string | null> {
     if (this.fixedFolderId) return this.fixedFolderId
     const clean = path.map((part) => (part || '').trim()).filter(Boolean)
+    // Пустой сегмент означает, что вызывающий не знает имени папки. Молча
+    // положить файл уровнем выше — худший исход: выглядит как норма, а на деле
+    // чертежи проекта оказываются в общей куче. Сообщаем.
+    if (clean.length !== path.length) {
+      logger.warn('В пути папки планировок пустой сегмент', { path })
+    }
     if (clean.length === 0) return null
 
     const cacheKey = clean.join('/')
