@@ -37,6 +37,7 @@ function apartment(externalId: number, over: Partial<ApartmentInput> = {}): Apar
     dateModified: '2026-08-19T12:58:58.000Z',
     planSignature: 'К2-54.65-6|abc123',
     planProbed: true,
+    planMissing: false,
     ...over,
   }
 }

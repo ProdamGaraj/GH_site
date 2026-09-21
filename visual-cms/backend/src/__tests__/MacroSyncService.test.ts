@@ -213,7 +213,7 @@ describe('повторный прогон', () => {
       externalId: a.id,
       dateModified: new Date(a.dateModified).toISOString(),
       probedAt: '2026-09-01T00:00:00.000Z',
-      planSignature: null,
+      planSignature: 'План-0',
     }))
     const { client } = makeMacro({ apartments })
     const { api, sent } = makeEstate(known)
@@ -228,7 +228,7 @@ describe('повторный прогон', () => {
       externalId: a.id,
       dateModified: i === 0 ? '2020-01-01T00:00:00.000Z' : new Date(a.dateModified).toISOString(),
       probedAt: '2026-09-01T00:00:00.000Z',
-      planSignature: null,
+      planSignature: 'План-0',
     }))
     const { client, planCalls } = makeMacro({ apartments })
     const { api } = makeEstate(known)
@@ -320,8 +320,10 @@ describe('инкрементальный прогон не стирает про
     expect(sent[0].apartments).toHaveLength(10)
   })
 
-  it('квартира без сохранённой привязки остаётся без планировки, а не выдумывает её', async () => {
-    const orphan = known.map((k) => ({ ...k, planSignature: null }))
+  it('квартира, у которой в CRM нет чертежа, остаётся без планировки', async () => {
+    // planMissing отличает честное отсутствие от потерянной связи: без него
+    // такие переспрашивались бы каждый прогон.
+    const orphan = known.map((k) => ({ ...k, planSignature: null, planMissing: true }))
     const { client } = makeMacro({ apartments })
     const { api, sent } = makeEstate(orphan, [])
     const outcome = await new MacroSyncService({ client, estate: api, importer: makeImporter() })

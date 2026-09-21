@@ -28,6 +28,8 @@ export interface KnownApartment {
    * предыдущего.
    */
   planSignature: string | null
+  /** CRM ответила, что чертежа нет: переспрашивать незачем. */
+  planMissing?: boolean
 }
 
 /** Тип планировки, собранный прошлыми прогонами. Картинки уже в медиатеке. */

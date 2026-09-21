@@ -54,6 +54,16 @@ export class Apartment {
   @Column({ type: 'timestamptz', nullable: true })
   planProbedAt!: Date | null
 
+  /**
+   * CRM ответила, что планировки у квартиры нет.
+   *
+   * Отличает честное отсутствие чертежа от потерянной на нашей стороне связи.
+   * Без этого признака квартира без привязки, но с отметкой об опросе, больше
+   * никогда не опрашивается — и остаётся без планировки навсегда.
+   */
+  @Column({ type: 'boolean', default: false })
+  planMissing!: boolean
+
   @Column({ type: 'int', default: 0 })
   order!: number
 

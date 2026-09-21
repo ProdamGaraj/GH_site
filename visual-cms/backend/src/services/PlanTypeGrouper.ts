@@ -239,15 +239,27 @@ export interface KnownProbe {
   externalId: number
   /** dateModified на момент последнего опроса. */
   dateModified: string | null
-  /**
-   * Когда за планировкой ходили в последний раз. null — не ходили ни разу.
-   *
-   * Именно отметка об опросе, а не наличие привязки: CRM может честно ответить,
-   * что чертежа нет, и по наличию типа такая квартира опрашивалась бы вечно.
-   */
+  /** Когда за планировкой ходили в последний раз. null — не ходили ни разу. */
   probedAt: string | null
+  /** Подпись типа, к которому квартира привязана сейчас. */
+  planSignature?: string | null
+  /** CRM ответила, что чертежа нет. Такую квартиру переспрашивать незачем. */
+  planMissing?: boolean
 }
 
+/**
+ * Какие квартиры опрашивать.
+ *
+ * Правило из трёх условий, и третье появилось не сразу. Сначала хватало
+ * «не опрашивали» и «изменилась в CRM». Но связи квартир с типами однажды
+ * потерялись на нашей стороне, отметка об опросе при этом осталась — и 144
+ * квартиры дома 5139395 оказались без планировки НАВСЕГДА: отбор считал их
+ * опрошенными и пропускал.
+ *
+ * Поэтому квартира без привязки опрашивается снова — кроме случая, когда CRM
+ * уже ответила, что чертежа у неё нет. Иначе такие опрашивались бы каждый
+ * прогон до скончания времён.
+ */
 export function selectProbeTargets(
   apartments: ApartmentPayload[],
   known: KnownProbe[]
@@ -257,6 +269,7 @@ export function selectProbeTargets(
     const prev = byId.get(apartment.externalId)
     if (!prev) return true
     if (!prev.probedAt) return true
-    return prev.dateModified !== apartment.dateModified
+    if (prev.dateModified !== apartment.dateModified) return true
+    return !prev.planSignature && prev.planMissing !== true
   })
 }

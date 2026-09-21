@@ -310,14 +310,15 @@ describe('отбор квартир на опрос', () => {
       externalId: f.externalId,
       dateModified: f.dateModified,
       probedAt: '2026-09-01T00:00:00.000Z',
+      planSignature: 'К2-54.65-6',
     }))
     expect(selectProbeTargets(flats, known)).toHaveLength(0)
   })
 
   it('изменившаяся в CRM квартира опрашивается заново', () => {
     const known = [
-      { externalId: 1, dateModified: '2026-01-01T00:00:00.000Z', probedAt: '2026-09-01T00:00:00.000Z' },
-      { externalId: 2, dateModified: flats[1].dateModified, probedAt: '2026-09-01T00:00:00.000Z' },
+      { externalId: 1, dateModified: '2026-01-01T00:00:00.000Z', probedAt: '2026-09-01T00:00:00.000Z', planSignature: 'X' },
+      { externalId: 2, dateModified: flats[1].dateModified, probedAt: '2026-09-01T00:00:00.000Z', planSignature: 'X' },
     ]
     expect(selectProbeTargets(flats, known).map((a) => a.externalId)).toEqual([1])
   })
@@ -325,13 +326,40 @@ describe('отбор квартир на опрос', () => {
   it('ни разу не опрошенная квартира опрашивается, даже если дата не менялась', () => {
     const known = [
       { externalId: 1, dateModified: flats[0].dateModified, probedAt: null },
-      { externalId: 2, dateModified: flats[1].dateModified, probedAt: '2026-09-01T00:00:00.000Z' },
+      { externalId: 2, dateModified: flats[1].dateModified, probedAt: '2026-09-01T00:00:00.000Z', planSignature: 'X' },
+    ]
+    expect(selectProbeTargets(flats, known).map((a) => a.externalId)).toEqual([1])
+  })
+
+  it('потерявшая привязку опрашивается заново', () => {
+    // На стенде 144 квартиры остались без планировки навсегда: связь стёрло
+    // прогоном, отметка об опросе осталась, и отбор их пропускал.
+    const known = [
+      { externalId: 1, dateModified: flats[0].dateModified, probedAt: '2026-09-01T00:00:00.000Z', planSignature: null },
+      { externalId: 2, dateModified: flats[1].dateModified, probedAt: '2026-09-01T00:00:00.000Z', planSignature: 'К2-54.65-6' },
+    ]
+    expect(selectProbeTargets(flats, known).map((a) => a.externalId)).toEqual([1])
+  })
+
+  it('квартира без чертежа в CRM переспрашиванию не подлежит', () => {
+    // Иначе такие опрашивались бы каждый прогон до скончания времён.
+    const known = [
+      { externalId: 1, dateModified: flats[0].dateModified, probedAt: '2026-09-01T00:00:00.000Z', planSignature: null, planMissing: true },
+      { externalId: 2, dateModified: flats[1].dateModified, probedAt: '2026-09-01T00:00:00.000Z', planSignature: 'X' },
+    ]
+    expect(selectProbeTargets(flats, known)).toHaveLength(0)
+  })
+
+  it('изменение в CRM сильнее признака отсутствия чертежа', () => {
+    const known = [
+      { externalId: 1, dateModified: '2020-01-01T00:00:00.000Z', probedAt: '2026-09-01T00:00:00.000Z', planSignature: null, planMissing: true },
+      { externalId: 2, dateModified: flats[1].dateModified, probedAt: '2026-09-01T00:00:00.000Z', planSignature: 'X' },
     ]
     expect(selectProbeTargets(flats, known).map((a) => a.externalId)).toEqual([1])
   })
 
   it('новая квартира опрашивается', () => {
-    const known = [{ externalId: 1, dateModified: flats[0].dateModified, probedAt: '2026-09-01T00:00:00.000Z' }]
+    const known = [{ externalId: 1, dateModified: flats[0].dateModified, probedAt: '2026-09-01T00:00:00.000Z', planSignature: 'X' }]
     expect(selectProbeTargets(flats, known).map((a) => a.externalId)).toEqual([2])
   })
 })

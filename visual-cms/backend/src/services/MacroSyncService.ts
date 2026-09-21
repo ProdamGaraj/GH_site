@@ -376,6 +376,11 @@ export class MacroSyncService {
       dateModified: apartment.dateModified,
       planSignature: signatureByApartment.get(apartment.externalId) ?? null,
       planProbed: probedIds.has(apartment.externalId),
+      // Опросили и типа не получилось — значит чертежа в CRM нет. Признак
+      // избавляет от бесконечного переспрашивания таких квартир.
+      planMissing:
+        probedIds.has(apartment.externalId) &&
+        !signatureByApartment.has(apartment.externalId),
     }))
   }
 }

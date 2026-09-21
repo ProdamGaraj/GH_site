@@ -53,6 +53,7 @@ export const apartmentInputSchema = z.object({
   dateModified: z.string().datetime().nullable().default(null),
   planSignature: z.string().max(200).nullable().default(null),
   planProbed: z.boolean().default(false),
+  planMissing: z.boolean().default(false),
 })
 
 export const syncHouseSchema = z.object({

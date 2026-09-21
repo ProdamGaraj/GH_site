@@ -57,7 +57,7 @@ export class SyncController {
 
       const apartments = await AppDataSource.getRepository(Apartment).find({
         where: { houseId: house.id },
-        select: ['externalId', 'dateModified', 'planProbedAt', 'planTypeId'],
+        select: ['externalId', 'dateModified', 'planProbedAt', 'planTypeId', 'planMissing'],
       })
       const planTypes = await AppDataSource.getRepository(PlanType).find({
         where: { houseId: house.id },
@@ -75,6 +75,9 @@ export class SyncController {
             // По этой подписи синк восстановит привязку квартиры, которую
             // в текущем прогоне не опрашивал.
             planSignature: a.planTypeId ? signatureById.get(a.planTypeId) ?? null : null,
+            // Без привязки, но с этим признаком — чертежа в CRM нет, и ходить
+            // за ним снова незачем.
+            planMissing: a.planMissing === true,
           })),
         // Картинки здесь уже наши, перенесённые в медиатеку: повторно
         // импортировать их не нужно и нельзя.
@@ -252,7 +255,9 @@ export class SyncController {
       windowView: input.windowView,
       status: input.status,
       dateModified: input.dateModified ? new Date(input.dateModified) : null,
-      ...(input.planProbed ? { planProbedAt: now } : {}),
+      // planProbedAt и planMissing пишем только когда синк действительно ходил
+      // за планировкой: прогон, который её не опрашивал, про неё ничего не знает.
+      ...(input.planProbed ? { planProbedAt: now, planMissing: input.planMissing } : {}),
       planTypeId: input.planSignature
         ? planTypeIdBySignature.get(input.planSignature) ?? null
         : null,
