@@ -169,8 +169,10 @@ export class MacroSyncService {
     // предыдущего прогона. Ровно это и случилось на первом боевом запуске.
     const full = this.completeProbes(apartments, state, probes.results)
     const { planTypes, unassigned } = groupPlanTypes(apartments, full.probes)
-    const folderName = house?.name ?? String(externalHouseId)
-    const withImages = await this.importImages(planTypes, folderName)
+    // Папка на проект внутри общей: иначе сотни чертежей двух домов сваливаются
+    // в одну кучу, и найти нужный в медиатеке невозможно.
+    const folderPath = [PLAN_FOLDER_ROOT, house?.name ?? String(externalHouseId)]
+    const withImages = await this.importImages(planTypes, folderPath)
 
     const result = await this.estate.syncHouse({
       externalHouseId,
@@ -199,6 +201,17 @@ export class MacroSyncService {
       apartments: this.toApartmentPayloads(apartments, withImages, probes.probedIds),
     })
 
+    // Типы, у которых квартир не осталось, в группировку не попадают — значит
+    // их чертежи никто не разложит, и медиатека копит мусор в корне. Строки
+    // таких типов мы храним ради переводов, файлы тоже никуда не деваются,
+    // поэтому просто доводим их до папки проекта.
+    await this.importer.relocate(
+      state.planTypes
+        .flatMap((planType) => planType.images.map((image) => image.url))
+        .filter(isOurMedia),
+      folderPath
+    )
+
     const after = this.importer.getStats()
 
     // Одна строка, по которой видно, что вообще произошло с домом. Без неё
@@ -211,7 +224,7 @@ export class MacroSyncService {
       опрошено: probes.probedIds.size,
       скачано: after.downloaded - before.downloaded,
       переложено: after.moved - before.moved,
-      папка: folderName,
+      папка: folderPath.join('/'),
     })
 
     return {
@@ -330,12 +343,8 @@ export class MacroSyncService {
    */
   private async importImages(
     planTypes: PlanTypePayload[],
-    projectName: string
+    folderPath: string[]
   ): Promise<PlanTypePayload[]> {
-    // Папка на проект внутри общей: иначе сотни чертежей двух домов сваливаются
-    // в одну кучу, и найти нужный в медиатеке невозможно.
-    const folderPath = [PLAN_FOLDER_ROOT, projectName]
-
     const out: PlanTypePayload[] = []
     for (const planType of planTypes) {
       // Решаем ПО САМИМ ССЫЛКАМ, а не по тому, восстановлен ли тип из базы.

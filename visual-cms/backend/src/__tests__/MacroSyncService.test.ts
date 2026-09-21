@@ -408,6 +408,99 @@ describe('ссылки CRM не попадают в базу', () => {
   })
 })
 
+describe('опустевшие типы', () => {
+  /**
+   * Тип, у которого не осталось квартир, в группировку не попадает: строка
+   * держится в базе ради переводов, но синк её не видит. На стенде из-за
+   * этого пять чертежей так и лежали в корне медиатеки — их типы опустели.
+   */
+  const apartments = FIXTURE.slice(0, 4)
+  const known: KnownApartment[] = apartments.map((a: any) => ({
+    externalId: a.id,
+    dateModified: new Date(a.dateModified).toISOString(),
+    probedAt: '2026-09-01T00:00:00.000Z',
+    planSignature: 'План-0',
+  }))
+  const existing = [
+    {
+      signature: 'План-0',
+      planName: 'План-0',
+      images: [{ title: 'Main image', url: '/media/живой.jpg', thumbUrl: '' }],
+      panoUrl: '',
+    },
+    {
+      // Квартир у этого типа не осталось ни одной.
+      signature: 'План-пустой',
+      planName: 'План-пустой',
+      images: [{ title: 'Main image', url: '/media/забытый.jpg', thumbUrl: '' }],
+      panoUrl: '',
+    },
+  ]
+
+  function makeRelocatingImporter() {
+    const importer = makeImporter()
+    const seen: string[] = []
+    jest.spyOn(importer, 'relocate').mockImplementation(async (urls: string[]) => {
+      seen.push(...urls)
+      return urls.length
+    })
+    return { importer, seen }
+  }
+
+  afterEach(() => jest.restoreAllMocks())
+
+  it('чертёж опустевшего типа тоже доходит до папки', async () => {
+    const { client } = makeMacro({ apartments })
+    const { api } = makeEstate(known, existing)
+    const { importer, seen } = makeRelocatingImporter()
+
+    await new MacroSyncService({ client, estate: api, importer }).syncHouse(HOUSE)
+
+    expect(seen).toContain('/media/забытый.jpg')
+  })
+
+  it('живой тип при этом не забыт', async () => {
+    const { client } = makeMacro({ apartments })
+    const { api } = makeEstate(known, existing)
+    const { importer, seen } = makeRelocatingImporter()
+
+    await new MacroSyncService({ client, estate: api, importer }).syncHouse(HOUSE)
+
+    expect(seen).toContain('/media/живой.jpg')
+  })
+
+  it('ссылки CRM в перекладывание не идут — их надо скачивать, а не двигать', async () => {
+    const withCrm = [
+      ...existing,
+      {
+        signature: 'План-чужой',
+        planName: 'План-чужой',
+        images: [
+          { title: 'Main image', url: 'https://macrocrm.gh.uz/estate/files/tmp/1/2/sig/p.jpg', thumbUrl: '' },
+        ],
+        panoUrl: '',
+      },
+    ]
+    const { client } = makeMacro({ apartments })
+    const { api } = makeEstate(known, withCrm)
+    const { importer, seen } = makeRelocatingImporter()
+
+    await new MacroSyncService({ client, estate: api, importer }).syncHouse(HOUSE)
+
+    expect(seen.some((url) => url.includes('macrocrm'))).toBe(false)
+  })
+
+  it('опустевший тип в выгрузку не попадает — карточки «0 квартир» не нужно', async () => {
+    const { client } = makeMacro({ apartments })
+    const { api, sent } = makeEstate(known, existing)
+    const { importer } = makeRelocatingImporter()
+
+    await new MacroSyncService({ client, estate: api, importer }).syncHouse(HOUSE)
+
+    expect(sent[0].planTypes.map((p: any) => p.signature)).not.toContain('План-пустой')
+  })
+})
+
 describe('полная пересборка', () => {
   it('опрашивает всех, игнорируя прошлые отметки', async () => {
     // Путь восстановления: отметка об опросе стоит, а привязки потеряны —
