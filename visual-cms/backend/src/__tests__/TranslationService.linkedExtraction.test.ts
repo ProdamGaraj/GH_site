@@ -8,7 +8,12 @@
  * идёт по `nodeId` и такие строки принимает, то есть перевести их было нечем
  * исключительно из-за выдачи.
  */
-import { extractTranslatableFields, dedupeEntries, TranslationEntry } from '../services/TranslationService'
+import {
+  extractTranslatableFields,
+  dedupeEntries,
+  isPurePlaceholder,
+  TranslationEntry,
+} from '../services/TranslationService'
 
 /** Страница в том виде, в каком она лежит в базе: у linked-блока детей нет. */
 const rawPage = {
@@ -94,5 +99,24 @@ describe('dedupeEntries', () => {
 
   it('пустой вход — пустой выход', () => {
     expect(dedupeEntries([])).toEqual([])
+  })
+})
+
+describe('isPurePlaceholder', () => {
+  it('маркер подстановки целиком — переводить нечего', () => {
+    expect(isPurePlaceholder('{{item.name}}')).toBe(true)
+    expect(isPurePlaceholder('{{$.label}}')).toBe(true)
+    expect(isPurePlaceholder('  {{item.heroImages.0}}  ')).toBe(true)
+  })
+
+  it('текст вместе с маркером переводить надо — маркер переносит переводчик', () => {
+    expect(isPurePlaceholder('{{item.name}} — Golden House')).toBe(false)
+    expect(isPurePlaceholder('Проект {{item.name}}')).toBe(false)
+  })
+
+  it('обычный текст не трогаем', () => {
+    expect(isPurePlaceholder('Выбрать')).toBe(false)
+    expect(isPurePlaceholder('')).toBe(false)
+    expect(isPurePlaceholder('{{}}')).toBe(false)
   })
 })
