@@ -28,6 +28,7 @@ import { secureDataSourceService, FetchConfig, AuthConfig } from './SecureDataSo
 import { resolveLoadStrategy } from './dataSourceRuntime'
 import { applyCollectionTransforms } from '../utils/collectionTransforms'
 import { localizeInternalLinks, langPrefix } from './linkLocalization'
+import { generateLanguageEntryStub } from './languageEntry'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
@@ -162,8 +163,46 @@ export class DeployService {
    * Относительный путь HTML-файла страницы для чистых URL (без .html в адресе):
    * домашняя → 'index.html' (URL '/'), остальные → '<slug>/index.html' (URL '/<slug>').
    */
-  private pageRelPath(slug: string, isHome: boolean): string {
-    return isHome ? 'index.html' : path.join(slug, 'index.html')
+  /**
+   * Путь файла страницы внутри языка.
+   *
+   * Префикс есть у каждого языка, включая язык по умолчанию: русский лежит в
+   * `/ru/`, а корневые адреса заняты распознавателем языка. Без `langCode`
+   * возвращает путь без префикса — это адрес распознавателя.
+   */
+  private pageRelPath(slug: string, isHome: boolean, langCode?: string): string {
+    const rel = isHome ? 'index.html' : path.join(slug, 'index.html')
+    return langCode ? path.join(langCode, rel) : rel
+  }
+
+  /**
+   * Кладёт в корневой адрес страницу-распознаватель языка.
+   *
+   * Молча пропускаем, если активен один язык: выбирать не из чего, и лишний
+   * переход только замедлил бы вход.
+   */
+  private writeLanguageEntry(p: {
+    siteDir: string
+    slug: string
+    isHome: boolean
+    languages: Array<{ code: string; isActive: boolean; isDefault: boolean }>
+    title?: string
+    deployedPages: string[]
+  }): void {
+    const active = p.languages.filter(l => l.isActive).map(l => l.code)
+    if (active.length < 2) return
+    const defaultCode = p.languages.find(l => l.isDefault)?.code || active[0]
+    const relPath = this.pageRelPath(p.slug, p.isHome)
+    const filePath = path.join(p.siteDir, relPath)
+    const html = generateLanguageEntryStub({
+      languages: active,
+      defaultLanguage: defaultCode,
+      pagePath: p.isHome ? '' : p.slug,
+      title: p.title,
+    })
+    this.ensureDirectoryExists(path.dirname(filePath))
+    fs.writeFileSync(filePath, html, 'utf-8')
+    p.deployedPages.push(relPath)
   }
 
   /**
@@ -232,7 +271,14 @@ export class DeployService {
 
       // Генерируем HTML (для домашней передаём slug='index', чтобы переключатель
       // языков и пр. трактовали страницу как корень)
-      const html = await this.generatePageHtml(updatedStructure, {
+      // Ссылки языка по умолчанию тоже получают префикс: он теперь есть у
+      // каждого языка, а корень занят распознавателем.
+      const { value: localizedStructure } = localizeInternalLinks(
+        updatedStructure,
+        langPrefix(defaultLang?.code || '')
+      )
+
+      const html = await this.generatePageHtml(localizedStructure, {
         metadata: page.metadata || { title: page.name, description: '', keywords: [] },
         slug: isHome ? 'index' : page.slug,
         dataConfig,
@@ -244,13 +290,21 @@ export class DeployService {
       })
 
       // Чистые URL без .html: домашняя → index.html, остальные → <slug>/index.html
-      const relPath = this.pageRelPath(page.slug, isHome)
+      const relPath = this.pageRelPath(page.slug, isHome, defaultLang?.code)
       const filePath = path.join(siteDir, relPath)
 
       // Записываем файл
       this.ensureDirectoryExists(path.dirname(filePath))
       fs.writeFileSync(filePath, html, 'utf-8')
       deployedPages.push(relPath)
+      // В корневой адрес кладём распознаватель языка: он уводит на
+      // /<lang>/<path> по сохранённому выбору или языку браузера.
+      this.writeLanguageEntry({
+        siteDir, slug: page.slug, isHome,
+        languages: activeLanguages,
+        title: page.metadata?.title || page.name,
+        deployedPages,
+      })
 
       // === Генерация мультиязычных версий ===
       await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir, isHome)
@@ -495,7 +549,14 @@ export class DeployService {
           
           const isHome = this.isHomePage(page, page.site)
 
-          const html = await this.generatePageHtml(updatedStructure, {
+          // Ссылки языка по умолчанию тоже получают префикс: он теперь есть у
+      // каждого языка, а корень занят распознавателем.
+      const { value: localizedStructure } = localizeInternalLinks(
+        updatedStructure,
+        langPrefix(defLang?.code || '')
+      )
+
+      const html = await this.generatePageHtml(localizedStructure, {
             metadata: page.metadata || { title: page.name, description: '', keywords: [] },
             slug: isHome ? 'index' : page.slug,
             dataConfig,
@@ -507,12 +568,20 @@ export class DeployService {
           })
 
           // Чистые URL без .html: домашняя → index.html, остальные → <slug>/index.html
-          const relPath = this.pageRelPath(page.slug, isHome)
+          const relPath = this.pageRelPath(page.slug, isHome, defLang?.code)
           const filePath = path.join(siteDir, relPath)
 
           this.ensureDirectoryExists(path.dirname(filePath))
           fs.writeFileSync(filePath, html, 'utf-8')
           deployedPages.push(`${page.site?.slug || ''}/${relPath}`.replace(/^\//, ''))
+
+          // Распознаватель языка в корневом адресе страницы.
+          this.writeLanguageEntry({
+            siteDir, slug: page.slug, isHome,
+            languages: allActiveLangs,
+            title: page.metadata?.title || page.name,
+            deployedPages,
+          })
 
           // Mark page as published
           page.status = 'published'
@@ -614,7 +683,14 @@ export class DeployService {
 
           const isHome = this.isHomePage(page, site)
 
-          const html = await this.generatePageHtml(updatedStructure, {
+          // Ссылки языка по умолчанию тоже получают префикс: он теперь есть у
+      // каждого языка, а корень занят распознавателем.
+      const { value: localizedStructure } = localizeInternalLinks(
+        updatedStructure,
+        langPrefix(defLang?.code || '')
+      )
+
+      const html = await this.generatePageHtml(localizedStructure, {
             metadata: page.metadata || { title: page.name, description: '', keywords: [] },
             slug: isHome ? 'index' : page.slug,
             dataConfig,
@@ -627,11 +703,19 @@ export class DeployService {
           })
 
           // Чистые URL без .html: домашняя → index.html, остальные → <slug>/index.html
-          const relPath = this.pageRelPath(page.slug, isHome)
+          const relPath = this.pageRelPath(page.slug, isHome, defLang?.code)
           const filePath = path.join(siteDir, relPath)
           this.ensureDirectoryExists(path.dirname(filePath))
           fs.writeFileSync(filePath, html, 'utf-8')
           deployedPages.push(relPath)
+          // В корневой адрес кладём распознаватель языка: он уводит на
+          // /<lang>/<path> по сохранённому выбору или языку браузера.
+          this.writeLanguageEntry({
+            siteDir, slug: page.slug, isHome,
+            languages: allActiveLangs,
+            title: page.metadata?.title || page.name,
+            deployedPages,
+          })
 
           // Mark page as published
           page.status = 'published'
@@ -1011,7 +1095,10 @@ export class DeployService {
 
     return this.generatePageHtml(pageStructure, {
       metadata,
-      slug: p.itemSlug,
+      // Полный путь страницы, а не только slug элемента: переключатель языка
+      // строит адрес из него, и без basePath кнопка RU уводила на
+      // /ozmakon-business/ вместо /complex/ozmakon-business/.
+      slug: `${p.collection.basePath.replace(/^\/|\/$/g, '')}/${p.itemSlug}`,
       dataConfig: pageDataConfig,
       navigation: p.resolvedNav,
       analyticsPageId: p.templatePageId,
@@ -1088,7 +1175,7 @@ export class DeployService {
         // меню и карточки иначе возвращали на русскую версию.
         const { value: linkedTemplateStructure } = localizeInternalLinks(
           translatedStructure,
-          langPrefix(lang.code, lang.isDefault)
+          langPrefix(lang.code)
         )
 
         const translatedDataConfig = p.templateDataConfig
@@ -2538,7 +2625,7 @@ export class DeployService {
           // на /uz/ возвращал посетителя на русскую версию.
           const { value: linkedStructure, count: relinked } = localizeInternalLinks(
             translatedStructure,
-            langPrefix(lang.code, lang.isDefault)
+            langPrefix(lang.code)
           )
           if (relinked > 0) logger.info(`Page "${page.name}" [${lang.code}]: ссылок локализовано ${relinked}`)
 

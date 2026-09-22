@@ -14,11 +14,9 @@ import {
 } from '../services/linkLocalization'
 
 describe('langPrefix', () => {
-  it('дефолтный язык живёт в корне', () => {
-    expect(langPrefix('ru', true)).toBe('')
-  })
-  it('остальные — в своём каталоге', () => {
-    expect(langPrefix('uz', false)).toBe('/uz')
+  it('префикс есть у каждого языка, включая язык по умолчанию', () => {
+    expect(langPrefix('ru')).toBe('/ru')
+    expect(langPrefix('uz')).toBe('/uz')
   })
 })
 

@@ -255,12 +255,18 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
     function getLangUrl(code) {
       var lang = langs.find(function(l){ return l.code === code; });
       if (!lang) return null;
-      return lang.isDefault ? '/' + seg : '/' + code + '/' + seg;
+      // Префикс есть у каждого языка, включая язык по умолчанию:
+      // корневые адреса заняты распознавателем языка.
+      return '/' + code + '/' + seg;
     }
 
     function switchLang(code) {
       var url = getLangUrl(code);
-      if (url) window.location.href = url;
+      if (!url) return;
+      // Запоминаем выбор: распознаватель в корне обязан его уважать,
+      // иначе язык сбрасывался бы при заходе по корневой ссылке.
+      try { localStorage.setItem('gh-lang', code); } catch (e) {}
+      window.location.href = url;
     }
 
     // Global API

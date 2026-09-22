@@ -98,7 +98,14 @@ export function localizeInternalLinks<T>(structure: T, prefix: string): { value:
   return { value: walk(structure) as T, count }
 }
 
-/** Префикс пути для языка: дефолтный — пустой, остальные — `/<code>`. */
-export function langPrefix(code: string, isDefault: boolean): string {
-  return isDefault ? '' : `/${code}`
+/**
+ * Префикс пути для языка.
+ *
+ * Префикс есть у КАЖДОГО языка, включая язык по умолчанию: русский живёт в
+ * `/ru/`, а корневые адреса отданы под распознаватель языка
+ * (`languageEntry.ts`). Раньше дефолтный язык лежал в корне без префикса, и
+ * переключатель строил для него адрес без языка.
+ */
+export function langPrefix(code: string): string {
+  return `/${code}`
 }
