@@ -62,6 +62,9 @@ export const APARTMENT_TR_FIELDS: FieldMap = {
  */
 export const PLANTYPE_TR_FIELDS: FieldMap = {
   planName: 'string',
+  // Виды из окон приходят из CRM по-русски («двор», «бульвар»): без оверлея
+  // узбекская версия страницы показывала бы их кириллицей.
+  windowViews: 'json',
 }
 
 // --- Входные структуры (совпадают с полями TypeORM-сущностей) ---

@@ -31,41 +31,112 @@ function hasApartments(bodyHtml: string): boolean {
   return bodyHtml.includes('apartment-card')
 }
 
-const LIGHTBOX_MARKUP = `
+
+/**
+ * Подписи служебных оверлеев по языкам.
+ *
+ * Оверлеи инжектирует генератор, а не блок структуры, поэтому система
+ * переводов их не видит: в `page.structure` этих узлов нет, и на узбекской
+ * версии страницы они оставались русскими. Отсюда таблица подписей вместо
+ * литералов в разметке.
+ *
+ * `floorWord` — слово, по которому в мете карточки ищется этаж. Оно тоже
+ * языкозависимо: estate-service отдаёт «8/9 этаж» на ru и «8/9 qavat» на uz,
+ * и регулярка с русским словом на узбекской странице не находила ничего.
+ */
+export interface OverlayLabels {
+  close: string
+  viewImage: string
+  prevView: string
+  nextView: string
+  prevImage: string
+  nextImage: string
+  plan: string
+  project: string
+  price: string
+  floor: string
+  deadline: string
+  cta: string
+  priceOnRequest: string
+  floorUnknown: string
+  deadlineUnknown: string
+  planDescription: string
+  floorWord: string
+}
+
+const OVERLAY_LABELS: Record<string, OverlayLabels> = {
+  ru: {
+    close: 'Закрыть', viewImage: 'Просмотр изображения', prevView: 'Предыдущий ракурс', nextView: 'Следующий ракурс',
+    prevImage: 'Предыдущее изображение', nextImage: 'Следующее изображение',
+    plan: 'Планировка', project: 'Проект', price: 'Стоимость', floor: 'Этаж',
+    deadline: 'Срок сдачи', cta: 'Получить консультацию',
+    priceOnRequest: 'Цена по запросу', floorUnknown: 'Этаж уточняется',
+    deadlineUnknown: 'Срок уточняется',
+    planDescription: ' — планировка с продуманными жилыми зонами и доступом к инфраструктуре проекта.',
+    floorWord: 'этаж',
+  },
+  uz: {
+    close: 'Yopish', viewImage: 'Rasmni ko‘rish', prevView: 'Oldingi rakurs', nextView: 'Keyingi rakurs',
+    prevImage: 'Oldingi rasm', nextImage: 'Keyingi rasm',
+    plan: 'Reja', project: 'Loyiha', price: 'Narx', floor: 'Qavat',
+    deadline: 'Topshirish muddati', cta: 'Maslahat olish',
+    priceOnRequest: 'Narx so‘rov bo‘yicha', floorUnknown: 'Qavat aniqlanmoqda',
+    deadlineUnknown: 'Muddat aniqlanmoqda',
+    planDescription: ' — puxta o‘ylangan yashash zonalari va loyiha infratuzilmasiga kirish imkoniga ega reja.',
+    floorWord: 'qavat',
+  },
+  en: {
+    close: 'Close', viewImage: 'Image preview', prevView: 'Previous view', nextView: 'Next view',
+    prevImage: 'Previous image', nextImage: 'Next image',
+    plan: 'Floor plan', project: 'Project', price: 'Price', floor: 'Floor',
+    deadline: 'Completion', cta: 'Get a consultation',
+    priceOnRequest: 'Price on request', floorUnknown: 'Floor to be confirmed',
+    deadlineUnknown: 'Date to be confirmed',
+    planDescription: ' — a layout with well-planned living areas and access to the project infrastructure.',
+    floorWord: 'floor',
+  },
+}
+
+/** Подписи языка; неизвестный код падает на русский — дефолт сайта. */
+export function overlayLabels(lang?: string): OverlayLabels {
+  return OVERLAY_LABELS[lang || 'ru'] || OVERLAY_LABELS.ru
+}
+
+const LIGHTBOX_MARKUP = (L: OverlayLabels) => `
   <div class="gallery-lightbox" id="galleryLightbox" aria-hidden="true">
-    <div class="gallery-lightbox-dialog" role="dialog" aria-modal="true" aria-label="Просмотр изображения">
-      <button class="gallery-lightbox-close" type="button" aria-label="Закрыть">&times;</button>
-      <button class="side-arrow left" type="button" id="galleryLightboxPrev" aria-label="Предыдущее изображение">&#8249;</button>
+    <div class="gallery-lightbox-dialog" role="dialog" aria-modal="true" aria-label="${L.viewImage}">
+      <button class="gallery-lightbox-close" type="button" aria-label="${L.close}">&times;</button>
+      <button class="side-arrow left" type="button" id="galleryLightboxPrev" aria-label="${L.prevImage}">&#8249;</button>
       <img class="gallery-lightbox-image" id="galleryLightboxImage" alt="">
-      <button class="side-arrow right" type="button" id="galleryLightboxNext" aria-label="Следующее изображение">&#8250;</button>
+      <button class="side-arrow right" type="button" id="galleryLightboxNext" aria-label="${L.nextImage}">&#8250;</button>
       <div class="gallery-lightbox-counter" id="galleryLightboxCounter"></div>
     </div>
   </div>`
 
-const PLAN_MODAL_MARKUP = `
+const PLAN_MODAL_MARKUP = (L: OverlayLabels) => `
   <div class="plan-modal" id="planModal" aria-hidden="true">
     <div class="plan-dialog" role="dialog" aria-modal="true" aria-labelledby="planModalTitle">
-      <button class="plan-modal-close" type="button" aria-label="Закрыть">&times;</button>
+      <button class="plan-modal-close" type="button" aria-label="${L.close}">&times;</button>
       <div class="plan-modal-media" id="planModalMedia">
-        <button class="side-arrow left" type="button" id="planModalPrev" aria-label="Предыдущий ракурс">&#8249;</button>
-        <button class="side-arrow right" type="button" id="planModalNext" aria-label="Следующий ракурс">&#8250;</button>
+        <button class="side-arrow left" type="button" id="planModalPrev" aria-label="${L.prevView}">&#8249;</button>
+        <button class="side-arrow right" type="button" id="planModalNext" aria-label="${L.nextView}">&#8250;</button>
       </div>
       <div class="plan-modal-info">
-        <span class="section-eyebrow">Планировка</span>
+        <span class="section-eyebrow">${L.plan}</span>
         <h3 id="planModalTitle"></h3>
         <p id="planModalText"></p>
         <div class="plan-modal-facts">
-          <span><b id="planModalProject"></b>Проект</span>
-          <span><b id="planModalPrice"></b>Стоимость</span>
-          <span><b id="planModalFloor"></b>Этаж</span>
-          <span><b id="planModalDeadline"></b>Срок сдачи</span>
+          <span><b id="planModalProject"></b>${L.project}</span>
+          <span><b id="planModalPrice"></b>${L.price}</span>
+          <span><b id="planModalFloor"></b>${L.floor}</span>
+          <span><b id="planModalDeadline"></b>${L.deadline}</span>
         </div>
-        <button class="plan-modal-cta" type="button">Получить консультацию</button>
+        <button class="plan-modal-cta" type="button">${L.cta}</button>
       </div>
     </div>
   </div>`
 
-const RUNTIME_JS = `<script>
+const RUNTIME_JS = (L: OverlayLabels) => `<script>
 (function () {
   'use strict';
 
@@ -127,16 +198,18 @@ const RUNTIME_JS = `<script>
     var titleText = title ? title.textContent.trim() : '';
     var metaText = meta ? meta.textContent.replace(/\\s+/g, ' ').trim() : '';
     var parts = metaText.split('|');
-    var floor = metaText.match(/\\d+\\/\\d+\\s*этаж/);
+    // Слово «этаж» языкозависимо: на uz мета приходит как «8/9 qavat».
+    var floorRe = new RegExp('\\d+\\/\\d+\\s*' + ${JSON.stringify(L.floorWord)});
+    var floor = metaText.match(floorRe);
 
-    setText('planModalTitle', titleText || 'Планировка');
+    setText('planModalTitle', titleText || ${JSON.stringify(L.plan)});
     setText('planModalPrice', price && price.childNodes[0]
-      ? price.childNodes[0].textContent.trim() : 'Цена по запросу');
+      ? price.childNodes[0].textContent.trim() : ${JSON.stringify(L.priceOnRequest)});
     setText('planModalProject', project ? project.textContent.trim() : '');
-    setText('planModalFloor', floor ? floor[0] : 'Этаж уточняется');
-    setText('planModalDeadline', parts.length > 1 ? parts[parts.length - 1].trim() : 'Срок уточняется');
+    setText('planModalFloor', floor ? floor[0] : ${JSON.stringify(L.floorUnknown)});
+    setText('planModalDeadline', parts.length > 1 ? parts[parts.length - 1].trim() : ${JSON.stringify(L.deadlineUnknown)});
     setText('planModalText', titleText
-      ? titleText + ' — планировка с продуманными жилыми зонами и доступом к инфраструктуре проекта.'
+      ? titleText + ${JSON.stringify(L.planDescription)}
       : '');
 
     var raw = card.getAttribute('data-plan-images') || '';
@@ -214,14 +287,15 @@ const RUNTIME_JS = `<script>
  * Разметка и скрипт оверлеев для страницы. Пустая строка, если на странице нет
  * ни галерей, ни карточек квартир.
  */
-export function generateComplexOverlays(bodyHtml: string): string {
+export function generateComplexOverlays(bodyHtml: string, lang?: string): string {
   const gallery = hasGallery(bodyHtml)
   const apartments = hasApartments(bodyHtml)
   if (!gallery && !apartments) return ''
 
+  const L = overlayLabels(lang)
   const parts: string[] = []
-  if (gallery) parts.push(LIGHTBOX_MARKUP)
-  if (apartments) parts.push(PLAN_MODAL_MARKUP)
-  parts.push(RUNTIME_JS)
+  if (gallery) parts.push(LIGHTBOX_MARKUP(L))
+  if (apartments) parts.push(PLAN_MODAL_MARKUP(L))
+  parts.push(RUNTIME_JS(L))
   return parts.join('\n')
 }

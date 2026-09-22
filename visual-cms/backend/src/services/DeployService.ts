@@ -700,6 +700,14 @@ export class DeployService {
       // дефолтной генерации (не-дефолтные языки обрабатывает deployCollectionTranslations).
       const defaultLangCode = (await languageService.getActive()).find(l => l.isDefault)?.code
 
+      // Переключатель языка на страницах элементов коллекции.
+      //
+      // Страницы НЕ-дефолтных языков этот список получали, а дефолтные — нет,
+      // и рантайм переключения на них не выводился: с русской страницы проекта
+      // кнопка UZ вела в никуда, хотя /uz/complex/<slug>/ существовала.
+      // Список строится по переводам страницы-шаблона — как в deployPage.
+      const collectionLangs = await this.collectionSwitcherLanguages(collection.templatePageId)
+
       // 2. Загрузить элементы из API
       let items: any[] = []
       // Начальный контекст extract из основного ответа (mainExtract)
@@ -842,6 +850,8 @@ export class DeployService {
               metaKeywords: templatePage.metadata?.keywords || [],
               resolvedNav, mainExtractedValues, statsByItemId, errors,
               site: collection.site,
+              lang: defaultLangCode,
+              availableLanguages: collectionLangs,
             })
           }
 
@@ -916,6 +926,29 @@ export class DeployService {
    * передаются уже локализованными; lang/direction/translationMap/availableLanguages
    * задаются для не-дефолтных языков).
    */
+  /**
+   * Языки для переключателя на страницах коллекции.
+   *
+   * Пусто, если у страницы-шаблона нет переводов: тогда переключать не на что,
+   * и генератор рантайм не печатает.
+   */
+  private async collectionSwitcherLanguages(
+    templatePageId: string
+  ): Promise<GeneratePageOptions['availableLanguages']> {
+    const locales = await translationService.getPageLocales(templatePageId)
+    if (locales.length === 0) return undefined
+    const languages = await languageService.getActive()
+    return languages
+      .filter(l => l.isActive && (l.isDefault || locales.includes(l.code)))
+      .map(l => ({
+        code: l.code,
+        name: l.nativeName,
+        flag: l.flag || '🌐',
+        isDefault: l.isDefault,
+        direction: l.direction,
+      }))
+  }
+
   private async renderCollectionTemplateItem(p: {
     collection: Collection
     item: any

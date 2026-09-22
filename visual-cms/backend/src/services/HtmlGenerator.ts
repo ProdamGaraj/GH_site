@@ -208,7 +208,7 @@ ${dataConfig ? generateDataBindingRuntime(dataConfig) : ''}
   })())};</script>
 ${generateResponsiveMediaRuntime()}
 ${generateCarouselRuntime()}
-${generateComplexOverlays(bodyContent)}
+${generateComplexOverlays(bodyContent, lang)}
 ${generatePlanFilterRuntime(bodyContent)}
 ${generateActiveLinkRuntime()}
 ${options.analyticsPageId ? `  <script src="/api/analytics/tracker.js" data-page-id="${options.analyticsPageId}" defer></script>\n` : ''}
