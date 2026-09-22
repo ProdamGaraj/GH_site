@@ -470,6 +470,8 @@ export interface ComplexDetailDTO {
 /** Строка plan_types как её отдаёт TypeORM. */
 export interface PlanTypeRow {
   id: string
+  /** Дом, которому принадлежит тип. Из него берётся срок сдачи. */
+  houseId: string
   signature: string
   planName: string
   images: Array<{ title: string; url: string; thumbUrl: string }>
@@ -507,6 +509,17 @@ export interface PlanTypeDTO {
   priceLabel: string
   countLabel: string
   floorsLabel: string
+
+  /**
+   * Срок сдачи — берётся у дома, которому принадлежит тип.
+   *
+   * В CRM срока нет ни на объекте, ни в том, что забирает синк, поэтому поле
+   * редакторское: заполняется у корпуса в админке ЖК и синком не затирается
+   * (`ensureHouse` трогает только name и floors). Уникальный индекс
+   * (houseId, signature) гарантирует, что дом у типа ровно один — срок
+   * переносится без выбора и без слияния.
+   */
+  deadline: string
 
   /** Первая картинка — для карточки; массив — для модалки со всеми ракурсами. */
   image: string
@@ -597,7 +610,9 @@ export function buildApartmentDTO(
 export function buildPlanTypeDTO(
   planType: PlanTypeRow,
   locale: Locale,
-  index: Map<string, string>
+  index: Map<string, string>,
+  /** Срок сдачи дома этого типа, уже с наложенным переводом. */
+  houseDeadline = ''
 ): PlanTypeDTO {
   const p = applyOverlay(planType, 'planType', planType.id, locale, PLANTYPE_TR_FIELDS, index)
   const images = Array.isArray(p.images) ? p.images : []
@@ -618,6 +633,7 @@ export function buildPlanTypeDTO(
     priceLabel: formatPriceFrom(p.priceMin, locale),
     countLabel: formatApartmentsCount(p.apartmentsCount, locale),
     floorsLabel: formatFloorsRange(floors, locale),
+    deadline: houseDeadline,
 
     image: images[0]?.url ?? '',
     cover: optionalOne('image', images[0]?.url),
@@ -643,6 +659,25 @@ export function buildPlanTypeDTO(
   }
 }
 
+/**
+ * Статус квартиры, при котором она попадает на витрину.
+ *
+ * Показываем только свободные. «Бронь» и «сделка в работе» схлопнуты синком в
+ * `reserved` — купить такую нельзя, а карточка с ценой и кнопкой заявки
+ * обещает обратное. `hidden` — не выпущена в продажу, туда же уходит статус,
+ * которого нет в справочнике CRM (fail-closed в mapStatus).
+ *
+ * Согласованность со счётчиком типа планировки: `apartmentsCount` считается по
+ * тому, что CRM отдала в выдаче продаж, то есть по продающимся. Не отфильтруй
+ * мы здесь — на странице было бы больше карточек, чем «N квартир» на плитке
+ * планировки.
+ */
+const SHOWN_APARTMENT_STATUS = 'available'
+
+export function isShownApartment(apartment: { status: string }): boolean {
+  return apartment.status === SHOWN_APARTMENT_STATUS
+}
+
 export function buildComplexDetail(
   complex: ComplexRow,
   houses: HouseRow[],
@@ -654,8 +689,12 @@ export function buildComplexDetail(
   const index = indexTranslations(translations)
   const c = applyOverlay(complex, 'complex', complex.id, locale, COMPLEX_TR_FIELDS, index)
 
+  // Проданные и забронированные отсекаем на входе, один раз: дальше по ним
+  // считаются и вложенные списки домов, и плоский список, и чипсы фильтра.
+  const onSale = apartments.filter(isShownApartment)
+
   const byHouse = new Map<string, ApartmentRow[]>()
-  for (const apt of apartments) {
+  for (const apt of onSale) {
     const list = byHouse.get(apt.houseId) || []
     list.push(apt)
     byHouse.set(apt.houseId, list)
@@ -665,7 +704,7 @@ export function buildComplexDetail(
 
   // DTO квартир строим один раз, переиспользуем в домах и в плоском списке.
   const aptDtoById = new Map<string, ApartmentDTO>()
-  for (const apt of apartments) {
+  for (const apt of onSale) {
     aptDtoById.set(apt.id, buildApartmentDTO(apt, locale, index))
   }
 
@@ -683,14 +722,19 @@ export function buildComplexDetail(
     }
   })
 
+  // Срок сдачи типу планировки достаётся от его дома — берём из уже собранных
+  // DTO, чтобы перевод накладывался один раз и одинаково в обоих местах.
+  const deadlineByHouseId = new Map(houseDTOs.map((h) => [h.id, h.deadline]))
+
   // Плоский список всех квартир для repeater «Выбрать»: сортировка по
   // ГЛОБАЛЬНОМУ order (грид не сгруппирован по домам, карточки идут вперемешку).
-  const flatApartments = sortByOrder(apartments).map((apt) => aptDtoById.get(apt.id)!)
+  const flatApartments = sortByOrder(onSale).map((apt) => aptDtoById.get(apt.id)!)
 
   // Типы без квартир не показываем: строка живёт ради переводов, но карточка
   // «0 квартир» на странице — мусор.
   const planTypeDTOs = sortByOrder(planTypes.filter((p) => p.apartmentsCount > 0)).map(
-    (planType) => buildPlanTypeDTO(planType, locale, index)
+    (planType) =>
+      buildPlanTypeDTO(planType, locale, index, deadlineByHouseId.get(planType.houseId) ?? '')
   )
 
   return {
@@ -730,7 +774,10 @@ export function buildComplexDetail(
     stats: Array.isArray(c.stats) ? c.stats : [],
     houses: houseDTOs,
     apartments: flatApartments,
-    deadlines: distinctValues(flatApartments, (a) => a.deadline),
+    // Чипсы срока — по типам планировок, а не по квартирам: карточки на
+    // странице теперь типы, и чип, которому не соответствует ни одна карточка,
+    // фильтрует экран в пустоту. У квартир этого поля из CRM и нет.
+    deadlines: distinctValues(planTypeDTOs, (p) => p.deadline),
     apartmentClasses: distinctValues(flatApartments, (a) => a.apartmentClass),
     // Типы без квартир не показываем: строка живёт ради переводов, но карточка
     // «0 квартир» на странице — мусор.

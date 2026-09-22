@@ -25,6 +25,7 @@ const EMPTY = new Map<string, string>()
 function planType(over: Partial<PlanTypeRow> = {}): PlanTypeRow {
   return {
     id: 'plan-1',
+    houseId: 'h1',
     signature: 'К2-54.65-6|abc123',
     planName: 'К2-54.65-6',
     images: [

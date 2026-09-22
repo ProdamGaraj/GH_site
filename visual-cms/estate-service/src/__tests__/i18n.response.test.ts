@@ -141,3 +141,44 @@ describe('buildComplexListItem', () => {
     expect(item.cardImage).toBe('h1.jpg')
   })
 })
+
+describe('buildComplexDetail — только продающиеся квартиры на витрине', () => {
+  // Проданная и забронированная в том же доме, что и a1/a3: если фильтр
+  // отвалится, они попадут и в дом, и в плоский грид, и в чипсы фильтра.
+  const sold: ApartmentRow = {
+    id: 'aSold', houseId: 'h1', order: 3, rooms: 2, areaM2: '42.26', price: '680799327',
+    oldPrice: null, entrance: 1, apartmentClass: 'Эконом', badges: [], floor: '2/16',
+    number: '16', deadline: '2 кв. 2029', offerLabel: '', status: 'sold', planImage: '',
+  }
+  const reserved: ApartmentRow = { ...sold, id: 'aReserved', order: 4, number: '17', status: 'reserved' }
+  const hidden: ApartmentRow = { ...sold, id: 'aHidden', order: 5, number: '18', status: 'hidden' }
+  const withGone = [...apartments, sold, reserved, hidden]
+  const dto = buildComplexDetail(complex, houses, withGone, [], 'ru')
+
+  it('не отдаёт проданные, забронированные и скрытые в плоском списке', () => {
+    expect(dto.apartments.map((a) => a.id)).toEqual(['a1', 'a2', 'a3'])
+  })
+
+  it('не отдаёт их и во вложенных списках домов', () => {
+    expect(dto.houses[0].apartments.map((a) => a.id)).toEqual(['a1', 'a3'])
+    expect(dto.houses[1].apartments.map((a) => a.id)).toEqual(['a2'])
+  })
+
+  it('не тянет их значения в чипсы фильтра', () => {
+    // «2 кв. 2029» и «Эконом» есть только у снятых с продажи
+    expect(dto.deadlines).not.toContain('2 кв. 2029')
+    expect(dto.apartmentClasses).not.toContain('Эконом')
+  })
+
+  it('статус, которого нет в справочнике, тоже не показывается', () => {
+    const weird = buildComplexDetail(complex, houses, [{ ...sold, id: 'aWeird', status: 'нечто' }], [], 'ru')
+    expect(weird.apartments).toEqual([])
+  })
+
+  it('пустой вход не ломает сборку', () => {
+    const empty = buildComplexDetail(complex, houses, [], [], 'ru')
+    expect(empty.apartments).toEqual([])
+    expect(empty.deadlines).toEqual([])
+    expect(empty.houses.every((h) => h.apartments.length === 0)).toBe(true)
+  })
+})

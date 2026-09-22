@@ -168,25 +168,56 @@ describe('externalHouseId в DTO', () => {
 
 describe('списки значений для чипсов фильтра', () => {
   const apts: ApartmentRow[] = [
-    { ...baseApartment, id: 'a1', deadline: '1 кв. 2028', apartmentClass: 'Бизнес' },
-    { ...baseApartment, id: 'a2', order: 1, deadline: '2 кв. 2029', apartmentClass: 'Бизнес' },
-    { ...baseApartment, id: 'a3', order: 2, deadline: '1 кв. 2028', apartmentClass: 'Комфорт' },
-    { ...baseApartment, id: 'a4', order: 3, deadline: '', apartmentClass: '  ' },
+    { ...baseApartment, id: 'a1', apartmentClass: 'Бизнес' },
+    { ...baseApartment, id: 'a2', order: 1, apartmentClass: 'Бизнес' },
+    { ...baseApartment, id: 'a3', order: 2, apartmentClass: 'Комфорт' },
+    { ...baseApartment, id: 'a4', order: 3, apartmentClass: '  ' },
   ]
-  const houses = [{ id: 'h1', complexId: 'c1', order: 0, name: 'К1', floors: '9', deadline: '', className: '', entrances: 1 }]
+  const houses = [
+    { id: 'h1', complexId: 'c1', order: 0, name: 'К1', floors: '9', deadline: '1 кв. 2028', className: '', entrances: 1 },
+    { id: 'h2', complexId: 'c1', order: 1, name: 'К2', floors: '16', deadline: '2 кв. 2029', className: '', entrances: 2 },
+    { id: 'h3', complexId: 'c1', order: 2, name: 'К3', floors: '5', deadline: '', className: '', entrances: 1 },
+  ]
   const withApts = apts.map((a) => ({ ...a, houseId: 'h1' }))
 
-  it('дедуплицирует и сохраняет порядок первого появления', () => {
-    const dto = buildComplexDetail(baseComplex, houses, withApts, [], 'ru')
+  // Карточки на странице — типы планировок, поэтому и чипсы срока строятся по
+  // ним: чип, которому не соответствует ни одна карточка, фильтрует в пустоту.
+  const plan = (over: Record<string, unknown>) => ({
+    id: 'p1', houseId: 'h1', signature: 's1', planName: 'К1-40', images: [], panoUrl: '',
+    rooms: 2, isStudio: false, areaMin: '40', areaMax: '40', priceMin: '100', priceMax: '100',
+    apartmentsCount: 1, floors: [2], entrances: [1], windowViews: [], order: 0,
+    ...over,
+  })
+
+  it('срок сдачи берётся у дома типа, дедуплицируется, порядок первого появления', () => {
+    const planTypes = [
+      plan({ id: 'p1', houseId: 'h1', order: 0 }),
+      plan({ id: 'p2', houseId: 'h2', order: 1 }),
+      plan({ id: 'p3', houseId: 'h1', order: 2 }), // тот же дом — срок повторяется
+    ]
+    const dto = buildComplexDetail(baseComplex, houses, withApts, [], 'ru', planTypes)
+    expect(dto.planTypes.map((p) => p.deadline)).toEqual(['1 кв. 2028', '2 кв. 2029', '1 кв. 2028'])
     expect(dto.deadlines).toEqual(['1 кв. 2028', '2 кв. 2029'])
+  })
+  it('класс жилья по-прежнему собирается по квартирам', () => {
+    const dto = buildComplexDetail(baseComplex, houses, withApts, [], 'ru')
     expect(dto.apartmentClasses).toEqual(['Бизнес', 'Комфорт'])
   })
   it('отбрасывает пустые значения и строки из пробелов', () => {
-    const dto = buildComplexDetail(baseComplex, houses, withApts, [], 'ru')
-    expect(dto.deadlines).not.toContain('')
+    const dto = buildComplexDetail(baseComplex, houses, withApts, [], 'ru', [
+      plan({ houseId: 'h3' }), // у дома срок не заполнен
+    ])
+    expect(dto.deadlines).toEqual([])
     expect(dto.apartmentClasses.some((c) => c.trim() === '')).toBe(false)
   })
-  it('без квартир — пустые списки, чипсы не рендерятся', () => {
+  it('тип, чей дом не пришёл в выборку, не роняет сборку и не даёт чипса', () => {
+    const dto = buildComplexDetail(baseComplex, houses, withApts, [], 'ru', [
+      plan({ houseId: 'нет-такого-дома' }),
+    ])
+    expect(dto.planTypes[0].deadline).toBe('')
+    expect(dto.deadlines).toEqual([])
+  })
+  it('без квартир и планировок — пустые списки, чипсы не рендерятся', () => {
     const dto = buildComplexDetail(baseComplex, [], [], [], 'ru')
     expect(dto.deadlines).toEqual([])
     expect(dto.apartmentClasses).toEqual([])
