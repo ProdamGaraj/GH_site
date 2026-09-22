@@ -868,7 +868,10 @@ export class DeployService {
 
       // Resolve deploy directory — очищаем перед генерацией, чтобы не оставались stale-файлы
       const siteDir = this.resolveSiteDir(collection.site)
-      const collectionDir = path.join(siteDir, collection.basePath.replace(/^\//, ''))
+      // Элементы языка по умолчанию тоже лежат под префиксом: в корневом
+      // <basePath>/<slug> кладётся распознаватель языка.
+      const basePathClean = collection.basePath.replace(/^\/|\/$/g, '')
+      const collectionDir = path.join(siteDir, defaultLangCode || '', basePathClean)
       if (collectionDir !== siteDir && fs.existsSync(collectionDir)) {
         fs.rmSync(collectionDir, { recursive: true, force: true })
       }
@@ -945,6 +948,16 @@ export class DeployService {
           this.ensureDirectoryExists(path.dirname(filePath))
           fs.writeFileSync(filePath, html, 'utf-8')
           deployedPages.push(`${collection.basePath.replace(/^\/|\/$/g, '')}/${itemSlug}`)
+
+          // Распознаватель языка в корневом адресе элемента.
+          this.writeLanguageEntry({
+            siteDir,
+            slug: `${basePathClean}/${itemSlug}`,
+            isHome: false,
+            languages: await languageService.getActive(),
+            title: itemTitle,
+            deployedPages,
+          })
 
           logger.info(`Collection "${collection.name}": deployed ${itemSlug} (${override ? 'custom' : 'template'})`)
         } catch (itemErr: any) {
