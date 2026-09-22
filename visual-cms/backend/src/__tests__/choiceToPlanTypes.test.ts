@@ -14,7 +14,18 @@ import {
   StructureNode,
 } from '../scripts/choiceToPlanTypes'
 
+/**
+ * Фикстура намеренно содержит комментарий ВЫШЕ функции matches().
+ *
+ * Первая версия регулярки описывала необязательный комментарий перед `if` как
+ * `\\/\\*[\\s\\S]*?\\*\\/`. Ленивый квантификатор не обязан останавливаться на
+ * своём `*​/` — при неудаче он растягивается до следующего, поэтому совпадение
+ * начиналось с первого комментария в файле и съедало весь код между ними.
+ * На реальном блоке это вырезало бы ~30 КБ скрипта. Без раннего комментария
+ * тест этого не ловит.
+ */
 const GLOBAL_JS = `(function () {
+  /* Тулбар и грид ищем один раз: узлы живут столько же, сколько страница. */
   var toolbar = section.querySelector('.apartment-toolbar');
   var grid = section.querySelector('.apartments-grid');
   if (!toolbar || !grid) return;
@@ -336,6 +347,20 @@ describe('migrateGlobalJs', () => {
     expect(out).not.toContain("v === '4' ? n >= 4")
     expect(out).not.toContain("field === 'rooms'")
     expect(changes.some((c) => c.includes('matches()'))).toBe(true)
+  })
+
+  it('правит только спецслучай комнатности, остальной скрипт цел', () => {
+    const out = migrateGlobalJs(GLOBAL_JS, [])
+    // Код и комментарий ВЫШЕ matches() обязаны уцелеть: ленивый квантификатор
+    // в регулярке однажды съел всё между первым комментарием файла и этим
+    // местом. Проверяем именно границы, а не только результат подстановки.
+    expect(out).toContain('/* Тулбар и грид ищем один раз')
+    expect(out).toContain("var toolbar = section.querySelector('.apartment-toolbar');")
+    expect(out).toContain("var triggers = toolbar.querySelectorAll('.filter-trigger[data-panel]');")
+    expect(out).toContain("var panels = toolbar.querySelectorAll('.filter-panel');")
+    // Код НИЖЕ заменённого куска — тоже.
+    expect(out).toContain("var price = Number(card.getAttribute('data-price'));")
+    expect(out).toContain('function matches(card) {')
   })
 
   it('прячет триггер, у которого в панели нет ни чипсов, ни диапазона', () => {
