@@ -311,11 +311,13 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
         });
       }
 
-      // data-lang-active="code" — add 'active' class if current
+      // data-lang-active="code" — отмечает кнопку текущего языка.
+      // Класс именно ПЕРЕКЛЮЧАЕТСЯ, а не добавляется: в вёрстке active мог
+      // быть зашит у русской кнопки, и на /uz/ подсвечивались обе.
       document.querySelectorAll('[data-lang-active]').forEach(function(el){
-        if (el.getAttribute('data-lang-active') === current) {
-          el.classList.add('active');
-        }
+        var isCurrent = el.getAttribute('data-lang-active') === current;
+        el.classList.toggle('active', isCurrent);
+        if (el.hasAttribute('aria-pressed')) el.setAttribute('aria-pressed', isCurrent ? 'true' : 'false');
       });
     }
 

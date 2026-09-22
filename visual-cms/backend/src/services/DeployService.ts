@@ -27,6 +27,7 @@ import { CredentialsManager } from './CredentialsManager'
 import { secureDataSourceService, FetchConfig, AuthConfig } from './SecureDataSourceService'
 import { resolveLoadStrategy } from './dataSourceRuntime'
 import { applyCollectionTransforms } from '../utils/collectionTransforms'
+import { localizeInternalLinks, langPrefix } from './linkLocalization'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
@@ -1082,6 +1083,14 @@ export class DeployService {
             translationMap,
             templatePage.metadata || { title: templatePage.name, description: '', keywords: [] }
           )
+
+        // Ссылки на страницах элементов тоже уводят на язык: с /uz/complex/…
+        // меню и карточки иначе возвращали на русскую версию.
+        const { value: linkedTemplateStructure } = localizeInternalLinks(
+          translatedStructure,
+          langPrefix(lang.code, lang.isDefault)
+        )
+
         const translatedDataConfig = p.templateDataConfig
           ? { ...p.templateDataConfig, variables: applyVariableMediaTranslations(p.templateDataConfig.variables, translationMap) }
           : undefined
@@ -1104,7 +1113,7 @@ export class DeployService {
             const html = await this.renderCollectionTemplateItem({
               collection, item, itemId, itemTitle, itemSlug,
               templatePageId: templatePage.id,
-              templateStructure: translatedStructure,
+              templateStructure: linkedTemplateStructure,
               templateDataConfig: translatedDataConfig,
               metaTitleTpl: translatedMeta?.title || '',
               metaDescTpl: translatedMeta?.description || '',
@@ -2525,13 +2534,21 @@ export class DeployService {
               page.metadata || { title: page.name, description: '', keywords: [] }
             )
 
+          // Внутренние ссылки уводят на язык страницы: без этого клик по меню
+          // на /uz/ возвращал посетителя на русскую версию.
+          const { value: linkedStructure, count: relinked } = localizeInternalLinks(
+            translatedStructure,
+            langPrefix(lang.code, lang.isDefault)
+          )
+          if (relinked > 0) logger.info(`Page "${page.name}" [${lang.code}]: ссылок локализовано ${relinked}`)
+
           // Локализуем медиа repeat-слайдеров в page-переменных под текущий язык.
           const localizedDataConfig = dataConfig
             ? { ...dataConfig, variables: applyVariableMediaTranslations(dataConfig.variables, translationMap) }
             : dataConfig
 
           // Generate localized HTML with lang attribute and language switcher
-          const localizedHtml = await this.generatePageHtml(translatedStructure, {
+          const localizedHtml = await this.generatePageHtml(linkedStructure, {
             metadata: translatedMetadata,
             slug: isHome ? 'index' : page.slug,
             dataConfig: localizedDataConfig,
