@@ -233,7 +233,7 @@ const BASE_COMPLEXES: ComplexSeed[] = [
   },
   {
     slug: 'harizma',
-    externalHouseId: null,
+    externalHouseId: 5673491,
     order: 2,
     status: 'active',
     name: 'Harizma',
@@ -268,7 +268,7 @@ const BASE_COMPLEXES: ComplexSeed[] = [
   },
   {
     slug: 'ozmahal',
-    externalHouseId: null,
+    externalHouseId: 4667449,
     order: 4,
     status: 'active',
     name: "O'zMahal",
@@ -359,11 +359,7 @@ export const COMPLEXES: ComplexSeed[] = BASE_COMPLEXES.map((complex) => {
  * «что дозаполнить руками» не терялся в коде.
  */
 export const GAPS: DataGap[] = [
-  { slug: 'harizma', field: 'externalHouseId', reason: 'ID в CRM не сообщён' },
-  { slug: 'ozmahal', field: 'externalHouseId', reason: 'ID в CRM не сообщён' },
   { slug: 'ozmakon', field: 'externalHouseId', reason: 'ID в CRM не сообщён' },
-  { slug: 'ozmahal', field: 'весь контент секций',
-    reason: 'лист «O`zMahal» в книге заказчика пуст; есть только карточка каталога' },
   { slug: '*', field: 'медиа из книги',
     reason: 'в колонке «Материал» ссылки на папки Google Drive — файлы туда не выгружены, медиа взято из медиатеки CMS' },
   { slug: 'ozmakon-business', field: 'houses / apartments',
@@ -374,8 +370,6 @@ export const GAPS: DataGap[] = [
     reason: 'в дизайне нет — карта остаётся схематичной с метками' },
   { slug: 'assalom-dostlik', field: 'apartments[].planImage',
     reason: 'планировок в дизайне нет — карточки показывают CSS-заглушку' },
-  { slug: 'harizma', field: 'весь контент секций',
-    reason: 'лист «Harizma» в книге заказчика пуст; в дизайне только карточка каталога' },
   { slug: 'harizma', field: 'медиа',
     reason: 'есть только project-harizma-card.jpg и project-harizma.jpg' },
   { slug: 'harizma', field: 'houses / apartments', reason: 'в дизайне нет' },

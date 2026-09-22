@@ -24,13 +24,68 @@ import { logger } from '../services/Logger'
 import { COMPLEXES, GAPS, ComplexSeed } from './design-projects.data'
 import { COMPLEX_TR_FIELDS } from '../services/i18n'
 
-/** Удаляет ЖК со slug вместе с переводами всех его сущностей. */
-async function removeExisting(m: typeof AppDataSource.manager, slug: string): Promise<void> {
+/**
+ * Квартиры, пришедшие из CRM: у них проставлен externalId.
+ *
+ * Пересоздание комплекса уносит их по FK CASCADE вместе с типами планировок, а
+ * восстановить можно только полным синком — сотни вызовов getFlatPlans под
+ * лимитом в 100 запросов в минуту плюс повторный перенос чертежей.
+ */
+export function syncedApartments(prev: {
+  houses?: Array<{ apartments?: Array<{ externalId?: number | null }> }>
+}): number {
+  return (prev.houses ?? []).reduce(
+    (n, h) =>
+      n + (h.apartments ?? []).filter((a) => a.externalId !== null && a.externalId !== undefined).length,
+    0
+  )
+}
+
+export class SeedGuardError extends Error {}
+
+/**
+ * Пересоздавать ли проект.
+ *
+ * Отказ — когда у проекта есть хоть одна квартира из CRM и не передан
+ * `--force`. Вынесено отдельно от базы, чтобы решение проверялось тестом:
+ * именно оно отделяет безопасный прогон от потери синхронизации.
+ */
+export function refuseReseedReason(
+  slug: string,
+  prev: Parameters<typeof syncedApartments>[0],
+  force: boolean
+): string | null {
+  const synced = syncedApartments(prev)
+  if (synced === 0 || force) return null
+  return (
+    `«${slug}»: ${synced} квартир(ы) из CRM будут удалены вместе с комплексом. ` +
+    'Для правки текстов используйте update-project-content.ts. ' +
+    'Если пересоздание действительно нужно — запустите с --force.'
+  )
+}
+
+/**
+ * Удаляет ЖК со slug вместе с переводами всех его сущностей.
+ *
+ * Отказывается трогать проект, связанный с CRM. Сид задуман для первичной
+ * заливки контента из дизайна, а на связанном проекте он молча уничтожал
+ * результат синхронизации. Для правки одних лишь текстов есть
+ * `update-project-content.ts`, который ничего не удаляет.
+ */
+async function removeExisting(
+  m: typeof AppDataSource.manager,
+  slug: string,
+  force: boolean
+): Promise<void> {
   const prev = await m.getRepository(Complex).findOne({
     where: { slug },
     relations: { houses: { apartments: true } },
   })
   if (!prev) return
+
+  const refusal = refuseReseedReason(slug, prev, force)
+  if (refusal) throw new SeedGuardError(refusal)
+
   const ids = [
     prev.id,
     ...prev.houses.map((h) => h.id),
@@ -91,12 +146,26 @@ async function insertComplex(m: typeof AppDataSource.manager, seed: ComplexSeed)
 }
 
 async function seed(): Promise<void> {
+  const force = process.argv.includes('--force')
+  const only = process.argv
+    .find((a) => a.startsWith('--slugs='))
+    ?.slice('--slugs='.length)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+  const targets = COMPLEXES.filter((c) => !only || only.includes(c.slug))
+  if (only) {
+    const unknown = only.filter((s) => !COMPLEXES.some((c) => c.slug === s))
+    if (unknown.length) throw new SeedGuardError(`Нет таких проектов: ${unknown.join(', ')}`)
+  }
+
   await AppDataSource.initialize()
   await runSafeMigrations(AppDataSource)
 
   await AppDataSource.transaction(async (m) => {
-    for (const complexSeed of COMPLEXES) {
-      await removeExisting(m, complexSeed.slug)
+    for (const complexSeed of targets) {
+      await removeExisting(m, complexSeed.slug, force)
       await insertComplex(m, complexSeed)
       const apartments = complexSeed.houses.reduce((n, h) => n + h.apartments.length, 0)
       logger.info(`Seeded ${complexSeed.slug}`, {
@@ -114,7 +183,12 @@ async function seed(): Promise<void> {
   await AppDataSource.destroy()
 }
 
-seed().catch((err) => {
-  logger.error('seed-design-projects failed', err instanceof Error ? err : undefined)
-  process.exit(1)
-})
+// Только при прямом запуске: файл экспортирует защиту от пересоздания, и
+// импорт ради неё не должен дёргать базу и гасить процесс.
+if (require.main === module) {
+  seed().catch((err) => {
+    logger.error('seed-design-projects failed', err instanceof Error ? err : undefined)
+    console.error(err instanceof Error ? err.message : err)
+    process.exit(1)
+  })
+}

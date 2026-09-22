@@ -16,12 +16,22 @@ const bySlug = (slug: string): ComplexSeed => {
 
 describe('разбор книги', () => {
   it('тексты есть ровно у тех проектов, чьи листы заполнены', () => {
-    expect(Object.keys(PROJECT_CONTENT).sort()).toEqual(['assalom-dostlik', 'ozmakon-business'])
+    // 2026-09-22: заказчик дозаполнил листы Harizma и O`zMahal.
+    // ozmakon листа в книге не имеет вовсе — он и не должен появиться.
+    expect(Object.keys(PROJECT_CONTENT).sort()).toEqual([
+      'assalom-dostlik',
+      'harizma',
+      'ozmahal',
+      'ozmakon-business',
+    ])
   })
 
-  it('пустые листы перечислены явно, а не молча пропущены', () => {
-    expect(EMPTY_SHEETS).toContain('Harizma')
-    expect(EMPTY_SHEETS).toContain('O`zMahal')
+  it('пустых листов не осталось — все четыре разобраны', () => {
+    expect(EMPTY_SHEETS).toEqual([])
+  })
+
+  it('у проекта без листа в книге текстов нет — выдумывать их нечем', () => {
+    expect(PROJECT_CONTENT['ozmakon']).toBeUndefined()
   })
 
   it('заголовок и текст секции разделены, а не слиплись в одну строку', () => {
@@ -67,17 +77,24 @@ describe('слияние с базовым описанием', () => {
     expect(c.address).toContain('Фаргона')
   })
 
-  it('проекты без текстов не получили чужих', () => {
-    for (const slug of ['harizma', 'ozmahal', 'ozmakon']) {
-      expect(bySlug(slug).hallText).toBe('')
-      expect(bySlug(slug).yardFeatures).toEqual([])
-    }
+  it('проект без листа в книге не получил чужих текстов', () => {
+    expect(bySlug('ozmakon').hallText).toBe('')
+    expect(bySlug('ozmakon').yardFeatures).toEqual([])
   })
 
-  it('пустые листы отмечены в реестре пропусков', () => {
-    for (const slug of ['harizma', 'ozmahal']) {
-      expect(GAPS.some((g) => g.slug === slug)).toBe(true)
-    }
+  it('дозаполненные проекты получили свой копирайт, а не соседний', () => {
+    expect(bySlug('harizma').about).toContain('Harizma')
+    expect(bySlug('ozmahal').about).toContain('Mahal')
+    expect(bySlug('harizma').yardFeatures.length).toBeGreaterThan(0)
+    expect(bySlug('ozmahal').yardFeatures.length).toBeGreaterThan(0)
+  })
+
+  it('незаполненное остаётся в реестре пропусков, заполненное из него ушло', () => {
+    // У harizma остались пропуски по медиа и корпусам, а «весь контент секций»
+    // и externalHouseId закрыты книгой — записи о них сняты.
+    expect(GAPS.some((g) => g.slug === 'harizma' && g.field === 'медиа')).toBe(true)
+    expect(GAPS.some((g) => g.field === 'весь контент секций' && g.slug !== 'ozmakon')).toBe(false)
+    expect(GAPS.some((g) => g.slug === 'ozmahal' && g.field === 'externalHouseId')).toBe(false)
   })
 })
 
@@ -113,9 +130,7 @@ describe('узбекские переводы', () => {
     expect(c.uz.yardFeatures).toHaveLength(c.ru.yardFeatures!.length)
   })
 
-  it('у проектов без текстов переводов нет', () => {
-    for (const slug of ['harizma', 'ozmahal', 'ozmakon']) {
-      expect(bySlug(slug).translations).toBeUndefined()
-    }
+  it('у проекта без листа в книге переводов нет', () => {
+    expect(bySlug('ozmakon').translations).toBeUndefined()
   })
 })

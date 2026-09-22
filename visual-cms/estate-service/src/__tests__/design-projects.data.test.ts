@@ -137,15 +137,16 @@ describe('externalHouseId — ключ для запроса квартир из
     const ids = COMPLEXES.map((c) => c.externalHouseId).filter((x): x is number => x !== null)
     expect(new Set(ids).size).toBe(ids.length)
   })
-  it('у публикуемых проектов ID проставлены, у остальных отмечены как пропуск', () => {
-    const PUBLISHED = ['ozmakon-business', 'assalom-dostlik']
+  it('проект без ID отмечен как пропуск — иначе синк молча его не увидит', () => {
+    // 2026-09-22: заказчик сообщил ID для harizma и ozmahal, остался ozmakon.
     for (const c of COMPLEXES) {
-      if (PUBLISHED.includes(c.slug)) {
-        expect(c.externalHouseId).not.toBeNull()
-      } else {
-        expect(c.externalHouseId).toBeNull()
-        expect(GAPS.some((g) => g.slug === c.slug && g.field === 'externalHouseId')).toBe(true)
-      }
+      if (c.externalHouseId !== null) continue
+      expect(GAPS.some((g) => g.slug === c.slug && g.field === 'externalHouseId')).toBe(true)
     }
+  })
+
+  it('проекты, связанные с CRM, перечислены явно', () => {
+    const linked = COMPLEXES.filter((c) => c.externalHouseId !== null).map((c) => c.slug).sort()
+    expect(linked).toEqual(['assalom-dostlik', 'harizma', 'ozmahal', 'ozmakon-business'])
   })
 })
