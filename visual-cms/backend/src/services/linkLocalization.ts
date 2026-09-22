@@ -109,3 +109,28 @@ export function localizeInternalLinks<T>(structure: T, prefix: string): { value:
 export function langPrefix(code: string): string {
   return `/${code}`
 }
+
+/** Пункт меню: важны только адрес и вложенность, остальное сохраняется как есть. */
+export interface NavItemLike {
+  href: string
+  children?: NavItemLike[]
+}
+
+/**
+ * Префиксует ссылки меню.
+ *
+ * Меню приходит в генератор отдельно от дерева страницы (`navigation`), поэтому
+ * обход структуры его не задевает: на `/ru/` и `/uz/` пункты меню продолжали
+ * вести на корневые адреса.
+ */
+export function localizeNavigation<T extends { href: string; children?: T[] }>(
+  items: T[] | undefined,
+  prefix: string
+): T[] | undefined {
+  if (!items || !prefix) return items
+  return items.map((item) => ({
+    ...item,
+    href: typeof item.href === 'string' ? localizeLink(item.href, prefix) : item.href,
+    ...(item.children ? { children: localizeNavigation(item.children, prefix) } : {}),
+  })) as T[]
+}

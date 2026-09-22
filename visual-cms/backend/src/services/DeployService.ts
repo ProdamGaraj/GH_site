@@ -27,7 +27,7 @@ import { CredentialsManager } from './CredentialsManager'
 import { secureDataSourceService, FetchConfig, AuthConfig } from './SecureDataSourceService'
 import { resolveLoadStrategy } from './dataSourceRuntime'
 import { applyCollectionTransforms } from '../utils/collectionTransforms'
-import { localizeInternalLinks, langPrefix } from './linkLocalization'
+import { localizeInternalLinks, localizeNavigation, langPrefix } from './linkLocalization'
 import { generateLanguageEntryStub } from './languageEntry'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
@@ -459,7 +459,7 @@ export class DeployService {
       lang: lang || defaultLang?.code,
       direction: defaultLang?.direction,
       availableLanguages,
-      navigation: resolvedNav,
+      navigation: localizeNavigation(resolvedNav, langPrefix(lang || defaultLang?.code || '')),
       ...this.siteAssetOptions(page.site),
     })
 
@@ -697,7 +697,7 @@ export class DeployService {
             lang: defLang?.code,
             direction: defLang?.direction,
             availableLanguages: pageLangSwitcher,
-            navigation: resolvedNav,
+            navigation: localizeNavigation(resolvedNav, langPrefix(defLang?.code || '')),
             analyticsPageId: page.id,
             ...this.siteAssetOptions(site),
           })
@@ -863,6 +863,13 @@ export class DeployService {
       let templateStructure = await linkedBlocksService.updateLinkedBlocks(templatePage.structure)
       templateStructure = await this.injectLibraryTemplates(templateStructure, templatePage.id)
 
+      // Ссылки шаблона под язык по умолчанию: страницы элементов тоже лежат
+      // под префиксом, и без этого меню с /ru/complex/… вело в корень.
+      const localizedTemplateStructure = localizeInternalLinks(
+        templateStructure,
+        langPrefix(defaultLangCode || '')
+      ).value
+
       // Подготовить data config шаблона (один раз)
       const templateDataConfig = await this.preparePageDataConfig(templatePage.id, templateStructure)
 
@@ -922,7 +929,7 @@ export class DeployService {
               metadata: pageMetadata,
               slug: itemSlug,
               dataConfig: pageDataConfig,
-              navigation: resolvedNav,
+              navigation: localizeNavigation(resolvedNav, langPrefix(defaultLangCode || '')),
               analyticsPageId: override.customPageId,
               ...this.siteAssetOptions(collection.site),
             })
@@ -931,7 +938,7 @@ export class DeployService {
             html = await this.renderCollectionTemplateItem({
               collection, item, itemId, itemTitle, itemSlug,
               templatePageId: templatePage.id,
-              templateStructure,
+              templateStructure: localizedTemplateStructure,
               templateDataConfig,
               metaTitleTpl: templatePage.metadata?.title || '',
               metaDescTpl: templatePage.metadata?.description || '',

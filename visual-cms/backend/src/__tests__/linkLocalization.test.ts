@@ -10,6 +10,7 @@ import {
   isLocalizableLink,
   localizeLink,
   localizeInternalLinks,
+  localizeNavigation,
   langPrefix,
 } from '../services/linkLocalization'
 
@@ -157,5 +158,47 @@ describe('localizeInternalLinks', () => {
     const same = localizeInternalLinks(tree, '')
     expect(same.count).toBe(0)
     expect(same.value).toBe(tree)
+  })
+})
+
+describe('localizeNavigation', () => {
+  // Меню приходит в генератор отдельно от дерева страницы, поэтому обход
+  // структуры его не задевает — на /ru/ и /uz/ пункты вели в корень сайта.
+  const nav = [
+    { label: 'Главная', href: '/' },
+    { label: 'О компании', href: '/about' },
+    {
+      label: 'Проекты',
+      href: '/#complexes',
+      children: [{ label: 'Harizma', href: '/complex/harizma/' }],
+    },
+    { label: 'Телефон', href: 'tel:+998781501111' },
+  ]
+
+  it('префиксует пункты и вложенные подпункты', () => {
+    const out = localizeNavigation(nav, '/uz')!
+    expect(out[0].href).toBe('/uz/')
+    expect(out[1].href).toBe('/uz/about')
+    expect(out[2].href).toBe('/uz/#complexes')
+    expect(out[2].children![0].href).toBe('/uz/complex/harizma/')
+  })
+
+  it('внешние схемы не трогает', () => {
+    expect(localizeNavigation(nav, '/uz')![3].href).toBe('tel:+998781501111')
+  })
+
+  it('подписи и прочие поля сохраняются', () => {
+    const out = localizeNavigation(nav, '/uz')!
+    expect(out.map((i) => i.label)).toEqual(['Главная', 'О компании', 'Проекты', 'Телефон'])
+  })
+
+  it('исходное меню не мутируется', () => {
+    localizeNavigation(nav, '/uz')
+    expect(nav[1].href).toBe('/about')
+  })
+
+  it('пустой префикс и отсутствие меню — возврат как есть', () => {
+    expect(localizeNavigation(nav, '')).toBe(nav)
+    expect(localizeNavigation(undefined, '/uz')).toBeUndefined()
   })
 })
