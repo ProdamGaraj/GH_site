@@ -17,7 +17,8 @@
  *   --sweep              таблица «допуск → сколько карточек» вместо состава
  *   --all                показывать и группы из одной планировки
  *
- * Применить подобранное значение:
+ * Применить подобранное значение (удобнее — в админке, раздел ЖК
+ * «Планировки на сайте»):
  *   PUT /api/admin/complexes/:id  { "planGrouping": { "areaTolerance": 0.3 } }
  */
 import 'dotenv/config'
@@ -26,7 +27,7 @@ import { Complex } from '../models/Complex'
 import { PlanType } from '../models/PlanType'
 import { House } from '../models/House'
 import { In } from 'typeorm'
-import { planGroups, normalizeConfig, PlanGroupingConfig } from '../services/planGrouping'
+import { planGroups, normalizeConfig, isShownPlanType, PlanGroupingConfig } from '../services/planGrouping'
 import type { PlanTypeRow } from '../services/i18n'
 
 /** Значения допуска для режима --sweep. */
@@ -70,7 +71,7 @@ async function main(): Promise<void> {
           order: { order: 'ASC' },
         })
       : []
-    const shown = (rows as unknown as PlanTypeRow[]).filter((p) => p.apartmentsCount > 0)
+    const shown = (rows as unknown as PlanTypeRow[]).filter(isShownPlanType)
 
     const saved = (complex.planGrouping || null) as PlanGroupingConfig | null
     console.log(`Проект: ${complex.name} (${slug})`)

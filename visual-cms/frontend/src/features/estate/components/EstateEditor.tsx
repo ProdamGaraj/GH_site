@@ -6,6 +6,7 @@ import { estateApi } from '../api'
 import { LocaleTabs } from './fields'
 import { ComplexForm } from './ComplexForm'
 import { HouseCard } from './HouseCard'
+import { PlanGroupingPanel } from './PlanGroupingPanel'
 
 /** Редактор одного ЖК: комплекс + дома + квартиры, вкладки языков. */
 export const EstateEditor: React.FC = () => {
@@ -64,6 +65,15 @@ export const EstateEditor: React.FC = () => {
           затираются серверными данными. Комплекс правится только своей кнопкой
           «Сохранить ЖК». */}
       <ComplexForm key={`complex-${complex.id}`} complex={complex} locale={locale} />
+
+      {/* Склейка не зависит от языка и сохраняется своей кнопкой; ключ по id
+          по той же причине, что у формы: reload после правки домов не должен
+          сбрасывать черновик. */}
+      <PlanGroupingPanel
+        key={`plans-${complex.id}`}
+        complexId={complex.id}
+        initial={complex.planGrouping}
+      />
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">

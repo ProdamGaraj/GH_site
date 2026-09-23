@@ -14,6 +14,21 @@ const locationLabelSchema = z.object({
   left: z.string().max(20),
 })
 
+/**
+ * Склейка типов планировок на витрине.
+ *
+ * Правится у каждого ЖК: общего признака «одна планировка» в метаданных
+ * CRM нет, а допустимый разброс площади у проектов свой. Подбирается в
+ * админке (раздел «Планировки на сайте») или scripts/preview-plan-groups.ts.
+ */
+const planGroupingSchema = z
+  .object({
+    areaTolerance: z.number().min(0).max(50).optional(),
+    groups: z.array(z.object({ plans: z.array(z.string().min(1)).min(2) })).optional(),
+    keepSeparate: z.array(z.string().min(1)).optional(),
+  })
+  .nullable()
+
 // --- Complex ---
 const complexBase = {
   slug: z.string().min(1).max(160).regex(/^[a-z0-9-]+$/, 'slug: только a-z, 0-9, дефис'),
@@ -48,25 +63,14 @@ const complexBase = {
   gallery: z.array(z.string()).optional(),
   hallGallery: z.array(z.string()).optional(),
   yardGallery: z.array(z.string()).optional(),
-  /**
-   * Склейка типов планировок на витрине.
-   *
-   * Правится у каждого ЖК: общего признака «одна планировка» в метаданных
-   * CRM нет, а допустимый разброс площади у проектов свой. Подобрать допуск
-   * помогает scripts/preview-plan-groups.ts.
-   */
-  planGrouping: z
-    .object({
-      areaTolerance: z.number().min(0).max(50).optional(),
-      groups: z.array(z.object({ plans: z.array(z.string()).min(2) })).optional(),
-      keepSeparate: z.array(z.string()).optional(),
-    })
-    .nullable()
-    .optional(),
+  planGrouping: planGroupingSchema.optional(),
   translations: translationsSchema,
 }
 export const createComplexSchema = z.object(complexBase)
 export const updateComplexSchema = z.object(complexBase).partial()
+
+/** Предпросмотр склейки: черновик настройки, ещё не сохранённый в ЖК. */
+export const previewPlanGroupsSchema = z.object({ planGrouping: planGroupingSchema })
 
 // --- House ---
 const houseBase = {

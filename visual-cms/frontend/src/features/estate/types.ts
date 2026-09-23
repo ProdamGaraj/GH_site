@@ -90,5 +90,54 @@ export interface ComplexDetail {
   hallGallery: string[]
   yardGallery: string[]
   translations: TranslationsByLocale
+  /** Склейка типов планировок на витрине; null — только точные совпадения. */
+  planGrouping?: PlanGroupingConfig | null
   houses: House[]
+}
+
+/** Настройка склейки планировок ЖК (estate-service: services/planGrouping.ts). */
+export interface PlanGroupingConfig {
+  /** Максимальный разброс площади внутри одной карточки, м². */
+  areaTolerance?: number
+  /** Принудительно объединённые планировки (по planName). */
+  groups?: Array<{ plans: string[] }>
+  /** Планировки, которые никогда ни с чем не склеиваются. */
+  keepSeparate?: string[]
+}
+
+/** Одна планировка внутри карточки предпросмотра. */
+export interface PlanPreview {
+  planName: string
+  houseId: string
+  houseName: string
+  areaMin: number
+  areaMax: number
+  floors: number[]
+  entrances: number[]
+  apartmentsCount: number
+  thumb: string
+  image: string
+  imagesCount: number
+  separated: boolean
+}
+
+/** Карточка витрины в предпросмотре. */
+export interface PlanGroupPreview {
+  manual: boolean
+  rooms: number
+  isStudio: boolean
+  areaMin: number
+  areaMax: number
+  floors: number[]
+  entrances: number[]
+  apartmentsCount: number
+  plans: PlanPreview[]
+}
+
+export interface PlanGroupingPreview {
+  config: Required<PlanGroupingConfig>
+  typesCount: number
+  cardsCount: number
+  groups: PlanGroupPreview[]
+  warnings: { duplicateNames: string[]; unknownNames: string[] }
 }

@@ -5,9 +5,11 @@ import { Complex } from '../models/Complex'
 import { House } from '../models/House'
 import { Apartment } from '../models/Apartment'
 import { EstateTranslation } from '../models/EstateTranslation'
+import { PlanType } from '../models/PlanType'
 import { logger } from '../services/Logger'
 import { buildComplexAdmin, buildTranslationRows, TranslationsByLocale } from '../services/adminSerialize'
-import { TrRow } from '../services/i18n'
+import { PlanTypeRow, TrRow } from '../services/i18n'
+import { previewPlanGrouping } from '../services/planGroupingPreview'
 
 /**
  * Admin CRUD для Complex/House/Apartment + переводы (uz/en).
@@ -137,6 +139,37 @@ export class AdminController {
         return
       }
       logger.error('admin.updateComplex failed', err instanceof Error ? err : undefined)
+      res.status(500).json({ error: 'Internal error' })
+    }
+  }
+
+  /**
+   * POST /complexes/:id/plan-groups/preview — во что превратится каталог
+   * планировок при черновике настройки. Ничего не сохраняет: сохранение идёт
+   * обычным PUT /complexes/:id с полем planGrouping.
+   */
+  static async previewPlanGroups(req: Request, res: Response): Promise<void> {
+    try {
+      const complex = await AppDataSource.getRepository(Complex).findOne({ where: { id: req.params.id } })
+      if (!complex) {
+        res.status(404).json({ error: 'Complex not found' })
+        return
+      }
+      const houses = await AppDataSource.getRepository(House).find({ where: { complexId: complex.id } })
+      const houseIds = houses.map((h) => h.id)
+      const planTypes =
+        houseIds.length > 0
+          ? await AppDataSource.getRepository(PlanType).find({
+              where: { houseId: In(houseIds) },
+              order: { order: 'ASC' },
+            })
+          : []
+      const houseNames = new Map(houses.map((h) => [h.id, h.name]))
+      res.json(
+        previewPlanGrouping(planTypes as unknown as PlanTypeRow[], req.body.planGrouping, houseNames)
+      )
+    } catch (err) {
+      logger.error('admin.previewPlanGroups failed', err instanceof Error ? err : undefined)
       res.status(500).json({ error: 'Internal error' })
     }
   }

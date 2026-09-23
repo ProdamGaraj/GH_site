@@ -27,7 +27,10 @@ export const ComplexForm: React.FC<{ complex: ComplexDetail; locale: Locale }> =
     setSaving(true)
     setMsg(null)
     try {
-      const { id, houses, ...rest } = form as any
+      // planGrouping правится своим разделом и своей кнопкой. Форма держит
+      // значение с момента загрузки страницы, и без исключения «Сохранить ЖК»
+      // молча откатывал бы свежую склейку.
+      const { id, houses, planGrouping, ...rest } = form as any
       await estateApi.updateComplex(complex.id, rest)
       setMsg('Сохранено')
     } catch (e: any) {

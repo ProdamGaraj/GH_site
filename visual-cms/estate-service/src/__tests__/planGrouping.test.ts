@@ -109,12 +109,48 @@ describe('допуск по площади', () => {
     expect(planGroups(rows, { areaTolerance: 0.5 })).toHaveLength(1)
   })
 
-  it('одиночная связь тянет цепочку: 39.79–40.03 и 39.80 — один ряд', () => {
-    const chain = [
+  it('планировка внутри диапазона группы присоединяется: 39.80 входит в 39.79–40.03', () => {
+    const inside = [
       plan({ planName: 'x', areaMin: 39.79, areaMax: 40.03, order: 0 }),
       plan({ planName: 'y', areaMin: 39.8, areaMax: 39.8, order: 1 }),
     ]
-    expect(planGroups(chain, { areaTolerance: 0.05 })).toHaveLength(1)
+    expect(planGroups(inside, { areaTolerance: 0.05 })).toHaveLength(1)
+  })
+
+  it('цепочка мелких шагов не собирается в одну карточку', () => {
+    // Реальный ряд ozmakon-business: соседние площади отличаются на 0.1–0.3,
+    // а крайние — на 1.17 м². При одиночной связи это была одна карточка.
+    const chain = [39.57, 39.83, 40.05, 40.3, 40.52, 40.74].map((area, i) =>
+      plan({ planName: `k${i}`, areaMin: area, areaMax: area, order: i })
+    )
+    const groups = planGroups(chain, { areaTolerance: 0.25 })
+    expect(groups.map((g) => names(g.rows))).toEqual([
+      ['k0'], ['k1', 'k2'], ['k3', 'k4'], ['k5'],
+    ])
+    for (const g of groups) {
+      const spread =
+        Math.max(...g.rows.map((r) => Number(r.areaMax))) -
+        Math.min(...g.rows.map((r) => Number(r.areaMin)))
+      expect(spread).toBeLessThanOrEqual(0.25 + 1e-9)
+    }
+  })
+
+  it('допуск — это максимальный разброс внутри карточки, граница включительно', () => {
+    const edge = [
+      plan({ planName: 'a', areaMin: 40.1, areaMax: 40.1, order: 0 }),
+      plan({ planName: 'b', areaMin: 40.3, areaMax: 40.3, order: 1 }),
+    ]
+    // 40.3 - 40.1 в двоичной арифметике = 0.19999999999999574
+    expect(planGroups(edge, { areaTolerance: 0.2 })).toHaveLength(1)
+    expect(planGroups(edge, { areaTolerance: 0.19 })).toHaveLength(2)
+  })
+
+  it('без допуска пересекающиеся диапазоны не склеиваются — только точные совпадения', () => {
+    const overlap = [
+      plan({ planName: 'x', areaMin: 39.79, areaMax: 39.79, order: 0 }),
+      plan({ planName: 'y', areaMin: 39.79, areaMax: 39.8, order: 1 }),
+    ]
+    expect(planGroups(overlap)).toHaveLength(2)
   })
 
   it('разрыв больше допуска не склеивается', () => {

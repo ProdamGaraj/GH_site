@@ -1,6 +1,6 @@
 import { apiFetch, ApiError } from '@/shared/api/http'
 import { api } from '@/shared/api'
-import type { ComplexDetail, ComplexListItem } from './types'
+import type { ComplexDetail, ComplexListItem, PlanGroupingConfig, PlanGroupingPreview } from './types'
 
 /**
  * Клиент estate-service через прокси /estate-api (vite dev / nginx prod).
@@ -43,6 +43,15 @@ export const estateApi = {
 
   deleteComplex: (id: string) =>
     apiFetch(`${BASE}/complexes/${id}`, { method: 'DELETE' }).then((r) => json<{ ok: boolean }>(r)),
+
+  /** Во что превратится каталог планировок при черновике настройки. Ничего не сохраняет. */
+  previewPlanGroups: (id: string, planGrouping: PlanGroupingConfig | null, signal?: AbortSignal) =>
+    apiFetch(`${BASE}/complexes/${id}/plan-groups/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ planGrouping }),
+      signal,
+    }).then((r) => json<PlanGroupingPreview>(r)),
 
   createHouse: (complexId: string, body: Record<string, unknown>) =>
     apiFetch(`${BASE}/complexes/${complexId}/houses`, {

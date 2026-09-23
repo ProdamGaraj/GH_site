@@ -30,8 +30,9 @@ export interface PlanGroupingConfig {
   /**
    * Допуск по площади, м². Планировки в пределах допуска считаются одной.
    *
-   * 0 — склеивать только точные совпадения (безопасный режим по умолчанию).
-   * Подобрать значение помогает `preview-plan-groups.ts`.
+   * Читается как максимальный разброс площади внутри одной карточки.
+   * 0 — склеивать только планировки с точно совпадающей площадью (режим по
+   * умолчанию). Подобрать значение помогает `preview-plan-groups.ts`.
    */
   areaTolerance?: number
   /** Принудительно объединить перечисленные планировки (по `planName`). */
@@ -58,6 +59,17 @@ export function normalizeConfig(config?: PlanGroupingConfig | null): Required<Pl
   }
 }
 
+/**
+ * Тип попадает на витрину, только если по нему есть квартиры.
+ *
+ * Строка без квартир живёт ради переводов, а карточка «0 квартир» на странице —
+ * мусор. Один предикат и для сайта, и для предпросмотра в админке: иначе
+ * админка показывала бы группы, которых на сайте нет.
+ */
+export function isShownPlanType(row: Pick<PlanTypeRow, 'apartmentsCount'>): boolean {
+  return row.apartmentsCount > 0
+}
+
 function num(value: string | number): number {
   const n = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(n) ? n : 0
@@ -74,34 +86,35 @@ function bucketKey(row: PlanTypeRow): string {
 }
 
 /**
- * Кластеризация по площади одиночной связью.
+ * Кластеризация по площади с ограничением разброса.
  *
- * Планировки сортируются по площади; следующая присоединяется к текущему
- * кластеру, если её минимум отстоит от максимума кластера не больше чем на
- * допуск. Одиночная связь выбрана намеренно: цепочка 39.79 → 39.80 → 40.03
- * при допуске 0.25 — это один ряд почти одинаковых квартир, и разрывать его
- * посередине было бы произвольно.
+ * Планировки сортируются по площади; следующая присоединяется к группе, если
+ * её максимум отстоит от НАИМЕНЬШЕЙ площади группы не больше чем на допуск.
+ * Так допуск читается просто: это максимальный разброс площади внутри одной
+ * карточки.
+ *
+ * Сначала здесь была одиночная связь (сравнение с максимумом группы) — и на
+ * ozmakon-business при допуске 0.25 она собрала десять разных планировок в
+ * одну карточку «39.57–40.74 м²»: каждый шаг укладывался в допуск, а сумма
+ * шагов давала 1.17 м². Ограничение разброса цепочек не допускает в принципе.
  */
 function clusterByArea(rows: PlanTypeRow[], tolerance: number): PlanTypeRow[][] {
   const sorted = [...rows].sort((a, b) => num(a.areaMin) - num(b.areaMin))
   const clusters: PlanTypeRow[][] = []
   let current: PlanTypeRow[] = []
-  let currentMax = 0
+  let groupMin = 0
 
   for (const row of sorted) {
-    if (current.length === 0) {
-      current = [row]
-      currentMax = num(row.areaMax)
+    // Сравнение с сотыми: 0.1 + 0.2 в двоичной арифметике не равно 0.3, и без
+    // округления граница допуска срабатывала бы через раз.
+    const spread = Math.round((num(row.areaMax) - groupMin) * 100) / 100
+    if (current.length > 0 && spread <= tolerance) {
+      current.push(row)
       continue
     }
-    if (num(row.areaMin) - currentMax <= tolerance) {
-      current.push(row)
-      currentMax = Math.max(currentMax, num(row.areaMax))
-    } else {
-      clusters.push(current)
-      current = [row]
-      currentMax = num(row.areaMax)
-    }
+    if (current.length) clusters.push(current)
+    current = [row]
+    groupMin = num(row.areaMin)
   }
   if (current.length) clusters.push(current)
   return clusters

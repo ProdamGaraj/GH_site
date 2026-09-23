@@ -11,6 +11,7 @@ import {
   updateHouseSchema,
   createApartmentSchema,
   updateApartmentSchema,
+  previewPlanGroupsSchema,
 } from '../schemas/estate.schema'
 
 /**
@@ -28,6 +29,11 @@ router.get('/complexes/:id', AdminController.getComplex)
 router.post('/complexes', validate(createComplexSchema), AdminController.createComplex)
 router.put('/complexes/:id', validate(updateComplexSchema), AdminController.updateComplex)
 router.delete('/complexes/:id', AdminController.deleteComplex)
+router.post(
+  '/complexes/:id/plan-groups/preview',
+  validate(previewPlanGroupsSchema),
+  AdminController.previewPlanGroups
+)
 
 // House
 router.post('/complexes/:complexId/houses', validate(createHouseSchema), AdminController.createHouse)

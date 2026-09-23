@@ -8,7 +8,7 @@
  * Всё здесь — чистые функции (без БД), покрываются unit-тестами.
  */
 
-import { mergePlanTypes, PlanGroupingConfig } from './planGrouping'
+import { isShownPlanType, mergePlanTypes, PlanGroupingConfig } from './planGrouping'
 
 export type Locale = 'ru' | 'uz' | 'en'
 export const DEFAULT_LOCALE: Locale = 'ru'
@@ -755,16 +755,12 @@ export function buildComplexDetail(
   // ГЛОБАЛЬНОМУ order (грид не сгруппирован по домам, карточки идут вперемешку).
   const flatApartments = sortByOrder(onSale).map((apt) => aptDtoById.get(apt.id)!)
 
-  // Типы без квартир не показываем: строка живёт ради переводов, но карточка
-  // «0 квартир» на странице — мусор.
+  // Типы без квартир не показываем (isShownPlanType).
   // Зеркальные варианты одной планировки склеиваются в одну карточку:
   // CRM отдаёт свой чертёж на каждое положение квартиры на этаже, и без
   // склейки каталог показывал до семи неотличимых плиток подряд. Правило
   // берётся из настройки ЖК — см. services/planGrouping.ts.
-  const shownPlanTypes = mergePlanTypes(
-    planTypes.filter((p) => p.apartmentsCount > 0),
-    complex.planGrouping
-  )
+  const shownPlanTypes = mergePlanTypes(planTypes.filter(isShownPlanType), complex.planGrouping)
   const planTypeDTOs = sortByOrder(shownPlanTypes).map(
     (planType) =>
       buildPlanTypeDTO(planType, locale, index, deadlineByHouseId.get(planType.houseId) ?? '')
