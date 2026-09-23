@@ -57,7 +57,7 @@ export class MigrationError extends Error {}
 
 // --- Обход дерева ---
 
-function walk(node: StructureNode, visit: (n: StructureNode, parent: StructureNode | null) => void): void {
+export function walk(node: StructureNode, visit: (n: StructureNode, parent: StructureNode | null) => void): void {
   const go = (n: StructureNode, parent: StructureNode | null): void => {
     visit(n, parent)
     for (const child of n.children ?? []) go(child, n)
@@ -69,11 +69,11 @@ function classOf(node: StructureNode): string {
   return node.attributes?.class ?? ''
 }
 
-function hasClass(node: StructureNode, name: string): boolean {
+export function hasClass(node: StructureNode, name: string): boolean {
   return classOf(node).split(/\s+/).includes(name)
 }
 
-function findAll(root: StructureNode, pred: (n: StructureNode) => boolean): StructureNode[] {
+export function findAll(root: StructureNode, pred: (n: StructureNode) => boolean): StructureNode[] {
   const out: StructureNode[] = []
   walk(root, (n) => {
     if (pred(n)) out.push(n)
@@ -88,7 +88,7 @@ function findAll(root: StructureNode, pred: (n: StructureNode) => boolean): Stru
  * непопавшее поле в пустую строку, и половинчатая миграция дала бы витрину с
  * пустыми карточками вместо явной ошибки.
  */
-function findOne(root: StructureNode, pred: (n: StructureNode) => boolean, what: string): StructureNode {
+export function findOne(root: StructureNode, pred: (n: StructureNode) => boolean, what: string): StructureNode {
   const found = findAll(root, pred)
   if (found.length !== 1) {
     throw new MigrationError(`Ожидался ровно один узел «${what}», найдено ${found.length}`)
@@ -96,7 +96,7 @@ function findOne(root: StructureNode, pred: (n: StructureNode) => boolean, what:
   return found[0]
 }
 
-function setAttr(node: StructureNode, key: string, value: string): void {
+export function setAttr(node: StructureNode, key: string, value: string): void {
   if (!node.attributes) node.attributes = {}
   node.attributes[key] = value
 }
