@@ -162,15 +162,31 @@ export const PageSettingsPanel: React.FC<PageSettingsPanelProps> = ({
               <label className="text-xs font-medium text-gray-700 mb-2 block">
                 Статус
               </label>
-              <select
-                value={settings.status || 'draft'}
-                onChange={(e) => handleChange('status', e.target.value as PageSettings['status'])}
-                className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm text-gray-900"
-              >
-                <option value="draft">Черновик</option>
-                <option value="published">Опубликовано</option>
-                <option value="archived">Архив</option>
-              </select>
+              {/* «Опубликовано» ставят и снимают только кнопки в списке страниц:
+                  они выкладывают и убирают файлы на сайте. Прямая смена статуса
+                  здесь расходилась с тем, что реально открывается. */}
+              {settings.status === 'published' ? (
+                <div className="px-3 py-2 rounded bg-green-50 text-sm text-green-800">
+                  Опубликовано
+                  <p className="mt-1 text-xs text-green-700">
+                    Снять с публикации — кнопкой в списке страниц.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <select
+                    value={settings.status || 'draft'}
+                    onChange={(e) => handleChange('status', e.target.value as PageSettings['status'])}
+                    className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm text-gray-900"
+                  >
+                    <option value="draft">Черновик</option>
+                    <option value="archived">Архив</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Опубликовать — кнопкой в списке страниц.
+                  </p>
+                </>
+              )}
             </div>
           </>
         )}

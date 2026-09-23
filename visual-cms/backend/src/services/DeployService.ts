@@ -7,7 +7,6 @@ import * as path from 'path'
 import { htmlGenerator, type ResolvedNavItem, type GeneratePageOptions } from './HtmlGenerator'
 import { responsiveImageService } from './ResponsiveImageService'
 import { AppDataSource } from '../config/database'
-import { Not, In } from 'typeorm'
 import { Page } from '../models/Page'
 import { Block } from '../models/Block'
 import { Site } from '../models/Site'
@@ -29,6 +28,7 @@ import { resolveLoadStrategy } from './dataSourceRuntime'
 import { applyCollectionTransforms } from '../utils/collectionTransforms'
 import { localizeInternalLinks, localizeNavigation, langPrefix } from './linkLocalization'
 import { generateLanguageEntryStub } from './languageEntry'
+import { planSiteSync, publishedFiles, removePublishedFiles } from './pagePublication'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
@@ -493,8 +493,9 @@ export class DeployService {
     const deployedPages: string[] = []
 
     try {
+      // Только опубликованные: черновик на сайт попадает лишь явной публикацией.
       const pages = await this.pageRepository.find({
-        where: { status: Not('archived') },
+        where: { status: 'published' },
         relations: ['site'],
       })
 
@@ -584,10 +585,6 @@ export class DeployService {
             deployedPages,
           })
 
-          // Mark page as published
-          page.status = 'published'
-          await this.pageRepository.save(page)
-
           // Deploy translations for this page
           await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir, isHome)
           
@@ -633,9 +630,11 @@ export class DeployService {
         return { success: false, message: 'Сайт не найден', deployedPages: [], errors: ['Site not found'] }
       }
 
-      const pages = await this.pageRepository.find({
-        where: { siteId, status: Not('archived') },
-      })
+      // Статус — источник истины: выкладываем опубликованные, файлы остальных
+      // убираем. Раньше выкладывалось всё кроме архива, и черновик получал
+      // `published` — снятые страницы возвращались первым же общим деплоем.
+      const allSitePages = await this.pageRepository.find({ where: { siteId } })
+      const { deploy: pages, cleanup } = planSiteSync(allSitePages, (p) => this.isHomePage(p, site))
 
       if (pages.length === 0) {
         return { success: false, message: 'Нет страниц для публикации', deployedPages: [], errors: [] }
@@ -647,8 +646,17 @@ export class DeployService {
       this.cleanHtmlFiles(siteDir)
       this.copyAssetsToDir(siteDir)
 
+      const allLanguageCodes = (await languageService.getAll()).map(l => l.code)
+      for (const page of cleanup) {
+        const removed = removePublishedFiles(
+          siteDir,
+          publishedFiles(siteDir, page.slug, false, allLanguageCodes),
+          allLanguageCodes
+        )
+        if (removed.length > 0) logger.info(`Site "${site.slug}": снята с публикации /${page.slug} (${removed.length} файлов)`)
+      }
+
       // Resolve navigation from site settings
-      const allSitePages = await this.pageRepository.find({ where: { siteId } })
       const resolvedNav = this.resolveNavigation(site.settings?.navigation, allSitePages, site.homepageId)
 
       // Загружаем коллекции заранее для auto-links в repeater'ах
@@ -718,10 +726,6 @@ export class DeployService {
             title: page.metadata?.title || page.name,
             deployedPages,
           })
-
-          // Mark page as published
-          page.status = 'published'
-          await this.pageRepository.save(page)
 
           await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir, isHome)
           logger.info(`Site "${site.slug}" deployed: ${relPath}`)
@@ -2045,25 +2049,47 @@ export class DeployService {
   }
 
   /**
-   * Удаляет опубликованный файл
+   * Удаляет опубликованные файлы адреса — во всех языках и в корне.
+   *
+   * Статус страниц не трогает: это низкоуровневая чистка по slug (DELETE
+   * /api/deploy/:slug). Снятие страницы целиком — `unpublishPage`.
    */
   async undeployPage(slug: string, siteSlug?: string): Promise<boolean> {
     const dir = siteSlug ? path.join(PUBLIC_DIR, 'sites', siteSlug) : PUBLIC_DIR
     const isHome = slug === 'index' || slug === 'home'
-    let removed = false
+    const codes = (await languageService.getAll()).map(l => l.code)
+    return removePublishedFiles(dir, publishedFiles(dir, slug, isHome, codes), codes).length > 0
+  }
 
-    if (isHome) {
-      const filePath = path.join(dir, 'index.html')
-      if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); removed = true }
-    } else {
-      // Директорный формат: <slug>/index.html
-      const pageDir = path.join(dir, slug)
-      if (fs.existsSync(pageDir)) { fs.rmSync(pageDir, { recursive: true, force: true }); removed = true }
-      // Legacy плоский файл <slug>.html
-      const legacy = path.join(dir, `${slug}.html`)
-      if (fs.existsSync(legacy)) { fs.unlinkSync(legacy); removed = true }
+  /**
+   * Снимает страницу с публикации: убирает её файлы во всех языках, ставит
+   * черновик и обновляет sitemap.
+   *
+   * Главную не снимаем: без неё корень сайта отдаёт 404. Чтобы убрать главную,
+   * назначают другую в настройках сайта.
+   */
+  async unpublishPage(pageId: string): Promise<{ success: boolean; message: string; removed: string[] }> {
+    const page = await this.pageRepository.findOne({ where: { id: pageId }, relations: ['site'] })
+    if (!page) return { success: false, message: 'Страница не найдена', removed: [] }
+    if (this.isHomePage(page, page.site)) {
+      return {
+        success: false,
+        message: 'Главную страницу сайта снять нельзя — сначала назначьте другую главную',
+        removed: [],
+      }
     }
-    return removed
+
+    const siteDir = this.resolveSiteDir(page.site)
+    const codes = (await languageService.getAll()).map(l => l.code)
+    const removed = removePublishedFiles(siteDir, publishedFiles(siteDir, page.slug, false, codes), codes)
+
+    page.status = 'draft'
+    await this.pageRepository.save(page)
+    if (page.site) {
+      await this.generateSitemap(page.site)
+    }
+    logger.info(`Unpublished: /${page.slug} (${removed.length} файлов)`)
+    return { success: true, message: `Страница /${page.slug} снята с публикации`, removed }
   }
 
   /**

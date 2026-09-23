@@ -6,6 +6,8 @@ import { Block } from '../models/Block'
 import { linkedBlocksService } from '../services/LinkedBlocksService'
 import { asyncHandler, NotFoundError, AppError } from '../middleware'
 import { cacheService } from '../services/CacheService'
+import { deployService } from '../services/DeployService'
+import { allowedStatusChange, initialStatus } from '../services/pagePublication'
 
 const pageRepository = AppDataSource.getRepository(Page)
 const versionRepository = AppDataSource.getRepository(PageVersion)
@@ -45,6 +47,9 @@ export class PageController {
   })
 
   create = asyncHandler(async (req: Request, res: Response) => {
+    // Опубликованной страница становится только публикацией: иначе статус
+    // обещал бы адрес, по которому на сайте ничего нет.
+    req.body.status = initialStatus(req.body.status)
     const page = pageRepository.create(req.body)
     await pageRepository.save(page)
     await cacheService.invalidateByTag('pages')
@@ -115,7 +120,13 @@ export class PageController {
       await versionRepository.save(snapshot)
     }
 
+    // Статус публикации меняют только публикация и снятие (routes/deploy.ts).
+    // Редактор шлёт статус при каждом сохранении, поэтому недопустимую смену
+    // молча отбрасываем, а не отвечаем 400 на обычное сохранение.
+    const nextStatus = allowedStatusChange(page.status, req.body.status)
+    delete req.body.status
     Object.assign(page, req.body)
+    if (nextStatus) page.status = nextStatus
     page.version += 1
     await pageRepository.save(page)
     await cacheService.invalidateByTag('pages')
@@ -125,6 +136,15 @@ export class PageController {
 
   delete = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params
+
+    // Удалённая страница не должна остаться на сайте: сначала снимаем её.
+    // Главную unpublishPage не снимет — тогда и удалять не даём.
+    const existing = await pageRepository.findOne({ where: { id } })
+    if (existing?.status === 'published') {
+      const unpublished = await deployService.unpublishPage(id)
+      if (!unpublished.success) throw new AppError(unpublished.message, 400)
+    }
+
     const result = await pageRepository.delete(id)
 
     if (result.affected === 0) {

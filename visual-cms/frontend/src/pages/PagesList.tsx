@@ -8,6 +8,7 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { fetchPages, deletePage, selectPages, selectPagesLoading } from '@/features/pages/pagesSlice'
 import type { BlockNode } from '@/shared/types'
 import { getPagePublicUrl } from '@/shared/utils'
+import { PublishToggle } from '@/features/pages/components'
 
 export const PagesList: React.FC = () => {
   const dispatch = useAppDispatch()
@@ -153,6 +154,7 @@ export const PagesList: React.FC = () => {
                             <ExternalLink size={18} />
                           </a>
                         )}
+                        <PublishToggle page={page} onChanged={() => dispatch(fetchPages())} />
                         <Link
                           to={`/editor/page/${page.id}`}
                           className="text-indigo-600 hover:text-indigo-900"

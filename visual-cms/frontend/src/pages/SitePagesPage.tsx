@@ -10,6 +10,7 @@ import { siteApi } from '@/shared/api'
 import type { Page } from '@/shared/types'
 import { getSitePublicUrl } from '@/shared/utils'
 import { useOverlayClose } from '@/shared/hooks/useOverlayClose'
+import { PublishToggle } from '@/features/pages/components'
 
 export const SitePagesPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -155,6 +156,13 @@ export const SitePagesPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
+                        <PublishToggle
+                          page={page}
+                          onChanged={() => {
+                            loadSitePages()
+                            dispatch(fetchPages())
+                          }}
+                        />
                         <Link
                           to={`/editor/page/${page.id}`}
                           className="p-1 text-indigo-600 hover:text-indigo-900"

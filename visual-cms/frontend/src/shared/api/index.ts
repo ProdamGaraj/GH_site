@@ -300,6 +300,9 @@ export interface DeployResult {
 
 export const deployApi = {
   deployPage: (pageId: string) => api.post<DeployResult>(`/deploy/${pageId}`),
+  /** Снять с публикации: файлы страницы уходят со всех языков, статус — черновик. */
+  unpublishPage: (pageId: string) =>
+    api.post<{ success: boolean; message: string; removed: string[] }>(`/deploy/${pageId}/unpublish`),
   deployAll: () => api.post<DeployResult>('/deploy'),
   getDeployedFiles: () => api.get<{ files: string[], publicUrl: string }>('/deploy'),
   undeploy: (slug: string) => api.delete<{ message: string }>(`/deploy/${slug}`),

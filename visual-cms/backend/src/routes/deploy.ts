@@ -125,6 +125,37 @@ router.post('/:pageId', asyncHandler(async (req: Request, res: Response) => {
 }))
 
 /**
+ * POST /api/deploy/:pageId/unpublish - Снять страницу с публикации
+ *
+ * Убирает файлы страницы во всех языках, ставит черновик, обновляет sitemap.
+ * Главную снять нельзя — 400 с объяснением.
+ */
+router.post('/:pageId/unpublish', asyncHandler(async (req: Request, res: Response) => {
+    const { pageId } = req.params
+    const start = Date.now()
+    const page = await pageRepository.findOne({ where: { id: pageId } })
+    if (!page) throw new NotFoundError('Page', pageId)
+
+    const result = await deployService.unpublishPage(pageId)
+
+    await deployLogRepository.save(deployLogRepository.create({
+      siteId: page.siteId || undefined,
+      pageId,
+      pageName: page.name,
+      pageSlug: page.slug,
+      action: 'undeploy',
+      status: result.success ? 'success' : 'failed',
+      message: result.message,
+      deployedFiles: result.removed,
+      errors: result.success ? [] : [result.message],
+      durationMs: Date.now() - start,
+      pageVersion: page.version,
+    }))
+
+    res.status(result.success ? 200 : 400).json(result)
+}))
+
+/**
  * POST /api/deploy/:pageId/rollback/:versionId - Rollback: restore version and redeploy
  */
 router.post('/:pageId/rollback/:versionId', asyncHandler(async (req: Request, res: Response) => {
