@@ -145,6 +145,32 @@ describe('migrateChoiceFilters', () => {
   })
 })
 
+describe('баннер «Оставить заявку»', () => {
+  function withBanner(): StructureNode {
+    const b = block()
+    b.children!.push({
+      id: 'banner',
+      tagName: 'div',
+      attributes: { id: 'choiceBanner', class: 'complex-banner' },
+      children: [{ id: 'cta', tagName: 'a', attributes: { href: '#lead' }, content: 'Оставить заявку' }],
+    })
+    return b
+  }
+
+  it('убирается вместе с содержимым', () => {
+    const out = migrateChoiceFilters(withBanner()).structure
+    expect(() => find(out, 'banner')).toThrow()
+    expect(() => find(out, 'cta')).toThrow()
+    expect(find(out, 'grid')).toBeDefined()
+  })
+
+  it('без баннера — правки про баннер нет, повторный запуск ничего не меняет', () => {
+    const once = migrateChoiceFilters(withBanner())
+    expect(once.changes).toContain('баннер «Оставить заявку» над карточками убран')
+    expect(migrateChoiceFilters(once.structure).alreadyMigrated).toBe(true)
+  })
+})
+
 describe('migrateFiltersJs', () => {
   it('скрипт первой версии не найден — ошибка', () => {
     expect(() => migrateFiltersJs('var x = 1;', [])).toThrow(MigrationError)

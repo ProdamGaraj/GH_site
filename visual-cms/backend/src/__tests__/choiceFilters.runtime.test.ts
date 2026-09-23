@@ -26,9 +26,9 @@ function chips(field: string, values: string[]): string {
 
 function page(cards: Card[], lang = 'ru', deadlines: string[] = []): Document {
   const rooms = [...new Set(cards.map((c) => c.rooms))]
-  const priceBox = `<div class="filter-group"><h3>Цена</h3><div class="range-box">
-      <input type="number" data-filter="priceMin" placeholder="от" />
-      <input type="number" data-filter="priceMax" placeholder="до" /></div></div>`
+  const priceBox = `<div class="filter-group"><h3>Цена, UZS</h3><div class="range-box">
+      <input type="number" data-filter="priceMin" placeholder="от" /><span>—</span>
+      <input type="number" data-filter="priceMax" placeholder="до" /><span>UZS</span></div></div>`
   const actions = `<div class="panel-actions">
       <button type="button" data-filter-action="reset">Сбросить</button>
       <button type="button" data-filter-action="apply">Показать</button></div>`
@@ -36,13 +36,15 @@ function page(cards: Card[], lang = 'ru', deadlines: string[] = []): Document {
   document.body.innerHTML = `
   <section id="choice" class="detail-section">
     <div class="apartment-toolbar">
-      <button type="button" class="filter-trigger" data-panel="rooms">Комнатность</button>
-      <button type="button" class="filter-trigger" data-panel="deadline">Срок сдачи</button>
-      <button type="button" class="filter-trigger" data-panel="price">Цена</button>
-      <button type="button" class="filter-trigger" data-panel="all">Все фильтры</button>
-      <button type="button" class="reset-filter">Сбросить</button>
+      <div class="filter-main">
+        <button type="button" class="filter-trigger" data-panel="rooms">Комнатность</button>
+        <button type="button" class="filter-trigger" data-panel="deadline">Срок сдачи</button>
+        <button type="button" class="filter-trigger" data-panel="price">Цена</button>
+        <button type="button" class="filter-trigger" data-panel="all">Все фильтры</button>
+        <button type="button" class="reset-filter">Сбросить</button>
+      </div>
       <div class="filter-panel" data-panel="rooms">
-        <div class="filter-group" id="g-rooms"><div class="chip-row">${chips('rooms', rooms)}</div></div>${actions}
+        <div class="filter-group" id="g-rooms"><h3>Комнатность</h3><div class="chip-row">${chips('rooms', rooms)}</div></div>${actions}
       </div>
       <div class="filter-panel" data-panel="deadline">
         <div class="filter-group" id="g-deadline"><div class="chip-row">${chips('deadline', deadlines)}</div></div>${actions}
@@ -311,7 +313,7 @@ describe('фильтры: панели', () => {
     // Регрессия v1: stopPropagation на панели глушил делегат на toolbar.
     const dom = page(CATALOG)
     trigger(dom, 'rooms').click()
-    chip(dom, 'rooms', '2').click()
+    ;(panel(dom, 'rooms').querySelector('[data-value="2"]') as HTMLButtonElement).click()
     expect(chip(dom, 'rooms', '2').classList.contains('active')).toBe(true)
     expect(visible(dom)).toEqual(['c2'])
     expect(panel(dom, 'rooms').classList.contains('is-open')).toBe(true)
@@ -357,5 +359,86 @@ describe('фильтры: язык страницы', () => {
     const dom = page(CATALOG, 'de')
     typePrice(dom, 'priceMax', '1')
     expect(emptyMessage(dom).textContent).toContain('планировок нет')
+  })
+})
+
+describe('фильтры: строка на десктопе', () => {
+  function inline(dom: Document): HTMLElement {
+    return dom.querySelector('.filter-main > .filter-inline') as HTMLElement
+  }
+  function inlineChip(dom: Document, value: string): HTMLButtonElement {
+    return inline(dom).querySelector(`[data-filter="rooms"][data-value="${value}"]`) as HTMLButtonElement
+  }
+  function inlineInput(dom: Document, kind: string): HTMLInputElement {
+    return inline(dom).querySelector(`[data-filter="${kind}"]`) as HTMLInputElement
+  }
+
+  it('собирается в начале .filter-main: комнатность и цена с подписями из заголовков панелей', () => {
+    const dom = page(CATALOG)
+    const groups = [...inline(dom).querySelectorAll('.filter-inline-group')]
+    expect(groups.map((g) => g.getAttribute('data-panel'))).toEqual(['rooms', 'price'])
+    expect(groups.map((g) => g.querySelector('.filter-inline-label')!.textContent)).toEqual([
+      'Комнатность',
+      'Цена, UZS',
+    ])
+    expect(dom.querySelector('.filter-main')!.firstElementChild).toBe(inline(dom))
+  })
+
+  it('чипс в строке фильтрует и синхронен с чипсами в панелях', () => {
+    const dom = page(CATALOG)
+    inlineChip(dom, '2').click()
+    expect(visible(dom)).toEqual(['c2'])
+    const all = [...dom.querySelectorAll('[data-filter="rooms"][data-value="2"]')]
+    expect(all.length).toBe(3) // строка + своя панель + «Все фильтры»
+    expect(all.every((c) => c.classList.contains('active'))).toBe(true)
+  })
+
+  it('цена в строке фильтрует и копируется в поля панелей', () => {
+    const dom = page(CATALOG)
+    const input = inlineInput(dom, 'priceMax')
+    input.value = String(400 * M)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(visible(dom)).toEqual(['c0'])
+    const others = [...dom.querySelectorAll('.filter-panel [data-filter="priceMax"]')] as HTMLInputElement[]
+    expect(others.every((i) => i.value === String(400 * M))).toBe(true)
+    expect(inlineChip(dom, '2').disabled).toBe(true)
+  })
+
+  it('подсказки цены обновляются и в строке', () => {
+    const dom = page(CATALOG)
+    expect(inlineInput(dom, 'priceMin').getAttribute('placeholder')).toBe('от 376 000 000')
+  })
+
+  it('счётчик стоит перед «Сбросить» и показывает число карточек', () => {
+    const dom = page(CATALOG)
+    const count = dom.querySelector('.filter-main > .filter-count') as HTMLElement
+    expect(count.nextElementSibling!.classList.contains('reset-filter')).toBe(true)
+    expect(count.textContent).toBe('Найдено: 3')
+    inlineChip(dom, '1').click()
+    expect(count.textContent).toBe('Найдено: 2')
+  })
+
+  it('счётчик на языке страницы', () => {
+    const dom = page(CATALOG, 'uz')
+    expect(dom.querySelector('.filter-count')!.textContent).toBe('Topildi: 3')
+  })
+
+  it('сброс очищает и строку', () => {
+    const dom = page(CATALOG)
+    inlineChip(dom, '1').click()
+    const input = inlineInput(dom, 'priceMin')
+    input.value = '1'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    ;(dom.querySelector('.reset-filter') as HTMLButtonElement).click()
+    expect(inlineChip(dom, '1').classList.contains('active')).toBe(false)
+    expect(input.value).toBe('')
+    expect(visible(dom)).toEqual(['c0', 'c1', 'c2'])
+  })
+
+  it('клик по чипсу в строке закрывает открытую панель — она больше не нужна', () => {
+    const dom = page(CATALOG)
+    ;(dom.querySelector('.filter-trigger[data-panel="all"]') as HTMLButtonElement).click()
+    inlineChip(dom, '1').click()
+    expect(dom.querySelector('.filter-panel[data-panel="all"]')!.classList.contains('is-open')).toBe(false)
   })
 })

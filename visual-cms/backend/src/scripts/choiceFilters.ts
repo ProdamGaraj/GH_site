@@ -1,12 +1,15 @@
 /**
- * Фильтры секции «Выбрать» (блок «Complex choice»), версия 3.
+ * Фильтры секции «Выбрать» (блок «Complex choice»), версия 4.
  *
  * Что было не так на странице проекта:
  * - панель фильтров рисовалась под карточками планировок, а на коротком
  *   каталоге её обрезала секция (`overflow: hidden`);
  * - панели открывались под всем тулбаром и на фиксированном left —
  *   «оторванными» от кнопок; «Все фильтры» уезжали вправо, поля цены
- *   в них обрезались (v3: панель ставится под своей кнопкой);
+ *   в них обрезались (v3: панель ставится под своей кнопкой; v4: на
+ *   десктопе комнатность и цена строкой, панели только на телефоне);
+ * - между фильтрами и карточками стоял баннер «Оставить заявку» с
+ *   невидимым названием проекта, линия и большой отступ (v4: убраны);
  * - клик по чипсу в панели не срабатывал вовсе: stopPropagation на панели
  *   глушил делегат на тулбаре;
  * - варианты не сужались: при цене «до 400 млн» оставался чипс «2», хотя
@@ -31,6 +34,7 @@ import {
   findOne,
   hasClass,
   setAttr,
+  walk,
 } from './choiceToPlanTypes'
 import {
   FILTERS_CSS,
@@ -73,7 +77,7 @@ export function migrateFiltersJs(js: string, changes: string[]): string {
   if (!tail.endsWith('})();')) {
     throw new MigrationError('Скрипт фильтров не последний в globalJs — после него есть другой код')
   }
-  changes.push('globalJs: скрипт фильтров v3 (панель под своей кнопкой, сужение вариантов, цена диапазоном, счётчик, ru/uz/en)')
+  changes.push('globalJs: скрипт фильтров v4 (десктоп — строкой, телефон — панель под кнопкой, сужение вариантов, цена диапазоном, счётчик, ru/uz/en)')
   return js.slice(0, start) + FILTERS_JS
 }
 
@@ -85,8 +89,26 @@ export function migrateFiltersCss(css: string, changes: string[]): string {
   if (css.includes(FILTERS_CSS_MARKER)) return css
   const start = css.indexOf(FILTERS_CSS_HEAD)
   const base = start === -1 ? css : css.slice(0, start)
-  changes.push('globalCss: панель под своей кнопкой и поверх карточек, «Все фильтры» в колонку, веса шрифта, CSS-галочка')
+  changes.push('globalCss: строка фильтров на десктопе, панель под кнопкой на телефоне, без линии и отступа над карточками')
   return base.trimEnd() + '\n' + FILTERS_CSS
+}
+
+/**
+ * Баннер «<проект> · Оставить заявку» между фильтрами и карточками.
+ *
+ * Его фон — картинка проекта, которой в шаблоне нет, поэтому название
+ * проекта выходило белым по белому, а оставалась одна кнопка-переход к
+ * форме посреди пустого места. Форма заявки и так ниже на странице.
+ */
+export function removeChoiceBanner(structure: StructureNode, changes: string[]): void {
+  walk(structure, (node) => {
+    const banners = (node.children ?? []).filter(
+      (child) => child.attributes?.id === 'choiceBanner' || hasClass(child, 'complex-banner')
+    )
+    if (banners.length === 0) return
+    node.children = node.children!.filter((child) => !banners.includes(child))
+    changes.push('баннер «Оставить заявку» над карточками убран')
+  })
 }
 
 export function migrateChoiceFilters(input: StructureNode): MigrationResult {
@@ -102,6 +124,8 @@ export function migrateChoiceFilters(input: StructureNode): MigrationResult {
     setAttr(card, PRICE_MAX_ATTR, PRICE_MAX_BINDING)
     changes.push(`карточка: ${PRICE_MAX_ATTR}="${PRICE_MAX_BINDING}"`)
   }
+
+  removeChoiceBanner(structure, changes)
 
   const triggers = findAll(structure, (n) => hasClass(n, 'filter-trigger'))
   for (const trigger of triggers) {

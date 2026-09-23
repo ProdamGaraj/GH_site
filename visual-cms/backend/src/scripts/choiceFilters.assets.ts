@@ -14,7 +14,7 @@
 export const FILTERS_JS_HEAD = '/* Фильтры квартир (#choice)'
 
 /** Заголовок текущей версии — по нему миграция узнаёт, что уже применена. */
-export const FILTERS_JS_MARKER = `${FILTERS_JS_HEAD}, v3.`
+export const FILTERS_JS_MARKER = `${FILTERS_JS_HEAD}, v4.`
 
 /** Начало скрипта первой версии (до миграций) — для тестов обновления. */
 export const FILTERS_JS_V1_START = `${FILTERS_JS_HEAD}. Работают по data-атрибутам`
@@ -26,7 +26,9 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
    Варианты сужаются под остальные условия: чипс, который при них ничего не
    покажет, выключается; выбранный остаётся кликабельным, чтобы его можно было
    снять. Цена карточки — диапазон «от priceMin до priceMax»: карточка подходит,
-   если он пересекается с заданным. */
+   если он пересекается с заданным.
+   На десктопе комнатность и цена стоят строкой, без панелей; на телефоне —
+   кнопки, панель открывается под своей кнопкой. */
 (function () {
   var section = document.getElementById('choice');
   if (!section) return;
@@ -35,12 +37,47 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
   if (!toolbar || !grid) return;
 
   var TEXTS = {
-    ru: { empty: 'По выбранным условиям планировок нет. Измените фильтры или сбросьте их.', from: 'от {n}', to: 'до {n}' },
-    uz: { empty: "Tanlangan shartlarga mos rejalar yo'q. Filtrlarni o'zgartiring yoki tozalang.", from: '{n} dan', to: '{n} gacha' },
-    en: { empty: 'No layouts match these filters. Change or reset them.', from: 'from {n}', to: 'up to {n}' }
+    ru: { empty: 'По выбранным условиям планировок нет. Измените фильтры или сбросьте их.', from: 'от {n}', to: 'до {n}', found: 'Найдено: {n}' },
+    uz: { empty: "Tanlangan shartlarga mos rejalar yo'q. Filtrlarni o'zgartiring yoki tozalang.", from: '{n} dan', to: '{n} gacha', found: 'Topildi: {n}' },
+    en: { empty: 'No layouts match these filters. Change or reset them.', from: 'from {n}', to: 'up to {n}', found: 'Found: {n}' }
   };
   var lang = (document.documentElement.getAttribute('lang') || 'ru').slice(0, 2).toLowerCase();
   var T = TEXTS[lang] || TEXTS.ru;
+
+  /* Строка фильтров для десктопа. Собирается из копий тех же чипсов и полей
+     цены, что и в панелях: состояние у них общее (выбор хранится по полю, поля
+     цены синхронизируются), так что строка и панели — одно и то же. Что
+     показать — строку или кнопки с панелями, — решает CSS по ширине экрана.
+     Поле без вариантов в строку не попадает. */
+  var INLINE_PANELS = ['rooms', 'price'];
+  var main = toolbar.querySelector('.filter-main');
+  var inline = document.createElement('div');
+  inline.className = 'filter-inline';
+  INLINE_PANELS.forEach(function (name) {
+    var panel = toolbar.querySelector('.filter-panel[data-panel="' + name + '"]');
+    var control = panel && (panel.querySelector('.chip-row') || panel.querySelector('.range-box'));
+    if (!control) return;
+    if (control.classList.contains('chip-row') && !control.querySelector('[data-value]')) return;
+    var group = document.createElement('div');
+    group.className = 'filter-inline-group';
+    group.setAttribute('data-panel', name);
+    var title = panel.querySelector('h3');
+    if (title) {
+      var label = document.createElement('span');
+      label.className = 'filter-inline-label';
+      label.textContent = title.textContent;
+      group.appendChild(label);
+    }
+    group.appendChild(control.cloneNode(true));
+    inline.appendChild(group);
+  });
+  var countLabel = null;
+  if (main && inline.children.length) {
+    main.insertBefore(inline, main.firstChild);
+    countLabel = document.createElement('span');
+    countLabel.className = 'filter-count';
+    main.insertBefore(countLabel, main.querySelector(':scope > .reset-filter'));
+  }
 
   var triggers = toolbar.querySelectorAll('.filter-trigger[data-panel]');
   var panels = toolbar.querySelectorAll('.filter-panel');
@@ -289,6 +326,7 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
     applyButtons.forEach(function (b) {
       b.textContent = b.getAttribute('data-label') + ' · ' + shown;
     });
+    if (countLabel) countLabel.textContent = T.found.replace('{n}', shown);
     if (!empty) {
       empty = document.createElement('p');
       empty.className = 'apartments-empty';
@@ -306,7 +344,7 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
 export const FILTERS_CSS_HEAD = '/* ==== choice-filters'
 
 /** Маркер текущей версии — по нему миграция узнаёт, что уже применена. */
-export const FILTERS_CSS_MARKER = `${FILTERS_CSS_HEAD} v3 ====`
+export const FILTERS_CSS_MARKER = `${FILTERS_CSS_HEAD} v4 ====`
 
 export const FILTERS_CSS = `
 ${FILTERS_CSS_MARKER}
@@ -322,9 +360,13 @@ ${FILTERS_CSS_MARKER}
 }
 
 /* Без z-index панель рисовалась под карточками: у них позиционированные
-   потомки, и они идут в разметке позже. */
+   потомки, и они идут в разметке позже. Линия и большой отступ под
+   фильтрами убраны: карточки идут сразу, панель может на них заезжать. */
 .apartment-toolbar {
   z-index: 20;
+  margin-bottom: 22px;
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 
 .filter-trigger,
@@ -413,10 +455,16 @@ ${FILTERS_CSS_MARKER}
   margin-top: 22px;
 }
 
+/* На телефоне — во всю ширину тулбара. Селекторы панелей с чипсами
+   перечислены явно: иначе их width: 420px (выше) побеждал по специфичности
+   и панель вылезала за край экрана. */
 @media (max-width: 760px) {
   .filter-panel,
   .filter-panel[data-panel="price"],
-  .filter-panel[data-panel="all"] {
+  .filter-panel[data-panel="all"],
+  .filter-panel[data-panel="rooms"],
+  .filter-panel[data-panel="deadline"],
+  .filter-panel[data-panel="windowViews"] {
     left: 0;
     right: 0;
     width: auto;
@@ -434,6 +482,86 @@ ${FILTERS_CSS_MARKER}
   }
 
   .range-box > span {
+    display: none;
+  }
+}
+
+/* ---- Десктоп: комнатность и цена строкой, без панелей ----
+   Строку собирает скрипт из копий чипсов и полей цены. На десктопе прячем
+   кнопки этих панелей и «Все фильтры» (всё основное уже на виду; срок сдачи и
+   вид из окна, если они есть у проекта, остаются своими кнопками). */
+.filter-inline,
+.filter-count {
+  display: none;
+}
+
+.filter-inline {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+}
+
+.filter-inline-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.filter-inline-label {
+  color: rgba(21, 24, 29, .56);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.filter-inline .chip-row {
+  flex-wrap: nowrap;
+}
+
+/* В строке поля цены стоят сами по себе, без общей рамки вокруг: рамка
+   вокруг полей с рамками выглядела двойной. */
+.filter-inline .range-box {
+  min-height: 0;
+  grid-template-columns: 170px auto 170px;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.filter-inline .range-box input {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(21, 24, 29, .16);
+  border-radius: 13px;
+  background: #fff;
+}
+
+/* «UZS» уже в подписи группы. */
+.filter-inline .range-box > span:last-child {
+  display: none;
+}
+
+.filter-count {
+  color: rgba(21, 24, 29, .56);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (min-width: 761px) {
+  .filter-inline {
+    display: flex;
+  }
+
+  .filter-count {
+    display: inline;
+    margin-left: auto;
+  }
+
+  .filter-trigger[data-panel="rooms"],
+  .filter-trigger[data-panel="price"],
+  .filter-trigger[data-panel="all"] {
     display: none;
   }
 }
