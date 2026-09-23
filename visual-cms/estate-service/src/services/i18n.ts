@@ -316,6 +316,27 @@ export function apartmentTitle(rooms: number, area: string | number, locale: Loc
   return `${rooms}-комн. ${a} м²`
 }
 
+/**
+ * Заголовок карточки типа планировки.
+ *
+ * Одна площадь — как у квартиры. Диапазон — «от» меньшей: после склейки в
+ * одну карточку попадают варианты 36.76–37.87 м², и заголовок с максимумом
+ * обещал бы площадь, которой у большинства вариантов нет. Сам диапазон
+ * показывает плашка `areaLabel`.
+ */
+export function planTypeTitle(
+  rooms: number,
+  areaMin: string | number,
+  areaMax: string | number,
+  locale: Locale
+): string {
+  const min = formatArea(areaMin)
+  if (min === formatArea(areaMax)) return apartmentTitle(rooms, areaMax, locale)
+  if (locale === 'uz') return `${rooms} xonali ${min} m² dan`
+  if (locale === 'en') return `${rooms}-room from ${min} m²`
+  return `${rooms}-комн. от ${min} м²`
+}
+
 /** Мета-строка карточки: "№ 102 | 8/9 этаж | 2 подъезд | 1 кв. 2028". */
 export function apartmentMeta(a: ApartmentRow, locale: Locale): string {
   const w = WORDS[locale]
@@ -652,7 +673,7 @@ export function buildPlanTypeDTO(
     rooms: p.rooms,
     isStudio: p.isStudio,
 
-    title: apartmentTitle(p.rooms, areaMax, locale),
+    title: planTypeTitle(p.rooms, areaMin, areaMax, locale),
     areaLabel: formatAreaRange(areaMin, areaMax, locale),
     priceLabel: formatPriceFrom(p.priceMin, locale),
     countLabel: formatApartmentsCount(p.apartmentsCount, locale),

@@ -135,11 +135,27 @@ describe('форматирование диапазонов', () => {
 describe('карточка типа', () => {
   it('собирает подписи для показа', () => {
     const dto = buildPlanTypeDTO(planType(), 'ru', EMPTY)
-    expect(dto.title).toBe('2-комн. 56.12 м²')
+    expect(dto.title).toBe('2-комн. от 55.64 м²')
     expect(dto.areaLabel).toBe('55.64 – 56.12 м²')
     expect(dto.priceLabel).toBe('от 1 153 779 562 UZS')
     expect(dto.countLabel).toBe('12 квартир')
     expect(dto.floorsLabel).toBe('этажи 3–16')
+  })
+
+  it('заголовок: одна площадь — как есть, диапазон — «от» меньшей', () => {
+    const single = planType({ areaMin: '42.24', areaMax: '42.24' })
+    expect(buildPlanTypeDTO(single, 'ru', EMPTY).title).toBe('2-комн. 42.24 м²')
+    // Склеенная карточка 36.76–37.87: максимум в заголовке обещал бы площадь,
+    // которой у большинства вариантов нет.
+    const merged = planType({ rooms: 1, areaMin: 36.76, areaMax: 37.87 })
+    expect(buildPlanTypeDTO(merged, 'ru', EMPTY).title).toBe('1-комн. от 36.76 м²')
+    expect(buildPlanTypeDTO(merged, 'uz', EMPTY).title).toBe('1 xonali 36.76 m² dan')
+    expect(buildPlanTypeDTO(merged, 'en', EMPTY).title).toBe('1-room from 36.76 m²')
+  })
+
+  it('заголовок: разница меньше сотой диапазоном не считается', () => {
+    const almost = planType({ areaMin: '42.240', areaMax: '42.24' })
+    expect(buildPlanTypeDTO(almost, 'ru', EMPTY).title).toBe('2-комн. 42.24 м²')
   })
 
   it('первая картинка идёт на карточку, все — в атрибут модалки', () => {
