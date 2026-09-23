@@ -8,6 +8,8 @@
  * Всё здесь — чистые функции (без БД), покрываются unit-тестами.
  */
 
+import { mergePlanTypes, PlanGroupingConfig } from './planGrouping'
+
 export type Locale = 'ru' | 'uz' | 'en'
 export const DEFAULT_LOCALE: Locale = 'ru'
 export const SUPPORTED_LOCALES: Locale[] = ['ru', 'uz', 'en']
@@ -118,6 +120,8 @@ export interface ComplexRow {
   gallery: string[]
   hallGallery: string[]
   yardGallery: string[]
+  /** Настройка склейки типов планировок; null — только точные совпадения. */
+  planGrouping?: PlanGroupingConfig | null
 }
 
 export interface HouseRow {
@@ -753,7 +757,15 @@ export function buildComplexDetail(
 
   // Типы без квартир не показываем: строка живёт ради переводов, но карточка
   // «0 квартир» на странице — мусор.
-  const planTypeDTOs = sortByOrder(planTypes.filter((p) => p.apartmentsCount > 0)).map(
+  // Зеркальные варианты одной планировки склеиваются в одну карточку:
+  // CRM отдаёт свой чертёж на каждое положение квартиры на этаже, и без
+  // склейки каталог показывал до семи неотличимых плиток подряд. Правило
+  // берётся из настройки ЖК — см. services/planGrouping.ts.
+  const shownPlanTypes = mergePlanTypes(
+    planTypes.filter((p) => p.apartmentsCount > 0),
+    complex.planGrouping
+  )
+  const planTypeDTOs = sortByOrder(shownPlanTypes).map(
     (planType) =>
       buildPlanTypeDTO(planType, locale, index, deadlineByHouseId.get(planType.houseId) ?? '')
   )

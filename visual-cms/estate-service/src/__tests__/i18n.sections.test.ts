@@ -193,7 +193,9 @@ describe('списки значений для чипсов фильтра', () 
     const planTypes = [
       plan({ id: 'p1', houseId: 'h1', order: 0 }),
       plan({ id: 'p2', houseId: 'h2', order: 1 }),
-      plan({ id: 'p3', houseId: 'h1', order: 2 }), // тот же дом — срок повторяется
+      // Площадь отличается намеренно: одинаковая склеилась бы с p1 в одну
+      // карточку, а проверяем мы здесь срок, а не группировку.
+      plan({ id: 'p3', houseId: 'h1', order: 2, areaMin: '55', areaMax: '55' }), // тот же дом — срок повторяется
     ]
     const dto = buildComplexDetail(baseComplex, houses, withApts, [], 'ru', planTypes)
     expect(dto.planTypes.map((p) => p.deadline)).toEqual(['1 кв. 2028', '2 кв. 2029', '1 кв. 2028'])

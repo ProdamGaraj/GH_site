@@ -48,6 +48,21 @@ const complexBase = {
   gallery: z.array(z.string()).optional(),
   hallGallery: z.array(z.string()).optional(),
   yardGallery: z.array(z.string()).optional(),
+  /**
+   * Склейка типов планировок на витрине.
+   *
+   * Правится у каждого ЖК: общего признака «одна планировка» в метаданных
+   * CRM нет, а допустимый разброс площади у проектов свой. Подобрать допуск
+   * помогает scripts/preview-plan-groups.ts.
+   */
+  planGrouping: z
+    .object({
+      areaTolerance: z.number().min(0).max(50).optional(),
+      groups: z.array(z.object({ plans: z.array(z.string()).min(2) })).optional(),
+      keepSeparate: z.array(z.string()).optional(),
+    })
+    .nullable()
+    .optional(),
   translations: translationsSchema,
 }
 export const createComplexSchema = z.object(complexBase)

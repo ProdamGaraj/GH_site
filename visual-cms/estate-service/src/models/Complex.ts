@@ -8,6 +8,7 @@ import {
   Index,
 } from 'typeorm'
 import { House } from './House'
+import type { PlanGroupingConfig } from '../services/planGrouping'
 
 /**
  * Жилой комплекс (ЖК).
@@ -148,6 +149,16 @@ export class Complex {
 
   @Column({ type: 'jsonb', default: () => "'[]'" })
   yardGallery!: string[]
+
+  /**
+   * Настройка склейки типов планировок на витрине.
+   *
+   * Живёт у ЖК, а не в коде: общего признака «одна планировка» в метаданных
+   * CRM нет, а допустимый разброс площади у проектов разный. Разбор и
+   * значения по умолчанию — в services/planGrouping.ts.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  planGrouping?: PlanGroupingConfig | null
 
   @OneToMany(() => House, (house) => house.complex)
   houses!: House[]

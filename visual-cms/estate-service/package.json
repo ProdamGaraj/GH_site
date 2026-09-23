@@ -10,7 +10,8 @@
     "test": "jest",
     "lint": "eslint src --ext .ts",
     "seed:dostlik": "ts-node src/scripts/seed-dostlik.ts",
-    "seed:design": "ts-node src/scripts/seed-design-projects.ts"
+    "seed:design": "ts-node src/scripts/seed-design-projects.ts",
+    "plan-groups": "ts-node src/scripts/preview-plan-groups.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
