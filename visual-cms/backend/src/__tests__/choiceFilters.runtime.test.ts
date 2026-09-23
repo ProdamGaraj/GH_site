@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  *
- * Скрипт фильтров секции «Выбрать» (v2) в браузере.
+ * Скрипт фильтров секции «Выбрать» в браузере.
  *
  * Скрипт встраивается в страницу строкой, поэтому проверяется по-честному:
  * запускается в jsdom на разметке, повторяющей деплой шаблона проекта.
@@ -100,7 +100,7 @@ function emptyMessage(dom: Document): HTMLElement {
   return dom.querySelector('.apartments-empty') as HTMLElement
 }
 
-describe('фильтры v2: исходное состояние', () => {
+describe('фильтры: исходное состояние', () => {
   const dom = page(CATALOG)
 
   it('видны все карточки, кнопка показывает их число', () => {
@@ -132,7 +132,7 @@ describe('фильтры v2: исходное состояние', () => {
   })
 })
 
-describe('фильтры v2: варианты сужаются под остальные условия', () => {
+describe('фильтры: варианты сужаются под остальные условия', () => {
   it('цена до 400 млн — «2» выключен в обеих панелях, «1» доступен', () => {
     const dom = page(CATALOG)
     typePrice(dom, 'priceMax', String(400 * M))
@@ -182,7 +182,7 @@ describe('фильтры v2: варианты сужаются под остал
   })
 })
 
-describe('фильтры v2: цена — диапазон карточки', () => {
+describe('фильтры: цена — диапазон карточки', () => {
   it('«от 600 млн» оставляет карточку 545–626: в ней есть квартиры дороже', () => {
     const dom = page(CATALOG)
     typePrice(dom, 'priceMin', String(600 * M))
@@ -217,7 +217,7 @@ describe('фильтры v2: цена — диапазон карточки', ()
   })
 })
 
-describe('фильтры v2: множества и сброс', () => {
+describe('фильтры: множества и сброс', () => {
   it('значение-множество через «|» совпадает по любому элементу', () => {
     const dom = page(
       [
@@ -252,13 +252,60 @@ describe('фильтры v2: множества и сброс', () => {
   })
 })
 
-describe('фильтры v2: панели', () => {
+describe('фильтры: панели', () => {
   function trigger(dom: Document, name: string): HTMLButtonElement {
     return dom.querySelector(`.filter-trigger[data-panel="${name}"]`) as HTMLButtonElement
   }
   function panel(dom: Document, name: string): HTMLElement {
     return dom.querySelector(`.filter-panel[data-panel="${name}"]`) as HTMLElement
   }
+
+  function rect(el: Element, r: { top?: number; bottom?: number; left?: number; width?: number }): void {
+    const box = { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0, x: 0, y: 0, ...r }
+    ;(el as HTMLElement).getBoundingClientRect = () => ({ ...box, toJSON: () => box }) as DOMRect
+  }
+
+  function layout(dom: Document, panelWidth: number): void {
+    rect(dom.querySelector('.apartment-toolbar')!, { top: 100, left: 50, width: 1000 })
+    rect(trigger(dom, 'all'), { top: 120, bottom: 168, left: 300 })
+    Object.defineProperty(panel(dom, 'all'), 'offsetWidth', { configurable: true, value: panelWidth })
+  }
+
+  it('панель открывается прямо под своей кнопкой: +8 px от низа, по её левому краю', () => {
+    const dom = page(CATALOG)
+    layout(dom, 560)
+    trigger(dom, 'all').click()
+    expect(panel(dom, 'all').style.top).toBe('76px') // 168 − 100 + 8
+    expect(panel(dom, 'all').style.left).toBe('250px') // 300 − 50
+  })
+
+  it('не помещается справа — сдвигается влево ровно настолько, насколько вылезает', () => {
+    const dom = page(CATALOG)
+    layout(dom, 900) // 250 + 900 = 1150 > 1000 → на 150 левее
+    trigger(dom, 'all').click()
+    expect(panel(dom, 'all').style.left).toBe('100px')
+  })
+
+  it('шире тулбара — прижимается к левому краю, а не уходит в минус', () => {
+    const dom = page(CATALOG)
+    layout(dom, 1400)
+    trigger(dom, 'all').click()
+    expect(panel(dom, 'all').style.left).toBe('0px')
+  })
+
+  it('на узком экране ставится только высота, ширину задаёт CSS', () => {
+    const original = window.matchMedia
+    window.matchMedia = ((q: string) => ({ matches: true, media: q })) as unknown as typeof window.matchMedia
+    try {
+      const dom = page(CATALOG)
+      layout(dom, 560)
+      trigger(dom, 'all').click()
+      expect(panel(dom, 'all').style.top).toBe('76px')
+      expect(panel(dom, 'all').style.left).toBe('')
+    } finally {
+      window.matchMedia = original
+    }
+  })
 
   it('клик по чипсу внутри открытой панели выбирает его и не закрывает панель', () => {
     // Регрессия v1: stopPropagation на панели глушил делегат на toolbar.
@@ -297,7 +344,7 @@ describe('фильтры v2: панели', () => {
   })
 })
 
-describe('фильтры v2: язык страницы', () => {
+describe('фильтры: язык страницы', () => {
   it('uz: пустое сообщение и подсказки цены по-узбекски', () => {
     const dom = page(CATALOG, 'uz')
     typePrice(dom, 'priceMax', '1')

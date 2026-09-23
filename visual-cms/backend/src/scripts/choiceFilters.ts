@@ -1,9 +1,14 @@
 /**
- * Фильтры секции «Выбрать» (блок «Complex choice»), версия 2.
+ * Фильтры секции «Выбрать» (блок «Complex choice»), версия 3.
  *
  * Что было не так на странице проекта:
  * - панель фильтров рисовалась под карточками планировок, а на коротком
  *   каталоге её обрезала секция (`overflow: hidden`);
+ * - панели открывались под всем тулбаром и на фиксированном left —
+ *   «оторванными» от кнопок; «Все фильтры» уезжали вправо, поля цены
+ *   в них обрезались (v3: панель ставится под своей кнопкой);
+ * - клик по чипсу в панели не срабатывал вовсе: stopPropagation на панели
+ *   глушил делегат на тулбаре;
  * - варианты не сужались: при цене «до 400 млн» оставался чипс «2», хотя
  *   двухкомнатных в этой цене нет;
  * - цена карточки сравнивалась только по минимуму, а после склейки
@@ -29,10 +34,11 @@ import {
 } from './choiceToPlanTypes'
 import {
   FILTERS_CSS,
+  FILTERS_CSS_HEAD,
   FILTERS_CSS_MARKER,
   FILTERS_JS,
+  FILTERS_JS_HEAD,
   FILTERS_JS_MARKER,
-  FILTERS_JS_V1_START,
 } from './choiceFilters.assets'
 
 /** Верхняя граница цены карточки: после склейки планировок это диапазон. */
@@ -51,30 +57,36 @@ export function hasChevron(text: string | null | undefined): boolean {
 }
 
 /**
- * Заменяет скрипт фильтров первой версии на вторую.
+ * Ставит текущую версию скрипта фильтров вместо любой прежней.
  *
  * Скрипт фильтров — последний в globalJs блока: от его заголовка до конца
- * строки. Меняем хвост целиком, а не точечными заменами: логика переписана,
- * и частичная склейка двух версий была бы хуже любой из них.
+ * строки. Меняем хвост целиком, а не точечными заменами: частичная склейка
+ * двух версий была бы хуже любой из них.
  */
 export function migrateFiltersJs(js: string, changes: string[]): string {
   if (js.includes(FILTERS_JS_MARKER)) return js
-  const start = js.indexOf(FILTERS_JS_V1_START)
+  const start = js.indexOf(FILTERS_JS_HEAD)
   if (start === -1) {
-    throw new MigrationError('В globalJs не найден скрипт фильтров первой версии — скрипт блока изменился')
+    throw new MigrationError('В globalJs не найден скрипт фильтров — скрипт блока изменился')
   }
   const tail = js.slice(start).trimEnd()
   if (!tail.endsWith('})();')) {
     throw new MigrationError('Скрипт фильтров не последний в globalJs — после него есть другой код')
   }
-  changes.push('globalJs: скрипт фильтров v2 (сужение вариантов, цена диапазоном, счётчик, пустые группы, ru/uz/en)')
+  changes.push('globalJs: скрипт фильтров v3 (панель под своей кнопкой, сужение вариантов, цена диапазоном, счётчик, ru/uz/en)')
   return js.slice(0, start) + FILTERS_JS
 }
 
+/**
+ * Ставит текущую CSS-секцию фильтров. Прежняя версия секции (она всегда в
+ * конце globalCss) заменяется до конца; если секции нет — дописывается.
+ */
 export function migrateFiltersCss(css: string, changes: string[]): string {
   if (css.includes(FILTERS_CSS_MARKER)) return css
-  changes.push('globalCss: панель поверх карточек, веса шрифта, CSS-галочка, выключенные варианты')
-  return css.trimEnd() + '\n' + FILTERS_CSS
+  const start = css.indexOf(FILTERS_CSS_HEAD)
+  const base = start === -1 ? css : css.slice(0, start)
+  changes.push('globalCss: панель под своей кнопкой и поверх карточек, «Все фильтры» в колонку, веса шрифта, CSS-галочка')
+  return base.trimEnd() + '\n' + FILTERS_CSS
 }
 
 export function migrateChoiceFilters(input: StructureNode): MigrationResult {

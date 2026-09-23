@@ -1,5 +1,6 @@
 /**
- * Единый шрифт сайта (Inter): CSS сайта + блоки и страницы со своим `--sans`.
+ * Единый шрифт сайта (Inter): CSS сайта + блоки и страницы со своим `--sans`
+ * или записью `font:` с неподключённым семейством.
  *
  * Преобразование — в `siteFont.ts` (чистое, под тестами). Здесь только
  * чтение, резервные копии и запись одной транзакцией.
@@ -21,7 +22,7 @@ import { AppDataSource } from '../config/database'
 import { Block } from '../models/Block'
 import { Page } from '../models/Page'
 import { Site } from '../models/Site'
-import { definesOtherSans, migrateSiteCss, unifySansToken } from './siteFont'
+import { migrateSiteCss, needsFontFix, unifyFonts } from './siteFont'
 import { flag, hasFlag, writeBackup } from './migrationIo'
 
 const DEFAULT_SITE_ID = '1d8d75f8-f85f-4324-9741-0e67fbf90bcc'
@@ -51,13 +52,13 @@ async function main(): Promise<void> {
     const siteCss = migrateSiteCss(site.settings?.globalCss ?? '', changes)
 
     const blocks = (await AppDataSource.getRepository(Block).find()).filter((b) =>
-      definesOtherSans(cssOf(b.structure))
+      needsFontFix(cssOf(b.structure))
     )
     const pages = (await AppDataSource.getRepository(Page).find({ where: { siteId } })).filter((p) =>
-      definesOtherSans(cssOf(p.structure))
+      needsFontFix(cssOf(p.structure))
     )
-    const blockCss = blocks.map((b) => unifySansToken(cssOf(b.structure), changes, `блок «${b.name}»`))
-    const pageCss = pages.map((p) => unifySansToken(cssOf(p.structure), changes, `страница ${p.slug}`))
+    const blockCss = blocks.map((b) => unifyFonts(cssOf(b.structure), changes, `блок «${b.name}»`))
+    const pageCss = pages.map((p) => unifyFonts(cssOf(p.structure), changes, `страница ${p.slug}`))
 
     if (changes.length === 0) {
       console.log('Уже применено — правок нет.')

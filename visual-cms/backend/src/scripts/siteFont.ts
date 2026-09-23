@@ -78,3 +78,44 @@ export function definesOtherSans(css: string | null | undefined): boolean {
   }
   return false
 }
+
+/** Семейства, которые на сайте не подключены: ссылка на них — это системный шрифт. */
+const FOREIGN_FAMILY_RE = /Urbanist|Manrope|Montserrat|Muller/i
+
+/**
+ * Сокращённая запись `font: 700 16px/1 Urbanist, Arial, sans-serif`: вес,
+ * размер, межстрочный — и семейство после них. `--sans` её не касается, так
+ * что золотая кнопка на главной рисовалась Arial.
+ *
+ * Слева — не дефис и не буква: `font-family:` и `--font:` сюда не попадают.
+ */
+const FONT_SHORTHAND_RE =
+  /((?<![-\w])font\s*:\s*[^;{}]*?\d(?:\.\d+)?(?:px|rem|em|%|pt)(?:\s*\/\s*[^\s;{}]+)?\s+)([^;{}]+)/gi
+
+/** В сокращённой записи `font:` чужое семейство меняется на var(--sans). */
+export function unifyFontShorthand(css: string, changes: string[], label: string): string {
+  let replaced = 0
+  const out = css.replace(FONT_SHORTHAND_RE, (match, head: string, family: string) => {
+    if (!FOREIGN_FAMILY_RE.test(family)) return match
+    replaced++
+    const important = /\s*!important\s*$/i.test(family) ? ' !important' : ''
+    return `${head}var(--sans)${important}`
+  })
+  if (replaced > 0) changes.push(`${label}: font: … → var(--sans) (${replaced})`)
+  return out
+}
+
+/** Есть что чинить: свой `--sans` не Inter или `font:` с неподключённым семейством. */
+export function needsFontFix(css: string | null | undefined): boolean {
+  if (typeof css !== 'string') return false
+  if (definesOtherSans(css)) return true
+  for (const match of css.matchAll(FONT_SHORTHAND_RE)) {
+    if (FOREIGN_FAMILY_RE.test(match[2])) return true
+  }
+  return false
+}
+
+/** Все правки шрифта для CSS блока или страницы. */
+export function unifyFonts(css: string, changes: string[], label: string): string {
+  return unifyFontShorthand(unifySansToken(css, changes, label), changes, label)
+}

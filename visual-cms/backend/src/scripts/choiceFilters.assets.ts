@@ -7,11 +7,17 @@
  * без сборки, как и остальной globalJs блока.
  */
 
-/** Первая строка скрипта фильтров версии 2 — по ней миграция узнаёт, что уже применена. */
-export const FILTERS_JS_MARKER = '/* Фильтры квартир (#choice), v2.'
+/**
+ * Общее начало заголовка скрипта фильтров любой версии: с него хвост globalJs
+ * заменяется целиком при обновлении.
+ */
+export const FILTERS_JS_HEAD = '/* Фильтры квартир (#choice)'
 
-/** Начало скрипта фильтров первой версии: с него хвост globalJs заменяется целиком. */
-export const FILTERS_JS_V1_START = '/* Фильтры квартир (#choice). Работают по data-атрибутам'
+/** Заголовок текущей версии — по нему миграция узнаёт, что уже применена. */
+export const FILTERS_JS_MARKER = `${FILTERS_JS_HEAD}, v3.`
+
+/** Начало скрипта первой версии (до миграций) — для тестов обновления. */
+export const FILTERS_JS_V1_START = `${FILTERS_JS_HEAD}. Работают по data-атрибутам`
 
 export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-атрибутам уже
    отрисованных карточек: разметка приходит с деплоя через _repeat, браузер
@@ -62,18 +68,49 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
     panels.forEach(function (p) { p.classList.remove('is-open'); });
   }
 
+  function panelFor(trigger) {
+    return toolbar.querySelector('.filter-panel[data-panel="' + trigger.getAttribute('data-panel') + '"]');
+  }
+
+  /* Панель открывается прямо под своей кнопкой. В первых версиях она стояла
+     под всем тулбаром (ниже его отступа и нижней границы) и на фиксированном
+     left — выглядела оторванной, а «Все фильтры» уезжали к правому краю.
+     На узком экране ширину задаёт CSS (во всю ширину тулбара), здесь — только
+     высота. */
+  var narrow = window.matchMedia ? window.matchMedia('(max-width: 760px)') : null;
+  function placePanel(trigger, panel) {
+    var box = toolbar.getBoundingClientRect();
+    var t = trigger.getBoundingClientRect();
+    panel.style.top = Math.round(t.bottom - box.top + 8) + 'px';
+    if (narrow && narrow.matches) {
+      panel.style.left = '';
+      panel.style.right = '';
+      return;
+    }
+    var left = t.left - box.left;
+    var overflow = left + panel.offsetWidth - box.width;
+    if (overflow > 0) left = Math.max(0, left - overflow);
+    panel.style.left = Math.round(left) + 'px';
+    panel.style.right = 'auto';
+  }
+
   triggers.forEach(function (trigger) {
     trigger.addEventListener('click', function (event) {
       event.stopPropagation();
-      var name = trigger.getAttribute('data-panel');
-      var panel = toolbar.querySelector('.filter-panel[data-panel="' + name + '"]');
+      var panel = panelFor(trigger);
       var wasOpen = trigger.classList.contains('is-open');
       closePanels();
       if (!wasOpen && panel) {
         trigger.classList.add('is-open');
         panel.classList.add('is-open');
+        placePanel(trigger, panel);
       }
     });
+  });
+  window.addEventListener('resize', function () {
+    var open = toolbar.querySelector('.filter-trigger.is-open');
+    var panel = open && panelFor(open);
+    if (panel) placePanel(open, panel);
   });
   /* Клик внутри панели её не закрывает. В первой версии это делал
      stopPropagation на самой панели — и заодно глушил клики по чипсам:
@@ -265,14 +302,18 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
 })();
 `
 
-/** Маркер CSS-дополнения — по нему миграция узнаёт, что уже применена. */
-export const FILTERS_CSS_MARKER = '/* ==== choice-filters v2 ===='
+/** Начало CSS-дополнения любой версии: с него хвост globalCss заменяется при обновлении. */
+export const FILTERS_CSS_HEAD = '/* ==== choice-filters'
+
+/** Маркер текущей версии — по нему миграция узнаёт, что уже применена. */
+export const FILTERS_CSS_MARKER = `${FILTERS_CSS_HEAD} v3 ====`
 
 export const FILTERS_CSS = `
 ${FILTERS_CSS_MARKER}
    Поверх исходного CSS блока (scripts/migrate-choice-filters.ts): панель
-   фильтров поверх карточек, веса под Inter, галочка вместо символа «⌄»,
-   выключенные варианты. */
+   фильтров поверх карточек и под своей кнопкой, веса под Inter, галочка
+   вместо символа «⌄», выключенные варианты. Секция должна оставаться
+   последней в globalCss: обновление заменяет её до конца. */
 
 /* Секция обрезала панель, когда после фильтра карточек оставалось мало и
    «Все фильтры» оказывались выше самой секции. */
@@ -340,5 +381,60 @@ ${FILTERS_CSS_MARKER}
 .range-box input::placeholder {
   color: rgba(21, 24, 29, .38);
   font-weight: 500;
+}
+
+/* Высоту и левый край панели ставит скрипт — прямо под её кнопкой. */
+.filter-panel,
+.filter-panel[data-panel="price"],
+.filter-panel[data-panel="all"] {
+  top: 0;
+}
+
+/* В панелях с чипсами пара кнопок — на 780 px это была пустая плашка. */
+.filter-panel[data-panel="rooms"],
+.filter-panel[data-panel="deadline"],
+.filter-panel[data-panel="windowViews"] {
+  width: min(420px, calc(100vw - 42px));
+}
+
+/* «Все фильтры» в одну колонку: в две поля цены сжимались до «от 376 5…». */
+.filter-panel[data-panel="all"] {
+  left: 0;
+  right: auto;
+  width: min(560px, calc(100vw - 42px));
+}
+
+.all-filter-grid {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+.all-filter-grid .filter-group + .filter-group {
+  margin-top: 22px;
+}
+
+@media (max-width: 760px) {
+  .filter-panel,
+  .filter-panel[data-panel="price"],
+  .filter-panel[data-panel="all"] {
+    left: 0;
+    right: 0;
+    width: auto;
+  }
+}
+
+/* На телефоне поля цены друг под другом: в два столбца подсказка
+   «от 376 511 429» обрезалась. «—» и «UZS» убираем, валюта уже есть в
+   заголовке группы. */
+@media (max-width: 560px) {
+  .range-box {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .range-box > span {
+    display: none;
+  }
 }
 `

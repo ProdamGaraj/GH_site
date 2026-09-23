@@ -1,11 +1,12 @@
 /**
- * Фильтры секции «Выбрать», версия 2: преобразование блока.
+ * Фильтры секции «Выбрать»: преобразование блока и обновление прежних версий.
  *
  * Поведение самого скрипта фильтров в браузере — в choiceFilters.runtime.test.ts.
  */
 import {
   chevronTranslationFixes,
   migrateChoiceFilters,
+  migrateFiltersCss,
   migrateFiltersJs,
   stripChevron,
 } from '../scripts/choiceFilters'
@@ -153,11 +154,52 @@ describe('migrateFiltersJs', () => {
     expect(() => migrateFiltersJs(V1_JS + '\nconsole.log(1);\n', [])).toThrow(MigrationError)
   })
 
-  it('v2 уже стоит — строка возвращается как есть', () => {
+  it('текущая версия уже стоит — строка возвращается как есть', () => {
     const js = PREFIX_JS + FILTERS_JS
     const changes: string[] = []
     expect(migrateFiltersJs(js, changes)).toBe(js)
     expect(changes).toEqual([])
+  })
+})
+
+describe('обновление с v2 (уже применённой на стенде) до текущей', () => {
+  const V2_JS = `/* Фильтры квартир (#choice), v2. Работают по data-атрибутам. */
+(function () {
+  var old = 'v2';
+})();
+`
+  const V2_CSS = `.filter-panel { display: none; }
+
+/* ==== choice-filters v2 ====
+   старая секция */
+.apartment-toolbar { z-index: 20; }
+`
+
+  it('хвост JS v2 заменяется целиком, код до него сохранён', () => {
+    const changes: string[] = []
+    const js = migrateFiltersJs(PREFIX_JS + V2_JS, changes)
+    expect(js).toBe(PREFIX_JS + FILTERS_JS)
+    expect(js).not.toContain("var old = 'v2'")
+    expect(changes).toHaveLength(1)
+  })
+
+  it('CSS-секция v2 заменяется, а не дописывается вторая', () => {
+    const changes: string[] = []
+    const css = migrateFiltersCss(V2_CSS, changes)
+    expect(css.startsWith('.filter-panel { display: none; }')).toBe(true)
+    expect(css).not.toContain('choice-filters v2')
+    expect(css.split('/* ==== choice-filters')).toHaveLength(2)
+    expect(css).toContain(FILTERS_CSS_MARKER)
+    expect(changes).toHaveLength(1)
+  })
+
+  it('весь блок с v2 обновляется, повторный запуск ничего не меняет', () => {
+    const v2 = block()
+    v2.metadata = { globalJs: PREFIX_JS + V2_JS, globalCss: V2_CSS }
+    const once = migrateChoiceFilters(v2)
+    expect(once.alreadyMigrated).toBe(false)
+    const twice = migrateChoiceFilters(once.structure)
+    expect(twice.alreadyMigrated).toBe(true)
   })
 })
 
