@@ -13,6 +13,7 @@ import {
   formatPriceFrom,
   formatApartmentsCount,
   formatFloorsRange,
+  formatEntrances,
   indexTranslations,
   PLANTYPE_TR_FIELDS,
   type PlanTypeRow,
@@ -287,5 +288,35 @@ describe('обложка и границы этажей', () => {
     const dto = buildPlanTypeDTO(planType({ floors: [] }), 'ru', EMPTY)
     expect(dto.floorMin).toBeNull()
     expect(dto.floorMax).toBeNull()
+  })
+})
+
+describe('formatEntrances — подпись, различающая зеркальные варианты', () => {
+  // У одной площади бывает семь типов: CRM отдаёт свой чертёж на каждое
+  // положение квартиры на этаже. Заголовок, площадь, цена и этажи у них
+  // совпадают, и в каталоге карточки выглядели неразличимо.
+  it('один подъезд — единственное число', () => {
+    expect(formatEntrances([1], 'ru')).toBe('подъезд 1')
+    expect(formatEntrances([3], 'uz')).toBe('kirish 3')
+    expect(formatEntrances([2], 'en')).toBe('entrance 2')
+  })
+
+  it('несколько подъездов — множественное и по возрастанию', () => {
+    expect(formatEntrances([3, 1], 'ru')).toBe('подъезды 1, 3')
+    expect(formatEntrances([2, 1], 'uz')).toBe('kirishlar 1, 2')
+  })
+
+  it('повторы схлопываются', () => {
+    expect(formatEntrances([1, 1, 3], 'ru')).toBe('подъезды 1, 3')
+  })
+
+  it('пусто — пустая строка, узел в шаблоне не рисуется', () => {
+    expect(formatEntrances([], 'ru')).toBe('')
+    expect(formatEntrances(undefined as unknown as number[], 'ru')).toBe('')
+  })
+
+  it('попадает в DTO типа планировки', () => {
+    const dto = buildPlanTypeDTO(planType({ entrances: [1, 3] }), 'ru', EMPTY)
+    expect(dto.entranceLabel).toBe('подъезды 1, 3')
   })
 })

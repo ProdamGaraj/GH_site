@@ -33,6 +33,8 @@ interface PageMetadata {
   ogImage?: string
 }
 
+import { localizeLink } from './linkLocalization'
+
 export interface ResolvedNavItem {
   label: string
   href: string
@@ -57,6 +59,15 @@ export interface GeneratePageOptions {
   direction?: string
   availableLanguages?: AvailableLanguage[]
   navigation?: ResolvedNavItem[]
+  /**
+   * Префикс языка для внутренних ссылок ('/ru', '/uz').
+   *
+   * Нужен здесь, а не только в структуре: `normalizeLinkAttributes` приводит
+   * относительные и legacy-ссылки ('index.html#top', 'commerce.html') к
+   * корневым уже при рендере — после того, как структуру локализовали. Без
+   * префикса такие пункты меню уводили из языковой версии в корень.
+   */
+  langPathPrefix?: string
   /** Общий CSS сайта (сырой) — инлайнится в <head> до стилей страницы. */
   siteCss?: string
   /** Общий JS сайта (сырой) — инлайнится перед скриптами страницы. */
@@ -92,7 +103,7 @@ export class HtmlGenerator {
     const breakpoints = styleGenerator.getBreakpoints(structure)
     const mediaPlan = resolveResponsiveMedia(structure, options.translationMap || {}, breakpoints)
 
-    const bodyContent = this.renderNode(structure, '  ', mediaPlan)
+    const bodyContent = this.renderNode(structure, '  ', mediaPlan, options.langPathPrefix)
 
     // Генерируем CSS для hover, анимаций и т.д.
     const { css: dynamicCSS, keyframes, scripts } = styleGenerator.generateNodeTreeStyles(structure)
@@ -339,7 +350,7 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
   /**
    * Некурсивно рендерит узел в HTML
    */
-  private renderNode(node: BlockNode, indent: string = '  ', mediaPlan?: MediaPlanMap): string {
+  private renderNode(node: BlockNode, indent: string = '  ', mediaPlan?: MediaPlanMap, langPathPrefix?: string): string {
     if (!node) return ''
 
     const tagName = node.tagName || 'div'
@@ -355,7 +366,7 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
         : styleProps
     const styles = this.renderStyles(stylePropsFinal)
     let attributes = this.renderAttributes(
-      this.normalizeLinkAttributes(tagName, this.normalizeMediaAttributes(tagName, node.attributes || {}))
+      this.normalizeLinkAttributes(tagName, this.normalizeMediaAttributes(tagName, node.attributes || {}), langPathPrefix)
     )
 
     // Брейкпоинтные подмены src у <video>: media-атрибут на <video><source>
@@ -403,7 +414,7 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
     
     // Дочерние элементы
     const childrenHtml = node.children?.map(child =>
-      this.renderNode(child, indent + '  ', mediaPlan)
+      this.renderNode(child, indent + '  ', mediaPlan, langPathPrefix)
     ).join('') || ''
 
     // Viewport-specific elements from variations (specificChildren)
@@ -412,7 +423,7 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
       for (const variation of Object.values(node.variations)) {
         if (variation.specificChildren) {
           specificChildrenHtml += variation.specificChildren.map(child =>
-            this.renderNode(child, indent + '  ', mediaPlan)
+            this.renderNode(child, indent + '  ', mediaPlan, langPathPrefix)
           ).join('')
         }
       }
@@ -489,7 +500,11 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
    *     ссылки отдавали 404.
    * Не трогаем: абсолютные URL (scheme:, //), якоря (#) и query (?).
    */
-  private normalizeLinkAttributes(tagName: string, attributes: Record<string, string>): Record<string, string> {
+  private normalizeLinkAttributes(
+    tagName: string,
+    attributes: Record<string, string>,
+    langPathPrefix?: string
+  ): Record<string, string> {
     if (tagName.toLowerCase() !== 'a') return attributes
     const href = attributes.href
     if (!href || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#|\?)/i.test(href)) return attributes
@@ -509,8 +524,10 @@ ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? custom
       else if (path.endsWith('/index')) path = path.slice(0, -'/index'.length) || '/'
     }
 
-    const normalized = path + suffix
-    return normalized === href ? attributes : { ...attributes, href: normalized }
+    // Префикс языка ставится уже после приведения к корневому пути:
+    // иначе 'commerce.html' превратилось бы в '/commerce' мимо языка.
+    const withLang = langPathPrefix ? localizeLink(path + suffix, langPathPrefix) : path + suffix
+    return withLang === href ? attributes : { ...attributes, href: withLang }
   }
 
   /**

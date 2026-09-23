@@ -197,11 +197,11 @@ export function applyOverlay<T extends Record<string, any>>(
 // --- Языковые производные (title / meta / price) ---
 const WORDS: Record<
   Locale,
-  { floor: string; entrance: string; numberPrefix: string; floors: string; from: string }
+  { floor: string; entrance: string; numberPrefix: string; floors: string; from: string; entrances: string }
 > = {
-  ru: { floor: 'этаж', entrance: 'подъезд', numberPrefix: '№', floors: 'этажи', from: 'от' },
-  uz: { floor: 'qavat', entrance: 'kirish', numberPrefix: '№', floors: 'qavatlar', from: 'dan' },
-  en: { floor: 'floor', entrance: 'entrance', numberPrefix: 'No.', floors: 'floors', from: 'from' },
+  ru: { floor: 'этаж', entrance: 'подъезд', numberPrefix: '№', floors: 'этажи', from: 'от', entrances: 'подъезды' },
+  uz: { floor: 'qavat', entrance: 'kirish', numberPrefix: '№', floors: 'qavatlar', from: 'dan', entrances: 'kirishlar' },
+  en: { floor: 'floor', entrance: 'entrance', numberPrefix: 'No.', floors: 'floors', from: 'from', entrances: 'entrances' },
 }
 
 /** Слово «квартира» с числом: 1 квартира, 3 квартиры, 12 квартир. */
@@ -367,6 +367,21 @@ export function formatFloorsRange(floors: number[], locale: Locale): string {
   return min === max ? `${min} ${WORDS[locale].floor}` : `${word} ${min}–${max}`
 }
 
+/**
+ * Подпись подъезда для карточки планировки.
+ *
+ * У проекта бывает по семь типов на одну площадь: CRM отдаёт отдельный чертёж
+ * на каждое положение квартиры на этаже, и зеркальные варианты в каталоге
+ * выглядели неразличимо — заголовок, площадь, цена и этажи у них совпадают.
+ * Подъезд — то, что их различает и что покупателю понятно.
+ */
+export function formatEntrances(entrances: number[], locale: Locale): string {
+  if (!Array.isArray(entrances) || entrances.length === 0) return ''
+  const unique = [...new Set(entrances)].sort((a, b) => a - b)
+  const word = unique.length === 1 ? WORDS[locale].entrance : WORDS[locale].entrances
+  return `${word} ${unique.join(', ')}`
+}
+
 // --- DTO выхода ---
 /** Подпись карты для шаблона: className уже собран из accent. */
 export interface LocationLabelDTO {
@@ -512,6 +527,8 @@ export interface PlanTypeDTO {
   priceLabel: string
   countLabel: string
   floorsLabel: string
+  /** «подъезд 1» / «подъезды 1, 3» — различает зеркальные варианты. */
+  entranceLabel: string
 
   /**
    * Срок сдачи — берётся у дома, которому принадлежит тип.
@@ -636,6 +653,7 @@ export function buildPlanTypeDTO(
     priceLabel: formatPriceFrom(p.priceMin, locale),
     countLabel: formatApartmentsCount(p.apartmentsCount, locale),
     floorsLabel: formatFloorsRange(floors, locale),
+    entranceLabel: formatEntrances(entrances, locale),
     deadline: houseDeadline,
 
     image: images[0]?.url ?? '',

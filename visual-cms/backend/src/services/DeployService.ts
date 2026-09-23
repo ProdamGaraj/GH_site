@@ -460,6 +460,7 @@ export class DeployService {
       direction: defaultLang?.direction,
       availableLanguages,
       navigation: localizeNavigation(resolvedNav, langPrefix(lang || defaultLang?.code || '')),
+      langPathPrefix: langPrefix(lang || defaultLang?.code || ''),
       ...this.siteAssetOptions(page.site),
     })
 
@@ -698,6 +699,7 @@ export class DeployService {
             direction: defLang?.direction,
             availableLanguages: pageLangSwitcher,
             navigation: localizeNavigation(resolvedNav, langPrefix(defLang?.code || '')),
+            langPathPrefix: langPrefix(defLang?.code || ''),
             analyticsPageId: page.id,
             ...this.siteAssetOptions(site),
           })
@@ -930,6 +932,7 @@ export class DeployService {
               slug: itemSlug,
               dataConfig: pageDataConfig,
               navigation: localizeNavigation(resolvedNav, langPrefix(defaultLangCode || '')),
+              langPathPrefix: langPrefix(defaultLangCode || ''),
               analyticsPageId: override.customPageId,
               ...this.siteAssetOptions(collection.site),
             })
@@ -939,6 +942,7 @@ export class DeployService {
               collection, item, itemId, itemTitle, itemSlug,
               templatePageId: templatePage.id,
               templateStructure: localizedTemplateStructure,
+              langPathPrefix: langPrefix(defaultLangCode || ''),
               templateDataConfig,
               metaTitleTpl: templatePage.metadata?.title || '',
               metaDescTpl: templatePage.metadata?.description || '',
@@ -1074,6 +1078,8 @@ export class DeployService {
     lang?: string
     direction?: string
     availableLanguages?: GeneratePageOptions['availableLanguages']
+    /** Префикс языка для ссылок внутри страницы элемента. */
+    langPathPrefix?: string
     translationMap?: TranslationMap
   }): Promise<string> {
     const { collection, item, itemId, itemTitle } = p
@@ -1119,6 +1125,7 @@ export class DeployService {
       // строит адрес из него, и без basePath кнопка RU уводила на
       // /ozmakon-business/ вместо /complex/ozmakon-business/.
       slug: `${p.collection.basePath.replace(/^\/|\/$/g, '')}/${p.itemSlug}`,
+      langPathPrefix: p.langPathPrefix,
       dataConfig: pageDataConfig,
       navigation: p.resolvedNav,
       analyticsPageId: p.templatePageId,
@@ -1231,6 +1238,7 @@ export class DeployService {
               errors: p.errors,
               site: collection.site,
               lang: lang.code,
+            langPathPrefix: langPrefix(lang.code),
               direction: lang.direction,
               availableLanguages,
               translationMap,
@@ -2660,6 +2668,7 @@ export class DeployService {
             slug: isHome ? 'index' : page.slug,
             dataConfig: localizedDataConfig,
             lang: lang.code,
+            langPathPrefix: langPrefix(lang.code),
             direction: lang.direction,
             availableLanguages,
             // Карта переводов языка — для адаптивного медиа «экран × язык» (<picture>/фон-@media).
