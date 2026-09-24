@@ -482,6 +482,14 @@ describe('CarouselRuntime — галерея внутри медиа-карто�
     expect(track.style.transform).toBe('')
   })
 
+  it('ширина трека из вёрстки сохраняется — иначе абсолютный трек и слайды схлопываются в 0', async () => {
+    await boot(galleryBody())
+    const track = document.querySelector<HTMLElement>('.gallery-track')!
+    expect(track.style.width).toBe('100%')
+    expect(track.style.height).toBe('100%')
+    for (const s of gSlides()) expect(s.style.width).toBe('100%')
+  })
+
   it('трек остаётся отдельным слоем: z-index не перебивается', async () => {
     await boot(galleryBody())
     expect(document.querySelector<HTMLElement>('.gallery-track')!.style.zIndex).toBe('0')

@@ -114,9 +114,11 @@ export function generateCarouselRuntime(): string {
     // Если вёрстка уже позиционирует слайды абсолютно (так сделан герой в дизайне),
     // не трогаем позиционирование — иначе сломаем чужой CSS. Если слайды в потоке,
     // первый оставляем в потоке (он держит габарит), остальные накладываем поверх.
+    // Ширину трека не трогаем: stacked её не задаёт, а стереть авторскую width:100%
+    // у абсолютного трека — значит схлопнуть его и все слайды в 0 (галереи холлов
+    // и двора показывали только обложку карточки, стрелки «листали» невидимое).
     function applyStackedLayout(n) {
       track.style.display = 'block';
-      track.style.width = '';
       track.style.transform = '';
       track.style.transition = '';
       var already = window.getComputedStyle(state.slides[0]).position === 'absolute';
