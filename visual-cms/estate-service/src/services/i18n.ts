@@ -41,6 +41,10 @@ export const COMPLEX_TR_FIELDS: FieldMap = {
   yardText: 'string',
   yardFeatures: 'json',
   stats: 'json',
+  // Словарь видов из окна: { "двор": "hovli", ... }. Виды приходят из CRM
+  // по-русски и одни и те же у десятков типов планировок, поэтому переводятся
+  // один раз на ЖК, а не у каждого типа. Базы (ru) у поля нет — только оверлей.
+  windowViewLabels: 'json',
 }
 export const HOUSE_TR_FIELDS: FieldMap = {
   name: 'string',
@@ -122,6 +126,8 @@ export interface ComplexRow {
   yardGallery: string[]
   /** Настройка склейки типов планировок; null — только точные совпадения. */
   planGrouping?: PlanGroupingConfig | null
+  /** Только из оверлея языка: перевод видов из окна, см. COMPLEX_TR_FIELDS. */
+  windowViewLabels?: Record<string, string> | null
 }
 
 export interface HouseRow {
@@ -652,18 +658,42 @@ export function buildApartmentDTO(
  * как есть, но заказчик может завести перевод — реестр PLANTYPE_TR_FIELDS это
  * допускает.
  */
+/**
+ * Переводит виды из окна по словарю ЖК.
+ *
+ * Значение без перевода остаётся как есть (фолбэк на ru, как у остальных
+ * полей). Два русских вида могут перевестись одинаково — повтор убирается,
+ * иначе в фильтре было бы два одинаковых чипса.
+ */
+export function translateViews(
+  views: string[],
+  labels?: Record<string, unknown> | null
+): string[] {
+  const out: string[] = []
+  for (const view of views) {
+    const label = labels && typeof labels[view] === 'string' ? (labels[view] as string).trim() : ''
+    const value = label || view
+    if (!out.includes(value)) out.push(value)
+  }
+  return out
+}
+
 export function buildPlanTypeDTO(
   planType: PlanTypeRow,
   locale: Locale,
   index: Map<string, string>,
   /** Срок сдачи дома этого типа, уже с наложенным переводом. */
-  houseDeadline = ''
+  houseDeadline = '',
+  /** Словарь видов из окна для языка страницы (оверлей ЖК). */
+  viewLabels: Record<string, unknown> | null = null
 ): PlanTypeDTO {
   const p = applyOverlay(planType, 'planType', planType.id, locale, PLANTYPE_TR_FIELDS, index)
   const images = Array.isArray(p.images) ? p.images : []
   const floors = Array.isArray(p.floors) ? p.floors : []
   const entrances = Array.isArray(p.entrances) ? p.entrances : []
-  const windowViews = Array.isArray(p.windowViews) ? p.windowViews : []
+  // Перевод конкретного типа (оверлей planType) важнее словаря ЖК: словарь
+  // ищет русские значения и переведённые не тронет.
+  const windowViews = translateViews(Array.isArray(p.windowViews) ? p.windowViews : [], viewLabels)
   const areaMin = toNumber(p.areaMin)
   const areaMax = toNumber(p.areaMax)
 
@@ -782,9 +812,18 @@ export function buildComplexDetail(
   // склейки каталог показывал до семи неотличимых плиток подряд. Правило
   // берётся из настройки ЖК — см. services/planGrouping.ts.
   const shownPlanTypes = mergePlanTypes(planTypes.filter(isShownPlanType), complex.planGrouping)
+  // Карточки и чипсы фильтра переводятся одним словарём — иначе на узбекской
+  // странице чипс «hovli» не находил бы карточек с «двор».
+  const viewLabels = c.windowViewLabels && typeof c.windowViewLabels === 'object' ? c.windowViewLabels : null
   const planTypeDTOs = sortByOrder(shownPlanTypes).map(
     (planType) =>
-      buildPlanTypeDTO(planType, locale, index, deadlineByHouseId.get(planType.houseId) ?? '')
+      buildPlanTypeDTO(
+        planType,
+        locale,
+        index,
+        deadlineByHouseId.get(planType.houseId) ?? '',
+        viewLabels
+      )
   )
 
   return {

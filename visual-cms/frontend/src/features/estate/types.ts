@@ -92,6 +92,11 @@ export interface ComplexDetail {
   translations: TranslationsByLocale
   /** Склейка типов планировок на витрине; null — только точные совпадения. */
   planGrouping?: PlanGroupingConfig | null
+  /**
+   * Виды из окна, которые есть на витрине ЖК (из CRM, по-русски). Только для
+   * чтения: по ним строится форма перевода `windowViewLabels` на вкладках uz/en.
+   */
+  windowViews?: string[]
   houses: House[]
 }
 

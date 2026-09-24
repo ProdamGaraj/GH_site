@@ -16,6 +16,7 @@ import {
   formatEntrances,
   indexTranslations,
   PLANTYPE_TR_FIELDS,
+  translateViews,
   type PlanTypeRow,
   type ComplexRow,
   type TrRow,
@@ -334,5 +335,70 @@ describe('formatEntrances — подпись, различающая зерка�
   it('попадает в DTO типа планировки', () => {
     const dto = buildPlanTypeDTO(planType({ entrances: [1, 3] }), 'ru', EMPTY)
     expect(dto.entranceLabel).toBe('подъезды 1, 3')
+  })
+})
+
+describe('виды из окна: словарь ЖК', () => {
+  // CRM отдаёт виды по-русски; на узбекской странице чипсы и карточки
+  // показывали «двор» и «бульвар» кириллицей.
+  const UZ_LABELS = { двор: 'hovli', бульвар: 'bulvar', 'двор блока-1': 'hovli' }
+  const tr = (value: unknown): TrRow => ({
+    entityType: 'complex',
+    entityId: 'c1',
+    locale: 'uz',
+    field: 'windowViewLabels',
+    value: JSON.stringify(value),
+  })
+  const plans = [
+    planType({ id: 'a', windowViews: ['двор', 'бульвар'], order: 0 }),
+    planType({ id: 'b', windowViews: ['двор блока-1', 'ТРЦ Альфраганус'], areaMin: 70, areaMax: 70, order: 1 }),
+  ]
+
+  it('translateViews: перевод по словарю, без перевода — как есть', () => {
+    expect(translateViews(['двор', 'ТРЦ'], UZ_LABELS)).toEqual(['hovli', 'ТРЦ'])
+  })
+
+  it('translateViews: одинаковые переводы не дублируются', () => {
+    expect(translateViews(['двор', 'двор блока-1'], UZ_LABELS)).toEqual(['hovli'])
+  })
+
+  it('translateViews: пустой перевод и не-строка — фолбэк на ru', () => {
+    expect(translateViews(['двор'], { двор: '  ' })).toEqual(['двор'])
+    expect(translateViews(['двор'], { двор: 5 })).toEqual(['двор'])
+    expect(translateViews(['двор'], null)).toEqual(['двор'])
+  })
+
+  it('на uz карточки и чипсы переводятся одним словарём — фильтр находит карточки', () => {
+    const dto = buildComplexDetail(baseComplex, [], [], [tr(UZ_LABELS)], 'uz', plans)
+    expect(dto.planTypes[0].windowViews).toEqual(['hovli', 'bulvar'])
+    expect(dto.planTypes[0].windowViewsAttr).toBe('hovli|bulvar')
+    expect(dto.planTypes[1].windowViewsAttr).toBe('hovli|ТРЦ Альфраганус')
+    expect(dto.planViews).toEqual(['hovli', 'bulvar', 'ТРЦ Альфраганус'])
+    for (const chip of dto.planViews) {
+      expect(dto.planTypes.some((p) => p.windowViews.includes(chip))).toBe(true)
+    }
+  })
+
+  it('на ru словарь не применяется', () => {
+    const dto = buildComplexDetail(baseComplex, [], [], [tr(UZ_LABELS)], 'ru', plans)
+    expect(dto.planViews).toEqual(['двор', 'бульвар', 'двор блока-1', 'ТРЦ Альфраганус'])
+  })
+
+  it('перевод конкретного типа важнее словаря ЖК', () => {
+    const own: TrRow = {
+      entityType: 'planType',
+      entityId: 'a',
+      locale: 'uz',
+      field: 'windowViews',
+      value: JSON.stringify(['ichki hovli']),
+    }
+    const dto = buildComplexDetail(baseComplex, [], [], [tr(UZ_LABELS), own], 'uz', plans)
+    expect(dto.planTypes[0].windowViews).toEqual(['ichki hovli'])
+  })
+
+  it('битый JSON словаря не роняет страницу', () => {
+    const broken: TrRow = { ...tr({}), value: '{не json' }
+    const dto = buildComplexDetail(baseComplex, [], [], [broken], 'uz', plans)
+    expect(dto.planTypes[0].windowViews).toEqual(['двор', 'бульвар'])
   })
 })

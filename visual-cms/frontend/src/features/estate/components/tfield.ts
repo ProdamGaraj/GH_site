@@ -23,3 +23,20 @@ export function setT<T extends { translations?: any }>(
 }
 
 export const isRu = (l: Locale) => l === 'ru'
+
+/**
+ * Словарь перевода «значение ru → перевод» (виды из окна): новая копия с одной
+ * правкой. Пустой перевод удаляет ключ — на сайте останется ru. Пустой словарь
+ * возвращается как undefined, чтобы не сохранять строку перевода «{}».
+ */
+export function setLabel(
+  labels: Record<string, string> | undefined | null,
+  key: string,
+  text: string
+): Record<string, string> | undefined {
+  const next: Record<string, string> = { ...(labels || {}) }
+  const value = text.trim()
+  if (value) next[key] = value
+  else delete next[key]
+  return Object.keys(next).length > 0 ? next : undefined
+}

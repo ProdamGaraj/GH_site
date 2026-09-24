@@ -2,8 +2,8 @@ import React, { useState } from 'react'
 import { Save } from 'lucide-react'
 import type { ComplexDetail, Locale, StatItem } from '../types'
 import { estateApi } from '../api'
-import { getT, setT, isRu } from './tfield'
-import { TextField, TextArea, NumberField, SelectField, StringListField, StatsField } from './fields'
+import { getT, setT, setLabel, isRu } from './tfield'
+import { TextField, TextArea, NumberField, SelectField, StringListField, StatsField, LabelMapField } from './fields'
 
 /** Панель редактирования полей ЖК (база ru + переводы uz/en). */
 export const ComplexForm: React.FC<{ complex: ComplexDetail; locale: Locale }> = ({ complex, locale }) => {
@@ -30,7 +30,8 @@ export const ComplexForm: React.FC<{ complex: ComplexDetail; locale: Locale }> =
       // planGrouping правится своим разделом и своей кнопкой. Форма держит
       // значение с момента загрузки страницы, и без исключения «Сохранить ЖК»
       // молча откатывал бы свежую склейку.
-      const { id, houses, planGrouping, ...rest } = form as any
+      // windowViews — вычисляемый список для формы перевода, не поле ЖК.
+      const { id, houses, planGrouping, windowViews, ...rest } = form as any
       await estateApi.updateComplex(complex.id, rest)
       setMsg('Сохранено')
     } catch (e: any) {
@@ -106,6 +107,23 @@ export const ComplexForm: React.FC<{ complex: ComplexDetail; locale: Locale }> =
       />
       <StatsField label="Параметры (stats)" value={tarr<StatItem[]>('stats')} onChange={(v) => setArr('stats', v)} />
       <TextArea label="Локация — текст" {...tprops('locationText')} />
+
+      {/* Виды из окна приходят из CRM по-русски; переводятся словарём на весь
+          ЖК, одним местом для карточек и чипсов фильтра. */}
+      {!isRu(locale) && (form.windowViews?.length ?? 0) > 0 && (
+        <LabelMapField
+          label="Виды из окна"
+          hint="перевод значений из CRM (пусто = ru)"
+          keys={form.windowViews!}
+          value={(getT(form, 'windowViewLabels', locale) as Record<string, string>) ?? {}}
+          onChange={(key, text) =>
+            setArr(
+              'windowViewLabels' as keyof ComplexDetail,
+              setLabel(getT(form, 'windowViewLabels', locale) as Record<string, string>, key, text)
+            )
+          }
+        />
+      )}
 
       {/* Медиа — языконезависимо */}
       {isRu(locale) && (

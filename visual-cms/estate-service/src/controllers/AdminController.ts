@@ -8,8 +8,9 @@ import { EstateTranslation } from '../models/EstateTranslation'
 import { PlanType } from '../models/PlanType'
 import { logger } from '../services/Logger'
 import { buildComplexAdmin, buildTranslationRows, TranslationsByLocale } from '../services/adminSerialize'
-import { PlanTypeRow, TrRow } from '../services/i18n'
+import { distinctValues, PlanTypeRow, TrRow } from '../services/i18n'
 import { previewPlanGrouping } from '../services/planGroupingPreview'
+import { isShownPlanType } from '../services/planGrouping'
 
 /**
  * Admin CRUD для Complex/House/Apartment + переводы (uz/en).
@@ -81,7 +82,23 @@ export class AdminController {
         where: { entityId: In(entityIds) },
       })) as unknown as TrRow[]
 
-      res.json(buildComplexAdmin(complex as any, houses as any, apartments as any, translations))
+      // Виды из окна, которые реально есть на витрине: по ним админка строит
+      // форму перевода (словарь windowViewLabels на вкладках uz/en).
+      const planTypes =
+        houseIds.length > 0
+          ? await AppDataSource.getRepository(PlanType).find({ where: { houseId: In(houseIds) } })
+          : []
+      const windowViews = distinctValues(
+        planTypes
+          .filter(isShownPlanType)
+          .flatMap((p) => (Array.isArray(p.windowViews) ? p.windowViews : [])),
+        (view) => view
+      ).sort((a, b) => a.localeCompare(b, 'ru'))
+
+      res.json({
+        ...buildComplexAdmin(complex as any, houses as any, apartments as any, translations),
+        windowViews,
+      })
     } catch (err) {
       logger.error('admin.getComplex failed', err instanceof Error ? err : undefined)
       res.status(500).json({ error: 'Internal error' })

@@ -200,3 +200,29 @@ export const LocaleTabs: React.FC<{
     ))}
   </div>
 )
+
+/**
+ * Перевод значений, пришедших из CRM по-русски (виды из окна): по строке на
+ * значение, слева оригинал, справа перевод. Пусто — на сайте останется ru.
+ */
+export const LabelMapField: React.FC<{
+  label: string
+  hint?: string
+  keys: string[]
+  value: Record<string, string>
+  onChange: (key: string, text: string) => void
+}> = ({ label, hint, keys, value, onChange }) => (
+  <div>
+    <Label hint={hint}>{label}</Label>
+    <div className="space-y-2">
+      {keys.map((key) => (
+        <div key={key} className="grid grid-cols-2 gap-3 items-center">
+          <span className="text-sm text-gray-600 truncate" title={key}>
+            {key}
+          </span>
+          <input className={inputCls} value={value[key] ?? ''} placeholder={key} onChange={(e) => onChange(key, e.target.value)} />
+        </div>
+      ))}
+    </div>
+  </div>
+)

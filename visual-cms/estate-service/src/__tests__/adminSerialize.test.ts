@@ -83,3 +83,19 @@ describe('buildComplexAdmin', () => {
     expect(dto.houses[0].apartments[0].translations).toEqual({ en: { offerLabel: 'Promo' } })
   })
 })
+
+describe('словарь видов из окна (windowViewLabels)', () => {
+  it('переводимое json-поле ЖК', () => {
+    expect(fieldKind('complex', 'windowViewLabels')).toBe('json')
+  })
+
+  it('сохраняется JSON-строкой и читается обратно объектом', () => {
+    const labels = { двор: 'hovli', бульвар: 'bulvar' }
+    const rows = buildTranslationRows('complex', 'c1', { uz: { windowViewLabels: labels } })
+    expect(rows).toEqual([
+      { entityType: 'complex', entityId: 'c1', locale: 'uz', field: 'windowViewLabels', value: JSON.stringify(labels) },
+    ])
+    const back = groupTranslations(rows).get('c1')!
+    expect(back.uz.windowViewLabels).toEqual(labels)
+  })
+})

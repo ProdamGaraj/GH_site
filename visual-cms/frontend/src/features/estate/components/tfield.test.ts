@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getT, setT, isRu } from './tfield'
+import { getT, setT, setLabel, isRu } from './tfield'
 
 describe('tfield getT/setT', () => {
   const form = {
@@ -40,5 +40,26 @@ describe('tfield getT/setT', () => {
   it('isRu', () => {
     expect(isRu('ru')).toBe(true)
     expect(isRu('uz')).toBe(false)
+  })
+})
+
+describe('setLabel — словарь перевода видов из окна', () => {
+  it('добавляет и меняет перевод, не мутируя исходный словарь', () => {
+    const labels = { двор: 'hovli' }
+    expect(setLabel(labels, 'бульвар', 'bulvar')).toEqual({ двор: 'hovli', бульвар: 'bulvar' })
+    expect(labels).toEqual({ двор: 'hovli' })
+  })
+
+  it('пробелы по краям срезаются', () => {
+    expect(setLabel({}, 'двор', '  hovli  ')).toEqual({ двор: 'hovli' })
+  })
+
+  it('пустой перевод удаляет ключ — на сайте останется ru', () => {
+    expect(setLabel({ двор: 'hovli', бульвар: 'bulvar' }, 'двор', '  ')).toEqual({ бульвар: 'bulvar' })
+  })
+
+  it('пустой словарь — undefined, чтобы не сохранять перевод «{}»', () => {
+    expect(setLabel({ двор: 'hovli' }, 'двор', '')).toBeUndefined()
+    expect(setLabel(undefined, 'двор', '')).toBeUndefined()
   })
 })
