@@ -469,6 +469,12 @@ export interface ComplexDetailDTO {
   aboutTitle: string
   aboutExtra: string
   aboutVideo: string
+  /**
+   * Видео «О проекте» списком 0..1: шаблон повторяет по нему <video>, и
+   * без видео плеера в разметке нет. Условий в движке шаблонов нет.
+   * Постер — картинка проекта: до запуска карточка выглядит как раньше.
+   */
+  aboutVideos: Array<{ url: string; poster: string }>
   hallTitle: string
   hallText: string
   address: string
@@ -837,6 +843,7 @@ export function buildComplexDetail(
     aboutTitle: c.aboutTitle,
     aboutExtra: c.aboutExtra,
     aboutVideo: c.aboutVideo,
+    aboutVideos: optionalOne('url', c.aboutVideo).map((v) => ({ ...v, poster: c.media || '' })),
     hallTitle: c.hallTitle,
     hallText: c.hallText,
     address: c.address,

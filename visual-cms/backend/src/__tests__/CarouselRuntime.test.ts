@@ -520,3 +520,62 @@ describe('CarouselRuntime — галерея внутри медиа-карто�
     expect(gSlides()[0].style.opacity).toBe('1')
   })
 })
+
+describe('CarouselRuntime — элементы управления по числу слайдов', () => {
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  const control = (sel: string) => document.querySelector<HTMLElement>(sel)!
+  const root = () => control('[data-carousel="true"]')
+
+  it('число слайдов пишется на корень — за него цепляется CSS вёрстки', async () => {
+    await boot(buildBody(3))
+    expect(root().getAttribute('data-carousel-count')).toBe('3')
+  })
+
+  it('один слайд — стрелки и точки спрятаны: листать нечего', async () => {
+    await boot(buildBody(1))
+    expect(root().getAttribute('data-carousel-count')).toBe('1')
+    expect(control('[data-carousel-prev]').style.display).toBe('none')
+    expect(control('[data-carousel-next]').style.display).toBe('none')
+    expect(control('[data-carousel-dots]').style.display).toBe('none')
+  })
+
+  it('нет слайдов (пустая галерея из данных) — count=0, стрелки спрятаны', async () => {
+    await boot(buildBody(0))
+    expect(root().getAttribute('data-carousel-count')).toBe('0')
+    expect(control('[data-carousel-next]').style.display).toBe('none')
+  })
+
+  it('два и больше — стрелки на месте', async () => {
+    await boot(buildBody(2))
+    expect(control('[data-carousel-prev]').style.display).toBe('')
+    expect(control('[data-carousel-next]').getAttribute('data-carousel-hidden')).toBeNull()
+  })
+
+  it('слайды пришли позже (repeater) — стрелки возвращаются с исходным inline display', async () => {
+    await boot(`
+      <div data-carousel="true" data-carousel-autoplay="0">
+        <div data-carousel-track="true"></div>
+        <button data-carousel-prev="true" style="display: flex">prev</button>
+        <button data-carousel-next="true">next</button>
+      </div>`)
+    expect(control('[data-carousel-prev]').style.display).toBe('none')
+    const track = trackEl()
+    track.innerHTML = '<div data-carousel-slide="true">a</div><div data-carousel-slide="true">b</div>'
+    await new Promise((r) => setTimeout(r, 20))
+    expect(root().getAttribute('data-carousel-count')).toBe('2')
+    expect(control('[data-carousel-prev]').style.display).toBe('flex')
+    expect(control('[data-carousel-next]').style.display).toBe('')
+  })
+
+  it('счётчик при одном слайде тоже прячется', async () => {
+    await boot(`
+      <div data-carousel="true" data-carousel-autoplay="0">
+        <div data-carousel-track="true"><div data-carousel-slide="true">a</div></div>
+        <span data-carousel-counter="true"></span>
+      </div>`)
+    expect(control('[data-carousel-counter]').style.display).toBe('none')
+  })
+})

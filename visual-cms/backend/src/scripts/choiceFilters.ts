@@ -89,7 +89,7 @@ export function migrateFiltersCss(css: string, changes: string[]): string {
   if (css.includes(FILTERS_CSS_MARKER)) return css
   const start = css.indexOf(FILTERS_CSS_HEAD)
   const base = start === -1 ? css : css.slice(0, start)
-  changes.push('globalCss: строка фильтров на десктопе, панель под кнопкой на телефоне, без линии и отступа над карточками')
+  changes.push('globalCss: строка фильтров на десктопе, панель под кнопкой на телефоне, без переключателя вида')
   return base.trimEnd() + '\n' + FILTERS_CSS
 }
 
@@ -111,6 +111,19 @@ export function removeChoiceBanner(structure: StructureNode, changes: string[]):
   })
 }
 
+/**
+ * Переключатель «Плитка / Шахматка». Шахматки не будет, а кнопки и так
+ * ничего не делали — скрипта у них не было.
+ */
+export function removeViewToggle(structure: StructureNode, changes: string[]): void {
+  walk(structure, (node) => {
+    const toggles = (node.children ?? []).filter((child) => hasClass(child, 'view-toggle'))
+    if (toggles.length === 0) return
+    node.children = node.children!.filter((child) => !toggles.includes(child))
+    changes.push('переключатель «Плитка / Шахматка» убран')
+  })
+}
+
 export function migrateChoiceFilters(input: StructureNode): MigrationResult {
   const structure: StructureNode = JSON.parse(JSON.stringify(input))
   const changes: string[] = []
@@ -126,6 +139,7 @@ export function migrateChoiceFilters(input: StructureNode): MigrationResult {
   }
 
   removeChoiceBanner(structure, changes)
+  removeViewToggle(structure, changes)
 
   const triggers = findAll(structure, (n) => hasClass(n, 'filter-trigger'))
   for (const trigger of triggers) {

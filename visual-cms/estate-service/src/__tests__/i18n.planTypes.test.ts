@@ -402,3 +402,20 @@ describe('виды из окна: словарь ЖК', () => {
     expect(dto.planTypes[0].windowViews).toEqual(['двор', 'бульвар'])
   })
 })
+
+describe('видео «О проекте»', () => {
+  it('есть видео — список из одного элемента для повтора <video>', () => {
+    const dto = buildComplexDetail(
+      { ...baseComplex, aboutVideo: ' /media/about.mp4 ', media: '/media/about.webp' },
+      [],
+      [],
+      [],
+      'ru'
+    )
+    expect(dto.aboutVideos).toEqual([{ url: '/media/about.mp4', poster: '/media/about.webp' }])
+  })
+
+  it('нет видео — пустой список, плеера в разметке не будет', () => {
+    expect(buildComplexDetail({ ...baseComplex, aboutVideo: '' }, [], [], [], 'ru').aboutVideos).toEqual([])
+  })
+})

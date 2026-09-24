@@ -34,6 +34,11 @@
  *   [data-carousel-slide-active-class]— класс активного слайда для stacked-эффектов
  *                                       (default: "is-active"); за него цепляется CSS вёрстки
  *
+ * Число слайдов runtime пишет на корень: data-carousel-count="N" — за него
+ * может цепляться CSS вёрстки (например, спрятать пустую галерею). Кнопки
+ * prev/next, точки и счётчик при N < 2 скрываются: листать нечего, а мёртвая
+ * стрелка выглядит поломкой. Появится второй слайд — вернутся.
+ *
  * Layout: track становится display:flex с width = N*100%, каждый слайд flex:0 0 100%.
  * Анимация через CSS transition на transform, либо JS scroll fallback.
  *
@@ -398,8 +403,34 @@ export function generateCarouselRuntime(): string {
     }
     function restartAutoplay() { startAutoplay(); }
 
+    // Прячет элемент управления, запомнив его собственный inline display, и
+    // возвращает ровно его: вёрстка могла задать кнопке display прямо в style.
+    function setControlShown(el, shown) {
+      if (!el) return;
+      var hiddenByUs = el.getAttribute('data-carousel-hidden') === 'true';
+      if (!shown && !hiddenByUs) {
+        el.setAttribute('data-carousel-display', el.style.display || '');
+        el.setAttribute('data-carousel-hidden', 'true');
+        el.style.display = 'none';
+      } else if (shown && hiddenByUs) {
+        el.style.display = el.getAttribute('data-carousel-display') || '';
+        el.removeAttribute('data-carousel-display');
+        el.removeAttribute('data-carousel-hidden');
+      }
+    }
+
+    function syncControls(n) {
+      root.setAttribute('data-carousel-count', String(n));
+      var many = n > 1;
+      setControlShown(prevBtn, many);
+      setControlShown(nextBtn, many);
+      setControlShown(dotsContainer, many);
+      setControlShown(counterEl, many);
+    }
+
     function rebuild() {
       state.slides = getSlides();
+      syncControls(state.slides.length);
       if (state.slides.length === 0) return;
       applyTrackLayout();
       rebuildDots();

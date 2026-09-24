@@ -171,6 +171,22 @@ describe('баннер «Оставить заявку»', () => {
   })
 })
 
+describe('переключатель «Плитка / Шахматка»', () => {
+  it('убирается вместе с кнопками, повторный запуск ничего не меняет', () => {
+    const b = block()
+    find(b, 'toolbar').children!.push({
+      id: 'toggle',
+      attributes: { class: 'view-toggle', 'aria-label': 'Вид каталога' },
+      children: [{ id: 'tile', tagName: 'button', content: 'Плитка' }, { id: 'chess', tagName: 'button', content: 'Шахматка' }],
+    })
+    const once = migrateChoiceFilters(b)
+    expect(once.changes).toContain('переключатель «Плитка / Шахматка» убран')
+    expect(() => find(once.structure, 'toggle')).toThrow()
+    expect(() => find(once.structure, 'chess')).toThrow()
+    expect(migrateChoiceFilters(once.structure).alreadyMigrated).toBe(true)
+  })
+})
+
 describe('migrateFiltersJs', () => {
   it('скрипт первой версии не найден — ошибка', () => {
     expect(() => migrateFiltersJs('var x = 1;', [])).toThrow(MigrationError)

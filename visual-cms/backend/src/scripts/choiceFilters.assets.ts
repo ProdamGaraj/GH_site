@@ -353,7 +353,7 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
 export const FILTERS_CSS_HEAD = '/* ==== choice-filters'
 
 /** Маркер текущей версии — по нему миграция узнаёт, что уже применена. */
-export const FILTERS_CSS_MARKER = `${FILTERS_CSS_HEAD} v5 ====`
+export const FILTERS_CSS_MARKER = `${FILTERS_CSS_HEAD} v6 ====`
 
 export const FILTERS_CSS = `
 ${FILTERS_CSS_MARKER}
@@ -564,19 +564,12 @@ ${FILTERS_CSS_MARKER}
   white-space: nowrap;
 }
 
-/* Строка фильтров — во всю ширину тулбара. Переключатель «Плитка / Шахматка»
-   стоит на уровне заголовка справа; колонкой рядом со строкой он отнимал у
-   неё ~200 px, и «Сбросить» уезжал на вторую строку. До 1180 px тулбар и так
-   идёт колонкой (исходный CSS блока). */
+/* Строка фильтров — во всю ширину тулбара. Переключатель «Плитка /
+   Шахматка» убран (v6): шахматки не будет, а колонкой рядом со строкой он
+   отнимал у неё ~200 px. */
 @media (min-width: 1181px) {
   .apartment-toolbar > :first-child {
     flex: 1 1 auto;
-  }
-
-  .apartment-toolbar > .view-toggle {
-    position: absolute;
-    top: 0;
-    right: 0;
   }
 }
 
