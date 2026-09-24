@@ -14,8 +14,6 @@
  * ретраев, написанный по месту, разошёлся бы с первым молча.
  */
 
-import { insecureFetch } from './macroInsecureFetch'
-
 export interface MacroHttpOptions {
   baseUrl: string
   token: string
@@ -38,14 +36,6 @@ export interface MacroHttpOptions {
   /** Стартовая пауза перед повтором, мс. Дальше удваивается. */
   retryBackoffMs?: number
   fetchImpl?: typeof fetch
-  /**
-   * Не проверять TLS-сертификат Macro.
-   *
-   * Заплатка: сертификат api.macrocrm.gh.uz истёк 25.09.2025. Отключение
-   * касается только запросов этого клиента — см. macroInsecureFetch. Явный
-   * fetchImpl (тесты) имеет приоритет и флагом не подменяется.
-   */
-  allowExpiredCertificate?: boolean
   /** Подменяется в тестах, чтобы не ждать по-настоящему. */
   sleepImpl?: (ms: number) => Promise<void>
   /** Подменяется в тестах вместе со sleepImpl, иначе паузы не отсчитываются. */
@@ -105,8 +95,7 @@ export class MacroHttp {
     this.minIntervalMs = opts.minIntervalMs ?? DEFAULT_MIN_INTERVAL_MS
     this.maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES
     this.retryBackoffMs = opts.retryBackoffMs ?? DEFAULT_RETRY_BACKOFF_MS
-    this.fetchImpl =
-      opts.fetchImpl ?? (opts.allowExpiredCertificate ? insecureFetch : fetch)
+    this.fetchImpl = opts.fetchImpl ?? fetch
     this.sleep = opts.sleepImpl ?? ((ms) => new Promise((r) => setTimeout(r, ms)))
     this.now = opts.nowImpl ?? Date.now
   }

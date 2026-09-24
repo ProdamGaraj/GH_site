@@ -64,10 +64,6 @@ services:
       # Коллекции, которые пересобрать после успешного прогона (через запятую).
       # Без них база обновится, а страницы останутся прежними до публикации.
       - MACRO_SYNC_COLLECTIONS=${MACRO_SYNC_COLLECTIONS:-}
-      # Заплатка: сертификат api.macrocrm.gh.uz истёк 25.09.2025, и без этого
-      # синк не соединяется. Отключение действует ТОЛЬКО на запросы к Macro
-      # (см. macroInsecureFetch), не на весь процесс. Убрать после продления.
-      - MACRO_INSECURE_TLS=${MACRO_INSECURE_TLS:-}
       # Куда класть картинки планировок в медиатеке.
       - MACRO_SYNC_MEDIA_SITE_ID=${MACRO_SYNC_MEDIA_SITE_ID:-}
       - MACRO_SYNC_MEDIA_FOLDER_ID=${MACRO_SYNC_MEDIA_FOLDER_ID:-}

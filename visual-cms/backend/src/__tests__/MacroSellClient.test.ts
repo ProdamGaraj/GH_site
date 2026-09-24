@@ -93,6 +93,11 @@ describe('заголовки и адрес', () => {
     await http.post('/estateSell/list', {})
     expect(calls[0].url).toBe('https://api.x/v2/estateSell/list')
   })
+
+  it('по умолчанию ходит обычным fetch — с проверкой TLS-сертификата', () => {
+    const http = new MacroHttp({ baseUrl: 'https://api.x/v2', token: 't' })
+    expect((http as any).fetchImpl).toBe(fetch)
+  })
 })
 
 describe('темп запросов', () => {
