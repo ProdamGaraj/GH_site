@@ -409,10 +409,12 @@ describe('фильтры: строка на десктопе', () => {
     expect(inlineInput(dom, 'priceMin').getAttribute('placeholder')).toBe('от 376 000 000')
   })
 
-  it('счётчик стоит перед «Сбросить» и показывает число карточек', () => {
+  it('счётчик и «Сбросить» — одна пара в конце строки, счётчик показывает число карточек', () => {
     const dom = page(CATALOG)
-    const count = dom.querySelector('.filter-main > .filter-count') as HTMLElement
+    const summary = dom.querySelector('.filter-main > .filter-summary') as HTMLElement
+    const count = summary.querySelector('.filter-count') as HTMLElement
     expect(count.nextElementSibling!.classList.contains('reset-filter')).toBe(true)
+    expect(dom.querySelector('.filter-main')!.lastElementChild).toBe(summary)
     expect(count.textContent).toBe('Найдено: 3')
     inlineChip(dom, '1').click()
     expect(count.textContent).toBe('Найдено: 2')

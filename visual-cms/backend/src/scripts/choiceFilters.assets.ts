@@ -14,7 +14,7 @@
 export const FILTERS_JS_HEAD = '/* Фильтры квартир (#choice)'
 
 /** Заголовок текущей версии — по нему миграция узнаёт, что уже применена. */
-export const FILTERS_JS_MARKER = `${FILTERS_JS_HEAD}, v4.`
+export const FILTERS_JS_MARKER = `${FILTERS_JS_HEAD}, v5.`
 
 /** Начало скрипта первой версии (до миграций) — для тестов обновления. */
 export const FILTERS_JS_V1_START = `${FILTERS_JS_HEAD}. Работают по data-атрибутам`
@@ -71,12 +71,21 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
     group.appendChild(control.cloneNode(true));
     inline.appendChild(group);
   });
+  /* Счётчик и «Сбросить» — одна пара: когда строка переносится (много
+     комнатностей + кнопка вида из окна), они уходят на новую строку вместе,
+     а не «Сбросить» в одиночку. На телефоне пара прозрачна для раскладки
+     (display: contents), и кнопка встаёт в сетку, как раньше. */
   var countLabel = null;
   if (main && inline.children.length) {
     main.insertBefore(inline, main.firstChild);
+    var summary = document.createElement('span');
+    summary.className = 'filter-summary';
+    var resetInMain = main.querySelector(':scope > .reset-filter');
+    main.insertBefore(summary, resetInMain);
     countLabel = document.createElement('span');
     countLabel.className = 'filter-count';
-    main.insertBefore(countLabel, main.querySelector(':scope > .reset-filter'));
+    summary.appendChild(countLabel);
+    if (resetInMain) summary.appendChild(resetInMain);
   }
 
   var triggers = toolbar.querySelectorAll('.filter-trigger[data-panel]');
@@ -344,7 +353,7 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
 export const FILTERS_CSS_HEAD = '/* ==== choice-filters'
 
 /** Маркер текущей версии — по нему миграция узнаёт, что уже применена. */
-export const FILTERS_CSS_MARKER = `${FILTERS_CSS_HEAD} v4 ====`
+export const FILTERS_CSS_MARKER = `${FILTERS_CSS_HEAD} v5 ====`
 
 export const FILTERS_CSS = `
 ${FILTERS_CSS_MARKER}
@@ -519,10 +528,11 @@ ${FILTERS_CSS_MARKER}
 }
 
 /* В строке поля цены стоят сами по себе, без общей рамки вокруг: рамка
-   вокруг полей с рамками выглядела двойной. */
+   вокруг полей с рамками выглядела двойной. Ширина — под самую длинную
+   подсказку: узбекское «4 789 163 414 gacha» в 170 px обрезалось. */
 .filter-inline .range-box {
   min-height: 0;
-  grid-template-columns: 170px auto 170px;
+  grid-template-columns: 190px auto 190px;
   gap: 8px;
   padding: 0;
   border: 0;
@@ -531,7 +541,8 @@ ${FILTERS_CSS_MARKER}
 
 .filter-inline .range-box input {
   min-height: 44px;
-  padding: 0 14px;
+  padding: 0 12px;
+  font-size: 15px;
   border: 1px solid rgba(21, 24, 29, .16);
   border-radius: 13px;
   background: #fff;
@@ -542,6 +553,10 @@ ${FILTERS_CSS_MARKER}
   display: none;
 }
 
+.filter-summary {
+  display: contents;
+}
+
 .filter-count {
   color: rgba(21, 24, 29, .56);
   font-size: 14px;
@@ -549,14 +564,39 @@ ${FILTERS_CSS_MARKER}
   white-space: nowrap;
 }
 
+/* Строка фильтров — во всю ширину тулбара. Переключатель «Плитка / Шахматка»
+   стоит на уровне заголовка справа; колонкой рядом со строкой он отнимал у
+   неё ~200 px, и «Сбросить» уезжал на вторую строку. До 1180 px тулбар и так
+   идёт колонкой (исходный CSS блока). */
+@media (min-width: 1181px) {
+  .apartment-toolbar > :first-child {
+    flex: 1 1 auto;
+  }
+
+  .apartment-toolbar > .view-toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+}
+
 @media (min-width: 761px) {
   .filter-inline {
     display: flex;
   }
 
+  /* Счётчик и «Сбросить» идут сразу за последним фильтром и не
+     разрываются: прижатые вправо, они повисали посреди второй строки. */
+  .filter-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    white-space: nowrap;
+  }
+
   .filter-count {
     display: inline;
-    margin-left: auto;
   }
 
   .filter-trigger[data-panel="rooms"],

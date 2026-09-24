@@ -77,7 +77,7 @@ export function migrateFiltersJs(js: string, changes: string[]): string {
   if (!tail.endsWith('})();')) {
     throw new MigrationError('Скрипт фильтров не последний в globalJs — после него есть другой код')
   }
-  changes.push('globalJs: скрипт фильтров v4 (десктоп — строкой, телефон — панель под кнопкой, сужение вариантов, цена диапазоном, счётчик, ru/uz/en)')
+  changes.push('globalJs: скрипт фильтров v5 (десктоп — строкой, телефон — панель под кнопкой, сужение вариантов, цена диапазоном, счётчик, ru/uz/en)')
   return js.slice(0, start) + FILTERS_JS
 }
 
