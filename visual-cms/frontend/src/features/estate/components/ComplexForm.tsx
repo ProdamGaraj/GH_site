@@ -133,14 +133,37 @@ export const ComplexForm: React.FC<{ complex: ComplexDetail; locale: Locale }> =
             <TextField label="Логотип" value={form.logo} onChange={(v) => setForm((f) => ({ ...f, logo: v }))} />
             <TextField label="CSS-класс логотипа" value={form.logoClass} onChange={(v) => setForm((f) => ({ ...f, logoClass: v }))} />
             <TextField label="About-медиа" value={form.media} onChange={(v) => setForm((f) => ({ ...f, media: v }))} />
-            <TextField label="About-видео" value={form.aboutVideo} onChange={(v) => setForm((f) => ({ ...f, aboutVideo: v }))} />
+            <TextField
+              label="About-видео"
+              hint="если «О проекте — слайды» пусто"
+              value={form.aboutVideo}
+              onChange={(v) => setForm((f) => ({ ...f, aboutVideo: v }))}
+            />
             <TextField label="Ссылка на карту" value={form.mapUrl} onChange={(v) => setForm((f) => ({ ...f, mapUrl: v }))} />
             <TextField label="Картинка карты" value={form.mapImage} onChange={(v) => setForm((f) => ({ ...f, mapImage: v }))} />
           </div>
           <StringListField label="Hero-изображения" value={form.heroImages} onChange={(v) => setForm((f) => ({ ...f, heroImages: v }))} />
-          <StringListField label="Галерея двора" value={form.yardGallery} onChange={(v) => setForm((f) => ({ ...f, yardGallery: v }))} />
-          <StringListField label="Галерея холлов" value={form.hallGallery} onChange={(v) => setForm((f) => ({ ...f, hallGallery: v }))} />
-          <StringListField label="Общая галерея" value={form.gallery} onChange={(v) => setForm((f) => ({ ...f, gallery: v }))} />
+          {/* Слайдеры страницы проекта: по ссылке на строку, фото или видео
+              (.mp4/.webm). Порядок строк — порядок слайдов; при одном элементе
+              навигации нет. Поведение слайдера — в редакторе CMS. */}
+          <StringListField
+            label="О проекте — слайды"
+            hint="фото и видео; пусто — About-видео, без него About-медиа"
+            value={form.gallery}
+            onChange={(v) => setForm((f) => ({ ...f, gallery: v }))}
+          />
+          <StringListField
+            label="Холлы — слайды"
+            hint="фото и видео"
+            value={form.hallGallery}
+            onChange={(v) => setForm((f) => ({ ...f, hallGallery: v }))}
+          />
+          <StringListField
+            label="Двор — слайды"
+            hint="фото и видео"
+            value={form.yardGallery}
+            onChange={(v) => setForm((f) => ({ ...f, yardGallery: v }))}
+          />
         </div>
       )}
     </div>

@@ -1,12 +1,12 @@
 /**
- * Медиа на странице проекта: преобразование блоков «О проекте», холлы, двор.
+ * Медиа на странице проекта: преобразование блоков «О проекте», холлы, двор
+ * в карусели из фото и видео (v2).
  *
- * Поведение скриптов в браузере — в complexMedia.runtime.test.ts.
+ * Поведение скрипта лайтбокса в браузере — в complexMedia.runtime.test.ts.
  */
 import {
-  ABOUT_CSS_MARKER,
-  ABOUT_JS,
-  ABOUT_JS_MARKER,
+  ABOUT_CSS_V1_MARKER,
+  ABOUT_JS_V1_MARKER,
   GALLERY_CSS_MARKER,
   LIGHTBOX_JS,
   LIGHTBOX_JS_MARKER,
@@ -27,7 +27,8 @@ function find(root: StructureNode, pred: (n: StructureNode) => boolean): Structu
 
 const btn = (cls: string): StructureNode => ({ tagName: 'button', attributes: { type: 'button', class: cls } })
 
-function aboutBlock(): StructureNode {
+/** «О проекте» в исходном виде: картинка и три нерабочие кнопки. */
+function aboutOriginal(): StructureNode {
   return {
     id: 'about',
     tagName: 'section',
@@ -44,134 +45,172 @@ function aboutBlock(): StructureNode {
   }
 }
 
-describe('«О проекте»', () => {
-  const result = migrateAboutBlock(aboutBlock())
-  const media = find(result.structure, (n) => n.attributes?.id === 'aboutMedia')!
+/** «О проекте» после v1: встроенный плеер и его скрипт/стили. */
+function aboutV1(): StructureNode {
+  const b = aboutOriginal()
+  const media = find(b, (n) => n.attributes?.id === 'aboutMedia')!
+  media.children = [
+    {
+      id: 'about-video-holder',
+      attributes: { class: 'about-video' },
+      _repeat: { source: 'item.aboutVideos' },
+      children: [{ tagName: 'video', attributes: { src: '{{$.url}}', controls: 'true' } }],
+    },
+  ]
+  b.metadata = {
+    globalJs: `${ABOUT_JS_V1_MARKER} ... */\n(function () {})();\n`,
+    globalCss: `.media-card { position: relative; }\n\n${ABOUT_CSS_V1_MARKER}\n*/\n.media-card:has(video) { aspect-ratio: 16 / 9; }\n`,
+  }
+  return b
+}
 
-  it('нерабочие стрелки и «плей» убраны', () => {
-    const classes = (media.children ?? []).map((c) => c.attributes?.class)
-    expect(classes).not.toContain('side-arrow left')
-    expect(classes).not.toContain('play-button')
-  })
+describe('«О проекте» → карусель фото и видео', () => {
+  for (const [name, make] of [['из исходного вида', aboutOriginal], ['из v1 (плеер)', aboutV1]] as const) {
+    describe(name, () => {
+      const result = migrateAboutBlock(make())
+      const media = find(result.structure, (n) => n.attributes?.id === 'aboutMedia')!
 
-  it('плеер повторяется по item.aboutVideos: без видео узла в разметке нет', () => {
-    const holder = (media.children ?? []).find((c) => c.attributes?.class === 'about-video')!
-    expect(holder._repeat).toEqual({ source: 'item.aboutVideos' })
-    const video = holder.children![0]
-    expect(video.tagName).toBe('video')
-    expect(video.elementType).toBe('video')
-    expect(video.attributes).toMatchObject({
-      src: '{{$.url}}',
-      poster: '{{$.poster}}',
-      controls: 'true',
-      muted: 'true',
-      playsinline: 'true',
-      'data-autoplay-visible': 'true',
+      it('карточка стала каруселью (fade), картинка проекта осталась фоном', () => {
+        expect(media.attributes).toMatchObject({ 'data-carousel': 'true', 'data-carousel-effect': 'fade' })
+        expect(media.styles?.properties?.['--image']).toBe('url("{{item.media}}")')
+      })
+
+      it('слайды повторяются по item.aboutSlides, у слайда фон и видео из данных', () => {
+        const track = media.children!.find((c) => c.attributes?.['data-carousel-track'] === 'true')!
+        expect(track._repeat).toEqual({ source: 'item.aboutSlides' })
+        const slide = track.children![0]
+        expect(slide.attributes).toMatchObject({ 'data-carousel-slide': 'true', 'data-slide-video': '{{$.video}}' })
+        expect(slide.styles?.properties?.backgroundImage).toBe('url("{{$.image}}")')
+      })
+
+      it('рабочие стрелки вместо декоративных, плеера и «плея» нет', () => {
+        const classes = media.children!.map((c) => c.attributes?.class)
+        expect(classes).not.toContain('play-button')
+        expect(classes).not.toContain('about-video')
+        expect(media.children!.filter((c) => c.attributes?.['data-carousel-prev'] === 'true')).toHaveLength(1)
+        expect(media.children!.filter((c) => c.attributes?.['data-carousel-next'] === 'true')).toHaveLength(1)
+        expect(find(media, (n) => n.tagName === 'video')).toBeUndefined()
+      })
+
+      it('скрипт и стили плеера v1 убраны, прочий CSS сохранён', () => {
+        expect(result.structure.metadata?.globalJs ?? '').not.toContain(ABOUT_JS_V1_MARKER)
+        const css = result.structure.metadata!.globalCss as string
+        expect(css).not.toContain(ABOUT_CSS_V1_MARKER)
+        expect(css.startsWith('.media-card { position: relative; }')).toBe(true)
+      })
+
+      it('повторный запуск ничего не меняет', () => {
+        const again = migrateAboutBlock(result.structure)
+        expect(again.alreadyMigrated).toBe(true)
+        expect(JSON.stringify(again.structure)).toBe(JSON.stringify(result.structure))
+      })
     })
-  })
-
-  it('картинка карточки (--image) не тронута', () => {
-    expect(media.styles?.properties?.['--image']).toBe('url("{{item.media}}")')
-  })
-
-  it('скрипт и стили дописаны, исходный CSS сохранён', () => {
-    expect(result.structure.metadata!.globalJs).toBe(ABOUT_JS)
-    const css = result.structure.metadata!.globalCss as string
-    expect(css.startsWith('.media-card { position: relative; }')).toBe(true)
-    expect(css).toContain(ABOUT_CSS_MARKER)
-  })
-
-  it('повторный запуск ничего не меняет', () => {
-    const again = migrateAboutBlock(result.structure)
-    expect(again.alreadyMigrated).toBe(true)
-    expect(JSON.stringify(again.structure)).toBe(JSON.stringify(result.structure))
-  })
+  }
 
   it('исходная структура не мутируется', () => {
-    const input = aboutBlock()
+    const input = aboutV1()
     const snapshot = JSON.stringify(input)
     migrateAboutBlock(input)
     expect(JSON.stringify(input)).toBe(snapshot)
   })
 
-  it('существующий скрипт блока сохраняется, новый дописывается после', () => {
-    const b = aboutBlock()
-    b.metadata!.globalJs = 'var existing = 1;'
-    const js = migrateAboutBlock(b).structure.metadata!.globalJs as string
-    expect(js.startsWith('var existing = 1;')).toBe(true)
-    expect(js).toContain(ABOUT_JS_MARKER)
-  })
-
   it('без #aboutMedia — ошибка, а не тихий пропуск', () => {
-    const b = aboutBlock()
+    const b = aboutOriginal()
     b.children = []
     expect(() => migrateAboutBlock(b)).toThrow(MigrationError)
   })
 })
 
-const OLD_LIGHTBOX = `
+const LIGHTBOX_V2 = `
 
-/* Разворот галереи-карусели в лайтбокс. Кадры и текущий индекс читаем из слайдов. */
+/* Разворот галереи-карусели в лайтбокс. v2. Кадры и текущий индекс читаем из слайдов. */
 (function () {
   var cards = document.querySelectorAll('.media-card[data-carousel="true"]');
 })();
 `
 
-function galleryBlock(): StructureNode {
+function galleryBlock(source = 'item.hallGallery'): StructureNode {
   return {
     id: 'hall',
     tagName: 'section',
-    metadata: { globalJs: OLD_LIGHTBOX, globalCss: '.gallery-row { display: grid; }\n' },
+    metadata: {
+      globalJs: LIGHTBOX_V2,
+      globalCss: '.gallery-row { display: grid; }\n\n/* ==== gallery-media v1 ====\n*/\n.media-card[data-carousel-count="0"] { display: none; }\n',
+    },
     children: [
       {
         id: 'media',
         attributes: { id: 'hallMedia', class: 'media-card gallery-media', 'data-carousel': 'true' },
-        children: [{ id: 'track', attributes: { 'data-carousel-track': 'true' }, _repeat: { source: 'item.hallGallery' } }],
+        children: [
+          {
+            id: 'track',
+            attributes: { 'data-carousel-track': 'true' },
+            _repeat: { source },
+            children: [
+              {
+                id: 'slide',
+                attributes: { class: 'gallery-slide', 'data-carousel-slide': 'true' },
+                styles: { properties: { position: 'absolute', backgroundImage: 'url("{{$}}")' } },
+              },
+            ],
+          },
+        ],
       },
     ],
   }
 }
 
-describe('галереи холлов и двора', () => {
-  const result = migrateGalleryBlock(galleryBlock(), 'Холлы')
+const HALL = { from: 'item.hallGallery', to: 'item.hallSlides' }
 
-  it('скрипт лайтбокса заменён на версию с однократной привязкой', () => {
-    const js = result.structure.metadata!.globalJs as string
-    expect(js).toContain(LIGHTBOX_JS_MARKER)
-    expect(js.trim()).toBe(LIGHTBOX_JS.trim())
-    expect(js).toContain("data-lightbox-bound")
+describe('галереи холлов и двора → фото и видео', () => {
+  const result = migrateGalleryBlock(galleryBlock(), 'Холлы', HALL)
+  const slide = find(result.structure, (n) => n.id === 'slide')!
+
+  it('слайды повторяются по новому списку, фон и видео из данных слайда', () => {
+    expect(find(result.structure, (n) => n.id === 'track')!._repeat).toEqual({ source: 'item.hallSlides' })
+    expect(slide.attributes!['data-slide-video']).toBe('{{$.video}}')
+    expect(slide.styles!.properties!.backgroundImage).toBe('url("{{$.image}}")')
+    expect(slide.styles!.properties!.position).toBe('absolute')
   })
 
-  it('CSS пустой галереи дописан один раз', () => {
+  it('лайтбокс заменён на v3: только фото, привязка один раз', () => {
+    const js = result.structure.metadata!.globalJs as string
+    expect(js.trim()).toBe(LIGHTBOX_JS.trim())
+    expect(js).toContain(LIGHTBOX_JS_MARKER)
+  })
+
+  it('CSS v1 заменён на v2, а не дописан вторым', () => {
     const css = result.structure.metadata!.globalCss as string
     expect(css.startsWith('.gallery-row { display: grid; }')).toBe(true)
-    expect(css.split(GALLERY_CSS_MARKER)).toHaveLength(2)
-    expect(css).toContain('[data-carousel-count="0"]')
-  })
-
-  it('разметка карусели не тронута: слайды и кнопки настраиваются в редакторе', () => {
-    expect(JSON.stringify(result.structure.children)).toBe(JSON.stringify(galleryBlock().children))
+    expect(css).toContain(GALLERY_CSS_MARKER)
+    expect(css.split('/* ==== gallery-media')).toHaveLength(2)
+    expect(css).toContain('.gallery-media[data-carousel-count="0"]')
+    expect(css).not.toMatch(/^\.media-card\[data-carousel-count="0"\]/m)
   })
 
   it('повторный запуск ничего не меняет', () => {
-    expect(migrateGalleryBlock(result.structure, 'Холлы').alreadyMigrated).toBe(true)
+    expect(migrateGalleryBlock(result.structure, 'Холлы', HALL).alreadyMigrated).toBe(true)
+  })
+
+  it('неожиданный источник слайдов — ошибка', () => {
+    expect(() => migrateGalleryBlock(galleryBlock('item.something'), 'Холлы', HALL)).toThrow(MigrationError)
   })
 
   it('без скрипта лайтбокса — ошибка: блок изменился', () => {
     const b = galleryBlock()
     b.metadata!.globalJs = 'var x;'
-    expect(() => migrateGalleryBlock(b, 'Холлы')).toThrow(MigrationError)
+    expect(() => migrateGalleryBlock(b, 'Холлы', HALL)).toThrow(MigrationError)
   })
 
   it('после скрипта лайтбокса чужой код — ошибка, чтобы его не отрезать', () => {
     const b = galleryBlock()
-    b.metadata!.globalJs = OLD_LIGHTBOX + '\nconsole.log(1);\n'
-    expect(() => migrateGalleryBlock(b, 'Холлы')).toThrow(MigrationError)
+    b.metadata!.globalJs = LIGHTBOX_V2 + '\nconsole.log(1);\n'
+    expect(() => migrateGalleryBlock(b, 'Холлы', HALL)).toThrow(MigrationError)
   })
 
   it('без карусели в блоке — ошибка', () => {
     const b = galleryBlock()
     b.children = []
-    expect(() => migrateGalleryBlock(b, 'Холлы')).toThrow(MigrationError)
+    expect(() => migrateGalleryBlock(b, 'Холлы', HALL)).toThrow(MigrationError)
   })
 })

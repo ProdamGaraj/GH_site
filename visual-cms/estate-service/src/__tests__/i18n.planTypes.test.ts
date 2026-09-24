@@ -403,19 +403,28 @@ describe('виды из окна: словарь ЖК', () => {
   })
 })
 
-describe('видео «О проекте»', () => {
-  it('есть видео — список из одного элемента для повтора <video>', () => {
+describe('слайды медиа-каруселей в DTO', () => {
+  it('«О проекте» без галереи — видео проекта с картинкой-постером, как раньше', () => {
     const dto = buildComplexDetail(
-      { ...baseComplex, aboutVideo: ' /media/about.mp4 ', media: '/media/about.webp' },
+      { ...baseComplex, aboutVideo: '/media/about.mp4', media: '/media/about.webp' } as ComplexRow,
       [],
       [],
       [],
       'ru'
     )
-    expect(dto.aboutVideos).toEqual([{ url: '/media/about.mp4', poster: '/media/about.webp' }])
+    expect(dto.aboutSlides).toEqual([{ url: '/media/about.mp4', image: '/media/about.webp', video: '/media/about.mp4' }])
   })
 
-  it('нет видео — пустой список, плеера в разметке не будет', () => {
-    expect(buildComplexDetail({ ...baseComplex, aboutVideo: '' }, [], [], [], 'ru').aboutVideos).toEqual([])
+  it('холлы и двор — из своих галерей, видео распознаётся по расширению', () => {
+    const dto = buildComplexDetail(
+      { ...baseComplex, hallGallery: ['/h1.webp', '/h2.mp4'], yardGallery: ['/y.webm'], media: '/m.webp' } as ComplexRow,
+      [],
+      [],
+      [],
+      'ru'
+    )
+    expect(dto.hallSlides.map((s) => s.video)).toEqual(['', '/h2.mp4'])
+    expect(dto.hallSlides[1].image).toBe('/h1.webp')
+    expect(dto.yard.slides).toEqual([{ url: '/y.webm', image: '/m.webp', video: '/y.webm' }])
   })
 })

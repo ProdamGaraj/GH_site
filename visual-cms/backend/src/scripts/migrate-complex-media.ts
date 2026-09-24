@@ -24,8 +24,16 @@ import { flag, hasFlag, writeBackup } from './migrationIo'
 /** Блоки шаблона проекта на .19. */
 const TARGETS: Array<{ id: string; label: string; migrate: (s: StructureNode) => MigrationResult }> = [
   { id: 'b9d39861-662c-455f-ba16-cf164abdf0b9', label: 'О проекте', migrate: migrateAboutBlock },
-  { id: '49a74500-eee1-4f49-aa42-d256eb0377b5', label: 'Холлы', migrate: (s) => migrateGalleryBlock(s, 'Холлы') },
-  { id: '84b308dd-0488-4d88-81f6-ac2f53cc6877', label: 'Двор', migrate: (s) => migrateGalleryBlock(s, 'Двор') },
+  {
+    id: '49a74500-eee1-4f49-aa42-d256eb0377b5',
+    label: 'Холлы',
+    migrate: (s) => migrateGalleryBlock(s, 'Холлы', { from: 'item.hallGallery', to: 'item.hallSlides' }),
+  },
+  {
+    id: '84b308dd-0488-4d88-81f6-ac2f53cc6877',
+    label: 'Двор',
+    migrate: (s) => migrateGalleryBlock(s, 'Двор', { from: 'item.yard.gallery', to: 'item.yard.slides' }),
+  },
 ]
 
 async function main(): Promise<void> {

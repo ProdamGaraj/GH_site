@@ -1,96 +1,71 @@
 /**
  * @jest-environment jsdom
  *
- * Скрипты медиаблоков страницы проекта в браузере: автозапуск видео «О проекте»
- * и однократная привязка лайтбокса галерей.
+ * Лайтбокс галерей холлов и двора (v3) в браузере: только фото, привязка к
+ * карточке один раз, на видеослайде не открывается.
  */
-import { ABOUT_JS, LIGHTBOX_JS } from '../scripts/complexMedia'
+import { LIGHTBOX_JS } from '../scripts/complexMedia'
 
-const run = (js: string) => new Function(js)()
+const run = () => new Function(LIGHTBOX_JS)()
 
 afterEach(() => {
   document.body.innerHTML = ''
   delete (window as any).ghLightbox
-  delete (window as any).IntersectionObserver
 })
 
-describe('видео «О проекте»', () => {
-  function mountVideo(): HTMLVideoElement {
-    document.body.innerHTML = '<div id="aboutMedia"><video data-autoplay-visible="true" src="/a.mp4"></video></div>'
-    const video = document.querySelector('video') as HTMLVideoElement
-    video.play = jest.fn().mockResolvedValue(undefined)
-    video.pause = jest.fn()
-    return video
-  }
+function mount(slides: string, withExpand = true): jest.Mock {
+  document.body.innerHTML = `
+    <div class="media-card" data-carousel="true" id="hallMedia">
+      <div data-carousel-track="true">${slides}</div>
+      ${withExpand ? '<button class="expand-button">⛶</button>' : ''}
+      <button class="side-arrow right" data-carousel-next="true">›</button>
+    </div>`
+  const open = jest.fn()
+  ;(window as any).ghLightbox = { open }
+  return open
+}
 
-  it('играет, когда карточка на экране, и встаёт на паузу, когда уходит', () => {
-    const video = mountVideo()
-    let callback: (entries: Array<{ isIntersecting: boolean }>) => void = () => {}
-    ;(window as any).IntersectionObserver = class {
-      constructor(cb: typeof callback) {
-        callback = cb
-      }
-      observe() {}
-    }
-    run(ABOUT_JS)
-    expect(video.muted).toBe(true)
-    callback([{ isIntersecting: true }])
-    expect(video.play).toHaveBeenCalledTimes(1)
-    callback([{ isIntersecting: false }])
-    expect(video.pause).toHaveBeenCalledTimes(1)
-  })
+const photo = (url: string, active = false) =>
+  `<div data-carousel-slide="true" data-slide-video="" class="${active ? 'is-active' : ''}" style="background-image: url('${url}')"></div>`
+const video = (url: string, poster: string, active = false) =>
+  `<div data-carousel-slide="true" data-slide-video="${url}" class="${active ? 'is-active' : ''}" style="background-image: url('${poster}')"></div>`
 
-  it('без IntersectionObserver просто запускается', () => {
-    const video = mountVideo()
-    run(ABOUT_JS)
-    expect(video.play).toHaveBeenCalledTimes(1)
-  })
+const expand = () => (document.querySelector('.expand-button') as HTMLButtonElement).click()
 
-  it('отказ браузера в автозапуске не роняет страницу', () => {
-    const video = mountVideo()
-    video.play = jest.fn().mockRejectedValue(new Error('NotAllowedError'))
-    expect(() => run(ABOUT_JS)).not.toThrow()
-  })
-
-  it('видео без data-autoplay-visible не трогается — поведение выключается в редакторе', () => {
-    document.body.innerHTML = '<video src="/a.mp4"></video>'
-    const video = document.querySelector('video') as HTMLVideoElement
-    video.play = jest.fn()
-    run(ABOUT_JS)
-    expect(video.play).not.toHaveBeenCalled()
-  })
+it('две копии скрипта (холлы и двор) — клик открывает лайтбокс один раз', () => {
+  const open = mount(photo('/a.webp') + photo('/b.webp', true))
+  run()
+  run()
+  expand()
+  expect(open).toHaveBeenCalledTimes(1)
+  expect(open).toHaveBeenCalledWith(['/a.webp', '/b.webp'], 1)
 })
 
-describe('лайтбокс галерей', () => {
-  function mountGallery(): void {
-    document.body.innerHTML = `
-      <div class="media-card" data-carousel="true" id="hallMedia">
-        <div data-carousel-track="true">
-          <div data-carousel-slide="true" style="background-image: url('/a.webp')"></div>
-          <div data-carousel-slide="true" class="is-active" style="background-image: url('/b.webp')"></div>
-        </div>
-        <button class="expand-button">⛶</button>
-        <button class="side-arrow right" data-carousel-next="true">›</button>
-      </div>`
-  }
+it('в лайтбокс идут только фото, индекс — среди фото', () => {
+  const open = mount(video('/v.mp4', '/a.webp') + photo('/a.webp') + photo('/b.webp', true))
+  run()
+  expand()
+  expect(open).toHaveBeenCalledWith(['/a.webp', '/b.webp'], 1)
+})
 
-  it('две копии скрипта (холлы и двор) — клик открывает лайтбокс один раз', () => {
-    mountGallery()
-    const open = jest.fn()
-    ;(window as any).ghLightbox = { open }
-    run(LIGHTBOX_JS)
-    run(LIGHTBOX_JS)
-    ;(document.querySelector('.expand-button') as HTMLButtonElement).click()
-    expect(open).toHaveBeenCalledTimes(1)
-    expect(open).toHaveBeenCalledWith(['/a.webp', '/b.webp'], 1)
-  })
+it('на видеослайде лайтбокс не открывается', () => {
+  const open = mount(video('/v.mp4', '/a.webp', true) + photo('/a.webp'))
+  run()
+  expand()
+  expect(open).not.toHaveBeenCalled()
+})
 
-  it('стрелка листает карусель и лайтбокс не открывает', () => {
-    mountGallery()
-    const open = jest.fn()
-    ;(window as any).ghLightbox = { open }
-    run(LIGHTBOX_JS)
-    ;(document.querySelector('.side-arrow') as HTMLButtonElement).click()
-    expect(open).not.toHaveBeenCalled()
-  })
+it('стрелка листает карусель и лайтбокс не открывает', () => {
+  const open = mount(photo('/a.webp', true) + photo('/b.webp'))
+  run()
+  ;(document.querySelector('.side-arrow') as HTMLButtonElement).click()
+  expect(open).not.toHaveBeenCalled()
+})
+
+it('карточка без кнопки «развернуть» («О проекте») не привязывается', () => {
+  const open = mount(photo('/a.webp', true), false)
+  run()
+  ;(document.querySelector('.media-card') as HTMLElement).click()
+  expect(open).not.toHaveBeenCalled()
+  expect(document.querySelector('.media-card')!.hasAttribute('data-lightbox-bound')).toBe(false)
 })

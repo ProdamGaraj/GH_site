@@ -31,8 +31,8 @@
  *                                       Неизвестное значение трактуется как "slide".
  *   [data-carousel-duration]          — длительность перехода, мс (по умолчанию зависит
  *                                       от эффекта: 500 для сдвига, 600 для наплыва, 0 для none)
- *   [data-carousel-slide-active-class]— класс активного слайда для stacked-эффектов
- *                                       (default: "is-active"); за него цепляется CSS вёрстки
+ *   [data-carousel-slide-active-class]— класс активного слайда (default: "is-active"),
+ *                                       при любом эффекте; за него цепляется CSS вёрстки
  *
  * Число слайдов runtime пишет на корень: data-carousel-count="N" — за него
  * может цепляться CSS вёрстки (например, спрятать пустую галерею). Кнопки
@@ -344,6 +344,12 @@ export function generateCarouselRuntime(): string {
         // translate в процентах от track (track имеет width/height = n*100%)
         var pct = -(state.index * (100 / n));
         track.style.transform = (vertical ? 'translateY(' : 'translateX(') + pct + '%)';
+        // Класс активного слайда нужен и при сдвиге: по нему скрипты вёрстки
+        // (лайтбокс галереи) и CSS находят текущий кадр. Раньше его ставил
+        // только renderStacked, и смена эффекта в редакторе их ломала.
+        for (var ai = 0; ai < n; ai++) {
+          state.slides[ai].classList.toggle(slideActiveClass, ai === state.index);
+        }
       }
       for (var i = 0; i < state.dots.length; i++) {
         var dot = state.dots[i];

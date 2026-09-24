@@ -579,3 +579,17 @@ describe('CarouselRuntime — элементы управления по чис�
     expect(control('[data-carousel-counter]').style.display).toBe('none')
   })
 })
+
+describe('CarouselRuntime — класс активного слайда при сдвиге', () => {
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('эффект slide тоже ставит is-active активному слайду — по нему лайтбокс находит кадр', async () => {
+    await boot(buildBody(3))
+    const slides = () => Array.from(document.querySelectorAll<HTMLElement>('[data-carousel-slide="true"]'))
+    expect(slides().map((s) => s.classList.contains('is-active'))).toEqual([true, false, false])
+    document.querySelector<HTMLElement>('[data-carousel-next]')!.click()
+    expect(slides().map((s) => s.classList.contains('is-active'))).toEqual([false, true, false])
+  })
+})

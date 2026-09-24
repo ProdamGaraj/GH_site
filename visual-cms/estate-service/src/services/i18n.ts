@@ -9,6 +9,7 @@
  */
 
 import { isShownPlanType, mergePlanTypes, PlanGroupingConfig } from './planGrouping'
+import { aboutSlides, MediaSlide, toSlides } from './mediaSlides'
 
 export type Locale = 'ru' | 'uz' | 'en'
 export const DEFAULT_LOCALE: Locale = 'ru'
@@ -469,12 +470,6 @@ export interface ComplexDetailDTO {
   aboutTitle: string
   aboutExtra: string
   aboutVideo: string
-  /**
-   * Видео «О проекте» списком 0..1: шаблон повторяет по нему <video>, и
-   * без видео плеера в разметке нет. Условий в движке шаблонов нет.
-   * Постер — картинка проекта: до запуска карточка выглядит как раньше.
-   */
-  aboutVideos: Array<{ url: string; poster: string }>
   hallTitle: string
   hallText: string
   address: string
@@ -492,12 +487,19 @@ export interface ComplexDetailDTO {
   heroImages: string[]
   gallery: string[]
   hallGallery: string[]
+  /**
+   * Слайды медиа-каруселей (фото и видео, см. services/mediaSlides.ts).
+   * Шаблон повторяет по ним слайд: фон — image, data-slide-video — video.
+   */
+  aboutSlides: MediaSlide[]
+  hallSlides: MediaSlide[]
   yard: {
     eyebrow: string
     title: string
     text: string
     features: string[]
     gallery: string[]
+    slides: MediaSlide[]
   }
   stats: Array<{ value: string; label: string }>
   houses: HouseDTO[]
@@ -843,7 +845,6 @@ export function buildComplexDetail(
     aboutTitle: c.aboutTitle,
     aboutExtra: c.aboutExtra,
     aboutVideo: c.aboutVideo,
-    aboutVideos: optionalOne('url', c.aboutVideo).map((v) => ({ ...v, poster: c.media || '' })),
     hallTitle: c.hallTitle,
     hallText: c.hallText,
     address: c.address,
@@ -860,12 +861,15 @@ export function buildComplexDetail(
     heroImages: Array.isArray(c.heroImages) ? c.heroImages : [],
     gallery: Array.isArray(c.gallery) ? c.gallery : [],
     hallGallery: Array.isArray(c.hallGallery) ? c.hallGallery : [],
+    aboutSlides: aboutSlides(c),
+    hallSlides: toSlides(c.hallGallery, c.media),
     yard: {
       eyebrow: c.yardEyebrow,
       title: c.yardTitle,
       text: c.yardText,
       features: Array.isArray(c.yardFeatures) ? c.yardFeatures : [],
       gallery: Array.isArray(c.yardGallery) ? c.yardGallery : [],
+      slides: toSlides(c.yardGallery, c.media),
     },
     stats: Array.isArray(c.stats) ? c.stats : [],
     houses: houseDTOs,
