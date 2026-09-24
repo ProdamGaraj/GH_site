@@ -7,7 +7,8 @@
  *
  * Флаги:
  *   --dry-run        показать правки, ничего не писать
- *   --dark=<url>     картинка тёмного логотипа (по умолчанию golden-house-logo-black)
+ *   --light=<url>    логотип при белом тексте (по умолчанию «GH logo белый желтый в две строки»)
+ *   --dark=<url>     логотип при тёмном тексте (по умолчанию «GH logo черный в две строки (без полей)»)
  *   --out=<dir>      куда положить резервную копию
  *
  * Шапка — на всех страницах: после записи нужен передеплой сайта и коллекций.
@@ -21,12 +22,18 @@ import { flag, hasFlag, writeBackup } from './migrationIo'
 
 /** Блок «Navigation» на .19. */
 const NAV_BLOCK_ID = '3d23aed7-be04-4ed7-934f-f0281b9c4670'
-/** golden-house-logo-black.png из медиатеки. */
-const DEFAULT_DARK_LOGO = '/media/ac0b2bef-1f84-4e9b-9316-f17d1e0ec785.png'
+/** Медиатека .19, папка «Логотипы»: белый текст с жёлтым знаком. */
+const DEFAULT_LIGHT_LOGO = '/media/762e0b48-40f3-4a61-aa9c-b7dde371b1a4.png'
+/**
+ * Там же: чёрный текст с жёлтым знаком — копия исходника без прозрачной каймы
+ * (у исходника поля, и в общей рамке он выходил мельче светлого).
+ */
+const DEFAULT_DARK_LOGO = '/media/d3505e4a-f939-4941-8416-ef6069df4f29.png'
 
 async function main(): Promise<void> {
   const dryRun = hasFlag('dry-run')
   const outDir = flag('out') ?? '/app/backups'
+  const lightSrc = flag('light') ?? DEFAULT_LIGHT_LOGO
   const darkSrc = flag('dark') ?? DEFAULT_DARK_LOGO
 
   await AppDataSource.initialize()
@@ -34,7 +41,7 @@ async function main(): Promise<void> {
     const repo = AppDataSource.getRepository(Block)
     const block = await repo.findOne({ where: { id: NAV_BLOCK_ID } })
     if (!block) throw new MigrationError(`Блок «Navigation» (${NAV_BLOCK_ID}) не найден`)
-    const result = migrateNavLogoTheme(block.structure as unknown as StructureNode, darkSrc)
+    const result = migrateNavLogoTheme(block.structure as unknown as StructureNode, { lightSrc, darkSrc })
     console.log(`Блок «${block.name}»: ${result.alreadyMigrated ? 'уже применено' : ''}`)
     for (const change of result.changes) console.log(`  · ${change}`)
     if (result.alreadyMigrated) return

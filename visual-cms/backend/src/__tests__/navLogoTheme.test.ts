@@ -1,13 +1,16 @@
 /**
  * @jest-environment jsdom
  *
- * Логотип шапки под цвет её текста: две картинки в .glogo, CSS блока
- * показывает нужную по классу темы на .gnav (его ставит syncLogoContrast).
+ * Логотип шапки под цвет её текста: две картинки в .glogo, наложенные одна на
+ * другую; CSS блока показывает нужную прозрачностью по классу темы на .gnav
+ * (его ставит syncLogoContrast).
  */
 import { MigrationError, StructureNode, incompleteNodes } from '../scripts/choiceToPlanTypes'
 import { LOGO_DARK_CLASS, LOGO_LIGHT_CLASS, NAV_LOGO_CSS, NAV_LOGO_CSS_MARKER, migrateNavLogoTheme } from '../scripts/navLogoTheme'
 
-const DARK = '/media/black.png'
+const LIGHT = '/media/white-yellow.png'
+const DARK = '/media/black-yellow.png'
+const SOURCES = { lightSrc: LIGHT, darkSrc: DARK }
 
 function nav(): StructureNode {
   return {
@@ -34,7 +37,7 @@ function nav(): StructureNode {
   }
 }
 
-const logoImages = (root: StructureNode) => {
+function logoImages(root: StructureNode): StructureNode[] {
   const stack = [root]
   while (stack.length) {
     const n = stack.pop()!
@@ -44,14 +47,28 @@ const logoImages = (root: StructureNode) => {
   throw new Error('no .glogo')
 }
 
+/** Блок после первой версии: тёмный логотип виден через display, у картинки — alt-дубль. */
+function navV1(): StructureNode {
+  const v1 = nav()
+  const link = logoImages(v1)
+  link[0].attributes = { ...link[0].attributes, class: LOGO_LIGHT_CLASS }
+  link.push({ id: 'logo-dark', tagName: 'img', elementType: 'image', attributes: { alt: 'Golden House', src: '/media/black.png', class: LOGO_DARK_CLASS }, children: [], styles: { properties: {} }, metadata: {} })
+  v1.metadata!.globalCss += '\n/* ==== nav-logo-theme v1 ====\n*/\n.glogo .glogo-dark { display: none; }\n'
+  return v1
+}
+
 describe('migrateNavLogoTheme — структура', () => {
-  const result = migrateNavLogoTheme(nav(), DARK)
+  const result = migrateNavLogoTheme(nav(), SOURCES)
   const [light, dark] = logoImages(result.structure)
 
-  it('текущий логотип — для белого текста, рядом тёмный с той же подписью', () => {
-    expect(light.attributes).toMatchObject({ src: '/media/white.png', class: LOGO_LIGHT_CLASS })
-    expect(dark.attributes).toEqual({ alt: 'Golden House', src: DARK, class: LOGO_DARK_CLASS })
+  it('светлый логотип — присланный, с подписью; рядом тёмный', () => {
+    expect(light.attributes).toEqual({ alt: 'Golden House', src: LIGHT, class: LOGO_LIGHT_CLASS })
     expect(dark.tagName).toBe('img')
+    expect(dark.attributes).toMatchObject({ src: DARK, class: LOGO_DARK_CLASS })
+  })
+
+  it('тёмный — дубль для глаз: пустой alt и aria-hidden, название не читается дважды', () => {
+    expect(dark.attributes).toMatchObject({ alt: '', 'aria-hidden': 'true' })
   })
 
   it('новая картинка — полный узел: иначе редактор CMS падает на открытии', () => {
@@ -64,30 +81,40 @@ describe('migrateNavLogoTheme — структура', () => {
     expect(css.trimEnd().endsWith(NAV_LOGO_CSS.trimEnd())).toBe(true)
   })
 
+  it('без lightSrc светлый логотип остаётся прежним', () => {
+    const [keep] = logoImages(migrateNavLogoTheme(nav(), { darkSrc: DARK }).structure)
+    expect(keep.attributes!.src).toBe('/media/white.png')
+  })
+
   it('повторный запуск ничего не меняет, вход не мутируется', () => {
-    expect(migrateNavLogoTheme(result.structure, DARK).alreadyMigrated).toBe(true)
+    expect(migrateNavLogoTheme(result.structure, SOURCES).alreadyMigrated).toBe(true)
     const input = nav()
     const snapshot = JSON.stringify(input)
-    migrateNavLogoTheme(input, DARK)
+    migrateNavLogoTheme(input, SOURCES)
     expect(JSON.stringify(input)).toBe(snapshot)
   })
 
-  it('старая версия секции заменяется, а не дописывается второй', () => {
-    const old = migrateNavLogoTheme(nav(), DARK).structure
-    old.metadata!.globalCss = (old.metadata!.globalCss as string).replace(NAV_LOGO_CSS_MARKER, '/* ==== nav-logo-theme v0 ====')
-    const css = migrateNavLogoTheme(old, DARK).structure.metadata!.globalCss as string
+  it('с v1: картинки меняются на присланные, тёмная скрыта от диктора, CSS v1 заменён на v2', () => {
+    const upgraded = migrateNavLogoTheme(navV1(), SOURCES)
+    const images = logoImages(upgraded.structure)
+    expect(images).toHaveLength(2)
+    expect(images[0].attributes!.src).toBe(LIGHT)
+    expect(images[1].attributes).toMatchObject({ src: DARK, alt: '', 'aria-hidden': 'true' })
+    const css = upgraded.structure.metadata!.globalCss as string
     expect(css.split('/* ==== nav-logo-theme')).toHaveLength(2)
     expect(css).toContain(NAV_LOGO_CSS_MARKER)
+    expect(css).not.toContain('display: none')
   })
 
   it('без .glogo, без картинки или без тёмного логотипа — ошибка', () => {
     const noLink = nav()
     noLink.children![0].children = []
-    expect(() => migrateNavLogoTheme(noLink, DARK)).toThrow(MigrationError)
+    expect(() => migrateNavLogoTheme(noLink, SOURCES)).toThrow(MigrationError)
     const noImg = nav()
     logoImages(noImg).length = 0
-    expect(() => migrateNavLogoTheme(noImg, DARK)).toThrow(MigrationError)
-    expect(() => migrateNavLogoTheme(nav(), ' ')).toThrow(MigrationError)
+    expect(() => migrateNavLogoTheme(noImg, SOURCES)).toThrow(MigrationError)
+    expect(() => migrateNavLogoTheme(nav(), { darkSrc: ' ' })).toThrow(MigrationError)
+    expect(() => migrateNavLogoTheme(nav(), { lightSrc: '', darkSrc: DARK })).toThrow(MigrationError)
   })
 })
 
@@ -103,19 +130,26 @@ describe('CSS логотипа в браузере', () => {
       <nav class="gnav ${theme}">
         <a class="glogo"><img class="${LOGO_LIGHT_CLASS}" src="/w.png"><img class="${LOGO_DARK_CLASS}" src="/b.png"></a>
       </nav>`
-    const shown = (cls: string) => getComputedStyle(document.querySelector(`.${cls}`)!).display !== 'none'
-    return { light: shown(LOGO_LIGHT_CLASS), dark: shown(LOGO_DARK_CLASS) }
+    const opacity = (cls: string) => getComputedStyle(document.querySelector(`.${cls}`)!).opacity || '1'
+    return { light: opacity(LOGO_LIGHT_CLASS), dark: opacity(LOGO_DARK_CLASS) }
   }
 
-  it('белый текст (logo-light) — белый логотип', () => {
-    expect(mount('logo-light')).toEqual({ light: true, dark: false })
+  it('белый текст (logo-light) — виден светлый логотип', () => {
+    expect(mount('logo-light')).toEqual({ light: '1', dark: '0' })
   })
 
-  it('тёмный текст (logo-dark) — тёмный логотип', () => {
-    expect(mount('logo-dark')).toEqual({ light: false, dark: true })
+  it('тёмный текст (logo-dark) — виден тёмный логотип', () => {
+    expect(mount('logo-dark')).toEqual({ light: '0', dark: '1' })
   })
 
-  it('до первого срабатывания скрипта — белый, как было', () => {
-    expect(mount('')).toEqual({ light: true, dark: false })
+  it('до первого срабатывания скрипта — светлый, как было', () => {
+    expect(mount('')).toEqual({ light: '1', dark: '0' })
+  })
+
+  it('тёмный наложен на светлый и не перехватывает клик по ссылке', () => {
+    mount('logo-light')
+    const dark = getComputedStyle(document.querySelector(`.${LOGO_DARK_CLASS}`)!)
+    expect(dark.position).toBe('absolute')
+    expect(dark.pointerEvents).toBe('none')
   })
 })
