@@ -9,7 +9,7 @@
  */
 
 import { isShownPlanType, mergePlanTypes, PlanGroupingConfig } from './planGrouping'
-import { aboutSlides, MediaSlide, toSlides } from './mediaSlides'
+import { aboutSlides, GalleryItem, galleryUrls, MediaSlide, toSlides } from './mediaSlides'
 
 export type Locale = 'ru' | 'uz' | 'en'
 export const DEFAULT_LOCALE: Locale = 'ru'
@@ -122,9 +122,9 @@ export interface ComplexRow {
   mapImage: string
   panoramaUrl: string
   heroImages: string[]
-  gallery: string[]
-  hallGallery: string[]
-  yardGallery: string[]
+  gallery: GalleryItem[]
+  hallGallery: GalleryItem[]
+  yardGallery: GalleryItem[]
   /** Настройка склейки типов планировок; null — только точные совпадения. */
   planGrouping?: PlanGroupingConfig | null
   /** Только из оверлея языка: перевод видов из окна, см. COMPLEX_TR_FIELDS. */
@@ -859,8 +859,9 @@ export function buildComplexDetail(
     logoClass: c.logoClass,
     media: c.media,
     heroImages: Array.isArray(c.heroImages) ? c.heroImages : [],
-    gallery: Array.isArray(c.gallery) ? c.gallery : [],
-    hallGallery: Array.isArray(c.hallGallery) ? c.hallGallery : [],
+    // Списки ссылок — как раньше; кадрирование живёт только в *Slides.
+    gallery: galleryUrls(c.gallery),
+    hallGallery: galleryUrls(c.hallGallery),
     aboutSlides: aboutSlides(c),
     hallSlides: toSlides(c.hallGallery, c.media),
     yard: {
@@ -868,7 +869,7 @@ export function buildComplexDetail(
       title: c.yardTitle,
       text: c.yardText,
       features: Array.isArray(c.yardFeatures) ? c.yardFeatures : [],
-      gallery: Array.isArray(c.yardGallery) ? c.yardGallery : [],
+      gallery: galleryUrls(c.yardGallery),
       slides: toSlides(c.yardGallery, c.media),
     },
     stats: Array.isArray(c.stats) ? c.stats : [],

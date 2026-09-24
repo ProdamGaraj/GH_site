@@ -7,16 +7,19 @@
  *   холлов и двора — карусели только из фото, пустая галерея показывала
  *   серую карточку с мёртвыми кнопками, лайтбокс вешался дважды;
  * - v1: «О проекте» — встроенный <video controls>; пустые галереи прячутся;
- * - v2 (сейчас): все три — карусели из фото и видео. Видеослайд — это
+ * - v2: все три — карусели из фото и видео. Видеослайд — это
  *   `data-slide-video` у слайда: рантайм карусели сам создаёт <video> без
  *   интерфейса плеера (без звука, по кругу, играет только активный слайд).
  *   Стрелки листают; при одном слайде рантайм их прячет, и слайдер выглядит
  *   как просто фото или видео. Автолистание, эффект, кнопки — в панели
- *   карусели редактора CMS.
+ *   карусели редактора CMS;
+ * - v3 (сейчас): кадрирование слайда из админки ЖК. Точка фокуса — это
+ *   background-position слайда (видео рантайм выравнивает по ней же), режим
+ *   «целиком» — data-slide-fit="contain": кадр полностью на размытой подложке.
  *
  * Слайды приходят из estate DTO: item.aboutSlides, item.hallSlides,
- * item.yard.slides — объекты {url, image, video} (estate-service,
- * services/mediaSlides.ts).
+ * item.yard.slides — объекты {url, image, video, position, fit}
+ * (estate-service, services/mediaSlides.ts).
  *
  * Здесь только чистое преобразование структур блоков: запись в базу — в
  * `migrate-complex-media.ts`. Все правки идемпотентны.
@@ -24,6 +27,51 @@
 import { MigrationError, MigrationResult, StructureNode, findOne, hasClass, makeNode } from './choiceToPlanTypes'
 
 // --- Общие детали карусели ---
+
+/** Привязки кадрирования у шаблона слайда (v3). */
+const FRAMING_ATTRIBUTES = { 'data-slide-fit': '{{$.fit}}' }
+const FRAMING_PROPERTIES = {
+  backgroundPosition: '{{$.position}}',
+  /* Целый кадр в режиме «целиком» рисует CSS блока из этой переменной. */
+  '--slide-image': 'url("{{$.image}}")',
+}
+
+/**
+ * Правила режима «целиком» — одним текстом во всех трёх блоках: CSS блоков
+ * собирается на страницу общим, но блок не должен зависеть от соседа.
+ */
+const SLIDE_FRAMING_RULES = `/* Кадрирование слайда из данных ЖК (estate: position, fit). Фокус —
+   background-position слайда; object-position видео по нему ставит рантайм.
+   «Целиком» (data-slide-fit="contain") — кадр полностью на размытой копии
+   себя: ::before (размытая копия) перекрывает собственный фон слайда, ::after
+   рисует целый кадр из --slide-image. У видеослайда ::after не нужен: видео
+   вписывает рантайм, а постер поверх закрыл бы его. */
+.media-card [data-carousel-slide][data-slide-fit="contain"] {
+  overflow: hidden;
+}
+
+.media-card [data-carousel-slide][data-slide-fit="contain"]::before,
+.media-card [data-carousel-slide][data-slide-fit="contain"]::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+
+.media-card [data-carousel-slide][data-slide-fit="contain"]::before {
+  inset: -24px;
+  background: var(--slide-image) center / cover no-repeat;
+  filter: blur(20px) brightness(0.85);
+}
+
+.media-card [data-carousel-slide][data-slide-fit="contain"]::after {
+  inset: 0;
+  background: var(--slide-image) center / contain no-repeat;
+}
+
+.media-card [data-carousel-slide][data-slide-fit="contain"]:not([data-slide-video=""])::after {
+  content: none;
+}
+`
 
 /** Шаблон слайда: фон — фото или постер, data-slide-video — видео слайда. */
 function slideTemplate(id: string): StructureNode {
@@ -36,6 +84,7 @@ function slideTemplate(id: string): StructureNode {
       'aria-hidden': 'true',
       'data-carousel-slide': 'true',
       'data-slide-video': '{{$.video}}',
+      ...FRAMING_ATTRIBUTES,
     },
     styles: {
       properties: {
@@ -47,10 +96,38 @@ function slideTemplate(id: string): StructureNode {
         backgroundSize: 'cover',
         backgroundImage: 'url("{{$.image}}")',
         backgroundRepeat: 'no-repeat',
-        backgroundPosition: 'center',
+        ...FRAMING_PROPERTIES,
       },
     },
   })
+}
+
+/** Привязывает кадрирование к шаблону слайда. true — если что-то поменялось. */
+function frameSlideTemplate(slide: StructureNode): boolean {
+  const attrs = slide.attributes ?? {}
+  const props = slide.styles?.properties ?? {}
+  const framed =
+    Object.entries(FRAMING_ATTRIBUTES).every(([k, v]) => attrs[k] === v) &&
+    Object.entries(FRAMING_PROPERTIES).every(([k, v]) => props[k] === v)
+  if (framed) return false
+  slide.attributes = { ...attrs, ...FRAMING_ATTRIBUTES }
+  slide.styles = { ...slide.styles, properties: { ...props, ...FRAMING_PROPERTIES } }
+  return true
+}
+
+/** Шаблон слайда в треке карусели. */
+function slideOf(track: StructureNode, label: string): StructureNode {
+  const slide = (track.children ?? []).find((c) => c.attributes?.['data-carousel-slide'] === 'true')
+  if (!slide) throw new MigrationError(`${label}: нет шаблона слайда`)
+  return slide
+}
+
+/** Заменяет CSS-секцию блока (она всегда в конце) на актуальную версию. */
+function upsertCssSection(metadata: Record<string, unknown>, head: string, marker: string, section: string): boolean {
+  const css = typeof metadata.globalCss === 'string' ? metadata.globalCss : ''
+  if (css.includes(marker)) return false
+  metadata.globalCss = stripSection(css, head) + '\n' + section
+  return true
 }
 
 function arrow(side: 'left' | 'right'): StructureNode {
@@ -87,6 +164,13 @@ const ABOUT_SLIDES_SOURCE = 'item.aboutSlides'
 export const ABOUT_JS_V1_MARKER = '/* О проекте: видео в карточке, v1.'
 export const ABOUT_CSS_V1_MARKER = '/* ==== about-media v1 ===='
 
+/** CSS-секция «О проекте» (v2): только кадрирование слайдов. */
+const ABOUT_CSS_HEAD = '/* ==== about-media'
+export const ABOUT_CSS_MARKER = `${ABOUT_CSS_HEAD} v2 ====`
+export const ABOUT_CSS = `
+${ABOUT_CSS_MARKER} */
+${SLIDE_FRAMING_RULES}`
+
 export function migrateAboutBlock(input: StructureNode): MigrationResult {
   const structure: StructureNode = JSON.parse(JSON.stringify(input))
   const changes: string[] = []
@@ -119,6 +203,9 @@ export function migrateAboutBlock(input: StructureNode): MigrationResult {
         (removed.length ? ` (убрано старое: ${removed.length})` : '')
     )
   }
+  if (frameSlideTemplate(slideOf(trackOf(card)!, '«О проекте»'))) {
+    changes.push('«О проекте»: кадрирование слайда — фокус и «целиком» из данных ЖК')
+  }
 
   const metadata = (structure.metadata ??= {})
   const js = typeof metadata.globalJs === 'string' ? metadata.globalJs : ''
@@ -128,10 +215,9 @@ export function migrateAboutBlock(input: StructureNode): MigrationResult {
     changes.push('«О проекте»: скрипт плеера v1 убран — видео ведёт рантайм карусели')
   }
   const css = typeof metadata.globalCss === 'string' ? metadata.globalCss : ''
-  const cssV2 = stripSection(css, ABOUT_CSS_V1_MARKER)
-  if (cssV2 !== css) {
-    metadata.globalCss = cssV2 + '\n'
-    changes.push('«О проекте»: стили плеера v1 убраны')
+  if (css.includes(ABOUT_CSS_V1_MARKER)) changes.push('«О проекте»: стили плеера v1 убраны')
+  if (upsertCssSection(metadata, ABOUT_CSS_HEAD, ABOUT_CSS_MARKER, ABOUT_CSS)) {
+    changes.push('«О проекте»: стили режима «целиком»')
   }
 
   if (changes.length === 0) return { structure: input, changes, alreadyMigrated: true }
@@ -192,7 +278,7 @@ export const LIGHTBOX_JS = `${LIGHTBOX_JS_MARKER} Кадры и текущий �
 /** Начало любой версии CSS-секции галерей — с него секция заменяется. */
 const GALLERY_CSS_HEAD = '/* ==== gallery-media'
 
-export const GALLERY_CSS_MARKER = `${GALLERY_CSS_HEAD} v2 ====`
+export const GALLERY_CSS_MARKER = `${GALLERY_CSS_HEAD} v3 ====`
 
 export const GALLERY_CSS = `
 ${GALLERY_CSS_MARKER}
@@ -213,12 +299,13 @@ ${GALLERY_CSS_MARKER}
 .media-card:has([data-carousel-slide].is-active[data-slide-video]:not([data-slide-video=""])) .expand-button {
   display: none;
 }
-`
+
+${SLIDE_FRAMING_RULES}`
 
 export interface GallerySource {
   /** Прежний источник повтора (список строк). */
   from: string
-  /** Новый источник (слайды {url, image, video}). */
+  /** Новый источник (слайды {url, image, video, position, fit}). */
   to: string
 }
 
@@ -233,16 +320,18 @@ export function migrateGalleryBlock(input: StructureNode, label: string, source:
   )
   const track = trackOf(card)
   if (!track) throw new MigrationError(`${label}: у карусели нет data-carousel-track`)
+  const slide = slideOf(track, label)
   if (track._repeat?.source === source.from) {
     track._repeat = { ...track._repeat, source: source.to }
-    const slide = (track.children ?? []).find((c) => c.attributes?.['data-carousel-slide'] === 'true')
-    if (!slide) throw new MigrationError(`${label}: нет шаблона слайда`)
     slide.attributes = { ...slide.attributes, 'data-slide-video': '{{$.video}}' }
     const props = slide.styles?.properties ?? {}
     slide.styles = { ...slide.styles, properties: { ...props, backgroundImage: 'url("{{$.image}}")' } }
     changes.push(`${label}: слайды по ${source.to} — фото и видео`)
   } else if (track._repeat?.source !== source.to) {
     throw new MigrationError(`${label}: неожиданный источник слайдов ${String(track._repeat?.source)}`)
+  }
+  if (frameSlideTemplate(slide)) {
+    changes.push(`${label}: кадрирование слайда — фокус и «целиком» из данных ЖК`)
   }
 
   const metadata = (structure.metadata ??= {})
@@ -257,10 +346,8 @@ export function migrateGalleryBlock(input: StructureNode, label: string, source:
     metadata.globalJs = js.slice(0, start) + LIGHTBOX_JS
     changes.push(`${label}: лайтбокс — только фото, привязка к карточке один раз`)
   }
-  const css = typeof metadata.globalCss === 'string' ? metadata.globalCss : ''
-  if (!css.includes(GALLERY_CSS_MARKER)) {
-    metadata.globalCss = stripSection(css, GALLERY_CSS_HEAD) + '\n' + GALLERY_CSS
-    changes.push(`${label}: пустая галерея прячется, «развернуть» прячется на видео`)
+  if (upsertCssSection(metadata, GALLERY_CSS_HEAD, GALLERY_CSS_MARKER, GALLERY_CSS)) {
+    changes.push(`${label}: пустая галерея прячется, «развернуть» прячется на видео, режим «целиком»`)
   }
 
   if (changes.length === 0) return { structure: input, changes, alreadyMigrated: true }

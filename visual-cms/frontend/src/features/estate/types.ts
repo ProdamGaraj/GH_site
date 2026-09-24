@@ -1,5 +1,7 @@
 // Типы модуля ЖК (estate-service admin API).
 
+import type { GalleryItem } from './gallerySlides'
+
 export type Locale = 'ru' | 'uz' | 'en'
 export const LOCALES: Locale[] = ['ru', 'uz', 'en']
 export const LOCALE_LABELS: Record<Locale, string> = { ru: 'RU', uz: 'UZ', en: 'EN' }
@@ -86,9 +88,10 @@ export interface ComplexDetail {
   mapUrl: string
   mapImage: string
   heroImages: string[]
-  gallery: string[]
-  hallGallery: string[]
-  yardGallery: string[]
+  /** Галереи слайдов: ссылка или ссылка с кадрированием (см. gallerySlides.ts). */
+  gallery: GalleryItem[]
+  hallGallery: GalleryItem[]
+  yardGallery: GalleryItem[]
   translations: TranslationsByLocale
   /** Склейка типов планировок на витрине; null — только точные совпадения. */
   planGrouping?: PlanGroupingConfig | null

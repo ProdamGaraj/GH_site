@@ -293,7 +293,12 @@ export function generateCarouselRuntime(): string {
         v.playsInline = true; v.preload = 'none';
         // Вписывание видео = вписыванию постера слайда: data-slide-fit (cover|contain).
         var fit = slide.getAttribute('data-slide-fit') || 'cover';
-        v.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:' + fit + ';pointer-events:none;z-index:0;';
+        // Точка фокуса видео = фокусу постера: background-position из вёрстки слайда.
+        // Берём инлайн, а не computed: у слайда без фона computed даёт «0% 0%»
+        // и прижал бы видео к углу вместо центра.
+        var focus = slide.style.backgroundPosition || 'center';
+        v.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:' + fit +
+          ';object-position:' + focus + ';pointer-events:none;z-index:0;';
         var s = document.createElement('source');
         s.src = url; v.appendChild(s);
         slide.insertBefore(v, slide.firstChild);

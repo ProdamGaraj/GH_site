@@ -4,6 +4,7 @@ import type { ComplexDetail, Locale, StatItem } from '../types'
 import { estateApi } from '../api'
 import { getT, setT, setLabel, isRu } from './tfield'
 import { TextField, TextArea, NumberField, SelectField, StringListField, StatsField, LabelMapField } from './fields'
+import { GallerySlidesField } from './GallerySlidesField'
 
 /** Панель редактирования полей ЖК (база ru + переводы uz/en). */
 export const ComplexForm: React.FC<{ complex: ComplexDetail; locale: Locale }> = ({ complex, locale }) => {
@@ -145,20 +146,21 @@ export const ComplexForm: React.FC<{ complex: ComplexDetail; locale: Locale }> =
           <StringListField label="Hero-изображения" value={form.heroImages} onChange={(v) => setForm((f) => ({ ...f, heroImages: v }))} />
           {/* Слайдеры страницы проекта: по ссылке на строку, фото или видео
               (.mp4/.webm). Порядок строк — порядок слайдов; при одном элементе
-              навигации нет. Поведение слайдера — в редакторе CMS. */}
-          <StringListField
+              навигации нет. Под списком — кадрирование каждого слайда.
+              Поведение слайдера — в редакторе CMS. */}
+          <GallerySlidesField
             label="О проекте — слайды"
             hint="фото и видео; пусто — About-видео, без него About-медиа"
             value={form.gallery}
             onChange={(v) => setForm((f) => ({ ...f, gallery: v }))}
           />
-          <StringListField
+          <GallerySlidesField
             label="Холлы — слайды"
             hint="фото и видео"
             value={form.hallGallery}
             onChange={(v) => setForm((f) => ({ ...f, hallGallery: v }))}
           />
-          <StringListField
+          <GallerySlidesField
             label="Двор — слайды"
             hint="фото и видео"
             value={form.yardGallery}

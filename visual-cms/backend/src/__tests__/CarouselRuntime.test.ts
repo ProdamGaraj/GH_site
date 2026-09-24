@@ -186,6 +186,31 @@ describe('CarouselRuntime', () => {
         .querySelector<HTMLVideoElement>('video[data-carousel-video="true"]')!
       expect(v.style.objectFit).toBe('contain')
     })
+
+    it('object-position видео = точке фокуса постера (background-position слайда)', async () => {
+      await boot(`
+        <div data-carousel="true" data-carousel-autoplay="0">
+          <div data-carousel-track="true">
+            <div data-carousel-slide="true" data-slide-video="https://cdn/a.mp4" data-element-id="s0"
+                 style="background-image:url('/p.jpg'); background-position: 30% 80%"></div>
+          </div>
+        </div>
+      `)
+      const v = document.querySelector('[data-element-id="s0"] video[data-carousel-video="true"]') as HTMLVideoElement
+      expect(v.style.objectPosition).toBe('30% 80%')
+    })
+
+    it('без фокуса в вёрстке видео по центру, а не в углу', async () => {
+      await boot(`
+        <div data-carousel="true" data-carousel-autoplay="0">
+          <div data-carousel-track="true">
+            <div data-carousel-slide="true" data-slide-video="https://cdn/a.mp4" data-element-id="s0"></div>
+          </div>
+        </div>
+      `)
+      const v = document.querySelector('[data-element-id="s0"] video[data-carousel-video="true"]') as HTMLVideoElement
+      expect(v.style.objectPosition).toBe('center')
+    })
   })
 
   describe('video-wait (смотреть видео до конца)', () => {

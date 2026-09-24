@@ -412,7 +412,9 @@ describe('слайды медиа-каруселей в DTO', () => {
       [],
       'ru'
     )
-    expect(dto.aboutSlides).toEqual([{ url: '/media/about.mp4', image: '/media/about.webp', video: '/media/about.mp4' }])
+    expect(dto.aboutSlides).toEqual([
+      { url: '/media/about.mp4', image: '/media/about.webp', video: '/media/about.mp4', position: '50% 50%', fit: 'cover' },
+    ])
   })
 
   it('холлы и двор — из своих галерей, видео распознаётся по расширению', () => {
@@ -425,6 +427,27 @@ describe('слайды медиа-каруселей в DTO', () => {
     )
     expect(dto.hallSlides.map((s) => s.video)).toEqual(['', '/h2.mp4'])
     expect(dto.hallSlides[1].image).toBe('/h1.webp')
-    expect(dto.yard.slides).toEqual([{ url: '/y.webm', image: '/m.webp', video: '/y.webm' }])
+    expect(dto.yard.slides).toEqual([{ url: '/y.webm', image: '/m.webp', video: '/y.webm', position: '50% 50%', fit: 'cover' }])
+  })
+
+  it('кадрирование из галереи доходит до слайдов, а списки ссылок остаются строками', () => {
+    const dto = buildComplexDetail(
+      {
+        ...baseComplex,
+        hallGallery: ['/h1.webp', { url: '/h2.webp', focus: { x: 30, y: 80 } }],
+        yardGallery: [{ url: '/y.webp', fit: 'contain' }],
+      } as ComplexRow,
+      [],
+      [],
+      [],
+      'ru'
+    )
+    expect(dto.hallSlides.map((s) => [s.position, s.fit])).toEqual([
+      ['50% 50%', 'cover'],
+      ['30% 80%', 'cover'],
+    ])
+    expect(dto.yard.slides[0].fit).toBe('contain')
+    expect(dto.hallGallery).toEqual(['/h1.webp', '/h2.webp'])
+    expect(dto.yard.gallery).toEqual(['/y.webp'])
   })
 })

@@ -29,6 +29,19 @@ const planGroupingSchema = z
   })
   .nullable()
 
+/**
+ * Элемент галереи слайдов: ссылка строкой или ссылка с кадрированием —
+ * точкой фокуса (проценты кадра) и вписыванием. См. services/mediaSlides.ts.
+ */
+export const galleryItemSchema = z.union([
+  z.string().max(500),
+  z.object({
+    url: z.string().min(1).max(500),
+    focus: z.object({ x: z.number().min(0).max(100), y: z.number().min(0).max(100) }).optional(),
+    fit: z.enum(['cover', 'contain']).optional(),
+  }),
+])
+
 // --- Complex ---
 const complexBase = {
   slug: z.string().min(1).max(160).regex(/^[a-z0-9-]+$/, 'slug: только a-z, 0-9, дефис'),
@@ -60,9 +73,9 @@ const complexBase = {
   mapImage: z.string().max(500).optional(),
   panoramaUrl: z.string().max(500).optional(),
   heroImages: z.array(z.string()).optional(),
-  gallery: z.array(z.string()).optional(),
-  hallGallery: z.array(z.string()).optional(),
-  yardGallery: z.array(z.string()).optional(),
+  gallery: z.array(galleryItemSchema).optional(),
+  hallGallery: z.array(galleryItemSchema).optional(),
+  yardGallery: z.array(galleryItemSchema).optional(),
   planGrouping: planGroupingSchema.optional(),
   translations: translationsSchema,
 }

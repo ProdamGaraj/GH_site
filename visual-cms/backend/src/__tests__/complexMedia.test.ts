@@ -5,6 +5,7 @@
  * Поведение скрипта лайтбокса в браузере — в complexMedia.runtime.test.ts.
  */
 import {
+  ABOUT_CSS_MARKER,
   ABOUT_CSS_V1_MARKER,
   ABOUT_JS_V1_MARKER,
   GALLERY_CSS_MARKER,
@@ -26,6 +27,28 @@ function find(root: StructureNode, pred: (n: StructureNode) => boolean): Structu
 }
 
 const btn = (cls: string): StructureNode => ({ tagName: 'button', attributes: { type: 'button', class: cls } })
+
+const slideTemplateOf = (root: StructureNode) => find(root, (n) => n.attributes?.['data-carousel-slide'] === 'true')!
+
+/** Слайд привязан к кадрированию из данных ЖК (v3). */
+function expectFramed(slide: StructureNode) {
+  expect(slide.attributes!['data-slide-fit']).toBe('{{$.fit}}')
+  expect(slide.styles!.properties!.backgroundPosition).toBe('{{$.position}}')
+  expect(slide.styles!.properties!['--slide-image']).toBe('url("{{$.image}}")')
+}
+
+/** Снимает кадрирование — состояние блока после v2, до v3. */
+function unframe(root: StructureNode, cssHead: string): StructureNode {
+  const copy: StructureNode = JSON.parse(JSON.stringify(root))
+  const slide = slideTemplateOf(copy)
+  delete slide.attributes!['data-slide-fit']
+  const props = slide.styles!.properties!
+  delete props['--slide-image']
+  props.backgroundPosition = 'center'
+  const css = copy.metadata!.globalCss as string
+  copy.metadata!.globalCss = css.slice(0, css.indexOf(cssHead)).trimEnd() + '\n'
+  return copy
+}
 
 /** «О проекте» в исходном виде: картинка и три нерабочие кнопки. */
 function aboutOriginal(): StructureNode {
@@ -99,6 +122,14 @@ describe('«О проекте» → карусель фото и видео', ()
         expect(css.startsWith('.media-card { position: relative; }')).toBe(true)
       })
 
+      it('слайд кадрируется из данных ЖК, стили «целиком» — одной секцией', () => {
+        expectFramed(slideTemplateOf(media))
+        const css = result.structure.metadata!.globalCss as string
+        expect(css).toContain(ABOUT_CSS_MARKER)
+        expect(css.split('/* ==== about-media')).toHaveLength(2)
+        expect(css).toContain('[data-slide-fit="contain"]::after')
+      })
+
       it('новые узлы полные: иначе редактор CMS падает на открытии страницы', () => {
         const added = media.children!.filter((c) => ['about-track', 'about-arrow-left', 'about-arrow-right'].includes(c.id!))
         expect(added).toHaveLength(3)
@@ -118,6 +149,17 @@ describe('«О проекте» → карусель фото и видео', ()
     const snapshot = JSON.stringify(input)
     migrateAboutBlock(input)
     expect(JSON.stringify(input)).toBe(snapshot)
+  })
+
+  it('карусель v2 без кадрирования получает только кадрирование', () => {
+    const v2 = unframe(migrateAboutBlock(aboutOriginal()).structure, '/* ==== about-media')
+    const result = migrateAboutBlock(v2)
+    expect(result.alreadyMigrated).toBe(false)
+    expect(result.changes).toHaveLength(2)
+    expectFramed(slideTemplateOf(result.structure))
+    const cardBefore = find(v2, (n) => n.attributes?.id === 'aboutMedia')!
+    const cardAfter = find(result.structure, (n) => n.attributes?.id === 'aboutMedia')!
+    expect(cardAfter.children!.map((c) => c.id)).toEqual(cardBefore.children!.map((c) => c.id))
   })
 
   it('без #aboutMedia — ошибка, а не тихий пропуск', () => {
@@ -185,13 +227,29 @@ describe('галереи холлов и двора → фото и видео',
     expect(js).toContain(LIGHTBOX_JS_MARKER)
   })
 
-  it('CSS v1 заменён на v2, а не дописан вторым', () => {
+  it('CSS прежней версии заменён на актуальную, а не дописан вторым', () => {
     const css = result.structure.metadata!.globalCss as string
     expect(css.startsWith('.gallery-row { display: grid; }')).toBe(true)
     expect(css).toContain(GALLERY_CSS_MARKER)
     expect(css.split('/* ==== gallery-media')).toHaveLength(2)
     expect(css).toContain('.gallery-media[data-carousel-count="0"]')
     expect(css).not.toMatch(/^\.media-card\[data-carousel-count="0"\]/m)
+  })
+
+  it('слайд кадрируется из данных ЖК, в CSS есть режим «целиком»', () => {
+    expectFramed(slide)
+    expect(result.structure.metadata!.globalCss).toContain('[data-slide-fit="contain"]::before')
+  })
+
+  it('галерея v2 без кадрирования получает кадрирование и CSS v3 — одной секцией', () => {
+    const v2 = unframe(result.structure, '/* ==== gallery-media')
+    const again = migrateGalleryBlock(v2, 'Холлы', HALL)
+    expect(again.alreadyMigrated).toBe(false)
+    expectFramed(find(again.structure, (n) => n.id === 'slide')!)
+    const css = again.structure.metadata!.globalCss as string
+    expect(css.split('/* ==== gallery-media')).toHaveLength(2)
+    expect(css).toContain(GALLERY_CSS_MARKER)
+    expect(find(again.structure, (n) => n.id === 'track')!._repeat).toEqual({ source: 'item.hallSlides' })
   })
 
   it('повторный запуск ничего не меняет', () => {

@@ -9,6 +9,7 @@ import {
 } from 'typeorm'
 import { House } from './House'
 import type { PlanGroupingConfig } from '../services/planGrouping'
+import type { GalleryItem } from '../services/mediaSlides'
 
 /**
  * Жилой комплекс (ЖК).
@@ -141,14 +142,15 @@ export class Complex {
   @Column({ type: 'jsonb', default: () => "'[]'" })
   heroImages!: string[]
 
+  /** Галереи слайдов: ссылка или {url, focus, fit} — см. services/mediaSlides.ts. */
   @Column({ type: 'jsonb', default: () => "'[]'" })
-  gallery!: string[]
+  gallery!: GalleryItem[]
 
   @Column({ type: 'jsonb', default: () => "'[]'" })
-  hallGallery!: string[]
+  hallGallery!: GalleryItem[]
 
   @Column({ type: 'jsonb', default: () => "'[]'" })
-  yardGallery!: string[]
+  yardGallery!: GalleryItem[]
 
   /**
    * Настройка склейки типов планировок на витрине.

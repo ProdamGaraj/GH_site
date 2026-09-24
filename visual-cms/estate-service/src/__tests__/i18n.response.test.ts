@@ -71,7 +71,7 @@ describe('buildComplexDetail — structure (ru)', () => {
       text: 'ru yard text',
       features: ['Площадки', 'BBQ'],
       gallery: ['yard1.jpg'],
-      slides: [{ url: 'yard1.jpg', image: 'yard1.jpg', video: '' }],
+      slides: [{ url: 'yard1.jpg', image: 'yard1.jpg', video: '', position: '50% 50%', fit: 'cover' }],
     })
     expect(dto.stats).toEqual([{ value: 'Комфорт+', label: 'Класс жилья' }])
   })
