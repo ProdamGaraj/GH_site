@@ -275,10 +275,91 @@ export const LIGHTBOX_JS = `${LIGHTBOX_JS_MARKER} Кадры и текущий �
 })();
 `
 
-/** Начало любой версии CSS-секции галерей — с него секция заменяется. */
-const GALLERY_CSS_HEAD = '/* ==== gallery-media'
+/**
+ * Правила оверлеев, потерянные при переносе дизайна в CMS (complex-detail.html).
+ *
+ * Разметку лайтбокса и модалки планировки вставляет ComplexOverlaysRuntime, а
+ * стили берутся из CSS блоков. Эти пять правил до CMS не доехали: крестик
+ * модалки стоял в её сетке как обычная кнопка и занимал целую колонку, фото в
+ * лайтбоксе не вписывалось в экран, его крестик и счётчик уезжали. Текст — из
+ * дизайна как есть. Лежат здесь: остальные стили оверлеев — в этих же блоках.
+ */
+const OVERLAY_CHROME_RULES = `/* Оверлеи страницы проекта: правила дизайна, потерянные при переносе в CMS. */
+.plan-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(21, 24, 29, .12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .78);
+  color: #15181d;
+  font-size: 20px;
+  font-weight: 900;
+  cursor: pointer;
+}
 
-export const GALLERY_CSS_MARKER = `${GALLERY_CSS_HEAD} v3 ====`
+.gallery-lightbox-dialog {
+  position: relative;
+  width: min(1500px, 100%);
+  height: min(860px, calc(100vh - 36px));
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .24);
+  border-radius: 28px;
+  background: rgba(13, 15, 18, .78);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .42);
+}
+
+.gallery-lightbox-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  object-position: center;
+  background: #0d0f12;
+}
+
+.gallery-lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 5;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, .28);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .92);
+  color: #15181d;
+  font-size: 22px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.gallery-lightbox-counter {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 5;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .9);
+  color: #15181d;
+  font-size: 13px;
+  font-weight: 900;
+  transform: translateX(-50%);
+}
+`
+
+/** Начало любой версии CSS-секции галерей — с него секция заменяется. */
+export const GALLERY_CSS_HEAD = '/* ==== gallery-media'
+
+export const GALLERY_CSS_MARKER = `${GALLERY_CSS_HEAD} v4 ====`
 
 export const GALLERY_CSS = `
 ${GALLERY_CSS_MARKER}
@@ -300,7 +381,8 @@ ${GALLERY_CSS_MARKER}
   display: none;
 }
 
-${SLIDE_FRAMING_RULES}`
+${SLIDE_FRAMING_RULES}
+${OVERLAY_CHROME_RULES}`
 
 export interface GallerySource {
   /** Прежний источник повтора (список строк). */

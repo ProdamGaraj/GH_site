@@ -241,6 +241,13 @@ describe('галереи холлов и двора → фото и видео',
     expect(result.structure.metadata!.globalCss).toContain('[data-slide-fit="contain"]::before')
   })
 
+  it('в CSS восстановлены правила оверлеев, потерянные при переносе дизайна', () => {
+    const css = result.structure.metadata!.globalCss as string
+    for (const selector of ['.plan-modal-close', '.gallery-lightbox-dialog', '.gallery-lightbox-image', '.gallery-lightbox-close', '.gallery-lightbox-counter']) {
+      expect(css).toContain(`\n${selector} {`)
+    }
+  })
+
   it('галерея v2 без кадрирования получает кадрирование и CSS v3 — одной секцией', () => {
     const v2 = unframe(result.structure, '/* ==== gallery-media')
     const again = migrateGalleryBlock(v2, 'Холлы', HALL)

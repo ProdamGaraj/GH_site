@@ -12,9 +12,10 @@
  * Так обычные страницы сайта не тащат лишнюю разметку.
  *
  * CSS оверлеев (.gallery-lightbox / .plan-modal и вложенные) живёт в globalCss
- * тех же блоков, что дают эти компоненты — галереи двора/холлов и каталог
- * квартир. Отдельной копии здесь нет намеренно: маркеры присутствия компонента
- * и наличие его стилей — одно и то же условие.
+ * блоков страницы проекта: копия CSS дизайна в «О проекте», «Холлы», «Двор», а
+ * правила, потерянные при переносе дизайна (крестики, окно и счётчик
+ * лайтбокса), — в секции галерей (scripts/complexMedia.ts, OVERLAY_CHROME_RULES).
+ * Отдельной копии здесь нет намеренно: стили правятся в CMS вместе с блоками.
  *
  * Публикует API для скриптов блоков:
  *   window.ghLightbox.open(images, index) / .close()
@@ -186,13 +187,25 @@ const RUNTIME_JS = (L: OverlayLabels) => `<script>
     var node = document.getElementById(id);
     if (node) node.textContent = value || '';
   }
+  // Цена карточки — первый непустой узел .apartment-price: в вёрстке дизайна
+  // это текст перед старой ценой, в карточке CMS — вложенный <span>, а первым
+  // узлом стоит перенос строки. Брать childNodes[0] значило показывать пустоту.
+  function priceOf(card) {
+    var box = card.querySelector('.apartment-price');
+    if (!box) return '';
+    for (var i = 0; i < box.childNodes.length; i++) {
+      var text = (box.childNodes[i].textContent || '').trim();
+      if (text) return text;
+    }
+    return '';
+  }
   function openPlan(card) {
     if (!modal || !card) return;
     closeLightbox();
     // Содержимое берём из самой карточки: она уже отрисована на деплое,
     // второго источника данных для модалки заводить не нужно.
     var title = card.querySelector('h3');
-    var price = card.querySelector('.apartment-price');
+    var price = priceOf(card);
     var meta = card.querySelector('.apartment-meta');
     var project = card.querySelector('[data-card-project]');
     var titleText = title ? title.textContent.trim() : '';
@@ -203,8 +216,7 @@ const RUNTIME_JS = (L: OverlayLabels) => `<script>
     var floor = metaText.match(floorRe);
 
     setText('planModalTitle', titleText || ${JSON.stringify(L.plan)});
-    setText('planModalPrice', price && price.childNodes[0]
-      ? price.childNodes[0].textContent.trim() : ${JSON.stringify(L.priceOnRequest)});
+    setText('planModalPrice', price || ${JSON.stringify(L.priceOnRequest)});
     setText('planModalProject', project ? project.textContent.trim() : '');
     setText('planModalFloor', floor ? floor[0] : ${JSON.stringify(L.floorUnknown)});
     setText('planModalDeadline', parts.length > 1 ? parts[parts.length - 1].trim() : ${JSON.stringify(L.deadlineUnknown)});
