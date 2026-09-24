@@ -21,13 +21,13 @@
  * Здесь только чистое преобразование структур блоков: запись в базу — в
  * `migrate-complex-media.ts`. Все правки идемпотентны.
  */
-import { MigrationError, MigrationResult, StructureNode, findOne, hasClass } from './choiceToPlanTypes'
+import { MigrationError, MigrationResult, StructureNode, findOne, hasClass, makeNode } from './choiceToPlanTypes'
 
 // --- Общие детали карусели ---
 
 /** Шаблон слайда: фон — фото или постер, data-slide-video — видео слайда. */
 function slideTemplate(id: string): StructureNode {
-  return {
+  return makeNode({
     id,
     tagName: 'div',
     elementType: 'container',
@@ -50,12 +50,12 @@ function slideTemplate(id: string): StructureNode {
         backgroundPosition: 'center',
       },
     },
-  }
+  })
 }
 
 function arrow(side: 'left' | 'right'): StructureNode {
   const prev = side === 'left'
-  return {
+  return makeNode({
     id: `about-arrow-${side}`,
     tagName: 'button',
     elementType: 'button',
@@ -66,7 +66,7 @@ function arrow(side: 'left' | 'right'): StructureNode {
       'aria-label': prev ? 'Предыдущий слайд' : 'Следующий слайд',
       [prev ? 'data-carousel-prev' : 'data-carousel-next']: 'true',
     },
-  }
+  })
 }
 
 /** Вырезает дописанную ранее секцию (она всегда в конце) от маркера до конца. */
@@ -98,14 +98,14 @@ export function migrateAboutBlock(input: StructureNode): MigrationResult {
     )
     card.children = [
       ...(card.children ?? []).filter((c) => !removed.includes(c)),
-      {
+      makeNode({
         id: 'about-track',
         tagName: 'div',
         elementType: 'container',
         attributes: { class: 'gallery-track', 'data-carousel-track': 'true' },
         _repeat: { source: ABOUT_SLIDES_SOURCE },
         children: [slideTemplate('about-slide')],
-      },
+      }),
       arrow('left'),
       arrow('right'),
     ]

@@ -13,7 +13,7 @@ import {
   migrateAboutBlock,
   migrateGalleryBlock,
 } from '../scripts/complexMedia'
-import { MigrationError, StructureNode } from '../scripts/choiceToPlanTypes'
+import { MigrationError, StructureNode, incompleteNodes } from '../scripts/choiceToPlanTypes'
 
 function find(root: StructureNode, pred: (n: StructureNode) => boolean): StructureNode | undefined {
   const stack = [root]
@@ -97,6 +97,12 @@ describe('«О проекте» → карусель фото и видео', ()
         const css = result.structure.metadata!.globalCss as string
         expect(css).not.toContain(ABOUT_CSS_V1_MARKER)
         expect(css.startsWith('.media-card { position: relative; }')).toBe(true)
+      })
+
+      it('новые узлы полные: иначе редактор CMS падает на открытии страницы', () => {
+        const added = media.children!.filter((c) => ['about-track', 'about-arrow-left', 'about-arrow-right'].includes(c.id!))
+        expect(added).toHaveLength(3)
+        for (const node of added) expect(incompleteNodes(node)).toEqual([])
       })
 
       it('повторный запуск ничего не меняет', () => {

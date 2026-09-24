@@ -5,6 +5,7 @@ import type { RootState } from '@/app/store'
 import { blockApi, pageApi, type CreateBlockDto } from '@/shared/api'
 import { cleanForLibrary } from '@/features/editor/utils/libraryClean'
 import { findNodeInTree, normalizeLegacyRootOverrides } from '@/features/editor/utils/variationUtils'
+import { ensureNodeShape } from '@/features/editor/utils/nodeShape'
 import { bgUrlPatch, composeBgStack } from '@/features/media/responsiveMediaMatrix.utils'
 import {
   findNodeById,
@@ -222,7 +223,9 @@ const editorSlice = createSlice({
     loadEditor: (state, action: PayloadAction<BlockNode>) => {
       // Чиним легаси-записи старого deleteNode (hidden-override в корне вместо
       // родителя) — иначе «удалённые» элементы видны в редакторе, но скрыты на деплое.
-      const normalized = normalizeLegacyRootOverrides(action.payload)
+      // Сначала полная форма узлов: данные не от редактора (импорт, миграции)
+      // могли прийти без children/styles, и страница не открывалась.
+      const normalized = normalizeLegacyRootOverrides(ensureNodeShape(action.payload))
       state.rootNode = normalized
       state.history = [normalized]
       state.historyIndex = 0

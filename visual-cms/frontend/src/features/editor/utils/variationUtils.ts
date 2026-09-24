@@ -43,8 +43,10 @@ export function getEffectiveTree(
       })
     }
     
-    // Рекурсивно обрабатываем дочерние элементы (базовые, без пометки)
-    const processedChildren: BlockNodeWithViewport[] = baseNode.children.map(child => ({
+    // Рекурсивно обрабатываем дочерние элементы (базовые, без пометки).
+    // children может не быть у узла, созданного не редактором (импорт,
+    // миграция данных): без запасного [] открытие страницы падало целиком.
+    const processedChildren: BlockNodeWithViewport[] = (baseNode.children || []).map(child => ({
       ...getEffectiveTree(child, breakpointId, editMode),
       _viewportId: null
     }))
@@ -73,7 +75,7 @@ export function getEffectiveTree(
   }
 
   // Применяем переопределения к базовым элементам
-  const processedChildren = baseNode.children
+  const processedChildren = (baseNode.children || [])
     .map(child => {
       const override = variation.inheritedOverrides?.[child.id]
       
@@ -92,7 +94,7 @@ export function getEffectiveTree(
           styles: {
             ...processedChild.styles,
             properties: {
-              ...processedChild.styles.properties,
+              ...(processedChild.styles?.properties || {}),
               ...override.styles,
             },
           },

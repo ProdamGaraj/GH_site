@@ -55,6 +55,38 @@ const TRIGGER_LABEL_AFTER = 'Вид из окна ⌄'
 
 export class MigrationError extends Error {}
 
+// --- Создание узлов ---
+
+/**
+ * Узел в полной форме BlockNode (types/blockNode.ts). Редактор CMS ждёт у
+ * каждого узла children, styles.properties, attributes и metadata: узел без
+ * children ронял открытие страницы («Cannot read properties of undefined
+ * (reading 'map')» в getEffectiveTree). Миграции создают узлы только так.
+ */
+export function makeNode(node: StructureNode & { id: string; tagName: string; elementType: string }): StructureNode {
+  return {
+    ...node,
+    attributes: node.attributes ?? {},
+    styles: { ...(node.styles ?? {}), properties: node.styles?.properties ?? {} },
+    children: node.children ?? [],
+    metadata: node.metadata ?? {},
+  }
+}
+
+/** Узлы дерева, у которых нет обязательных полей, — для проверок в тестах. */
+export function incompleteNodes(root: StructureNode): string[] {
+  const out: string[] = []
+  walk(root, (n) => {
+    const missing = [
+      Array.isArray(n.children) ? '' : 'children',
+      n.styles && typeof n.styles.properties === 'object' ? '' : 'styles.properties',
+      n.attributes && typeof n.attributes === 'object' ? '' : 'attributes',
+    ].filter(Boolean)
+    if (missing.length) out.push(`${n.id ?? n.tagName ?? '?'}: ${missing.join(', ')}`)
+  })
+  return out
+}
+
 // --- Обход дерева ---
 
 export function walk(node: StructureNode, visit: (n: StructureNode, parent: StructureNode | null) => void): void {
