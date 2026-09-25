@@ -6,6 +6,7 @@ import { House } from '../models/House'
 import { Apartment } from '../models/Apartment'
 import { PlanType } from '../models/PlanType'
 import { EstateTranslation } from '../models/EstateTranslation'
+import { PlaceType } from '../models/PlaceType'
 import { logger } from '../services/Logger'
 import {
   buildComplexDetail,
@@ -81,6 +82,7 @@ export class ComplexController {
     const translations = (await AppDataSource.getRepository(EstateTranslation).find({
       where: { locale },
     })) as unknown as TrRow[]
+    const placeTypes = await AppDataSource.getRepository(PlaceType).find()
 
     const housesByComplex = new Map<string, House[]>()
     for (const h of houses) {
@@ -111,7 +113,8 @@ export class ComplexController {
         cApts as any,
         translations,
         locale,
-        cPlans as any
+        cPlans as any,
+        placeTypes
       )
     })
   }
@@ -160,13 +163,16 @@ export class ComplexController {
         where: { entityId: In(entityIds), locale },
       })
 
+      const placeTypes = await AppDataSource.getRepository(PlaceType).find()
+
       const dto = buildComplexDetail(
         complex as any,
         houses as any,
         apartments as any,
         translations as unknown as TrRow[],
         locale,
-        planTypes as any
+        planTypes as any,
+        placeTypes
       )
       res.json(dto)
     } catch (err) {

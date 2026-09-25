@@ -1,5 +1,6 @@
 export { EstateList } from './components/EstateList'
 export { EstateEditor } from './components/EstateEditor'
+export { PlaceTypesPanel } from './components/PlaceTypesPanel'
 export * from './types'
 export { estateApi } from './api'
 export { MacroSyncPanel } from './components/MacroSyncPanel'

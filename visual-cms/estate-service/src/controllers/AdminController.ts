@@ -6,11 +6,14 @@ import { House } from '../models/House'
 import { Apartment } from '../models/Apartment'
 import { EstateTranslation } from '../models/EstateTranslation'
 import { PlanType } from '../models/PlanType'
+import { PlaceType } from '../models/PlaceType'
 import { logger } from '../services/Logger'
 import { buildComplexAdmin, buildTranslationRows, TranslationsByLocale } from '../services/adminSerialize'
 import { distinctValues, PlanTypeRow, TrRow } from '../services/i18n'
 import { previewPlanGrouping } from '../services/planGroupingPreview'
 import { isShownPlanType } from '../services/planGrouping'
+import { MAP_ICONS, iconSvg } from '../services/mapIcons'
+import { missingPlaceTypes } from '../services/projectMap'
 
 /**
  * Admin CRUD для Complex/House/Apartment + переводы (uz/en).
@@ -33,6 +36,20 @@ export class AdminController {
     if (rows.length > 0) {
       await m.getRepository(EstateTranslation).save(rows.map((r) => m.getRepository(EstateTranslation).create(r)))
     }
+  }
+
+  /** Места ссылаются только на существующие типы — иначе 400 со списком чужих ключей. */
+  private static async assertPlaceTypes(m: EntityManager, places: unknown): Promise<void> {
+    if (!Array.isArray(places) || places.length === 0) return
+    const known = await m.getRepository(PlaceType).find({ select: ['key'] })
+    const missing = missingPlaceTypes(places as Array<{ type: string }>, known.map((t) => t.key))
+    if (missing.length > 0) throw Object.assign(new Error('unknown place types'), { status: 400, types: missing })
+  }
+
+  private static unknownTypesResponse(res: Response, err: any): boolean {
+    if (err?.status !== 400 || !err.types) return false
+    res.status(400).json({ error: 'Неизвестный тип места', types: err.types })
+    return true
   }
 
   // ================= Complex =================
@@ -112,12 +129,14 @@ export class AdminController {
         const repo = m.getRepository(Complex)
         const existing = await repo.findOne({ where: { slug: base.slug } })
         if (existing) throw Object.assign(new Error('slug already exists'), { status: 409 })
+        await AdminController.assertPlaceTypes(m, base.places)
         const complex: Complex = await repo.save(repo.create(base as Complex))
         await AdminController.writeTranslations(m, 'complex', complex.id, translations)
         return complex
       })
       res.status(201).json({ id: created.id, slug: created.slug })
     } catch (err: any) {
+      if (AdminController.unknownTypesResponse(res, err)) return
       if (err?.status === 409) {
         res.status(409).json({ error: 'Complex with this slug already exists' })
         return
@@ -138,6 +157,7 @@ export class AdminController {
           const clash = await repo.findOne({ where: { slug: base.slug } })
           if (clash) throw Object.assign(new Error('slug clash'), { status: 409 })
         }
+        await AdminController.assertPlaceTypes(m, base.places)
         Object.assign(complex, base)
         await repo.save(complex)
         if (translations !== undefined) {
@@ -151,6 +171,7 @@ export class AdminController {
       }
       res.json({ ok: true })
     } catch (err: any) {
+      if (AdminController.unknownTypesResponse(res, err)) return
       if (err?.status === 409) {
         res.status(409).json({ error: 'Another complex uses this slug' })
         return
@@ -359,5 +380,81 @@ export class AdminController {
       logger.error('admin.deleteApartment failed', err instanceof Error ? err : undefined)
       res.status(500).json({ error: 'Internal error' })
     }
+  }
+
+  // ================= Типы мест на карте =================
+  static async listPlaceTypes(_req: Request, res: Response): Promise<void> {
+    try {
+      const types = await AppDataSource.getRepository(PlaceType).find({ order: { order: 'ASC', key: 'ASC' } })
+      res.json(types)
+    } catch (err) {
+      logger.error('admin.listPlaceTypes failed', err instanceof Error ? err : undefined)
+      res.status(500).json({ error: 'Internal error' })
+    }
+  }
+
+  static async createPlaceType(req: Request, res: Response): Promise<void> {
+    try {
+      const repo = AppDataSource.getRepository(PlaceType)
+      if (await repo.findOne({ where: { key: req.body.key } })) {
+        res.status(409).json({ error: 'Тип с таким ключом уже есть' })
+        return
+      }
+      const saved = await repo.save(repo.create(req.body as PlaceType))
+      res.status(201).json(saved)
+    } catch (err) {
+      logger.error('admin.createPlaceType failed', err instanceof Error ? err : undefined)
+      res.status(500).json({ error: 'Internal error' })
+    }
+  }
+
+  /** Ключ не меняется: на него ссылаются места у ЖК. */
+  static async updatePlaceType(req: Request, res: Response): Promise<void> {
+    try {
+      const repo = AppDataSource.getRepository(PlaceType)
+      const type = await repo.findOne({ where: { key: String(req.params.key) } })
+      if (!type) {
+        res.status(404).json({ error: 'Тип не найден' })
+        return
+      }
+      Object.assign(type, req.body)
+      res.json(await repo.save(type))
+    } catch (err) {
+      logger.error('admin.updatePlaceType failed', err instanceof Error ? err : undefined)
+      res.status(500).json({ error: 'Internal error' })
+    }
+  }
+
+  /**
+   * Тип, которым пользуются места, не удаляется — 409 со списком ЖК. Убрать
+   * его с карты, не теряя места, можно флагом hidden.
+   */
+  static async deletePlaceType(req: Request, res: Response): Promise<void> {
+    try {
+      const key = String(req.params.key)
+      const users = await AppDataSource.getRepository(Complex)
+        .createQueryBuilder('c')
+        .select(['c.id', 'c.name'])
+        .where('c.places @> CAST(:probe AS jsonb)', { probe: JSON.stringify([{ type: key }]) })
+        .getMany()
+      if (users.length > 0) {
+        res.status(409).json({ error: 'Тип используется местами ЖК — его можно скрыть', complexes: users.map((c) => c.name) })
+        return
+      }
+      const result = await AppDataSource.getRepository(PlaceType).delete({ key })
+      if (!result.affected) {
+        res.status(404).json({ error: 'Тип не найден' })
+        return
+      }
+      res.json({ ok: true })
+    } catch (err) {
+      logger.error('admin.deletePlaceType failed', err instanceof Error ? err : undefined)
+      res.status(500).json({ error: 'Internal error' })
+    }
+  }
+
+  /** Набор иконок для выбора у типа: единственный источник — services/mapIcons.ts. */
+  static listMapIcons(_req: Request, res: Response): void {
+    res.json(MAP_ICONS.map((icon) => ({ key: icon.key, label: icon.label, svg: iconSvg(icon.key) })))
   }
 }

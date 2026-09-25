@@ -5,6 +5,7 @@ import { estateApi } from '../api'
 import { getT, setT, setLabel, isRu } from './tfield'
 import { TextField, TextArea, NumberField, SelectField, StringListField, StatsField, LabelMapField } from './fields'
 import { GallerySlidesField } from './GallerySlidesField'
+import { ProjectMapSection } from './ProjectMapSection'
 
 /** Панель редактирования полей ЖК (база ru + переводы uz/en). */
 export const ComplexForm: React.FC<{ complex: ComplexDetail; locale: Locale }> = ({ complex, locale }) => {
@@ -125,6 +126,8 @@ export const ComplexForm: React.FC<{ complex: ComplexDetail; locale: Locale }> =
           }
         />
       )}
+
+      <ProjectMapSection form={form} setForm={setForm} locale={locale} />
 
       {/* Медиа — языконезависимо */}
       {isRu(locale) && (

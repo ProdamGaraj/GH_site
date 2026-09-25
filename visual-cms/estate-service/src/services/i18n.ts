@@ -10,6 +10,7 @@
 
 import { isShownPlanType, mergePlanTypes, PlanGroupingConfig } from './planGrouping'
 import { aboutSlides, GalleryItem, galleryUrls, MediaSlide, toSlides } from './mediaSlides'
+import { buildProjectMap, GeoPoint, MapPlace, PlaceTypeRow, ProjectMapDTO, SalesOffice } from './projectMap'
 
 export type Locale = 'ru' | 'uz' | 'en'
 export const DEFAULT_LOCALE: Locale = 'ru'
@@ -46,6 +47,11 @@ export const COMPLEX_TR_FIELDS: FieldMap = {
   // по-русски и одни и те же у десятков типов планировок, поэтому переводятся
   // один раз на ЖК, а не у каждого типа. Базы (ru) у поля нет — только оверлей.
   windowViewLabels: 'json',
+  // Карта проекта (services/projectMap.ts). Базы (ru) у полей нет: адрес
+  // отдела продаж лежит в salesOffice.address, названия мест — в places[].name.
+  // Переводы названий — словарём по id места: { "<uuid>": "Maktab №1" }.
+  salesOfficeAddress: 'string',
+  placeNames: 'json',
 }
 export const HOUSE_TR_FIELDS: FieldMap = {
   name: 'string',
@@ -129,6 +135,14 @@ export interface ComplexRow {
   planGrouping?: PlanGroupingConfig | null
   /** Только из оверлея языка: перевод видов из окна, см. COMPLEX_TR_FIELDS. */
   windowViewLabels?: Record<string, string> | null
+  /** Карта проекта, см. services/projectMap.ts. */
+  housePoint?: GeoPoint | null
+  salesOffice?: SalesOffice | null
+  places?: MapPlace[]
+  /** Только из оверлея языка: перевод адреса отдела продаж. */
+  salesOfficeAddress?: string | null
+  /** Только из оверлея языка: переводы названий мест по id. */
+  placeNames?: Record<string, string> | null
 }
 
 export interface HouseRow {
@@ -458,7 +472,8 @@ export interface HouseDTO {
   apartments: ApartmentDTO[]
 }
 
-export interface ComplexDetailDTO {
+/** Деталь ЖК; карта проекта — плоскими списками mapPoints/mapLegend/mapOffices. */
+export interface ComplexDetailDTO extends ProjectMapDTO {
   slug: string
   /** ID дома в MacroCRM: {{item.externalHouseId}} в доп.источнике квартир. */
   externalHouseId: number | null
@@ -768,7 +783,8 @@ export function buildComplexDetail(
   apartments: ApartmentRow[],
   translations: TrRow[],
   locale: Locale,
-  planTypes: PlanTypeRow[] = []
+  planTypes: PlanTypeRow[] = [],
+  placeTypes: PlaceTypeRow[] = []
 ): ComplexDetailDTO {
   const index = indexTranslations(translations)
   const c = applyOverlay(complex, 'complex', complex.id, locale, COMPLEX_TR_FIELDS, index)
@@ -889,6 +905,18 @@ export function buildComplexDetail(
     planViews: distinctValues(
       planTypeDTOs.flatMap((p) => p.windowViews),
       (view) => view
+    ),
+    ...buildProjectMap(
+      {
+        name: c.name,
+        housePoint: c.housePoint,
+        salesOffice: c.salesOffice,
+        places: c.places,
+        salesOfficeAddress: c.salesOfficeAddress,
+        placeNames: c.placeNames,
+      },
+      placeTypes,
+      locale
     ),
     planSections: planTypeDTOs.length > 0 ? [{ title: PLAN_SECTION_TITLE[locale] }] : [],
   }

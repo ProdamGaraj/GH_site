@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Trash2, Building2, Layers } from 'lucide-react'
+import { Plus, Trash2, Building2, Layers, MapPin } from 'lucide-react'
 import type { ComplexListItem } from '../types'
 import { estateApi } from '../api'
 import { ApiError } from '@/shared/api/http'
@@ -63,6 +63,12 @@ export const EstateList: React.FC = () => {
           <Building2 size={24} /> Жилые комплексы
         </h1>
         <div className="flex items-center gap-2">
+          <Link
+            to="/estate/place-types"
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-md text-sm hover:bg-gray-50"
+          >
+            <MapPin size={16} /> Типы мест на карте
+          </Link>
           <button
             onClick={() => setShowProvision(true)}
             className="flex items-center gap-2 px-4 py-2 border border-primary-600 text-primary-700 rounded-md text-sm hover:bg-primary-50"

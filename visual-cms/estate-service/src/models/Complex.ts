@@ -10,6 +10,7 @@ import {
 import { House } from './House'
 import type { PlanGroupingConfig } from '../services/planGrouping'
 import type { GalleryItem } from '../services/mediaSlides'
+import type { GeoPoint, MapPlace, SalesOffice } from '../services/projectMap'
 
 /**
  * Жилой комплекс (ЖК).
@@ -161,6 +162,21 @@ export class Complex {
    */
   @Column({ type: 'jsonb', nullable: true })
   planGrouping?: PlanGroupingConfig | null
+
+  /**
+   * Карта проекта (services/projectMap.ts). Точка дома — центр карты; без неё
+   * карты на странице нет. Отдел продаж — для кнопок «Вызвать такси» и
+   * «Маршрут». Места рядом ссылаются на ключ типа из place_types; переводы
+   * их названий — полем перевода placeNames {id места: название}.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  housePoint?: GeoPoint | null
+
+  @Column({ type: 'jsonb', nullable: true })
+  salesOffice?: SalesOffice | null
+
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  places!: MapPlace[]
 
   @OneToMany(() => House, (house) => house.complex)
   houses!: House[]

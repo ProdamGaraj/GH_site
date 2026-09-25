@@ -12,6 +12,8 @@ import {
   createApartmentSchema,
   updateApartmentSchema,
   previewPlanGroupsSchema,
+  createPlaceTypeSchema,
+  updatePlaceTypeSchema,
 } from '../schemas/estate.schema'
 
 /**
@@ -34,6 +36,13 @@ router.post(
   validate(previewPlanGroupsSchema),
   AdminController.previewPlanGroups
 )
+
+// Карта проекта: типы мест (общие для всех ЖК) и набор иконок для них.
+router.get('/place-types', AdminController.listPlaceTypes)
+router.post('/place-types', validate(createPlaceTypeSchema), AdminController.createPlaceType)
+router.put('/place-types/:key', validate(updatePlaceTypeSchema), AdminController.updatePlaceType)
+router.delete('/place-types/:key', AdminController.deletePlaceType)
+router.get('/map-icons', AdminController.listMapIcons)
 
 // House
 router.post('/complexes/:complexId/houses', validate(createHouseSchema), AdminController.createHouse)

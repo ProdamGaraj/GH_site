@@ -1,6 +1,13 @@
 import { apiFetch, ApiError } from '@/shared/api/http'
 import { api } from '@/shared/api'
-import type { ComplexDetail, ComplexListItem, PlanGroupingConfig, PlanGroupingPreview } from './types'
+import type {
+  ComplexDetail,
+  ComplexListItem,
+  MapIconOption,
+  PlaceType,
+  PlanGroupingConfig,
+  PlanGroupingPreview,
+} from './types'
 
 /**
  * Клиент estate-service через прокси /estate-api (vite dev / nginx prod).
@@ -23,6 +30,32 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export const estateApi = {
+  // --- Карта проекта: типы мест (общие для всех ЖК) и набор иконок ---
+  listPlaceTypes: () => apiFetch(`${BASE}/place-types`).then((r) => json<PlaceType[]>(r)),
+
+  createPlaceType: (body: PlaceType) =>
+    apiFetch(`${BASE}/place-types`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then((r) => json<PlaceType>(r)),
+
+  /** Ключ не меняется — в теле только правимые поля. */
+  updatePlaceType: (key: string, body: Omit<PlaceType, 'key'>) =>
+    apiFetch(`${BASE}/place-types/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then((r) => json<PlaceType>(r)),
+
+  /** Тип, которым пользуются места, сервер не удалит: 409 со списком ЖК в details.complexes. */
+  deletePlaceType: (key: string) =>
+    apiFetch(`${BASE}/place-types/${encodeURIComponent(key)}`, { method: 'DELETE' }).then((r) =>
+      json<{ ok: boolean }>(r)
+    ),
+
+  listMapIcons: () => apiFetch(`${BASE}/map-icons`).then((r) => json<MapIconOption[]>(r)),
+
   listComplexes: () => apiFetch(`${BASE}/complexes`).then((r) => json<ComplexListItem[]>(r)),
 
   getComplex: (id: string) => apiFetch(`${BASE}/complexes/${id}`).then((r) => json<ComplexDetail>(r)),

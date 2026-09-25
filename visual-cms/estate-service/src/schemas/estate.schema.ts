@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isMapIcon } from '../services/mapIcons'
 
 /** Переводы: { uz: {field: value}, en: {field: value} }. Значения свободны
  *  (string | string[] | объект) — контроллер сериализует по типу поля. */
@@ -42,6 +43,45 @@ export const galleryItemSchema = z.union([
   }),
 ])
 
+// --- Карта проекта (services/projectMap.ts) ---
+const latitude = z.number().min(-90).max(90)
+const longitude = z.number().min(-180).max(180)
+
+export const geoPointSchema = z.object({ lat: latitude, lng: longitude })
+
+export const salesOfficeSchema = geoPointSchema.extend({ address: z.string().max(300).optional() })
+
+export const mapPlaceSchema = z.object({
+  id: z.string().uuid(),
+  type: z.string().min(1).max(40),
+  name: z.string().trim().min(1).max(120),
+  lat: latitude,
+  lng: longitude,
+})
+
+/** Места рядом с ЖК: id уникальны — на них держатся переводы названий. */
+export const mapPlacesSchema = z
+  .array(mapPlaceSchema)
+  .max(100)
+  .refine((places) => new Set(places.map((p) => p.id)).size === places.length, 'id мест повторяются')
+
+const placeTypeFields = {
+  nameRu: z.string().trim().min(1).max(80),
+  nameUz: z.string().trim().max(80).optional(),
+  nameEn: z.string().trim().max(80).optional(),
+  icon: z.string().refine(isMapIcon, 'Иконки нет в наборе'),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Цвет в виде #rrggbb'),
+  order: z.number().int().optional(),
+  hidden: z.boolean().optional(),
+}
+
+/** Ключ типа неизменен: на него ссылаются места у ЖК. */
+export const createPlaceTypeSchema = z.object({
+  key: z.string().regex(/^[a-z][a-z0-9-]{1,39}$/, 'Ключ: латиница, цифры и дефис, от 2 символов'),
+  ...placeTypeFields,
+})
+export const updatePlaceTypeSchema = z.object(placeTypeFields).partial()
+
 // --- Complex ---
 const complexBase = {
   slug: z.string().min(1).max(160).regex(/^[a-z0-9-]+$/, 'slug: только a-z, 0-9, дефис'),
@@ -77,6 +117,9 @@ const complexBase = {
   hallGallery: z.array(galleryItemSchema).optional(),
   yardGallery: z.array(galleryItemSchema).optional(),
   planGrouping: planGroupingSchema.optional(),
+  housePoint: geoPointSchema.nullable().optional(),
+  salesOffice: salesOfficeSchema.nullable().optional(),
+  places: mapPlacesSchema.optional(),
   translations: translationsSchema,
 }
 export const createComplexSchema = z.object(complexBase)

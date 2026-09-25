@@ -100,7 +100,48 @@ export interface ComplexDetail {
    * чтения: по ним строится форма перевода `windowViewLabels` на вкладках uz/en.
    */
   windowViews?: string[]
+  /** Карта проекта: точка дома (без неё карты нет), отдел продаж, места рядом. */
+  housePoint?: GeoPoint | null
+  salesOffice?: SalesOffice | null
+  places?: MapPlace[]
   houses: House[]
+}
+
+// --- Карта проекта (estate-service: services/projectMap.ts) ---
+
+export interface GeoPoint {
+  lat: number
+  lng: number
+}
+
+export interface SalesOffice extends GeoPoint {
+  address?: string
+}
+
+/** Место рядом с ЖК; id — uuid, на нём держатся переводы названия (placeNames). */
+export interface MapPlace extends GeoPoint {
+  id: string
+  type: string
+  name: string
+}
+
+/** Тип места — общий для всех ЖК. Ключ неизменен: на него ссылаются места. */
+export interface PlaceType {
+  key: string
+  nameRu: string
+  nameUz: string
+  nameEn: string
+  icon: string
+  color: string
+  order: number
+  hidden: boolean
+}
+
+/** Иконка из набора estate-service: готовый svg. */
+export interface MapIconOption {
+  key: string
+  label: string
+  svg: string
 }
 
 /** Настройка склейки планировок ЖК (estate-service: services/planGrouping.ts). */

@@ -20,6 +20,7 @@ import { CollectionEditor } from '@/pages/CollectionEditor'
 import { MediaLibraryPage } from '@/pages/MediaLibraryPage'
 import { EstatePage } from '@/pages/EstatePage'
 import { EstateEditorPage } from '@/pages/EstateEditorPage'
+import { EstatePlaceTypesPage } from '@/pages/EstatePlaceTypesPage'
 import { Login } from '@/pages/Login'
 import { RequireAuth } from '@/widgets/auth/RequireAuth'
 
@@ -81,6 +82,10 @@ export const router = createBrowserRouter([
       {
         path: 'estate',
         element: <EstatePage />,
+      },
+      {
+        path: 'estate/place-types',
+        element: <EstatePlaceTypesPage />,
       },
       {
         path: 'estate/:id',
