@@ -105,6 +105,14 @@ export function hasClass(node: StructureNode, name: string): boolean {
   return classOf(node).split(/\s+/).includes(name)
 }
 
+/** Добавляет класс узлу; true — если его не было. */
+export function withClass(node: StructureNode, name: string): boolean {
+  if (hasClass(node, name)) return false
+  const current = (node.attributes?.class ?? '').trim()
+  node.attributes = { ...node.attributes, class: current ? `${current} ${name}` : name }
+  return true
+}
+
 export function findAll(root: StructureNode, pred: (n: StructureNode) => boolean): StructureNode[] {
   const out: StructureNode[] = []
   walk(root, (n) => {

@@ -50,6 +50,31 @@ bash scripts/map/build-map-assets.sh
 node --test scripts/map/generate-style.test.js
 ```
 
+## Карта на странице проекта
+
+- Данные — estate-service (`services/projectMap.ts`): `mapHouse` (0..1, без
+  точки дома карты нет), `mapPoints`, `mapLegend`, `mapOffices`. Координаты,
+  места и типы мест задаются в админке estate.
+- Разметка — блок «Complex location», миграция
+  `backend/src/scripts/migrate-project-map.ts`.
+- Рантайм — `backend/src/services/runtime/map-runtime.js`. Генератор вставляет
+  его только в страницы с `[data-map]`. MapLibre подгружается, когда карта
+  подъезжает к экрану.
+
+## Проверка в браузере
+
+После передеплоя страниц проектов или пересборки карты:
+
+```bash
+node scripts/map/check-project-map.js https://test_analytics.gh.uz/ru/complex/assalom-dostlik/
+```
+
+Проверяет отрисовку, ошибки, метки (не плывут ли при масштабировании),
+легенду, подсказки, ссылки поездки и запасной список мест без `/map/`.
+Скриншоты кладёт в `./map-check`. Нужны `playwright-core` из
+`visual-cms/node_modules` и Chrome (`--chrome=путь`, если он не на обычном
+месте).
+
 ## Что в каталоге и лицензии
 
 | Путь | Что | Лицензия |

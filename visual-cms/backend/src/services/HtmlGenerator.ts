@@ -6,6 +6,7 @@ import { generateDataBindingRuntime, type PageDataConfig } from './DataBindingGe
 import { generateCarouselRuntime } from './CarouselRuntime'
 import { generateComplexOverlays } from './ComplexOverlaysRuntime'
 import { generatePlanFilterRuntime } from './PlanFilterRuntime'
+import { generateMapRuntime } from './MapRuntime'
 import { generateResponsiveMediaRuntime } from './ResponsiveMediaRuntime'
 import { generateActiveLinkRuntime } from './ActiveLinkRuntime'
 import {
@@ -221,6 +222,7 @@ ${generateResponsiveMediaRuntime()}
 ${generateCarouselRuntime()}
 ${generateComplexOverlays(bodyContent, lang)}
 ${generatePlanFilterRuntime(bodyContent)}
+${generateMapRuntime(bodyContent)}
 ${generateActiveLinkRuntime()}
 ${options.analyticsPageId ? `  <script src="/api/analytics/tracker.js" data-page-id="${options.analyticsPageId}" defer></script>\n` : ''}
 ${authoredJs}${scripts ? `<script>\n${scripts}\n</script>` : ''}

@@ -19,7 +19,7 @@
  *
  * Чистое преобразование структуры блока; запись — `migrate-nav-logo-theme.ts`.
  */
-import { MigrationError, MigrationResult, StructureNode, findOne, hasClass, makeNode } from './choiceToPlanTypes'
+import { MigrationError, MigrationResult, StructureNode, findOne, hasClass, makeNode, withClass } from './choiceToPlanTypes'
 
 export const LOGO_LIGHT_CLASS = 'glogo-light'
 export const LOGO_DARK_CLASS = 'glogo-dark'
@@ -71,13 +71,6 @@ export interface NavLogoSources {
 
 /** Атрибуты тёмного логотипа: дубль для глаз, экранному диктору не нужен. */
 const DARK_A11Y = { alt: '', 'aria-hidden': 'true' }
-
-function withClass(node: StructureNode, name: string): boolean {
-  if (hasClass(node, name)) return false
-  const current = (node.attributes?.class ?? '').trim()
-  node.attributes = { ...node.attributes, class: current ? `${current} ${name}` : name }
-  return true
-}
 
 /** Ставит атрибуты картинки; true — если что-то поменялось. */
 function withAttributes(node: StructureNode, attrs: Record<string, string>): boolean {

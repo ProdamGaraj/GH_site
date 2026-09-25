@@ -472,7 +472,7 @@ export interface HouseDTO {
   apartments: ApartmentDTO[]
 }
 
-/** Деталь ЖК; карта проекта — плоскими списками mapPoints/mapLegend/mapOffices. */
+/** Деталь ЖК; карта проекта — плоскими списками mapPoints/mapLegend/mapOffices/mapHouse. */
 export interface ComplexDetailDTO extends ProjectMapDTO {
   slug: string
   /** ID дома в MacroCRM: {{item.externalHouseId}} в доп.источнике квартир. */

@@ -8,8 +8,10 @@
  *                их в [data-map-point], рантайм рисует;
  *   mapLegend  — использованные типы мест: название, цвет, SVG иконки, число;
  *   mapOffices — отдел продаж списком 0..1: кнопки поездки повторяются по
- *                нему и пропадают, если отдела нет.
- * Нет точки дома — все три пустые: карты у проекта нет, блок прячется.
+ *                нему и пропадают, если отдела нет;
+ *   mapHouse   — точка дома списком 0..1: по нему повторяется сам узел карты,
+ *                и без дома на странице нет ни карты, ни её скрипта.
+ * Нет точки дома — все списки пустые: карты у проекта нет.
  *
  * Иконки — из services/mapIcons.ts: единственный набор на систему.
  * Кривые точки и места неизвестного или скрытого типа отбрасываются, не
@@ -81,10 +83,15 @@ export interface MapOfficeDTO extends GeoPoint {
   address: string
 }
 
+export interface MapHouseDTO extends GeoPoint {
+  name: string
+}
+
 export interface ProjectMapDTO {
   mapPoints: MapPointDTO[]
   mapLegend: MapLegendItem[]
   mapOffices: MapOfficeDTO[]
+  mapHouse: MapHouseDTO[]
 }
 
 const OFFICE_LABEL: Record<MapLocale, string> = {
@@ -93,7 +100,7 @@ const OFFICE_LABEL: Record<MapLocale, string> = {
   en: 'Sales office',
 }
 
-const EMPTY: ProjectMapDTO = { mapPoints: [], mapLegend: [], mapOffices: [] }
+const EMPTY: ProjectMapDTO = { mapPoints: [], mapLegend: [], mapOffices: [], mapHouse: [] }
 
 // --- Точки ---
 
@@ -252,5 +259,10 @@ export function buildProjectMap(input: ProjectMapInput, placeTypes: PlaceTypeRow
     else legend.set(type.key, { type: type.key, name: typeName(type, locale), color: type.color, icon: iconSvg(type.icon) ?? '', count: 1 })
   }
 
-  return { mapPoints: points, mapLegend: [...legend.values()], mapOffices: offices }
+  return {
+    mapPoints: points,
+    mapLegend: [...legend.values()],
+    mapOffices: offices,
+    mapHouse: [{ name: input.name, ...house }],
+  }
 }

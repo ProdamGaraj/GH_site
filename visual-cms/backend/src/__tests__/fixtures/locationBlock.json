@@ -1,0 +1,200 @@
+{
+  "id": "node-1783405511132-ru6pfwsh4",
+  "styles": {
+    "properties": {
+      "display": "grid"
+    }
+  },
+  "tagName": "section",
+  "children": [
+    {
+      "id": "node-1783405511132-bwe22tzvv",
+      "styles": {
+        "properties": {}
+      },
+      "tagName": "div",
+      "children": [
+        {
+          "id": "node-1783405511132-kxgakrjj1",
+          "styles": {
+            "properties": {}
+          },
+          "content": "{{item.locationTitle}}",
+          "tagName": "h2",
+          "children": [],
+          "metadata": {},
+          "attributes": {},
+          "elementType": "text"
+        },
+        {
+          "id": "node-1783405511132-i2kdjr8pu",
+          "styles": {
+            "properties": {}
+          },
+          "content": "{{item.locationText}}",
+          "tagName": "p",
+          "children": [],
+          "metadata": {},
+          "attributes": {
+            "id": "projectLocationText"
+          },
+          "elementType": "text"
+        }
+      ],
+      "metadata": {},
+      "attributes": {
+        "class": "section-copy"
+      },
+      "elementType": "container"
+    },
+    {
+      "id": "node-1783405511132-edhif0r1v",
+      "styles": {
+        "properties": {}
+      },
+      "tagName": "div",
+      "children": [
+        {
+          "id": "node-1783405511132-hirpk35et",
+          "styles": {
+            "properties": {}
+          },
+          "content": "Посмотреть на карте",
+          "tagName": "a",
+          "children": [],
+          "metadata": {},
+          "attributes": {
+            "id": "mapLink",
+            "href": "#location"
+          },
+          "elementType": "text"
+        },
+        {
+          "id": "node-1783405511132-x2x8gk3eq",
+          "styles": {
+            "properties": {}
+          },
+          "content": "Панорама 360°",
+          "tagName": "a",
+          "children": [],
+          "metadata": {},
+          "attributes": {
+            "id": "panoramaLink",
+            "href": "#location",
+            "hidden": ""
+          },
+          "elementType": "text"
+        }
+      ],
+      "metadata": {},
+      "attributes": {
+        "class": "location-actions"
+      },
+      "elementType": "container"
+    },
+    {
+      "id": "node-1783405511132-92pii0rt2",
+      "styles": {
+        "properties": {}
+      },
+      "tagName": "div",
+      "children": [
+        {
+          "id": "tplnode-8bidx5aeu",
+          "styles": {
+            "properties": {}
+          },
+          "_repeat": {
+            "source": "item.mapImages"
+          },
+          "content": "",
+          "tagName": "div",
+          "children": [
+            {
+              "id": "tplnode-cywfbkbfe",
+              "styles": {
+                "properties": {
+                  "top": "0",
+                  "left": "0",
+                  "width": "100%",
+                  "height": "100%",
+                  "position": "absolute",
+                  "backgroundSize": "cover",
+                  "backgroundImage": "url(\"{{$.image}}\")",
+                  "backgroundRepeat": "no-repeat",
+                  "backgroundPosition": "center"
+                }
+              },
+              "content": "",
+              "tagName": "div",
+              "children": [],
+              "metadata": {
+                "name": "Map image"
+              },
+              "attributes": {
+                "aria-hidden": "true"
+              },
+              "elementType": "container"
+            }
+          ],
+          "metadata": {
+            "name": "Map image (repeat)"
+          },
+          "attributes": {},
+          "elementType": "container"
+        },
+        {
+          "id": "tplnode-e3vgryb3c",
+          "styles": {
+            "properties": {}
+          },
+          "_repeat": {
+            "source": "item.locationLabels"
+          },
+          "content": "",
+          "tagName": "div",
+          "children": [
+            {
+              "id": "node-1783405511132-38bvrb41s",
+              "styles": {
+                "properties": {
+                  "top": "{{$.top}}",
+                  "left": "{{$.left}}",
+                  "position": "absolute"
+                }
+              },
+              "content": "{{$.label}}",
+              "tagName": "span",
+              "children": [],
+              "metadata": {},
+              "attributes": {
+                "class": "{{$.className}}"
+              },
+              "elementType": "text"
+            }
+          ],
+          "metadata": {
+            "name": "Map labels (repeat)"
+          },
+          "attributes": {},
+          "elementType": "container"
+        }
+      ],
+      "metadata": {},
+      "attributes": {
+        "id": "locationVisual",
+        "class": "location-visual",
+        "aria-label": "Карта расположения"
+      },
+      "elementType": "container"
+    }
+  ],
+  "metadata": {
+    "globalCss": ".map-label {position: absolute;\n  display: inline-flex;\n  align-items: center;\n  gap: 8px;\n  min-height: 34px;\n  padding: 0 12px;\n  border-radius: 999px;\n  background: rgba(255, 255, 255, .9);\n  color: #15181d;\n  font-size: 12px;\n  font-weight: 900;\n  box-shadow: 0 10px 28px rgba(0, 0, 0, .18);}\n\n.location-actions {display: flex;\n  justify-content: flex-end;\n  gap: 10px;\n  margin-top: 18px;}\n\n/* ============================================================\n   БЛОК: LOCATION — расположение проекта (карта, метки, ссылки).\n   Зависимости: page.css (.detail-section, .section-copy;\n   отступ .location-section.detail-section-pad задан там же).\n   Карту и ссылки подставляет page.js.\n   ============================================================ */\n\n.location-visual {\n  position: relative;\n  min-height: clamp(360px, 56vw, 690px);\n  border-radius: 28px;\n  background:\n    linear-gradient(180deg, rgba(13, 15, 18, .08), rgba(13, 15, 18, .38)),\n    url(\"https://images.unsplash.com/photo-1534471812555-5b0bb08f034c?auto=format&fit=crop&w=1800&q=84\") center / cover no-repeat;\n  overflow: hidden;\n}\n\nbody[data-project=\"ozmakon-business\"] .location-visual {\n  min-height: clamp(340px, 46vw, 620px);\n  border: 1px solid rgba(21, 24, 29, .08);\n  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .24);\n}\n\n.map-label.accent {\n  background: #15181d;\n  color: #fff;\n}\n\n.location-actions a {\n  min-height: 48px;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  padding: 0 18px;\n  border: 1px solid rgba(21, 24, 29, .12);\n  border-radius: 13px;\n  background: #fff;\n  color: #15181d;\n  font-weight: 900;\n}\n\n@media (max-width: 980px) {\n  .location-actions {\n    justify-content: flex-start;\n    flex-wrap: wrap;\n  }\n}\n\n@media (max-width: 560px) {\n  .location-grid {\n    grid-template-columns: 1fr;\n  }\n\n  .location-visual {\n    min-height: 360px;\n    border-radius: 22px;\n  }\n\n  .location-actions a {\n    width: 100%;\n    justify-content: center;\n  }\n}"
+  },
+  "attributes": {
+    "id": "location",
+    "class": "detail-section detail-section-pad location-section"
+  },
+  "elementType": "container"
+}

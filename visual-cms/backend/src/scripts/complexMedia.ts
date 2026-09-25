@@ -123,7 +123,7 @@ function slideOf(track: StructureNode, label: string): StructureNode {
 }
 
 /** Заменяет CSS-секцию блока (она всегда в конце) на актуальную версию. */
-function upsertCssSection(metadata: Record<string, unknown>, head: string, marker: string, section: string): boolean {
+export function upsertCssSection(metadata: Record<string, unknown>, head: string, marker: string, section: string): boolean {
   const css = typeof metadata.globalCss === 'string' ? metadata.globalCss : ''
   if (css.includes(marker)) return false
   metadata.globalCss = stripSection(css, head) + '\n' + section

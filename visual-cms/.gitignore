@@ -54,3 +54,5 @@ ssl/
 # README держит каталог в репозитории, чтобы Docker не создал его от root.
 map-assets/*
 !map-assets/README.md
+# Скриншоты scripts/map/check-project-map.js.
+map-check/

@@ -27,6 +27,11 @@ COPY src/ ./src/
 # иначе раннер в проде не найдёт ни одной миграции.
 RUN npm run build && cp src/migrations/*.sql dist/migrations/ 2>/dev/null || true
 
+# Рантайм карты проекта — обычный .js, который генератор читает с диска
+# (services/MapRuntime.ts); tsc его не переносит. Отдельной строкой и без
+# `|| true`: без файла страницы проектов публиковались бы без карты.
+RUN mkdir -p dist/services/runtime && cp src/services/runtime/*.js dist/services/runtime/
+
 # Prune dev dependencies
 RUN npm prune --production
 

@@ -89,7 +89,17 @@ describe('buildProjectMap', () => {
   const input = { name: 'Doʼstlik', housePoint: HOUSE, salesOffice: { ...HOUSE, lng: HOUSE.lng + 0.01, address: 'ул. Навои, 1' }, places }
 
   it('нет точки дома — карты нет: все списки пустые', () => {
-    expect(buildProjectMap({ ...input, housePoint: null }, TYPES, 'ru')).toEqual({ mapPoints: [], mapLegend: [], mapOffices: [] })
+    expect(buildProjectMap({ ...input, housePoint: null }, TYPES, 'ru')).toEqual({
+      mapPoints: [],
+      mapLegend: [],
+      mapOffices: [],
+      mapHouse: [],
+    })
+  })
+
+  it('дом: списком 0..1 с названием ЖК — по нему повторяется узел карты', () => {
+    expect(buildProjectMap(input, TYPES, 'ru').mapHouse).toEqual([{ name: 'Doʼstlik', ...HOUSE }])
+    expect(buildProjectMap({ ...input, housePoint: { lat: 'x', lng: 1 } }, TYPES, 'ru').mapHouse).toEqual([])
   })
 
   it('точки: дом, отдел продаж, места — по порядку типа, внутри ближние первыми', () => {
