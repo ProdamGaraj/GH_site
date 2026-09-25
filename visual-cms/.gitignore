@@ -49,3 +49,8 @@ redis-data/
 minio-data/
 
 ssl/
+
+# Карта проекта: собирает scripts/map/build-map-assets.sh, в git не кладётся.
+# README держит каталог в репозитории, чтобы Docker не создал его от root.
+map-assets/*
+!map-assets/README.md

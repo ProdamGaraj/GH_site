@@ -50,6 +50,8 @@ lol.html
 strip-html.js
 inspect-hero.js
 visual-cms/scripts/*
+# Сборка карты проекта — не разовая, нужна на каждом сервере.
+!visual-cms/scripts/map/
 visual-cms/backend/scripts/*
 visual-cms/backend/fix_rce.js
 visual-cms/backend/fix_rce2.js
