@@ -10,7 +10,13 @@ export class Page {
   @Column()
   name!: string
 
-  @Column({ unique: true })
+  /**
+   * Адрес страницы в пределах сайта. Уникален только среди опубликованных:
+   * у адреса может быть несколько черновиков-вариантов. Держит это частичный
+   * уникальный индекс (migrations/page-variants-published-address.sql), а не
+   * `unique` здесь — TypeORM частичные индексы с выражением не описывает.
+   */
+  @Column()
   slug!: string
 
   @ManyToOne(() => Site, site => site.pages, { nullable: true, onDelete: 'SET NULL' })

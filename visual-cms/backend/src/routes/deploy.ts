@@ -92,15 +92,27 @@ router.post('/collection/:collectionId', asyncHandler(async (req: Request, res: 
 
 /**
  * POST /api/deploy/:pageId - Деплой одной страницы
+ *
+ * Адрес занят другим опубликованным вариантом — 409 с details.code
+ * SLUG_OCCUPIED и details.occupant; `?replace=1` публикует вместо него
+ * (deployService.replacePublishedVariant).
  */
 router.post('/:pageId', asyncHandler(async (req: Request, res: Response) => {
     const { pageId } = req.params
+    const replace = req.query.replace === '1'
     const start = Date.now()
 
     const page = await pageRepository.findOne({ where: { id: pageId } })
 
-    const result = await deployService.deployPage(pageId)
+    const result = replace
+      ? await deployService.replacePublishedVariant(pageId)
+      : await deployService.deployPage(pageId)
     const durationMs = Date.now() - start
+
+    if (result.code === 'SLUG_OCCUPIED') {
+      res.status(409).json({ ...result, details: { code: result.code, occupant: result.occupant } })
+      return
+    }
 
     await deployLogRepository.save(deployLogRepository.create({
       siteId: page?.siteId || undefined,

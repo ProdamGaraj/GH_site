@@ -10,7 +10,8 @@ import { siteApi } from '@/shared/api'
 import type { Page } from '@/shared/types'
 import { getSitePublicUrl } from '@/shared/utils'
 import { useOverlayClose } from '@/shared/hooks/useOverlayClose'
-import { PublishToggle } from '@/features/pages/components'
+import { CreateVariantButton, PublishToggle } from '@/features/pages/components'
+import { groupByAddress, occupantOf } from '@/features/pages/pageVariants'
 
 export const SitePagesPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -64,6 +65,11 @@ export const SitePagesPage: React.FC = () => {
     } catch (error) {
       console.error('Failed to unassign page:', error)
     }
+  }
+
+  const refresh = () => {
+    loadSitePages()
+    dispatch(fetchPages())
   }
 
   const unassignedPages = allPages.filter(
@@ -140,10 +146,19 @@ export const SitePagesPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {sitePages.map((page) => (
-                  <tr key={page.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{page.name}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900 font-mono">/{page.slug}</td>
+                {/* Страницы одного адреса — варианты: группой, опубликованный первым. */}
+                {groupByAddress(sitePages).flatMap((group) => group.pages.map((page, index) => (
+                  <tr key={page.id} className={`hover:bg-gray-50 ${index > 0 ? 'bg-gray-50/50' : ''}`}>
+                    <td className={`py-4 text-sm font-medium text-gray-900 ${index > 0 ? 'pl-12 pr-6' : 'px-6'}`}>
+                      {index > 0 && <span className="text-gray-400 mr-1">↳</span>}
+                      {page.name}
+                    </td>
+                    <td className={`px-6 py-4 text-sm font-mono ${index > 0 ? 'text-gray-400' : 'text-gray-900'}`}>
+                      /{page.slug}
+                      {index === 0 && group.pages.length > 1 && (
+                        <div className="text-xs text-gray-500 font-sans">вариантов: {group.pages.length}</div>
+                      )}
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                         page.status === 'published' ? 'bg-green-100 text-green-700' :
@@ -156,13 +171,8 @@ export const SitePagesPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
-                        <PublishToggle
-                          page={page}
-                          onChanged={() => {
-                            loadSitePages()
-                            dispatch(fetchPages())
-                          }}
-                        />
+                        <PublishToggle page={page} occupant={occupantOf(page, group)} onChanged={refresh} />
+                        <CreateVariantButton page={page} onCreated={refresh} />
                         <Link
                           to={`/editor/page/${page.id}`}
                           className="p-1 text-indigo-600 hover:text-indigo-900"
@@ -180,7 +190,7 @@ export const SitePagesPage: React.FC = () => {
                       </div>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>

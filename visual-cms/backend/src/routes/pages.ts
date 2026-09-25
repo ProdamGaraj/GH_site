@@ -21,6 +21,7 @@ router.put('/:id', validate(updatePageSchema), pageController.update)
 router.post('/:id/save-preflight', validate(savePreflightSchema), pageController.savePreflight)
 router.delete('/:id', pageController.delete)
 router.post('/:id/publish', pageController.publish)
+router.post('/:id/variants', pageController.createVariant)
 
 // Data Binding routes (Stage 3.5 & 3.6)
 router.get('/:id/data-settings', pageController.getDataSettings)

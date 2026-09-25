@@ -151,11 +151,19 @@ export const PageSettingsPanel: React.FC<PageSettingsPanelProps> = ({
                   onChange={(e) => handleChange('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
                   placeholder="home"
                   className="flex-1"
+                  disabled={settings.status === 'published'}
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 URL: /{settings.slug || 'home'}
               </p>
+              {/* Файлы опубликованной страницы лежат по её адресу: смена адреса
+                  оставила бы их висеть. Сервер такое сохранение тоже отклонит. */}
+              {settings.status === 'published' && (
+                <p className="text-xs text-amber-700 mt-1">
+                  Адрес опубликованной страницы не меняется — сначала снимите её с публикации.
+                </p>
+              )}
             </div>
 
             <div>

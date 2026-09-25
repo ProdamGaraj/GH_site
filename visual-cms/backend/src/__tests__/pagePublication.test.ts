@@ -6,11 +6,16 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import {
+  addressChangeError,
   allowedStatusChange,
+  findPublishedSibling,
   initialStatus,
+  leftoverFiles,
   planSiteSync,
   publishedFiles,
   removePublishedFiles,
+  sameAddress,
+  variantName,
 } from '../services/pagePublication'
 
 const LANGS = ['ru', 'uz', 'en']
@@ -147,5 +152,42 @@ describe('initialStatus', () => {
     expect(initialStatus('published')).toBe('draft')
     expect(initialStatus(undefined)).toBe('draft')
     expect(initialStatus('archived')).toBe('archived')
+  })
+})
+
+describe('варианты страницы', () => {
+  const page = (id: string, status: string, slug = 'harizma', siteId: string | null = 'site') => ({ id, slug, status, siteId })
+
+  it('один адрес — тот же сайт и тот же slug; страницы без сайта тоже сравниваются', () => {
+    expect(sameAddress(page('a', 'draft'), page('b', 'draft'))).toBe(true)
+    expect(sameAddress(page('a', 'draft'), page('b', 'draft', 'other'))).toBe(false)
+    expect(sameAddress(page('a', 'draft'), page('b', 'draft', 'harizma', 'site2'))).toBe(false)
+    expect(sameAddress(page('a', 'draft', 'x', null), { id: 'b', slug: 'x', status: 'draft' })).toBe(true)
+  })
+
+  it('опубликованный сосед — другая опубликованная страница того же адреса', () => {
+    const me = page('b', 'draft')
+    const pages = [page('b', 'published'), page('c', 'draft'), page('d', 'published', 'harizma', 'site2'), page('a', 'published')]
+    expect(findPublishedSibling(me, pages)?.id).toBe('a')
+    expect(findPublishedSibling(me, [page('b', 'published')])).toBeUndefined()
+  })
+
+  it('лишние файлы прежнего варианта — те, что новый не перезаписал', () => {
+    const prev = ['/s/harizma/index.html', '/s/ru/harizma/index.html', '/s/uz/harizma/index.html']
+    expect(leftoverFiles(prev, ['/s/harizma/index.html', '/s/ru/harizma/../harizma/index.html'])).toEqual(['/s/uz/harizma/index.html'])
+    expect(leftoverFiles(prev, [])).toEqual(prev)
+  })
+
+  it('адрес и сайт опубликованной страницы менять нельзя, черновика — можно', () => {
+    expect(addressChangeError(page('a', 'published'), { slug: 'new' })).toMatch(/снимите/)
+    expect(addressChangeError(page('a', 'published'), { siteId: 'site2' })).toMatch(/другой сайт/)
+    expect(addressChangeError(page('a', 'published'), { slug: 'harizma', siteId: 'site' })).toBeNull()
+    expect(addressChangeError(page('a', 'published'), {})).toBeNull()
+    expect(addressChangeError(page('a', 'draft'), { slug: 'new', siteId: 'site2' })).toBeNull()
+  })
+
+  it('имя варианта — с порядковым номером, суффикс прежнего варианта не копится', () => {
+    expect(variantName('Harizma', 1)).toBe('Harizma — вариант 2')
+    expect(variantName('Harizma — вариант 2', 2)).toBe('Harizma — вариант 3')
   })
 })

@@ -7,7 +7,8 @@ import { linkedBlocksService } from '../services/LinkedBlocksService'
 import { asyncHandler, NotFoundError, AppError } from '../middleware'
 import { cacheService } from '../services/CacheService'
 import { deployService } from '../services/DeployService'
-import { allowedStatusChange, initialStatus } from '../services/pagePublication'
+import { addressChangeError, allowedStatusChange, initialStatus } from '../services/pagePublication'
+import { pageVariantService } from '../services/PageVariantService'
 
 const pageRepository = AppDataSource.getRepository(Page)
 const versionRepository = AppDataSource.getRepository(PageVersion)
@@ -80,6 +81,10 @@ export class PageController {
     if (!page) {
       throw new NotFoundError('Page', id)
     }
+
+    // Адрес опубликованной страницы неизменен: её файлы лежат по нему.
+    const addressError = addressChangeError(page, { slug: req.body.slug, siteId: req.body.siteId })
+    if (addressError) throw new AppError(addressError, 409, 'PUBLISHED_ADDRESS_LOCKED')
 
     // Решения по изменённым linked-блокам не являются полем страницы — извлекаем до Object.assign.
     const decisions = (req.body.decisions || {}) as Record<string, 'push' | 'static' | 'revert'>
@@ -155,6 +160,18 @@ export class PageController {
     res.status(204).send()
   })
 
+  /**
+   * POST /api/pages/:id/variants — вариант страницы: черновик с тем же адресом,
+   * вместе с переводами, привязками данных и переменными (PageVariantService).
+   */
+  createVariant = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const variant = await pageVariantService.createVariant(id)
+    if (!variant) throw new NotFoundError('Page', id)
+    await cacheService.invalidateByTag('pages')
+    res.status(201).json(variant)
+  })
+
   publish = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params
     const page = await pageRepository.findOne({ where: { id } })
@@ -182,6 +199,9 @@ export class PageController {
     const { deployService } = await import('../services/DeployService')
     const deployResult = await deployService.deployPage(id)
 
+    if (deployResult.code === 'SLUG_OCCUPIED') {
+      throw new AppError(deployResult.message, 409, 'SLUG_OCCUPIED', { code: 'SLUG_OCCUPIED', occupant: deployResult.occupant })
+    }
     if (!deployResult.success) {
       throw new AppError(
         deployResult.message || 'Deploy failed',

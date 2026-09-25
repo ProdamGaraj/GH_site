@@ -125,6 +125,8 @@ export const pageApi = {
   create: (data: CreatePageDto) => api.post<Page>('/pages', data),
   update: (id: string, data: UpdatePageDto) => api.put<Page>(`/pages/${id}`, data),
   delete: (id: string) => api.delete<void>(`/pages/${id}`),
+  /** Вариант страницы: черновик с тем же адресом, с переводами и привязками данных. */
+  createVariant: (id: string) => api.post<Page>(`/pages/${id}/variants`),
   // Preflight перед сохранением: какие linked-блоки разошлись с библиотекой.
   // Возвращает список изменённых инстансов для модалки выбора действия.
   savePreflight: (id: string, structure: BlockNode) =>
@@ -296,10 +298,29 @@ export interface DeployResult {
   deployedPages: string[]
   errors: string[]
   publicUrl?: string
+  /** Вариант, который заменила эта публикация (при replace). */
+  replaced?: { id: string; name: string }
+}
+
+/**
+ * details ответа 409 на публикацию: адрес занят другим опубликованным
+ * вариантом. Опубликовать вместо него — deployPage(id, { replace: true }).
+ */
+export interface SlugOccupiedDetails {
+  code: 'SLUG_OCCUPIED'
+  occupant: { id: string; name: string }
+}
+
+export function slugOccupiedDetails(error: unknown): SlugOccupiedDetails | null {
+  const details = (error as { status?: number; details?: Partial<SlugOccupiedDetails> } | null)
+  if (details?.status !== 409 || details.details?.code !== 'SLUG_OCCUPIED' || !details.details.occupant) return null
+  return details.details as SlugOccupiedDetails
 }
 
 export const deployApi = {
-  deployPage: (pageId: string) => api.post<DeployResult>(`/deploy/${pageId}`),
+  /** Опубликовать страницу; replace — вместо опубликованного варианта того же адреса. */
+  deployPage: (pageId: string, opts?: { replace?: boolean }) =>
+    api.post<DeployResult>(`/deploy/${pageId}${opts?.replace ? '?replace=1' : ''}`),
   /** Снять с публикации: файлы страницы уходят со всех языков, статус — черновик. */
   unpublishPage: (pageId: string) =>
     api.post<{ success: boolean; message: string; removed: string[] }>(`/deploy/${pageId}/unpublish`),

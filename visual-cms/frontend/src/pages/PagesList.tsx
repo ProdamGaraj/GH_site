@@ -8,7 +8,8 @@ import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { fetchPages, deletePage, selectPages, selectPagesLoading } from '@/features/pages/pagesSlice'
 import type { BlockNode } from '@/shared/types'
 import { getPagePublicUrl } from '@/shared/utils'
-import { PublishToggle } from '@/features/pages/components'
+import { CreateVariantButton, PublishToggle } from '@/features/pages/components'
+import { groupByAddress, occupantOf } from '@/features/pages/pageVariants'
 
 export const PagesList: React.FC = () => {
   const dispatch = useAppDispatch()
@@ -30,6 +31,10 @@ export const PagesList: React.FC = () => {
       }
     }
   }
+
+  // Страницы одного адреса (сайт + slug) — варианты: идут группой,
+  // опубликованный первым, черновики под ним с отступом.
+  const groups = groupByAddress(pages)
 
   const getStatusBadge = (status: string) => {
     const styles = {
@@ -114,16 +119,22 @@ export const PagesList: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {pages.map((page) => (
-                  <tr key={page.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{page.name}</div>
+                {groups.flatMap((group) => group.pages.map((page, index) => (
+                  <tr key={page.id} className={`hover:bg-gray-50 ${index > 0 ? 'bg-gray-50/50' : ''}`}>
+                    <td className={`py-4 whitespace-nowrap ${index > 0 ? 'pl-12 pr-6' : 'px-6'}`}>
+                      <div className="text-sm font-medium text-gray-900">
+                        {index > 0 && <span className="text-gray-400 mr-1">↳</span>}
+                        {page.name}
+                      </div>
                       {page.metadata?.title && page.metadata.title !== page.name && (
                         <div className="text-xs text-gray-500">SEO: {page.metadata.title}</div>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 font-mono">/{page.slug}</div>
+                      <div className={`text-sm font-mono ${index > 0 ? 'text-gray-400' : 'text-gray-900'}`}>/{page.slug}</div>
+                      {index === 0 && group.pages.length > 1 && (
+                        <div className="text-xs text-gray-500">вариантов: {group.pages.length}</div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(page.status || 'draft')}
@@ -154,7 +165,12 @@ export const PagesList: React.FC = () => {
                             <ExternalLink size={18} />
                           </a>
                         )}
-                        <PublishToggle page={page} onChanged={() => dispatch(fetchPages())} />
+                        <PublishToggle
+                          page={page}
+                          occupant={occupantOf(page, group)}
+                          onChanged={() => dispatch(fetchPages())}
+                        />
+                        <CreateVariantButton page={page} onCreated={() => dispatch(fetchPages())} />
                         <Link
                           to={`/editor/page/${page.id}`}
                           className="text-indigo-600 hover:text-indigo-900"
@@ -172,7 +188,7 @@ export const PagesList: React.FC = () => {
                       </div>
                     </td>
                   </tr>
-                ))}
+                )))}
               </tbody>
             </table>
           </div>

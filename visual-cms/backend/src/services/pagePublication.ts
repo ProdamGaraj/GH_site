@@ -100,6 +100,63 @@ export interface PublicationCandidate {
  *   страницей (иначе снесли бы её файлы) и это не главная — корень сайта
  *   чисткой не трогаем, главную снимают сменой главной в настройках сайта.
  */
+// --- Варианты страницы ---
+//
+// Вариант — черновик с тем же адресом (сайт + slug), что у другой страницы.
+// Черновиков у адреса сколько угодно, опубликован всегда один: это держит
+// частичный уникальный индекс в базе (migrations/page-variants-published-address.sql).
+// Опубликовать вариант = заменить им опубликованный на том же адресе.
+
+export interface AddressCandidate extends PublicationCandidate {
+  siteId?: string | null
+}
+
+/** Один ли адрес у страниц: тот же сайт и тот же slug. */
+export function sameAddress(a: AddressCandidate, b: AddressCandidate): boolean {
+  return a.slug === b.slug && (a.siteId ?? null) === (b.siteId ?? null)
+}
+
+/** Опубликованный вариант того же адреса — другая страница, которую заменит публикация. */
+export function findPublishedSibling<T extends AddressCandidate>(page: AddressCandidate, pages: T[]): T | undefined {
+  return pages.find((p) => p.id !== page.id && p.status === 'published' && sameAddress(p, page))
+}
+
+/**
+ * Файлы прежнего варианта, которые новый не перезаписал: языковые версии,
+ * которых у нового нет. Их убирают, иначе на `/uz/<адрес>` висел бы прежний.
+ */
+export function leftoverFiles(previous: string[], written: string[]): string[] {
+  const done = new Set(written.map((f) => path.resolve(f)))
+  return previous.filter((f) => !done.has(path.resolve(f)))
+}
+
+/**
+ * Почему нельзя сменить адрес или сайт страницы; `null` — можно.
+ *
+ * У опубликованной нельзя: файлы остались бы по старому адресу, а сам адрес
+ * последней публикации нигде не хранится. Сначала снять с публикации.
+ */
+export function addressChangeError(
+  page: AddressCandidate,
+  patch: { slug?: unknown; siteId?: unknown }
+): string | null {
+  if (page.status !== 'published') return null
+  if (patch.slug !== undefined && patch.slug !== page.slug) {
+    return 'Адрес опубликованной страницы менять нельзя: сначала снимите её с публикации.'
+  }
+  if (patch.siteId !== undefined && (patch.siteId ?? null) !== (page.siteId ?? null)) {
+    return 'Опубликованную страницу нельзя перенести в другой сайт: сначала снимите её с публикации.'
+  }
+  return null
+}
+
+const VARIANT_SUFFIX = / — вариант \d+$/
+
+/** Имя нового варианта: «Harizma — вариант 3», где 3 — порядковый номер у адреса. */
+export function variantName(name: string, pagesAtAddress: number): string {
+  return `${name.replace(VARIANT_SUFFIX, '')} — вариант ${pagesAtAddress + 1}`
+}
+
 export function planSiteSync<T extends PublicationCandidate>(
   pages: T[],
   isHome: (page: T) => boolean

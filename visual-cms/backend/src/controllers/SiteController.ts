@@ -5,6 +5,7 @@ import { Page } from '../models/Page'
 import { asyncHandler, NotFoundError, AppError } from '../middleware'
 import { cacheService } from '../services/CacheService'
 import { deployService } from '../services/DeployService'
+import { addressChangeError } from '../services/pagePublication'
 
 const siteRepository = AppDataSource.getRepository(Site)
 const pageRepository = AppDataSource.getRepository(Page)
@@ -163,6 +164,9 @@ export class SiteController {
 
     const page = await pageRepository.findOne({ where: { id: pageId } })
     if (!page) throw new NotFoundError('Page', pageId)
+    // Сайт — часть адреса: опубликованная страница уехала бы, оставив файлы.
+    const addressError = addressChangeError(page, { siteId: id })
+    if (addressError) throw new AppError(addressError, 409, 'PUBLISHED_ADDRESS_LOCKED')
 
     page.siteId = id
     await pageRepository.save(page)
@@ -176,9 +180,13 @@ export class SiteController {
 
     const page = await pageRepository.findOne({ where: { id: pageId, siteId: id } })
     if (!page) throw new NotFoundError('Page', pageId)
+    const addressError = addressChangeError(page, { siteId: null })
+    if (addressError) throw new AppError(addressError, 409, 'PUBLISHED_ADDRESS_LOCKED')
 
+    // Явный NULL в запросе: save() пропускает поля со значением undefined, и
+    // страница оставалась в сайте — открепление молча не срабатывало.
+    await pageRepository.update(page.id, { siteId: () => 'NULL' })
     page.siteId = undefined
-    await pageRepository.save(page)
     await cacheService.invalidateByTag('pages')
     res.json(page)
   })

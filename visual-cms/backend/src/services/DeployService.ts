@@ -28,7 +28,7 @@ import { resolveLoadStrategy } from './dataSourceRuntime'
 import { applyCollectionTransforms } from '../utils/collectionTransforms'
 import { localizeInternalLinks, localizeNavigation, langPrefix } from './linkLocalization'
 import { generateLanguageEntryStub } from './languageEntry'
-import { planSiteSync, publishedFiles, removePublishedFiles } from './pagePublication'
+import { findPublishedSibling, leftoverFiles, planSiteSync, publishedFiles, removePublishedFiles } from './pagePublication'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
@@ -40,6 +40,12 @@ export interface DeployResult {
   deployedPages: string[]
   errors: string[]
   publicUrl?: string
+  /** SLUG_OCCUPIED — адрес занят другим опубликованным вариантом (см. occupant). */
+  code?: 'SLUG_OCCUPIED'
+  /** Опубликованный вариант, занимающий адрес. */
+  occupant?: { id: string; name: string }
+  /** Вариант, который заменила эта публикация. */
+  replaced?: { id: string; name: string }
 }
 
 // Определение дополнительного источника коллекции (как в Collection.additionalSources).
@@ -230,6 +236,21 @@ export class DeployService {
           message: 'Страница не имеет структуры',
           deployedPages: [],
           errors: ['Page has no structure']
+        }
+      }
+
+      // Адрес занят другим опубликованным вариантом: молча перезаписать его
+      // файлы нельзя. Замена — отдельной операцией replacePublishedVariant.
+      const occupant = await this.publishedSiblingOf(page)
+      if (occupant) {
+        const message = `Адрес /${page.slug} занят опубликованной страницей «${occupant.name}»`
+        return {
+          success: false,
+          message,
+          deployedPages: [],
+          errors: [message],
+          code: 'SLUG_OCCUPIED',
+          occupant: { id: occupant.id, name: occupant.name },
         }
       }
 
@@ -2071,6 +2092,11 @@ export class DeployService {
   async unpublishPage(pageId: string): Promise<{ success: boolean; message: string; removed: string[] }> {
     const page = await this.pageRepository.findOne({ where: { id: pageId }, relations: ['site'] })
     if (!page) return { success: false, message: 'Страница не найдена', removed: [] }
+    // Файлы по адресу принадлежат опубликованной странице. У черновика-варианта
+    // адрес общий с опубликованным, и «снятие» черновика снесло бы чужие файлы.
+    if (page.status !== 'published') {
+      return { success: true, message: `Страница /${page.slug} не опубликована — снимать нечего`, removed: [] }
+    }
     if (this.isHomePage(page, page.site)) {
       return {
         success: false,
@@ -2090,6 +2116,78 @@ export class DeployService {
     }
     logger.info(`Unpublished: /${page.slug} (${removed.length} файлов)`)
     return { success: true, message: `Страница /${page.slug} снята с публикации`, removed }
+  }
+
+  /** Опубликованный вариант того же адреса (сайт + slug), кроме самой страницы. */
+  private async publishedSiblingOf(page: Page): Promise<Page | undefined> {
+    const published = await this.pageRepository.find({ where: { slug: page.slug, status: 'published' } })
+    return findPublishedSibling(page, published)
+  }
+
+  /**
+   * Публикует вариант вместо опубликованного на том же адресе — без простоя.
+   *
+   * Порядок:
+   *  1. прежний вариант становится черновиком (частичный уникальный индекс не
+   *     даёт двум опубликованным делить адрес), главная сайта, если это была
+   *     она, переходит на новый вариант;
+   *  2. новый выкладывается поверх тех же файлов;
+   *  3. языковые версии прежнего, которых у нового нет, убираются.
+   * Не выложился новый — всё возвращается: статус, главная и файлы прежнего
+   * (он перевыкладывается, раз часть файлов могла быть уже перезаписана).
+   *
+   * Адрес свободен — обычная публикация.
+   */
+  async replacePublishedVariant(pageId: string): Promise<DeployResult> {
+    const page = await this.pageRepository.findOne({ where: { id: pageId }, relations: ['site'] })
+    if (!page) return { success: false, message: 'Страница не найдена', deployedPages: [], errors: ['Page not found'] }
+    const occupant = await this.publishedSiblingOf(page)
+    if (!occupant) return this.deployPage(pageId)
+
+    const site = page.site
+    const siteDir = this.resolveSiteDir(site)
+    const codes = (await languageService.getAll()).map(l => l.code)
+    const wasHome = this.isHomePage(occupant, site)
+    const previousFiles = publishedFiles(siteDir, occupant.slug, wasHome, codes).filter(f => fs.existsSync(f))
+
+    occupant.status = 'draft'
+    await this.pageRepository.save(occupant)
+    if (wasHome && site) {
+      site.homepageId = page.id
+      await this.siteRepository.save(site)
+    }
+
+    const result = await this.deployPage(pageId)
+    if (!result.success) {
+      // deployPage мог упасть уже после того, как отметил страницу
+      // опубликованной (например, на sitemap) — тогда адрес занят ею.
+      await this.pageRepository.update(page.id, { status: 'draft' })
+      if (wasHome && site) {
+        site.homepageId = occupant.id
+        await this.siteRepository.save(site)
+      }
+      const restored = await this.deployPage(occupant.id)
+      if (!restored.success) {
+        // Прежний не перевыложился — хотя бы статус не должен врать о файлах.
+        occupant.status = 'published'
+        await this.pageRepository.save(occupant)
+      }
+      logger.error(`Замена варианта /${page.slug} не удалась: ${result.message}`)
+      return {
+        ...result,
+        message: `Вариант «${page.name}» не опубликован, на адресе остался «${occupant.name}»: ${result.message}`,
+      }
+    }
+
+    const written = result.deployedPages.map(rel => path.join(siteDir, rel))
+    removePublishedFiles(siteDir, leftoverFiles(previousFiles, written), codes)
+    if (site) await this.generateSitemap(site)
+    logger.info(`Вариант «${page.name}» опубликован на /${page.slug} вместо «${occupant.name}»`)
+    return {
+      ...result,
+      message: `«${page.name}» опубликована на /${page.slug} вместо «${occupant.name}»`,
+      replaced: { id: occupant.id, name: occupant.name },
+    }
   }
 
   /**
