@@ -54,6 +54,24 @@ export function readEffect(node: BlockNode): CarouselEffect {
     || CAROUSEL_EFFECTS.find((e) => e.id === DEFAULT_EFFECT_ID)!
 }
 
+/**
+ * Бесконечная лента (читает CarouselRuntime): с последнего слайда «вперёд» лента
+ * едет дальше на первый, а не отматывается назад через все слайды. Включена по
+ * умолчанию; выключение — data-carousel-infinite="false". Работает только у
+ * сдвига и только при зацикливании.
+ */
+export const INFINITE_ATTR = 'data-carousel-infinite'
+
+/** Эффекты, где слайды едут лентой — только у них есть направление перемотки. */
+export function isTrackEffect(effectId: string): boolean {
+  return effectId === 'slide' || effectId === 'slide-vertical'
+}
+
+/** Включена ли бесконечная лента (без атрибута — да). */
+export function readInfinite(node: BlockNode): boolean {
+  return node.attributes?.[INFINITE_ATTR] !== 'false'
+}
+
 /** Заданная вручную длительность в мс, либо null — тогда действует дефолт эффекта. */
 export function readDurationMs(node: BlockNode): number | null {
   const raw = node.attributes?.[DURATION_ATTR]

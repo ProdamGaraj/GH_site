@@ -3,6 +3,8 @@ import type { BlockNode } from '@/shared/types'
 import { readAutoplayMs,
   readEffect,
   readDurationMs,
+  readInfinite,
+  isTrackEffect,
   CAROUSEL_EFFECTS,
 } from './carouselAutoplayHelper'
 
@@ -74,5 +76,17 @@ describe('readDurationMs', () => {
     expect(readDurationMs(withAttr('быстро'))).toBeNull()
     expect(readDurationMs(withAttr('-5'))).toBeNull()
     expect(readDurationMs(withAttr(''))).toBeNull()
+  })
+})
+
+describe('бесконечная лента', () => {
+  it('включена по умолчанию, выключается только явным "false"', () => {
+    expect(readInfinite(node({}))).toBe(true)
+    expect(readInfinite(node({ 'data-carousel-infinite': 'true' }))).toBe(true)
+    expect(readInfinite(node({ 'data-carousel-infinite': 'false' }))).toBe(false)
+  })
+
+  it('есть только у эффектов, где слайды едут лентой', () => {
+    expect(CAROUSEL_EFFECTS.filter((e) => isTrackEffect(e.id)).map((e) => e.id)).toEqual(['slide', 'slide-vertical'])
   })
 })

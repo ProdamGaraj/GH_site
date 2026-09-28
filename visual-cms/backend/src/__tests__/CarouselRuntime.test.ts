@@ -27,7 +27,7 @@ const buildBody = (slidesCount: number, dotsCount: number = slidesCount): string
     return `<div data-carousel-dot="true" data-element-id="dot-${i}" style="${style}"></div>`
   }).join('')
   return `
-    <div data-carousel="true" data-carousel-autoplay="0" data-carousel-loop="true" data-element-id="root">
+    <div data-carousel="true" data-carousel-autoplay="0" data-carousel-loop="true" data-carousel-infinite="false" data-element-id="root">
       <div data-carousel-track="true" data-element-id="track">${slides}</div>
       <div data-carousel-dots="true" data-element-id="dots">${dots}</div>
       <button data-carousel-prev="true">prev</button>
@@ -215,7 +215,7 @@ describe('CarouselRuntime', () => {
 
   describe('video-wait (смотреть видео до конца)', () => {
     const bodyWithVideo = (autoplay: number, wait: boolean) => `
-      <div data-carousel="true" data-carousel-autoplay="${autoplay}"${wait ? ' data-carousel-video-wait="true"' : ''}>
+      <div data-carousel="true" data-carousel-autoplay="${autoplay}" data-carousel-infinite="false"${wait ? ' data-carousel-video-wait="true"' : ''}>
         <div data-carousel-track="true">
           <div data-carousel-slide="true" data-slide-video="https://cdn/a.mp4" data-element-id="s0"></div>
           <div data-carousel-slide="true" data-element-id="s1" style="background:#111"></div>
@@ -287,7 +287,7 @@ describe('CarouselRuntime', () => {
   describe('hidden template slide', () => {
     it('исключает скрытый template-слайд (display:none) из счёта slides', async () => {
       await boot(`
-        <div data-carousel="true" data-carousel-autoplay="0">
+        <div data-carousel="true" data-carousel-autoplay="0" data-carousel-infinite="false">
           <div data-carousel-track="true">
             <div data-carousel-slide="true" style="display:none">TEMPLATE</div>
             <div data-carousel-slide="true" style="background:#111">A</div>
@@ -309,7 +309,7 @@ describe('CarouselRuntime', () => {
       // что в flex-item резолвится от track-width = N*100% viewport и растягивает
       // слайд на N viewports. Runtime обязан их сбрасывать.
       await boot(`
-        <div data-carousel="true" data-carousel-autoplay="0">
+        <div data-carousel="true" data-carousel-autoplay="0" data-carousel-infinite="false">
           <div data-carousel-track="true">
             <div data-carousel-slide="true" style="min-width:100%; max-width:50%; background:#111">A</div>
             <div data-carousel-slide="true" style="background:#222">B</div>
@@ -343,7 +343,7 @@ const buildEffectBody = (effect: string, slidesCount = 3, extraRootAttrs = ''): 
     `<div data-carousel-slide="true" data-element-id="slide-${i}">Slide ${i}</div>`
   ).join('')
   return `
-    <div data-carousel="true" data-carousel-autoplay="0" data-carousel-effect="${effect}"
+    <div data-carousel="true" data-carousel-autoplay="0" data-carousel-effect="${effect}" data-carousel-infinite="false"
          ${extraRootAttrs} data-element-id="root">
       <div data-carousel-track="true" data-element-id="track">${slides}</div>
       <button data-carousel-prev="true">prev</button>
@@ -880,5 +880,173 @@ describe('CarouselRuntime — свайп по экранам', () => {
       </div>
     </div>`)
     expect(document.querySelector<HTMLVideoElement>('video[data-carousel-video="true"]')!.loop).toBe(false)
+  })
+})
+
+describe('CarouselRuntime — бесконечная лента', () => {
+  const body = (slides = 3, rootAttrs = '') => {
+    const items = Array.from({ length: slides })
+      .map((_, i) => `<div data-carousel-slide="true" data-element-id="slide-${i}" id="dom-${i}">Slide ${i}</div>`)
+      .join('')
+    return `<div data-carousel="true" data-carousel-autoplay="0"${rootAttrs}>
+      <div data-carousel-track="true">${items}</div>
+      <div data-carousel-dots="true"><span data-carousel-dot="true"></span></div>
+      <span data-carousel-counter="true"></span>
+      <button data-carousel-prev="true">prev</button>
+      <button data-carousel-next="true">next</button>
+    </div>`
+  }
+  const clonesOf = () => Array.from(trackEl().querySelectorAll<HTMLElement>('[data-carousel-clone="true"]'))
+  const next = () => document.querySelector<HTMLElement>('[data-carousel-next]')!.click()
+  const prev = () => document.querySelector<HTMLElement>('[data-carousel-prev]')!.click()
+  const activeDot = () => dotsAt().findIndex((d) => d.classList.contains('active'))
+
+  /** Синхронный запуск рантайма — для тестов с поддельными таймерами. */
+  const bootSync = (html: string) => {
+    document.body.innerHTML = html
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
+    new Function(RUNTIME_JS)()
+  }
+
+  afterEach(() => {
+    jest.useRealTimers()
+    document.body.innerHTML = ''
+  })
+
+  it('по умолчанию: по краям копии крайних слайдов, трек на две клетки длиннее, виден первый слайд', async () => {
+    await boot(body(3))
+    expect(trackEl().style.width).toBe('500%')
+    expect(trackEl().style.transform).toBe('translateX(-20%)')
+    const [tail, head] = clonesOf()
+    // Копия первого — после последнего; копия последнего — в DOM тоже после слайдов,
+    // а перед первым встаёт только на экране.
+    expect(tail.getAttribute('data-element-id')).toBe('slide-0')
+    expect(head.getAttribute('data-element-id')).toBe('slide-2')
+    expect(head.style.order).toBe('-1')
+  })
+
+  it('копия — только для глаза: не слайд, без id, скрыта от диктора и клавиатуры', async () => {
+    await boot(body(3))
+    for (const clone of clonesOf()) {
+      expect(clone.hasAttribute('data-carousel-slide')).toBe(false)
+      expect(clone.hasAttribute('id')).toBe(false)
+      expect(clone.getAttribute('aria-hidden')).toBe('true')
+      expect(clone.hasAttribute('inert')).toBe(true)
+    }
+  })
+
+  it('точки, счётчик и скрипты вёрстки видят только настоящие слайды', async () => {
+    await boot(body(3))
+    expect(dotsAt()).toHaveLength(3)
+    expect(document.querySelector('[data-carousel]')!.getAttribute('data-carousel-count')).toBe('3')
+    expect(document.querySelectorAll('[data-carousel-slide="true"]')).toHaveLength(3)
+    expect(document.querySelector('[data-carousel-counter]')!.textContent).toBe('01 / 03')
+    // querySelector по data-element-id находит слайд, а не его копию.
+    expect(document.querySelector('[data-element-id="slide-2"]')!.hasAttribute('data-carousel-slide')).toBe(true)
+  })
+
+  it('с последнего вперёд: едет на копию первого, по окончании перехода без анимации встаёт на первый', () => {
+    jest.useFakeTimers()
+    bootSync(body(3))
+    next()
+    next()
+    expect(trackEl().style.transform).toBe('translateX(-60%)')
+    next()
+    // Вперёд, а не назад через все слайды: клетка за последним слайдом.
+    expect(trackEl().style.transform).toBe('translateX(-80%)')
+    expect(activeDot()).toBe(0)
+    jest.advanceTimersByTime(500)
+    expect(trackEl().style.transform).toBe('translateX(-20%)')
+    expect(trackEl().style.transition).toBe('transform 500ms ease')
+  })
+
+  it('с первого назад: едет на копию последнего, потом встаёт на последний', () => {
+    jest.useFakeTimers()
+    bootSync(body(3))
+    prev()
+    expect(trackEl().style.transform).toBe('translateX(0%)')
+    expect(activeDot()).toBe(2)
+    jest.advanceTimersByTime(500)
+    expect(trackEl().style.transform).toBe('translateX(-60%)')
+  })
+
+  it('нажатие во время перескока: сначала на настоящий слайд, потом дальше — без рывка через всю ленту', () => {
+    jest.useFakeTimers()
+    bootSync(body(3))
+    prev()
+    prev()
+    // Второе «назад» стартует с настоящего последнего слайда и едет на предпоследний.
+    expect(trackEl().style.transform).toBe('translateX(-40%)')
+    expect(activeDot()).toBe(1)
+  })
+
+  it('класс активного слайда у копии — вслед за своим слайдом', async () => {
+    await boot(body(3))
+    const [tail, head] = clonesOf()
+    expect(tail.classList.contains('is-active')).toBe(true)
+    expect(head.classList.contains('is-active')).toBe(false)
+    prev()
+    expect(head.classList.contains('is-active')).toBe(true)
+    expect(tail.classList.contains('is-active')).toBe(false)
+  })
+
+  it('новый слайд из данных — копии пересобираются по новому краю', async () => {
+    await boot(body(2))
+    const slide = document.createElement('div')
+    slide.setAttribute('data-carousel-slide', 'true')
+    slide.setAttribute('data-element-id', 'slide-new')
+    trackEl().appendChild(slide)
+    await new Promise((r) => setTimeout(r, 30))
+    expect(clonesOf()).toHaveLength(2)
+    expect(clonesOf()[1].getAttribute('data-element-id')).toBe('slide-new')
+    expect(trackEl().style.width).toBe('500%')
+  })
+
+  it('копия видео-слайда играет своё видео только на время перехода через край', () => {
+    jest.useFakeTimers()
+    const play = jest.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve())
+    const pause = jest.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined)
+    bootSync(`<div data-carousel="true" data-carousel-autoplay="0">
+      <div data-carousel-track="true">
+        <div data-carousel-slide="true" data-slide-video="/a.mp4"></div>
+        <div data-carousel-slide="true" data-slide-video="/b.mp4"></div>
+      </div>
+      <button data-carousel-prev="true">prev</button>
+    </div>`)
+    const [, head] = clonesOf()
+    // Скопированный <video> не переносится: копия без видео, пока не понадобится.
+    expect(head.querySelector('video')).toBeNull()
+    document.querySelector<HTMLElement>('[data-carousel-prev]')!.click()
+    // С первого назад лента едет на копию последнего — у неё своё видео.
+    const video = head.querySelector<HTMLVideoElement>('video[data-carousel-video="true"]')!
+    expect(video.querySelector('source')!.getAttribute('src')).toBe('/b.mp4')
+    expect(play.mock.instances).toContain(video)
+    jest.advanceTimersByTime(500)
+    expect(pause.mock.instances).toContain(video)
+    jest.restoreAllMocks()
+  })
+
+  it('выключатель data-carousel-infinite="false" — как раньше: без копий, с последнего назад через ленту', async () => {
+    await boot(body(3, ' data-carousel-infinite="false"'))
+    expect(clonesOf()).toHaveLength(0)
+    expect(trackEl().style.width).toBe('300%')
+    next()
+    next()
+    next()
+    expect(trackEl().style.transform).toBe('translateX(0%)')
+  })
+
+  it.each([
+    ['перетекание', ' data-carousel-effect="fade"'],
+    ['без зацикливания', ' data-carousel-loop="false"'],
+  ])('%s — копий нет', async (_name, attrs) => {
+    await boot(body(3, attrs))
+    expect(clonesOf()).toHaveLength(0)
+  })
+
+  it('один слайд — копий нет', async () => {
+    await boot(body(1))
+    expect(clonesOf()).toHaveLength(0)
+    expect(trackEl().style.width).toBe('100%')
   })
 })

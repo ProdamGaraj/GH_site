@@ -7,8 +7,12 @@ import {
   DURATION_ATTR,
   DEFAULT_EFFECT_ID,
   CAROUSEL_EFFECTS,
+  INFINITE_ATTR,
+  LOOP_ATTR,
+  isTrackEffect,
   readEffect,
   readDurationMs,
+  readInfinite,
 } from '@/features/editor/utils/carouselAutoplayHelper'
 
 /**
@@ -57,6 +61,12 @@ export const CarouselTransitionSection: React.FC<{ carouselRoot: BlockNode }> = 
   }
 
   const instant = effect.id === 'none'
+  const infinite = readInfinite(carouselRoot)
+  // Рантайм зацикливает, пока нет явного data-carousel-loop="false".
+  const looped = carouselRoot.attributes?.[LOOP_ATTR] !== 'false'
+
+  // Включено — значение по умолчанию, пишем отсутствием атрибута.
+  const setInfinite = (on: boolean) => patchAttrs({ [INFINITE_ATTR]: on ? undefined : 'false' })
 
   return (
     <div className="space-y-2 rounded border border-gray-200 p-3">
@@ -97,6 +107,25 @@ export const CarouselTransitionSection: React.FC<{ carouselRoot: BlockNode }> = 
         <p className="text-xs text-gray-400">
           Пусто — берётся стандартная для этого перехода: {effect.defaultMs} мс.
         </p>
+      )}
+
+      {isTrackEffect(effect.id) && (
+        <label className="flex items-start gap-2 text-xs text-gray-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={infinite}
+            onChange={(e) => setInfinite(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            Бесконечная лента
+            <span className="block text-gray-400">
+              {looped
+                ? 'С последнего слайда лента едет дальше к первому, а не отматывается назад через все слайды.'
+                : 'Работает, когда слайды листаются по кругу («Зацикливать» в автопрокрутке).'}
+            </span>
+          </span>
+        </label>
       )}
     </div>
   )

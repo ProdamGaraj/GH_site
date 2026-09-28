@@ -33,6 +33,13 @@
  *                                       от эффекта: 500 для сдвига, 600 для наплыва, 0 для none)
  *   [data-carousel-slide-active-class]— класс активного слайда (default: "is-active"),
  *                                       при любом эффекте; за него цепляется CSS вёрстки
+ *   [data-carousel-infinite="false"]  — выключить бесконечную ленту. По умолчанию при
+ *                                       эффектах сдвига и зацикливании лента бесконечна:
+ *                                       с последнего слайда «вперёд» едет дальше на первый,
+ *                                       с первого «назад» — на последний, без перемотки
+ *                                       через все слайды. Для этого по краям трека
+ *                                       стоят копии крайних слайдов (data-carousel-clone,
+ *                                       без data-carousel-slide — скрипты вёрстки их не считают).
  *   [data-carousel-swipe="mobile,tablet"] — экраны (id брейкпоинтов страницы из
  *                                       window.__ghBreakpoints), где слайды листаются
  *                                       жестом: пальцем, пером, перетаскиванием мышью.
@@ -110,6 +117,13 @@ ${BREAKPOINT_RUNTIME_JS}
     var duration = parseInt(root.getAttribute('data-carousel-duration') || '', 10);
     if (!isFinite(duration) || duration < 0) duration = EFFECTS[effect].duration;
 
+    // Бесконечная лента — только у сдвига: у перетекания и наплыва направления нет.
+    var infinite = root.getAttribute('data-carousel-infinite') !== 'false' && !stacked && loop;
+    /** [копия последнего слайда — перед первым, копия первого — после последнего]. */
+    var clones = [];
+    /** Лента стоит на копии за краем и ждёт перескока на настоящий слайд. */
+    var wrapTimer = null;
+
     var prevBtn = root.querySelector('[data-carousel-prev]');
     var nextBtn = root.querySelector('[data-carousel-next]');
     var dotsContainer = root.querySelector('[data-carousel-dots]');
@@ -121,7 +135,7 @@ ${BREAKPOINT_RUNTIME_JS}
       // Только прямые дети track. Фильтруем по data-carousel-slide если есть, иначе все children.
       // Исключаем скрытые (display:none) — это template-слайд для repeater'а.
       var children = Array.prototype.slice.call(track.children);
-      var visible = children.filter(function(c){ return c.style && c.style.display !== 'none'; });
+      var visible = children.filter(function(c){ return c.style && c.style.display !== 'none' && !isClone(c); });
       var marked = visible.filter(function(c){ return c.getAttribute && c.getAttribute('data-carousel-slide') === 'true'; });
       return marked.length ? marked : visible;
     }
@@ -158,18 +172,91 @@ ${BREAKPOINT_RUNTIME_JS}
       holder.style.overflow = 'hidden';
     }
 
+    // --- Бесконечная лента: копии крайних слайдов ---
+    function isClone(el) {
+      return !!(el && el.getAttribute && el.getAttribute('data-carousel-clone') === 'true');
+    }
+
+    // Копия нужна только глазу: лента задерживается на ней на время перехода.
+    // С клавиатуры и для диктора её нет, id не дублируются, скрипты вёрстки
+    // слайдом её не считают. Видео копии заводится заново и только на время
+    // перехода через край (edgeVideo) — скопированное играло бы всегда.
+    function makeClone(slide) {
+      var c = slide.cloneNode(true);
+      c.removeAttribute('data-carousel-slide');
+      c.setAttribute('data-carousel-clone', 'true');
+      c.setAttribute('aria-hidden', 'true');
+      c.setAttribute('inert', '');
+      c.removeAttribute('id');
+      var inner = c.querySelectorAll('[id]');
+      for (var i = 0; i < inner.length; i++) inner[i].removeAttribute('id');
+      var videos = c.querySelectorAll('video[data-carousel-video="true"]');
+      for (var j = 0; j < videos.length; j++) videos[j].parentNode.removeChild(videos[j]);
+      return c;
+    }
+
+    function syncClones() {
+      for (var i = 0; i < clones.length; i++) {
+        if (clones[i].parentNode) clones[i].parentNode.removeChild(clones[i]);
+      }
+      clones = [];
+      var n = state.slides.length;
+      if (!infinite || n < 2) return;
+      var first = state.slides[0];
+      var last = state.slides[n - 1];
+      var head = makeClone(last);
+      var tail = makeClone(first);
+      // Обе копии — в DOM после слайдов, копия последнего встаёт перед первым
+      // только на экране (order). Так querySelector по data-element-id находит
+      // настоящий слайд, а не его копию: у копий те же data-element-id, чтобы
+      // на них действовали те же стили, что у слайда.
+      head.style.order = '-1';
+      track.insertBefore(tail, last.nextSibling);
+      track.insertBefore(head, tail.nextSibling);
+      clones = [head, tail];
+    }
+
+    /** Клетки трека: слайды и, у бесконечной ленты, копии по краям. */
+    function cellCount() {
+      return state.slides.length + clones.length;
+    }
+
+    /** Клетка трека, где стоит слайд с индексом i. */
+    function cellOf(i) {
+      return clones.length ? i + 1 : i;
+    }
+
+    function moveTrackTo(cell) {
+      var pct = -(cell * (100 / cellCount()));
+      track.style.transform = (vertical ? 'translateY(' : 'translateX(') + pct + '%)';
+    }
+
+    // Лента доехала до копии за краем — без анимации встаёт на настоящий слайд:
+    // картинка та же, подмены не видно.
+    function finishWrap() {
+      if (wrapTimer === null) return;
+      clearTimeout(wrapTimer);
+      wrapTimer = null;
+      track.style.transition = 'none';
+      moveTrackTo(cellOf(state.index));
+      void track.offsetWidth; // браузер фиксирует положение до возврата анимации
+      track.style.transition = 'transform ' + duration + 'ms ease';
+      for (var i = 0; i < clones.length; i++) pauseSlideVideo(clones[i]);
+    }
+
     function applyTrackLayout() {
       var n = state.slides.length;
       if (n === 0) return;
       if (stacked) { applyStackedLayout(n); return; }
+      var cells = clones.length ? [clones[0]].concat(state.slides, [clones[1]]) : state.slides;
       track.style.display = 'flex';
       if (vertical) track.style.flexDirection = 'column';
-      track.style[vertical ? 'height' : 'width'] = (n * 100) + '%';
+      track.style[vertical ? 'height' : 'width'] = (cells.length * 100) + '%';
       track.style.transition = 'transform ' + duration + 'ms ease';
-      for (var i = 0; i < n; i++) {
-        var s = state.slides[i];
-        s.style.flex = '0 0 ' + (100 / n) + '%';
-        s.style[vertical ? 'height' : 'width'] = (100 / n) + '%';
+      for (var i = 0; i < cells.length; i++) {
+        var s = cells[i];
+        s.style.flex = '0 0 ' + (100 / cells.length) + '%';
+        s.style[vertical ? 'height' : 'width'] = (100 / cells.length) + '%';
         // Очищаем конкурирующие inline-свойства, которые могли прийти из БД
         // (особенно у hybrid-static-слайдов): min-width/max-width в flex-item
         // резолвятся ОТ track-width (= n*100% viewport), что растягивает слайд
@@ -359,20 +446,25 @@ ${BREAKPOINT_RUNTIME_JS}
       }
     }
 
-    function update() {
+    /** cell — клетка трека, куда ехать; по умолчанию — клетка активного слайда. */
+    function update(cell) {
       var n = state.slides.length;
       if (n === 0) return;
       if (stacked) {
         renderStacked();
       } else {
-        // translate в процентах от track (track имеет width/height = n*100%)
-        var pct = -(state.index * (100 / n));
-        track.style.transform = (vertical ? 'translateY(' : 'translateX(') + pct + '%)';
+        // translate в процентах от трека (его размер — число клеток × 100%)
+        moveTrackTo(cell === undefined ? cellOf(state.index) : cell);
         // Класс активного слайда нужен и при сдвиге: по нему скрипты вёрстки
         // (лайтбокс галереи) и CSS находят текущий кадр. Раньше его ставил
         // только renderStacked, и смена эффекта в редакторе их ломала.
         for (var ai = 0; ai < n; ai++) {
           state.slides[ai].classList.toggle(slideActiveClass, ai === state.index);
+        }
+        // Копия выглядит как свой слайд и во время перехода: класс — вслед за ним.
+        if (clones.length) {
+          clones[0].classList.toggle(slideActiveClass, state.index === n - 1);
+          clones[1].classList.toggle(slideActiveClass, state.index === 0);
         }
       }
       for (var i = 0; i < state.dots.length; i++) {
@@ -400,13 +492,28 @@ ${BREAKPOINT_RUNTIME_JS}
     function goTo(i, userInteraction) {
       var n = state.slides.length;
       if (n === 0) return;
+      // Прошлый переход ещё стоит на копии за краем — сначала на настоящий слайд.
+      finishWrap();
       var target = loop ? ((i % n) + n) % n : Math.max(0, Math.min(n - 1, i));
       // Тот же слайд — ничего не делаем: update() начал бы его видео с начала.
       // Так свайп по «О проекте» с одним видео перезапускал ролик, а нажатие на
       // точку открытого слайда — его.
       if (target === state.index) return;
       state.index = target;
-      update();
+      // Шаг за край бесконечной ленты: едем на копию за краем, а по окончании
+      // перехода — без анимации на настоящий слайд.
+      var edge = null;
+      if (clones.length && i >= n) edge = n + 1;
+      else if (clones.length && i < 0) edge = 0;
+      if (edge === null) {
+        update();
+      } else {
+        update(edge);
+        // Видео-слайд без постера на копии был бы пустым кадром. Видео копии
+        // стартует вместе с видео настоящего слайда — после перескока подмены не видно.
+        playSlideVideo(edge === 0 ? clones[0] : clones[1]);
+        wrapTimer = setTimeout(finishWrap, duration);
+      }
       if (userInteraction) restartAutoplay();
     }
 
@@ -460,9 +567,11 @@ ${BREAKPOINT_RUNTIME_JS}
     }
 
     function rebuild() {
+      if (wrapTimer !== null) { clearTimeout(wrapTimer); wrapTimer = null; }
       state.slides = getSlides();
       syncControls(state.slides.length);
       syncSwipe();
+      syncClones();
       if (state.slides.length === 0) return;
       applyTrackLayout();
       rebuildDots();
@@ -569,8 +678,17 @@ ${BREAKPOINT_RUNTIME_JS}
 
     rebuild();
 
-    // Перерисовка при появлении/изменении слайдов (repeater из DataBindingGenerator)
-    var mo = new MutationObserver(function(){ rebuild(); });
+    // Перерисовка при появлении/изменении слайдов (repeater из DataBindingGenerator).
+    // Свои копии крайних слайдов рантайм переставляет сам — на них не реагируем,
+    // иначе rebuild вызывал бы сам себя.
+    function onlyClones(records) {
+      for (var i = 0; i < records.length; i++) {
+        var nodes = Array.prototype.slice.call(records[i].addedNodes).concat(Array.prototype.slice.call(records[i].removedNodes));
+        for (var j = 0; j < nodes.length; j++) if (!isClone(nodes[j])) return false;
+      }
+      return true;
+    }
+    var mo = new MutationObserver(function(records){ if (!onlyClones(records)) rebuild(); });
     mo.observe(track, { childList: true });
   }
 
