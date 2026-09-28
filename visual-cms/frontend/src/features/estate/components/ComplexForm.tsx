@@ -6,6 +6,7 @@ import { getT, setT, setLabel, isRu } from './tfield'
 import { TextField, TextArea, NumberField, SelectField, StringListField, StatsField, LabelMapField } from './fields'
 import { GallerySlidesField } from './GallerySlidesField'
 import { ProjectMapSection } from './ProjectMapSection'
+import { SiteCardSection } from './SiteCardSection'
 
 /** Панель редактирования полей ЖК (база ru + переводы uz/en). */
 export const ComplexForm: React.FC<{ complex: ComplexDetail; locale: Locale }> = ({ complex, locale }) => {
@@ -74,7 +75,7 @@ export const ComplexForm: React.FC<{ complex: ComplexDetail; locale: Locale }> =
             value={form.status}
             options={[
               { value: 'active', label: 'Активен' },
-              { value: 'sold_out', label: 'Sold out' },
+              { value: 'sold_out', label: 'Распродано' },
             ]}
             onChange={(v) => setForm((f) => ({ ...f, status: v }))}
           />
@@ -87,6 +88,8 @@ export const ComplexForm: React.FC<{ complex: ComplexDetail; locale: Locale }> =
           />
         </div>
       )}
+
+      <SiteCardSection form={form} setForm={setForm} locale={locale} />
 
       {/* Переводимые текстовые поля */}
       <div className="grid grid-cols-2 gap-4">

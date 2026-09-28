@@ -43,6 +43,8 @@ export const COMPLEX_TR_FIELDS: FieldMap = {
   yardText: 'string',
   yardFeatures: 'json',
   stats: 'json',
+  // Теги карточки на главной («Ремонт в подарок», «Рассрочка»).
+  cardTags: 'json',
   // Словарь видов из окна: { "двор": "hovli", ... }. Виды приходят из CRM
   // по-русски и одни и те же у десятков типов планировок, поэтому переводятся
   // один раз на ЖК, а не у каждого типа. Базы (ru) у поля нет — только оверлей.
@@ -143,6 +145,10 @@ export interface ComplexRow {
   salesOfficeAddress?: string | null
   /** Только из оверлея языка: переводы названий мест по id. */
   placeNames?: Record<string, string> | null
+  /** Карточка на главной (migrations/008_site_catalog.sql). */
+  filterClass?: string
+  cardImage?: string
+  cardTags?: string[]
 }
 
 export interface HouseRow {
@@ -537,6 +543,13 @@ export interface ComplexDetailDTO extends ProjectMapDTO {
    * «условность» выражается длиной массива — тот же приём, что у обложек.
    */
   planSections: Array<{ title: string }>
+  /** Тег «Распродано» массивом 0..1 — бейдж в шапке страницы проекта. */
+  soldOut: Array<{ label: string }>
+  /**
+   * Класс страницы распроданного проекта ('is-sold-out' или пусто): по нему
+   * вёрстка прячет цены и фильтр по цене в «Выбрать планировку».
+   */
+  saleStateClass: string
 }
 
 /** Строка plan_types как её отдаёт TypeORM. */
@@ -636,9 +649,37 @@ export interface ComplexListItemDTO {
   name: string
   className: string
   intro: string
+  /** Картинка карточки: своя, иначе About-медиа, иначе первый hero. */
   cardImage: string
   status: string
   order: number
+  /** Класс для фильтра карточек на главной: comfort | business | premium. */
+  filterClass: string
+  /** Теги карточки на языке страницы. */
+  tags: string[]
+  /** Тег «Распродано» массивом 0..1: условий в движке шаблонов нет. */
+  soldOut: Array<{ label: string }>
+  /** Класс карточки: у распроданной 'is-sold-visible' — без подсветки и без цены. */
+  cardClass: string
+}
+
+// --- Распроданный проект ---
+
+export const SOLD_OUT_STATUS = 'sold_out'
+
+const SOLD_OUT_LABEL: Record<Locale, string> = {
+  ru: 'Распродано',
+  uz: 'Sotilgan',
+  en: 'Sold out',
+}
+
+export function isSoldOut(complex: { status: string }): boolean {
+  return complex.status === SOLD_OUT_STATUS
+}
+
+/** Тег «Распродано» массивом 0..1 — шаблон повторяет по нему бейдж. */
+export function soldOutTags(complex: { status: string }, locale: Locale): Array<{ label: string }> {
+  return isSoldOut(complex) ? [{ label: SOLD_OUT_LABEL[locale] }] : []
 }
 
 // --- Сборщики ответа ---
@@ -708,8 +749,14 @@ export function buildPlanTypeDTO(
   /** Срок сдачи дома этого типа, уже с наложенным переводом. */
   houseDeadline = '',
   /** Словарь видов из окна для языка страницы (оверлей ЖК). */
-  viewLabels: Record<string, unknown> | null = null
+  viewLabels: Record<string, unknown> | null = null,
+  /**
+   * Проект распродан: планировку показываем, а цену и «N квартир» — нет.
+   * Последняя цена из CRM у распроданного типа устаревшая и продать нечего.
+   */
+  options: { soldOut?: boolean } = {}
 ): PlanTypeDTO {
+  const soldOut = options.soldOut === true
   const p = applyOverlay(planType, 'planType', planType.id, locale, PLANTYPE_TR_FIELDS, index)
   const images = Array.isArray(p.images) ? p.images : []
   const floors = Array.isArray(p.floors) ? p.floors : []
@@ -728,8 +775,8 @@ export function buildPlanTypeDTO(
 
     title: planTypeTitle(p.rooms, areaMin, areaMax, locale),
     areaLabel: formatAreaRange(areaMin, areaMax, locale),
-    priceLabel: formatPriceFrom(p.priceMin, locale),
-    countLabel: formatApartmentsCount(p.apartmentsCount, locale),
+    priceLabel: soldOut ? '' : formatPriceFrom(p.priceMin, locale),
+    countLabel: soldOut ? '' : formatApartmentsCount(p.apartmentsCount, locale),
     floorsLabel: formatFloorsRange(floors, locale),
     entranceLabel: formatEntrances(entrances, locale),
     deadline: houseDeadline,
@@ -743,8 +790,8 @@ export function buildPlanTypeDTO(
     apartmentsCount: p.apartmentsCount,
     areaMin,
     areaMax,
-    priceMin: toNumber(p.priceMin),
-    priceMax: toNumber(p.priceMax),
+    priceMin: soldOut ? 0 : toNumber(p.priceMin),
+    priceMax: soldOut ? 0 : toNumber(p.priceMax),
     floorMin: floors.length ? Math.min(...floors) : null,
     floorMax: floors.length ? Math.max(...floors) : null,
 
@@ -830,12 +877,19 @@ export function buildComplexDetail(
   // ГЛОБАЛЬНОМУ order (грид не сгруппирован по домам, карточки идут вперемешку).
   const flatApartments = sortByOrder(onSale).map((apt) => aptDtoById.get(apt.id)!)
 
-  // Типы без квартир не показываем (isShownPlanType).
+  // Типы без квартир не показываем (isShownPlanType) — кроме распроданного
+  // проекта: у него свободных квартир нет ни у одного типа, а планировки
+  // показать нужно (без цен, см. buildPlanTypeDTO). Синк типы не удаляет:
+  // распроданный тип остаётся с чертежами и нулевым счётчиком.
   // Зеркальные варианты одной планировки склеиваются в одну карточку:
   // CRM отдаёт свой чертёж на каждое положение квартиры на этаже, и без
   // склейки каталог показывал до семи неотличимых плиток подряд. Правило
   // берётся из настройки ЖК — см. services/planGrouping.ts.
-  const shownPlanTypes = mergePlanTypes(planTypes.filter(isShownPlanType), complex.planGrouping)
+  const soldOut = isSoldOut(complex)
+  const shownPlanTypes = mergePlanTypes(
+    soldOut ? planTypes : planTypes.filter(isShownPlanType),
+    complex.planGrouping
+  )
   // Карточки и чипсы фильтра переводятся одним словарём — иначе на узбекской
   // странице чипс «hovli» не находил бы карточек с «двор».
   const viewLabels = c.windowViewLabels && typeof c.windowViewLabels === 'object' ? c.windowViewLabels : null
@@ -846,7 +900,8 @@ export function buildComplexDetail(
         locale,
         index,
         deadlineByHouseId.get(planType.houseId) ?? '',
-        viewLabels
+        viewLabels,
+        { soldOut }
       )
   )
 
@@ -919,6 +974,8 @@ export function buildComplexDetail(
       locale
     ),
     planSections: planTypeDTOs.length > 0 ? [{ title: PLAN_SECTION_TITLE[locale] }] : [],
+    soldOut: soldOutTags(complex, locale),
+    saleStateClass: soldOut ? 'is-sold-out' : '',
   }
 }
 
@@ -935,8 +992,14 @@ export function buildComplexListItem(
     name: c.name,
     className: c.className,
     intro: c.intro,
-    cardImage: c.media || (Array.isArray(c.heroImages) && c.heroImages[0]) || '',
+    cardImage: c.cardImage || c.media || (Array.isArray(c.heroImages) && c.heroImages[0]) || '',
     status: c.status,
     order: c.order,
+    filterClass: c.filterClass || 'business',
+    tags: (Array.isArray(c.cardTags) ? c.cardTags : [])
+      .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+      .filter(Boolean),
+    soldOut: soldOutTags(c, locale),
+    cardClass: isSoldOut(c) ? 'is-sold-visible' : '',
   }
 }

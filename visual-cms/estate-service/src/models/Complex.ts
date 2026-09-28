@@ -48,9 +48,28 @@ export class Complex {
   @Column({ type: 'int', default: 0 })
   order!: number
 
-  /** active | sold_out */
+  /** active | sold_out. Распроданный: тег «Распродано», планировки без цен. */
   @Column({ length: 20, default: 'active' })
   status!: string
+
+  /**
+   * Проект на сайте: карточка на главной и страница проекта. Публичное API
+   * отдаёт только такие ЖК; новый по умолчанию скрыт.
+   */
+  @Column({ type: 'boolean', default: false })
+  showOnSite!: boolean
+
+  /** Класс для фильтра карточек на главной: comfort | business | premium. */
+  @Column({ length: 20, default: 'business' })
+  filterClass!: string
+
+  /** Картинка карточки на главной; пусто — About-медиа или первый hero. */
+  @Column({ length: 500, default: '' })
+  cardImage!: string
+
+  /** Теги карточки на главной — переводимый список. */
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  cardTags!: string[]
 
   // --- Переводимые текстовые поля (ru = база) ---
   @Column({ length: 200 })

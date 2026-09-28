@@ -134,6 +134,11 @@ describe('buildComplexListItem', () => {
       cardImage: 'media.jpg',
       status: 'active',
       order: 0,
+      // Поля карточки на главной; у ЖК без них — значения по умолчанию.
+      filterClass: 'business',
+      tags: [],
+      soldOut: [],
+      cardClass: '',
     })
   })
 

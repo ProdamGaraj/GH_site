@@ -63,6 +63,7 @@ export class AdminController {
           name: c.name,
           className: c.className,
           status: c.status,
+          showOnSite: c.showOnSite,
           order: c.order,
           // Без этого поля в списке не видно, какие проекты вообще участвуют
           // в синхронизации с CRM, — а пустое значение её молча отключает.

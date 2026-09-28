@@ -136,7 +136,15 @@ export const EstateList: React.FC = () => {
                 <span className="ml-3 text-sm text-gray-400">/{item.slug}</span>
                 <span className="ml-3 text-xs text-gray-500">{item.className}</span>
                 {item.status === 'sold_out' && (
-                  <span className="ml-2 text-xs px-2 py-0.5 bg-gray-200 rounded">Sold out</span>
+                  <span className="ml-2 text-xs px-2 py-0.5 bg-gray-900 text-white rounded">Распродано</span>
+                )}
+                {!item.showOnSite && (
+                  <span
+                    className="ml-2 text-xs px-2 py-0.5 bg-gray-200 text-gray-600 rounded"
+                    title="Снята галочка «Показывать на сайте» — нет ни карточки на главной, ни страницы проекта"
+                  >
+                    не на сайте
+                  </span>
                 )}
                 {/* Пустой ID дома молча выключает проект из синхронизации —
                     без пометки это видно только по нулям в журнале прогона. */}

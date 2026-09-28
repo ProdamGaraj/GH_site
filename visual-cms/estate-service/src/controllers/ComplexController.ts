@@ -20,6 +20,9 @@ import {
  * Read-API комплексов. Данные грузятся из БД, преобразование в DTO (overlay
  * языка + производные) делают чистые функции services/i18n.ts.
  */
+/** Публичное API отдаёт только ЖК, выставленные на сайт (админка видит все). */
+const ON_SITE = { showOnSite: true }
+
 export class ComplexController {
   /**
    * GET /api/complexes?lang=[&full=1]
@@ -30,7 +33,10 @@ export class ComplexController {
   static async list(req: Request, res: Response): Promise<void> {
     try {
       const locale = normalizeLocale(req.query.lang as string)
+      // Только проекты, выставленные на сайт: по этому списку строятся и
+      // карточки на главной, и страницы проектов (коллекция CMS).
       const complexes = await AppDataSource.getRepository(Complex).find({
+        where: ON_SITE,
         order: { order: 'ASC' },
       })
 
@@ -125,7 +131,7 @@ export class ComplexController {
       const locale = normalizeLocale(req.query.lang as string)
       const slug = String(req.params.slug)
 
-      const complex = await AppDataSource.getRepository(Complex).findOne({ where: { slug } })
+      const complex = await AppDataSource.getRepository(Complex).findOne({ where: { slug, ...ON_SITE } })
       if (!complex) {
         res.status(404).json({ error: 'Complex not found', slug })
         return

@@ -89,6 +89,19 @@ export const SelectField: React.FC<{
   </div>
 )
 
+export const CheckboxField: React.FC<{
+  label: string
+  checked: boolean
+  onChange: (v: boolean) => void
+  hint?: string
+}> = ({ label, checked, onChange, hint }) => (
+  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+    <input type="checkbox" className="h-4 w-4" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    {label}
+    {hint && <span className="text-xs font-normal text-gray-400">{hint}</span>}
+  </label>
+)
+
 /** Массив строк через перевод строки (для yardFeatures/badges/heroImages...). */
 export const StringListField: React.FC<{
   label: string

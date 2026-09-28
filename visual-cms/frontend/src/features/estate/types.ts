@@ -20,6 +20,8 @@ export interface ComplexListItem {
   name: string
   className: string
   status: string
+  /** Проект на сайте (карточка на главной и страница). */
+  showOnSite: boolean
   order: number
   /** ID дома в MacroCRM; null — проект не синхронизируется. */
   externalHouseId: number | null
@@ -63,6 +65,14 @@ export interface ComplexDetail {
   slug: string
   order: number
   status: string
+  /** Проект на сайте: карточка на главной и страница проекта. */
+  showOnSite: boolean
+  /** Класс для фильтра карточек на главной: comfort | business | premium. */
+  filterClass: string
+  /** Картинка карточки на главной; пусто — About-медиа. */
+  cardImage: string
+  /** Теги карточки на главной (переводимые). */
+  cardTags: string[]
   /**
    * ID ДОМА в MacroCRM (houseId), не ЖК.
    *
