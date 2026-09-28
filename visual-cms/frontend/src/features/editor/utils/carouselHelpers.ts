@@ -25,6 +25,7 @@
 import type { BlockNode } from '@/shared/types'
 import type { Block } from '@/shared/types'
 import type { DataBinding } from '@/shared/types/dataBinding'
+import { SWIPE_ATTR } from './carouselSwipeHelper'
 
 export type CarouselMode = 'static' | 'repeat'
 
@@ -354,6 +355,8 @@ export function buildControlElement(
 export interface CarouselConversionOptions {
   /** Добавить стрелки prev/next и контейнер точек. По умолчанию true. */
   withControls?: boolean
+  /** Экраны свайпа (data-carousel-swipe); не задано — атрибут не ставится. */
+  swipeScreens?: string[]
 }
 
 /** Кнопка управления каруселью (prev/next). */
@@ -427,6 +430,7 @@ export function buildCarouselConversion(
       ...(node.attributes || {}),
       'data-carousel': 'true',
       'data-carousel-mode': 'static',
+      ...(options.swipeScreens ? { [SWIPE_ATTR]: options.swipeScreens.join(',') } : {}),
     },
     children,
   }

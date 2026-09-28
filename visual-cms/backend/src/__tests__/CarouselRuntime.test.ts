@@ -626,3 +626,259 @@ describe('CarouselRuntime — класс активного слайда при 
     expect(slides().map((s) => s.classList.contains('is-active'))).toEqual([false, true, false])
   })
 })
+
+describe('CarouselRuntime — свайп по экранам', () => {
+  /** Экраны сайта — как их выдаёт HtmlGenerator в window.__ghBreakpoints. */
+  const SITE_BREAKPOINTS = [
+    { id: 'desktop-hd', width: 1440, boundary: 1919 },
+    { id: 'desktop-fhd', width: 1920, boundary: null },
+    { id: 'tablet', width: 768, boundary: 1439 },
+    { id: 'mobile', width: 375, boundary: 767 },
+  ]
+
+  const setViewport = (width: number) => {
+    Object.defineProperty(window, 'innerWidth', { value: width, configurable: true, writable: true })
+  }
+
+  const carousel = (swipe: string | null, slides = 3, extra = '') => {
+    const attr = swipe === null ? '' : ` data-carousel-swipe="${swipe}"`
+    const items = Array.from({ length: slides })
+      .map((_, i) => `<div data-carousel-slide="true" data-element-id="s${i}"><a href="#s${i}" data-link="${i}">link ${i}</a></div>`)
+      .join('')
+    return `<div data-carousel="true" data-carousel-autoplay="0"${attr}${extra}>
+      <div data-carousel-track="true">${items}</div>
+      <div data-carousel-dots="true"><span data-carousel-dot="true"></span></div>
+    </div>`
+  }
+
+  const active = () =>
+    Array.from(document.querySelectorAll<HTMLElement>('[data-carousel-slide="true"]')).findIndex((s) =>
+      s.classList.contains('is-active')
+    )
+
+  /** Свайп на текущем экране работает (метка рантайма; вместе с ней корню ставится touch-action: pan-y). */
+  const swipeActive = () => document.querySelector('[data-carousel="true"]')!.getAttribute('data-carousel-swipe-active') === 'true'
+
+  /** Событие указателя. jsdom не знает PointerEvent — MouseEvent с полями указателя. */
+  const pointer = (
+    type: string,
+    x: number,
+    y: number,
+    opts: { pointerType?: string; button?: number; isPrimary?: boolean; pointerId?: number; target?: Element } = {}
+  ) => {
+    const e = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: opts.button ?? 0 })
+    Object.defineProperties(e, {
+      pointerId: { value: opts.pointerId ?? 1 },
+      pointerType: { value: opts.pointerType ?? 'touch' },
+      isPrimary: { value: opts.isPrimary ?? true },
+    })
+    ;(opts.target ?? trackEl()).dispatchEvent(e)
+    return e
+  }
+
+  /** Жест от (200, 300) со сдвигом dx, dy — несколькими шагами, как палец. */
+  const swipe = (dx: number, dy = 0, opts: Parameters<typeof pointer>[3] = {}) => {
+    pointer('pointerdown', 200, 300, opts)
+    for (let i = 1; i <= 4; i++) pointer('pointermove', 200 + (dx * i) / 4, 300 + (dy * i) / 4, opts)
+    pointer('pointerup', 200 + dx, 300 + dy, opts)
+  }
+
+  let play: jest.SpyInstance
+
+  beforeEach(() => {
+    ;(window as any).__ghBreakpoints = SITE_BREAKPOINTS
+    setViewport(390)
+    // jsdom не проигрывает видео — считаем вызовы.
+    play = jest.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve())
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+    delete (window as any).__ghBreakpoints
+    play.mockRestore()
+    jest.restoreAllMocks()
+  })
+
+  it('на телефоне: влево — следующий слайд, вправо — предыдущий', async () => {
+    await boot(carousel('mobile,tablet'))
+    expect(active()).toBe(0)
+    swipe(-120)
+    expect(active()).toBe(1)
+    swipe(120)
+    expect(active()).toBe(0)
+  })
+
+  it('жест, начатый на оформлении карточки поверх трека, тоже листает', async () => {
+    await boot(carousel('mobile'))
+    // Накладка карточки (градиент, подпись) — сосед трека, а не его потомок.
+    const overlay = document.createElement('div')
+    document.querySelector('[data-carousel="true"]')!.appendChild(overlay)
+    swipe(-120, 0, { target: overlay })
+    expect(active()).toBe(1)
+  })
+
+  it('карусель внутри карусели: жест листает только внутреннюю', async () => {
+    await boot(`<div data-carousel="true" data-carousel-swipe="mobile" data-element-id="outer">
+      <div data-carousel-track="true">
+        <div data-carousel-slide="true" data-element-id="o0">
+          <div data-carousel="true" data-carousel-swipe="mobile" data-element-id="inner">
+            <div data-carousel-track="true" data-element-id="inner-track">
+              <div data-carousel-slide="true">i0</div><div data-carousel-slide="true">i1</div>
+            </div>
+          </div>
+        </div>
+        <div data-carousel-slide="true" data-element-id="o1">o1</div>
+      </div>
+    </div>`)
+    const index = (id: string) => {
+      const track = document.querySelector(`[data-element-id="${id}"]`)!.querySelector('[data-carousel-track="true"]')!
+      return Array.from(track.children).findIndex((s) => s.classList.contains('is-active'))
+    }
+    swipe(-120, 0, { target: document.querySelector('[data-element-id="inner-track"]')!.children[0] })
+    expect(index('inner')).toBe(1)
+    expect(index('outer')).toBe(0)
+  })
+
+  it('жест короче 40 px не листает', async () => {
+    await boot(carousel('mobile,tablet'))
+    swipe(-35)
+    expect(active()).toBe(0)
+  })
+
+  it('на экране из списка свайп включён (корень получает touch-action: pan-y)', async () => {
+    await boot(carousel('mobile,tablet'))
+    expect(swipeActive()).toBe(true)
+  })
+
+  it('движение вверх-вниз отдаётся странице — слайд не меняется', async () => {
+    await boot(carousel('mobile,tablet'))
+    swipe(-60, 200)
+    expect(active()).toBe(0)
+  })
+
+  it('экран не из списка — жестом не листается и касание не перехватывается', async () => {
+    setViewport(1600)
+    await boot(carousel('mobile,tablet'))
+    swipe(-120, 0, { pointerType: 'mouse' })
+    expect(active()).toBe(0)
+    expect(swipeActive()).toBe(false)
+  })
+
+  it('без настройки жестом не листается', async () => {
+    await boot(carousel(null))
+    swipe(-120)
+    expect(active()).toBe(0)
+    expect(swipeActive()).toBe(false)
+  })
+
+  it('поворот телефона и изменение окна — настройка пересчитывается под новый экран', async () => {
+    await boot(carousel('mobile'))
+    expect(swipeActive()).toBe(true)
+    setViewport(1000)
+    window.dispatchEvent(new Event('resize'))
+    expect(swipeActive()).toBe(false)
+    swipe(-120)
+    expect(active()).toBe(0)
+  })
+
+  it('экран компьютера в списке — листается перетаскиванием мышью', async () => {
+    setViewport(1600)
+    await boot(carousel('desktop-hd'))
+    swipe(-120, 0, { pointerType: 'mouse' })
+    expect(active()).toBe(1)
+  })
+
+  it('после перетаскивания мышью click по ссылке под курсором гасится, обычный клик проходит', async () => {
+    setViewport(1600)
+    await boot(carousel('desktop-hd'))
+    const clicks: string[] = []
+    document.addEventListener('click', (e) => clicks.push((e.target as HTMLElement).getAttribute('data-link') || ''))
+    const link = document.querySelector<HTMLElement>('[data-link="0"]')!
+
+    swipe(-120, 0, { pointerType: 'mouse', target: link })
+    link.click()
+    expect(clicks).toEqual([])
+
+    jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 1000)
+    link.click()
+    expect(clicks).toEqual(['0'])
+  })
+
+  it('касание со сдвигом click не гасит — следующее нажатие работает', async () => {
+    await boot(carousel('mobile'))
+    const clicks: string[] = []
+    document.addEventListener('click', (e) => clicks.push((e.target as HTMLElement).getAttribute('data-link') || ''))
+    swipe(-120)
+    document.querySelector<HTMLElement>('[data-link="1"]')!.click()
+    expect(clicks).toEqual(['1'])
+  })
+
+  it('правая кнопка мыши и второй палец жест не начинают', async () => {
+    setViewport(1600)
+    await boot(carousel('desktop-hd,mobile'))
+    swipe(-120, 0, { pointerType: 'mouse', button: 2 })
+    expect(active()).toBe(0)
+    setViewport(390)
+    swipe(-120, 0, { isPrimary: false })
+    expect(active()).toBe(0)
+  })
+
+  it('браузер забрал жест (pointercancel) — слайд не меняется', async () => {
+    await boot(carousel('mobile'))
+    pointer('pointerdown', 200, 300)
+    pointer('pointermove', 100, 300)
+    pointer('pointercancel', 100, 300)
+    pointer('pointerup', 60, 300)
+    expect(active()).toBe(0)
+  })
+
+  describe('один слайд', () => {
+    const single = (extra = '') => `<div data-carousel="true" data-carousel-swipe="mobile,tablet,desktop-hd,desktop-fhd"${extra}>
+      <div data-carousel-track="true"><div data-carousel-slide="true" data-slide-video="/v.mp4" data-element-id="s0"></div></div>
+    </div>`
+
+    it('жест не перехватывается ни на одном экране — страница прокручивается как обычно', async () => {
+      await boot(single())
+      expect(swipeActive()).toBe(false)
+    })
+
+    it('свайп не перезапускает видео (баг «О проекте»)', async () => {
+      await boot(single())
+      const calls = play.mock.calls.length
+      swipe(-120)
+      swipe(120)
+      expect(play.mock.calls.length).toBe(calls)
+    })
+
+    it('«смотреть видео до конца» с автопрокруткой: одиночное видео крутится по кругу', async () => {
+      await boot(single(' data-carousel-autoplay="5000" data-carousel-video-wait="true"'))
+      const v = document.querySelector<HTMLVideoElement>('video[data-carousel-video="true"]')!
+      expect(v.loop).toBe(true)
+    })
+  })
+
+  it('нажатие на точку открытого слайда не перезапускает его видео', async () => {
+    await boot(`<div data-carousel="true" data-carousel-autoplay="0">
+      <div data-carousel-track="true">
+        <div data-carousel-slide="true" data-slide-video="/a.mp4"></div>
+        <div data-carousel-slide="true" data-slide-video="/b.mp4"></div>
+      </div>
+      <div data-carousel-dots="true"><span data-carousel-dot="true"></span></div>
+    </div>`)
+    const calls = play.mock.calls.length
+    dotsAt()[0].click()
+    expect(play.mock.calls.length).toBe(calls)
+    dotsAt()[1].click()
+    expect(play.mock.calls.length).toBe(calls + 1)
+  })
+
+  it('«смотреть видео до конца» с автопрокруткой и несколькими слайдами — видео не зациклено', async () => {
+    await boot(`<div data-carousel="true" data-carousel-autoplay="5000" data-carousel-video-wait="true">
+      <div data-carousel-track="true">
+        <div data-carousel-slide="true" data-slide-video="/a.mp4"></div>
+        <div data-carousel-slide="true" data-slide-video="/b.mp4"></div>
+      </div>
+    </div>`)
+    expect(document.querySelector<HTMLVideoElement>('video[data-carousel-video="true"]')!.loop).toBe(false)
+  })
+})

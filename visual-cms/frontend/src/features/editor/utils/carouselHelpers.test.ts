@@ -494,6 +494,12 @@ describe('buildCarouselConversion', () => {
     buildCarouselConversion(node, genId)
     expect(JSON.stringify(node)).toBe(before)
   })
+
+  it('экраны свайпа — атрибутом data-carousel-swipe; без них атрибута нет', () => {
+    const withSwipe = buildCarouselConversion(container([]), genId, { swipeScreens: ['tablet', 'mobile'] })
+    expect(withSwipe.attributes['data-carousel-swipe']).toBe('tablet,mobile')
+    expect('data-carousel-swipe' in buildCarouselConversion(container([]), genId).attributes).toBe(false)
+  })
 })
 
 describe('пикер управляющих элементов карусели', () => {

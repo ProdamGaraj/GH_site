@@ -24,7 +24,8 @@ describe('generateResponsiveMediaRuntime', () => {
   })
 
   it('выбирает наименьший подходящий брейкпоинт по boundary (границы диапазонов) и наблюдает DOM', () => {
-    expect(js).toContain('w <= boundOf(bp)')
+    // Правило выбора — общее с каруселью, поведение проверяет breakpointRuntime.test.ts.
+    expect(js).toContain('ghBreakpointAt(BPS, w,')
     // boundary null = самый широкий breakpoint, не ограничен сверху
     expect(js).toContain('bp.boundary === null')
     expect(js).toContain('MutationObserver')

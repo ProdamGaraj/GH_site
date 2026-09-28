@@ -33,6 +33,13 @@
  *                                       от эффекта: 500 для сдвига, 600 для наплыва, 0 для none)
  *   [data-carousel-slide-active-class]— класс активного слайда (default: "is-active"),
  *                                       при любом эффекте; за него цепляется CSS вёрстки
+ *   [data-carousel-swipe="mobile,tablet"] — экраны (id брейкпоинтов страницы из
+ *                                       window.__ghBreakpoints), где слайды листаются
+ *                                       жестом: пальцем, пером, перетаскиванием мышью.
+ *                                       Нет атрибута или пуст — жестом не листается.
+ *                                       При одном слайде жест не перехватывается вовсе.
+ *                                       Где свайп работает сейчас, на корне стоит
+ *                                       data-carousel-swipe-active="true".
  *
  * Число слайдов runtime пишет на корень: data-carousel-count="N" — за него
  * может цепляться CSS вёрстки (например, спрятать пустую галерею). Кнопки
@@ -44,11 +51,20 @@
  *
  * Перерисовка при mutation track.children (нужно для repeater из DataBindingGenerator).
  */
+import { BREAKPOINT_RUNTIME_JS } from './breakpointRuntime'
+
 export function generateCarouselRuntime(): string {
   return `<script>
 (function(){
   'use strict';
+${BREAKPOINT_RUNTIME_JS}
   var ACTIVE_CLASS_DEFAULT = 'active';
+  /** Жест короче — не листает (случайное касание, дрожание мыши). */
+  var SWIPE_MIN_PX = 40;
+  /** После такого сдвига ясно, куда жест: вбок — карусели, вверх-вниз — странице. */
+  var SWIPE_LOCK_PX = 10;
+  /** Столько после перетаскивания мышью гасим click: он пришёл бы по ссылке под курсором. */
+  var SWIPE_CLICK_GUARD_MS = 400;
   var SLIDE_ACTIVE_CLASS_DEFAULT = 'is-active';
   var EFFECT_DEFAULT = 'slide';
 
@@ -99,7 +115,7 @@ export function generateCarouselRuntime(): string {
     var dotsContainer = root.querySelector('[data-carousel-dots]');
     var counterEl = root.querySelector('[data-carousel-counter]');
 
-    var state = { index: 0, slides: [], dots: [], timer: null, interacting: false, dotActiveStyle: '', dotInactiveStyle: '' };
+    var state = { index: 0, slides: [], dots: [], timer: null, interacting: false, swiping: false, dotActiveStyle: '', dotInactiveStyle: '' };
 
     function getSlides() {
       // Только прямые дети track. Фильтруем по data-carousel-slide если есть, иначе все children.
@@ -286,8 +302,9 @@ export function generateCarouselRuntime(): string {
         v.setAttribute('data-carousel-video', 'true');
         v.muted = true; v.defaultMuted = true; v.autoplay = true;
         // «Смотреть видео до конца» + автоплей: НЕ зацикливаем, иначе 'ended' не сработает.
-        // В обычном режиме видео крутится бесконечно как фон.
-        var oneShot = videoWait && autoplay > 0;
+        // В обычном режиме видео крутится бесконечно как фон. Единственный слайд
+        // листать некуда — его видео тоже крутится по кругу.
+        var oneShot = videoWait && autoplay > 0 && state.slides.length > 1;
         v.loop = !oneShot;
         v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
         v.playsInline = true; v.preload = 'none';
@@ -383,11 +400,12 @@ export function generateCarouselRuntime(): string {
     function goTo(i, userInteraction) {
       var n = state.slides.length;
       if (n === 0) return;
-      if (loop) {
-        state.index = ((i % n) + n) % n;
-      } else {
-        state.index = Math.max(0, Math.min(n - 1, i));
-      }
+      var target = loop ? ((i % n) + n) % n : Math.max(0, Math.min(n - 1, i));
+      // Тот же слайд — ничего не делаем: update() начал бы его видео с начала.
+      // Так свайп по «О проекте» с одним видео перезапускал ролик, а нажатие на
+      // точку открытого слайда — его.
+      if (target === state.index) return;
+      state.index = target;
       update();
       if (userInteraction) restartAutoplay();
     }
@@ -399,7 +417,7 @@ export function generateCarouselRuntime(): string {
       stopAutoplay();
       if (autoplay > 0 && state.slides.length > 1) {
         state.timer = setInterval(function(){
-          if (state.interacting) return;
+          if (state.interacting || state.swiping) return;
           // «Смотреть видео до конца»: пока активное видео не доиграло — не листаем по
           // таймеру (уход обеспечит 'ended'-обработчик). Так длинное видео не обрежется.
           if (videoWait) {
@@ -444,6 +462,7 @@ export function generateCarouselRuntime(): string {
     function rebuild() {
       state.slides = getSlides();
       syncControls(state.slides.length);
+      syncSwipe();
       if (state.slides.length === 0) return;
       applyTrackLayout();
       rebuildDots();
@@ -459,16 +478,94 @@ export function generateCarouselRuntime(): string {
     root.addEventListener('mouseenter', function(){ state.interacting = true; });
     root.addEventListener('mouseleave', function(){ state.interacting = false; });
 
-    // Touch swipe
-    var touchX = null;
-    track.addEventListener('touchstart', function(e){ touchX = e.touches[0].clientX; state.interacting = true; }, { passive: true });
-    track.addEventListener('touchend', function(e){
-      if (touchX === null) return;
-      var dx = e.changedTouches[0].clientX - touchX;
-      if (Math.abs(dx) > 40) { dx < 0 ? next() : prev(); restartAutoplay(); }
-      touchX = null;
-      state.interacting = false;
-    }, { passive: true });
+    // --- Свайп: data-carousel-swipe = экраны, где слайды листаются жестом ---
+    // Жест ловим на всём корне, а не на треке: трек обычно перекрыт оформлением
+    // карточки, стрелками, подписями — палец попадает в них, а не в слайд.
+    var swipeScreens = (root.getAttribute('data-carousel-swipe') || '')
+      .split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+    var ownTouchAction = root.style.touchAction;
+    var gesture = null;
+    var swallowClickUntil = 0;
+
+    function swipeEnabled() {
+      if (state.slides.length < 2 || swipeScreens.length === 0) return false;
+      var bp = ghBreakpointAt(ghBreakpoints(), ghViewportWidth());
+      return !!bp && swipeScreens.indexOf(bp.id) !== -1;
+    }
+
+    // Пока свайп включён, вертикальную прокрутку пальцем ведёт браузер, а движение
+    // вбок достаётся карусели. Без pan-y браузер забрал бы себе весь жест.
+    // Метка на корне — для вёрстки (курсор и т.п.) и проверок.
+    function syncSwipe() {
+      var on = swipeEnabled();
+      root.style.touchAction = on ? 'pan-y' : ownTouchAction;
+      if (on) root.setAttribute('data-carousel-swipe-active', 'true');
+      else root.removeAttribute('data-carousel-swipe-active');
+    }
+
+    function endGesture() {
+      if (!gesture) return;
+      if (gesture.mouse) root.style.userSelect = gesture.userSelect;
+      gesture = null;
+      state.swiping = false;
+    }
+
+    root.addEventListener('pointerdown', function(e){
+      if (gesture || e.isPrimary === false) return;
+      // Карусель внутри карусели: жест достаётся той, что ближе к пальцу.
+      if (e.target && e.target.closest && e.target.closest('[data-carousel="true"]') !== root) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (!swipeEnabled()) return;
+      gesture = { id: e.pointerId, x: e.clientX, y: e.clientY, mouse: e.pointerType === 'mouse', horizontal: false, userSelect: root.style.userSelect };
+      state.swiping = true;
+    });
+
+    root.addEventListener('pointermove', function(e){
+      if (!gesture || e.pointerId !== gesture.id) return;
+      var dx = e.clientX - gesture.x;
+      var dy = e.clientY - gesture.y;
+      if (!gesture.horizontal) {
+        // Вверх-вниз — прокрутка страницы, карусель отпускает жест.
+        if (Math.abs(dy) > SWIPE_LOCK_PX && Math.abs(dy) >= Math.abs(dx)) { endGesture(); return; }
+        if (Math.abs(dx) <= SWIPE_LOCK_PX || Math.abs(dx) <= Math.abs(dy)) return;
+        gesture.horizontal = true;
+        // Мышь, ушедшая за край карусели, не должна терять жест.
+        try { root.setPointerCapture(e.pointerId); } catch (err) {}
+        if (gesture.mouse) {
+          root.style.userSelect = 'none';
+          var sel = window.getSelection && window.getSelection();
+          if (sel && sel.removeAllRanges) sel.removeAllRanges();
+        }
+      }
+      if (gesture.mouse) e.preventDefault();
+    });
+
+    root.addEventListener('pointerup', function(e){
+      if (!gesture || e.pointerId !== gesture.id) return;
+      var dx = e.clientX - gesture.x;
+      var horizontal = gesture.horizontal;
+      var mouse = gesture.mouse;
+      endGesture();
+      if (!horizontal) return;
+      // Касание со сдвигом click не порождает, а мышь — да, по элементу под курсором.
+      if (mouse) swallowClickUntil = Date.now() + SWIPE_CLICK_GUARD_MS;
+      if (Math.abs(dx) >= SWIPE_MIN_PX) { dx < 0 ? next() : prev(); restartAutoplay(); }
+    });
+
+    root.addEventListener('pointercancel', endGesture);
+
+    root.addEventListener('click', function(e){
+      if (Date.now() >= swallowClickUntil) return;
+      swallowClickUntil = 0;
+      e.preventDefault();
+      e.stopPropagation();
+    }, true);
+
+    // Картинку внутри слайда браузер иначе потащил бы мышью как файл.
+    root.addEventListener('dragstart', function(e){ if (swipeEnabled()) e.preventDefault(); });
+
+    // Экран меняется при повороте телефона и изменении окна.
+    window.addEventListener('resize', syncSwipe);
 
     rebuild();
 

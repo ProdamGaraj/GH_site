@@ -18,11 +18,14 @@
  * Выбор: брейкпоинт с наименьшей boundary ≥ вьюпорта среди присутствующих в
  * карте; иначе — база. Совпадает с семантикой @media/<picture>.
  */
+import { BREAKPOINT_RUNTIME_JS } from './breakpointRuntime'
+
 export function generateResponsiveMediaRuntime(): string {
   return `<script>
 (function(){
   'use strict';
-  var BPS = (window.__ghBreakpoints || []).filter(function(b){ return b && typeof b.width === 'number'; });
+${BREAKPOINT_RUNTIME_JS}
+  var BPS = ghBreakpoints();
   var tracked = [];
 
   function baseOf(el, kind){
@@ -31,18 +34,8 @@ export function generateResponsiveMediaRuntime(): string {
     return el.__rmBase;
   }
 
-  function boundOf(bp){
-    if (bp.boundary === null) return Infinity;
-    return typeof bp.boundary === 'number' ? bp.boundary : bp.width;
-  }
-
   function pick(map, w){
-    var best = null;
-    for (var i = 0; i < BPS.length; i++){
-      var bp = BPS[i];
-      if (map[bp.id] == null || map[bp.id] === '') continue;
-      if (w <= boundOf(bp) && (best === null || boundOf(bp) < boundOf(best))) best = bp;
-    }
+    var best = ghBreakpointAt(BPS, w, function(bp){ return map[bp.id] != null && map[bp.id] !== ''; });
     return best ? map[best.id] : null;
   }
 
@@ -51,7 +44,7 @@ export function generateResponsiveMediaRuntime(): string {
     try { map = JSON.parse(el.getAttribute('data-rmedia') || '{}'); } catch(e){ return; }
     var kind = el.getAttribute('data-rmedia-kind') === 'src' ? 'src' : 'bg';
     var base = baseOf(el, kind);
-    var chosen = pick(map, window.innerWidth || document.documentElement.clientWidth || 0);
+    var chosen = pick(map, ghViewportWidth());
     if (kind === 'src'){
       var v = chosen != null ? chosen : base;
       // Меняем только при реальной смене: лишний setAttribute на <video>

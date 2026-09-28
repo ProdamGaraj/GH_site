@@ -13,6 +13,7 @@ import {
 } from '@/features/editor/editorSlice'
 import { writeSlideResponsive } from '@/features/editor/utils/slideResponsiveHelper'
 import { hasSlidesWithoutId, slideLangField } from '@/features/editor/utils/slideLangHelper'
+import { defaultSwipeScreens } from '@/features/editor/utils/carouselSwipeHelper'
 import { selectAllBindings, bumpBindingsVersion } from '@/features/dataBindings/dataBindingsSlice'
 import {
   DndContext,
@@ -67,6 +68,7 @@ import { StaticSlidesPanel } from './StaticSlidesPanel'
 import { CarouselControlsPicker } from './CarouselControlsPicker'
 import { CarouselOverlaysSection } from './CarouselOverlaysSection'
 import { CarouselAutoplaySection } from './CarouselAutoplaySection'
+import { CarouselSwipeSection } from './CarouselSwipeSection'
 import { CarouselTransitionSection } from './CarouselTransitionSection'
 import { RepeatTemplatePicker } from './RepeatTemplatePicker'
 import { RepeatSourcePicker } from './RepeatSourcePicker'
@@ -270,7 +272,8 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
   // (карточка/контролы поверх слайдера). После этого панель покажет редактор слайдов.
   const handleMakeCarousel = () => {
     if (!node) return
-    const conv = buildCarouselConversion(node, generateId)
+    // Новая карусель листается свайпом на телефоне и планшете — как существующие после миграции.
+    const conv = buildCarouselConversion(node, generateId, { swipeScreens: defaultSwipeScreens(breakpoints) })
     const pos = node.styles?.properties?.position
     const styles =
       pos && ['relative', 'absolute', 'fixed', 'sticky'].includes(pos)
@@ -333,6 +336,7 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
         <StaticSlidesPanel track={track} pageId={pageId} />
         <CarouselTransitionSection carouselRoot={node} />
         <CarouselAutoplaySection carouselRoot={node} />
+        <CarouselSwipeSection carouselRoot={node} />
         <CarouselControlsPicker carouselRoot={node} />
         <CarouselOverlaysSection carouselRoot={node} />
       </div>
@@ -535,6 +539,7 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
 
       <CarouselTransitionSection carouselRoot={node} />
         <CarouselAutoplaySection carouselRoot={node} />
+      <CarouselSwipeSection carouselRoot={node} />
       <CarouselControlsPicker carouselRoot={node} />
       <CarouselOverlaysSection carouselRoot={node} />
 
