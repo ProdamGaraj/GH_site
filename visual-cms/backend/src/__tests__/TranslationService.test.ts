@@ -146,11 +146,23 @@ describe('extractVariableMediaFields', () => {
     ],
   }
 
-  it('извлекает медиа-поля с синтетическими ключами pagevar:/media:', () => {
+  it('извлекает медиа-поля с синтетическими ключами pagevar:/media:<_id слайда>', () => {
     const e = extractVariableMediaFields(envelope)
-    expect(e).toContainEqual({ nodeId: 'pagevar:heroSlides', field: 'media:0:imageUrl', value: '/media/1.png' })
-    expect(e).toContainEqual({ nodeId: 'pagevar:heroSlides', field: 'media:1:imageUrl', value: '/media/2.jpg' })
-    expect(e).toContainEqual({ nodeId: 'pagevar:heroSlides', field: 'media:1:videoUrl', value: 'https://cdn/v.mp4' })
+    expect(e).toContainEqual({ nodeId: 'pagevar:heroSlides', field: 'media:a:imageUrl', value: '/media/1.png' })
+    expect(e).toContainEqual({ nodeId: 'pagevar:heroSlides', field: 'media:b:imageUrl', value: '/media/2.jpg' })
+    expect(e).toContainEqual({ nodeId: 'pagevar:heroSlides', field: 'media:b:videoUrl', value: 'https://cdn/v.mp4' })
+  })
+
+  it('слайд без _id не выдаётся: адресовать его вариант нечем', () => {
+    const env: any = {
+      variables: [
+        {
+          name: 'heroSlides',
+          defaultValue: [{ imageUrl: '/media/no-id.png' }, { _id: '', imageUrl: '/media/empty-id.png' }, { _id: 'x:y', imageUrl: '/media/colon.png' }, { _id: 'ok', imageUrl: '/media/ok.png' }],
+        },
+      ],
+    }
+    expect(extractVariableMediaFields(env)).toEqual([{ nodeId: 'pagevar:heroSlides', field: 'media:ok:imageUrl', value: '/media/ok.png' }])
   })
 
   it('не берёт текст, ссылки и служебные поля (_*)', () => {
@@ -165,21 +177,21 @@ describe('extractVariableMediaFields', () => {
     expect(extractVariableMediaFields(null)).toEqual([])
   })
 
-  it('извлекает пер-брейкпоинтные медиа слайда из _responsive → media:i:field@bp', () => {
+  it('извлекает пер-брейкпоинтные медиа слайда из _responsive → media:<_id>:field@bp', () => {
     const env: any = {
       variables: [
         {
           name: 'heroSlides',
           type: 'array',
           defaultValue: [
-            { imageUrl: '/media/1.png', _responsive: { imageUrl: { tablet: '/media/1t.png', mobile: '/media/1m.png' } } },
+            { _id: 's1', imageUrl: '/media/1.png', _responsive: { imageUrl: { tablet: '/media/1t.png', mobile: '/media/1m.png' } } },
           ],
         },
       ],
     }
     const e = extractVariableMediaFields(env)
-    expect(e).toContainEqual({ nodeId: 'pagevar:heroSlides', field: 'media:0:imageUrl@tablet', value: '/media/1t.png' })
-    expect(e).toContainEqual({ nodeId: 'pagevar:heroSlides', field: 'media:0:imageUrl@mobile', value: '/media/1m.png' })
+    expect(e).toContainEqual({ nodeId: 'pagevar:heroSlides', field: 'media:s1:imageUrl@tablet', value: '/media/1t.png' })
+    expect(e).toContainEqual({ nodeId: 'pagevar:heroSlides', field: 'media:s1:imageUrl@mobile', value: '/media/1m.png' })
   })
 })
 
@@ -188,13 +200,13 @@ describe('applyVariableMediaTranslations', () => {
     {
       name: 'heroSlides',
       type: 'array',
-      defaultValue: [{ imageUrl: '/media/orig1.png' }, { imageUrl: '/media/orig2.png' }],
+      defaultValue: [{ _id: 's1', imageUrl: '/media/orig1.png' }, { _id: 's2', imageUrl: '/media/orig2.png' }],
     },
   ]
 
   it('накладывает перевод по ключам, не мутируя исходник', () => {
     const variables = makeVars()
-    const map = { 'pagevar:heroSlides': { 'media:1:imageUrl': '/media/en2.png' } }
+    const map = { 'pagevar:heroSlides': { 'media:s2:imageUrl': '/media/en2.png' } }
     const out: any = applyVariableMediaTranslations(variables, map)
     expect(out[0].defaultValue[1].imageUrl).toBe('/media/en2.png')
     expect(out[0].defaultValue[0].imageUrl).toBe('/media/orig1.png')
@@ -207,25 +219,56 @@ describe('applyVariableMediaTranslations', () => {
     expect(applyVariableMediaTranslations(variables, { x: { content: 'y' } })).toBe(variables)
   })
 
-  it('индекс за границей / отсутствующая переменная — безопасно игнорируются', () => {
+  it('вариант удалённого слайда, ключ по номеру и отсутствующая переменная — безопасно игнорируются', () => {
     const variables = makeVars()
     const map = {
-      'pagevar:heroSlides': { 'media:9:imageUrl': 'z' },
-      'pagevar:missing': { 'media:0:imageUrl': 'z' },
+      'pagevar:heroSlides': { 'media:gone:imageUrl': 'z', 'media:0:imageUrl': 'z' },
+      'pagevar:missing': { 'media:s1:imageUrl': 'z' },
     }
     const out: any = applyVariableMediaTranslations(variables, map)
     expect(out[0].defaultValue.length).toBe(2)
     expect(out[0].defaultValue[0].imageUrl).toBe('/media/orig1.png')
   })
 
-  it('пер-брейкпоинтный ключ media:i:field@bp → item._responsive[field][bp], без мутации оригинала', () => {
+  it('пер-брейкпоинтный ключ media:<_id>:field@bp → item._responsive[field][bp], без мутации оригинала', () => {
     const variables = makeVars()
-    const map = { 'pagevar:heroSlides': { 'media:0:imageUrl@mobile': '/media/en1m.png' } }
+    const map = { 'pagevar:heroSlides': { 'media:s1:imageUrl@mobile': '/media/en1m.png' } }
     const out: any = applyVariableMediaTranslations(variables, map)
     expect(out[0].defaultValue[0]._responsive.imageUrl.mobile).toBe('/media/en1m.png')
     // базовый imageUrl не тронут; оригинал без _responsive
     expect(out[0].defaultValue[0].imageUrl).toBe('/media/orig1.png')
     expect(variables[0].defaultValue[0]._responsive).toBeUndefined()
+  })
+
+  describe('вариант остаётся у своего слайда, что бы со слайдами ни делали', () => {
+    // Слайды A, B, C; узбекские варианты есть у A и B.
+    const UZ = { 'pagevar:heroSlides': { 'media:A:imageUrl': '/media/A-uz.png', 'media:B:imageUrl': '/media/B-uz.png' } }
+    const slide = (id: string) => ({ _id: id, imageUrl: `/media/${id}.png` })
+    const shown = (slides: Array<{ _id: string; imageUrl: string }>) =>
+      (applyVariableMediaTranslations([{ name: 'heroSlides', defaultValue: slides }], UZ)[0].defaultValue as any[]).map(
+        (s) => `${s._id}=${s.imageUrl}`
+      )
+
+    it('удалили первый', () => {
+      expect(shown([slide('B'), slide('C')])).toEqual(['B=/media/B-uz.png', 'C=/media/C.png'])
+    })
+
+    it('переставили', () => {
+      expect(shown([slide('C'), slide('A'), slide('B')])).toEqual(['C=/media/C.png', 'A=/media/A-uz.png', 'B=/media/B-uz.png'])
+    })
+
+    it('скопировали: у копии свой _id и пока нет варианта', () => {
+      expect(shown([slide('A'), slide('A2'), slide('B'), slide('C')])).toEqual([
+        'A=/media/A-uz.png',
+        'A2=/media/A2.png',
+        'B=/media/B-uz.png',
+        'C=/media/C.png',
+      ])
+    })
+
+    it('удалили и добавили новый: новому не достаётся вариант удалённого', () => {
+      expect(shown([slide('A'), slide('C'), slide('D')])).toEqual(['A=/media/A-uz.png', 'C=/media/C.png', 'D=/media/D.png'])
+    })
   })
 })
 

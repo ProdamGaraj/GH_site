@@ -262,8 +262,12 @@ export function applyTranslationsToTree(
 // (например heroSlides[i].imageUrl). Кодируем такие переводы в общую overlay-модель
 // синтетическими ключами:
 //   nodeId = "pagevar:<varName>"
-//   field  = "media:<index>:<sourceField>"
+//   field  = "media:<_id слайда>:<sourceField>"
 // На деплое applyVariableMediaTranslations накладывает их на dataConfig.variables.
+//
+// Слайд адресуется постоянным _id, а не номером в массиве: при номере удаление,
+// перестановка или копирование слайда молча отдавали языковые варианты чужим
+// слайдам (видно было только на языковой версии сайта).
 // ──────────────────────────────────────────────────────────────────────────
 
 export const PAGEVAR_PREFIX = 'pagevar:'
@@ -278,23 +282,35 @@ export function looksLikeMediaUrl(value: unknown): boolean {
   return /\.(jpe?g|png|webp|gif|avif|svg|bmp|mp4|webm|mov|m4v|ogg|ogv)(\?.*)?$/i.test(v)
 }
 
-/** Разбирает field вида "media:<index>:<sourceField>". */
-function parseVarMediaField(field: string): { index: number; sourceField: string } | null {
+/**
+ * Ключ слайда в переводе — его постоянный _id (выдаёт панель слайдов при
+ * создании и копировании, хранится в самой переменной). Слайд без _id
+ * адресовать нечем: его медиа на перевод не выдаётся, пока слайды не
+ * сохранят из панели.
+ */
+export function slideKeyOf(item: unknown): string | null {
+  const id = item && typeof item === 'object' ? (item as { _id?: unknown })._id : undefined
+  // Двоеточие разделяет части ключа "media:<id>:<поле>" — такой id не адресуем.
+  return typeof id === 'string' && id.trim() !== '' && !id.includes(':') ? id : null
+}
+
+/** Разбирает field вида "media:<_id слайда>:<sourceField>". */
+function parseVarMediaField(field: string): { slideKey: string; sourceField: string } | null {
   if (typeof field !== 'string' || !field.startsWith(VAR_MEDIA_PREFIX)) return null
   const rest = field.slice(VAR_MEDIA_PREFIX.length)
   const colon = rest.indexOf(':')
   if (colon <= 0) return null
-  const index = Number(rest.slice(0, colon))
+  const slideKey = rest.slice(0, colon)
   const sourceField = rest.slice(colon + 1)
-  if (!Number.isInteger(index) || index < 0 || !sourceField) return null
-  return { index, sourceField }
+  if (!sourceField) return null
+  return { slideKey, sourceField }
 }
 
 /**
  * Извлекает переводимые медиа-поля из envelope page-переменных
  * ({ variables: [{ name, defaultValue }] }). Для каждого массива-переменной,
- * каждого элемента и каждого строкового поля, похожего на медиа-URL, — одна запись.
- * Служебные поля (начинаются с '_': _id, _hidden, _*AssetId) пропускаем.
+ * каждого элемента с _id и каждого строкового поля, похожего на медиа-URL, —
+ * одна запись. Служебные поля (начинаются с '_': _id, _hidden, _*AssetId) пропускаем.
  */
 export function extractVariableMediaFields(envelope: any): TranslationEntry[] {
   const entries: TranslationEntry[] = []
@@ -305,14 +321,15 @@ export function extractVariableMediaFields(envelope: any): TranslationEntry[] {
     const name = v?.name
     const arr = v?.defaultValue
     if (typeof name !== 'string' || !Array.isArray(arr)) continue
-    arr.forEach((item: any, index: number) => {
-      if (!item || typeof item !== 'object') return
+    arr.forEach((item: any) => {
+      const key = slideKeyOf(item)
+      if (key === null) return
       for (const [field, value] of Object.entries(item as Record<string, unknown>)) {
         if (field.startsWith('_')) continue
         if (looksLikeMediaUrl(value)) {
           entries.push({
             nodeId: PAGEVAR_PREFIX + name,
-            field: VAR_MEDIA_PREFIX + index + ':' + field,
+            field: VAR_MEDIA_PREFIX + key + ':' + field,
             value: value as string,
           })
         }
@@ -326,7 +343,7 @@ export function extractVariableMediaFields(envelope: any): TranslationEntry[] {
             if (looksLikeMediaUrl(url)) {
               entries.push({
                 nodeId: PAGEVAR_PREFIX + name,
-                field: VAR_MEDIA_PREFIX + index + ':' + field + '@' + bp,
+                field: VAR_MEDIA_PREFIX + key + ':' + field + '@' + bp,
                 value: url as string,
               })
             }
@@ -349,7 +366,7 @@ export function applyVariableMediaTranslations<T extends { name: string; default
 ): T[] {
   if (!Array.isArray(variables)) return variables
 
-  const byVar = new Map<string, Array<{ index: number; sourceField: string; value: string }>>()
+  const byVar = new Map<string, Array<{ slideKey: string; sourceField: string; value: string }>>()
   for (const [nodeId, fields] of Object.entries(map)) {
     if (!nodeId.startsWith(PAGEVAR_PREFIX)) continue
     const varName = nodeId.slice(PAGEVAR_PREFIX.length)
@@ -357,7 +374,7 @@ export function applyVariableMediaTranslations<T extends { name: string; default
       const parsed = parseVarMediaField(field)
       if (!parsed) continue
       const list = byVar.get(varName) || []
-      list.push({ index: parsed.index, sourceField: parsed.sourceField, value })
+      list.push({ slideKey: parsed.slideKey, sourceField: parsed.sourceField, value })
       byVar.set(varName, list)
     }
   }
@@ -369,10 +386,15 @@ export function applyVariableMediaTranslations<T extends { name: string; default
     const arr = (v.defaultValue as unknown[]).map((item) =>
       item && typeof item === 'object' ? { ...(item as Record<string, unknown>) } : item
     )
+    const bySlide = new Map<string, Record<string, unknown>>()
+    for (const item of arr) {
+      const key = slideKeyOf(item)
+      if (key !== null) bySlide.set(key, item as Record<string, unknown>)
+    }
     for (const o of overrides) {
-      const item = arr[o.index]
-      if (!item || typeof item !== 'object') continue
-      const rec = item as Record<string, unknown>
+      // Слайда с таким _id нет (удалён) — вариант ничей и не применяется.
+      const rec = bySlide.get(o.slideKey)
+      if (!rec) continue
       const at = o.sourceField.indexOf('@')
       if (at > 0) {
         // Пер-брейкпоинтный вариант: пишем в _responsive[field][bp] (новые объекты, без мутации оригинала).

@@ -117,7 +117,7 @@ const FIELD_LABEL: Record<string, string> = {
 
 const MEDIA_FIELDS = ['src', 'poster', 'meta:ogImage', 'bg:image', 'data-slide-video']
 
-// Синтетические ключи медиа в page-переменных (repeat-слайдеры): nodeId="pagevar:<var>", field="media:<i>:<sf>".
+// Синтетические ключи медиа в page-переменных (repeat-слайдеры): nodeId="pagevar:<var>", field="media:<_id слайда>:<sf>".
 const PAGEVAR_PREFIX = 'pagevar:'
 const VAR_MEDIA_PREFIX = 'media:'
 
@@ -133,14 +133,12 @@ function humanizeField(sf: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1)
 }
 
-/** Подпись медиа-поля: статичная из FIELD_LABEL либо «Слайд N · <поле>» для page-переменных. */
+/** Подпись медиа-поля: статичная из FIELD_LABEL либо «Слайд · <поле>» для page-переменных. */
 function fieldLabel(field: string): string {
   if (field.startsWith(VAR_MEDIA_PREFIX)) {
+    // Слайд в ключе — его _id, номера в нём нет.
     const rest = field.slice(VAR_MEDIA_PREFIX.length)
-    const colon = rest.indexOf(':')
-    const idx = Number(rest.slice(0, colon))
-    const sf = rest.slice(colon + 1)
-    return `Слайд ${Number.isInteger(idx) ? idx + 1 : '?'} · ${humanizeField(sf)}`
+    return `Слайд · ${humanizeField(rest.slice(rest.indexOf(':') + 1))}`
   }
   return FIELD_LABEL[field] || field
 }

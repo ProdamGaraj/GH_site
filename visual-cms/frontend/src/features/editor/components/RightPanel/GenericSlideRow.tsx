@@ -28,7 +28,7 @@ interface SlideBreakpoint {
 /**
  * Контекст языкового варианта media-полей слайда (repeat-карусель).
  * Переводы живут как pagevar-переводы страницы: nodeId="pagevar:<var>",
- * field="media:<index>:<sourceField>" — привязаны к ИНДЕКСУ слайда в массиве.
+ * field="media:<_id слайда>:<sourceField>" (см. utils/slideLangHelper).
  */
 export interface SlideLangContext {
   /** Подпись активного языка (флаг + название). */

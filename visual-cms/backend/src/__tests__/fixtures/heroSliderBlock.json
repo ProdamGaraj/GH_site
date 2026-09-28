@@ -1,0 +1,684 @@
+{
+  "id": "1782277020408_anlkx6rxj",
+  "styles": {
+    "properties": {
+      "border": "0",
+      "margin": "0 auto",
+      "display": "flex",
+      "minWidth": "100%",
+      "position": "relative",
+      "boxShadow": "none",
+      "minHeight": "100vh",
+      "background": "transparent",
+      "borderRadius": "0px",
+      "flexDirection": "column",
+      "backgroundColor": "#f4f1ea"
+    }
+  },
+  "tagName": "div",
+  "children": [
+    {
+      "id": "1782799096172_2cymch9yc",
+      "styles": {
+        "properties": {
+          "top": "0",
+          "left": "0",
+          "inset": "0",
+          "right": "0",
+          "bottom": "0",
+          "zIndex": "1",
+          "position": "absolute",
+          "borderRadius": "0px",
+          "backgroundColor": "rgba(0, 0, 0, 0.3)"
+        }
+      },
+      "tagName": "div",
+      "children": [],
+      "metadata": {
+        "name": "Div"
+      },
+      "attributes": {},
+      "elementType": "container"
+    },
+    {
+      "id": "1782799096172_zrbjexpw5",
+      "tag": "div",
+      "styles": {
+        "properties": {
+          "inset": "0",
+          "width": "100%",
+          "height": "100%",
+          "zIndex": "0",
+          "position": "absolute"
+        }
+      },
+      "tagName": "div",
+      "children": [
+        {
+          "id": "1782800046909-gli337mn1",
+          "tag": "div",
+          "styles": {
+            "properties": {
+              "width": "100%",
+              "height": "100%",
+              "minHeight": "240px",
+              "backgroundSize": "contain",
+              "backgroundImage": "url(\"/media/58f397f3-bca6-42ec-8465-0d89e40f4c03.png\")",
+              "backgroundRepeat": "no-repeat",
+              "backgroundPosition": "center"
+            }
+          },
+          "content": "",
+          "tagName": "div",
+          "children": [],
+          "metadata": {
+            "name": "Фото-слайд",
+            "mediaAssetId": "836b46a5-e17f-4f1c-809c-982b5b7aa694"
+          },
+          "attributes": {
+            "data-slide-fit": "contain",
+            "data-carousel-slide": "true"
+          },
+          "elementType": "container"
+        },
+        {
+          "id": "1782800066134-pk2bq6rpl",
+          "tag": "div",
+          "styles": {
+            "properties": {
+              "width": "100%",
+              "height": "100%",
+              "minHeight": "240px",
+              "backgroundSize": "contain",
+              "backgroundImage": "url(\"/media/968e5407-9af7-47ea-a05f-742d19397f5b.png\")",
+              "backgroundRepeat": "no-repeat",
+              "backgroundPosition": "center"
+            }
+          },
+          "content": "",
+          "tagName": "div",
+          "children": [],
+          "metadata": {
+            "name": "Фото-слайд",
+            "mediaAssetId": "91327896-00f2-4b0b-ae93-9cb9a8d648ca"
+          },
+          "attributes": {
+            "data-slide-fit": "contain",
+            "data-carousel-slide": "true"
+          },
+          "elementType": "container"
+        },
+        {
+          "id": "1782800081162-gghx43onm",
+          "tag": "div",
+          "styles": {
+            "properties": {
+              "width": "100%",
+              "height": "100%",
+              "minHeight": "240px",
+              "backgroundSize": "contain",
+              "backgroundRepeat": "no-repeat",
+              "backgroundPosition": "center"
+            }
+          },
+          "content": "",
+          "tagName": "div",
+          "children": [],
+          "metadata": {
+            "name": "Видео-слайд",
+            "mediaAssetId": "74c46d71-1925-4f6c-b31e-2d7da5171671"
+          },
+          "attributes": {
+            "data-slide-fit": "contain",
+            "data-slide-video": "/media/af0a8f36-8adc-429b-8ace-793635ce26ec.mp4",
+            "data-carousel-slide": "true"
+          },
+          "elementType": "container"
+        },
+        {
+          "id": "1782800088277-mlwmabe4s",
+          "tag": "div",
+          "styles": {
+            "properties": {
+              "width": "100%",
+              "height": "100%",
+              "minHeight": "240px",
+              "backgroundSize": "contain",
+              "backgroundRepeat": "no-repeat",
+              "backgroundPosition": "center"
+            }
+          },
+          "content": "",
+          "tagName": "div",
+          "children": [],
+          "metadata": {
+            "name": "Видео-слайд",
+            "mediaAssetId": "3a59d155-8303-4b65-bfa2-1ec74e905e7e"
+          },
+          "attributes": {
+            "data-slide-fit": "contain",
+            "data-slide-video": "/media/610d479b-8c47-4a10-98e8-669ecb63d705.mp4",
+            "data-carousel-slide": "true"
+          },
+          "elementType": "container"
+        }
+      ],
+      "metadata": {
+        "name": "Трек слайдов"
+      },
+      "attributes": {
+        "data-carousel-track": "true"
+      },
+      "elementType": "container"
+    },
+    {
+      "id": "1782799096172_499wux2nv",
+      "styles": {
+        "properties": {
+          "gap": "20px",
+          "inset": "0",
+          "zIndex": "1",
+          "display": "flex",
+          "position": "absolute",
+          "marginTop": "5%",
+          "alignItems": "flex-end",
+          "marginLeft": "5%",
+          "marginRight": "5%",
+          "marginBottom": "5%",
+          "flexDirection": "row",
+          "justifyContent": "space-between"
+        }
+      },
+      "tagName": "div",
+      "children": [
+        {
+          "id": "1782799096172_51n3ybk8v",
+          "styles": {
+            "properties": {
+              "flex": "0 1 390px",
+              "border": "1px solid rgba(255, 255, 255, .25)",
+              "padding": "clamp(18px, 2vw, 24px)",
+              "background": "rgba(255, 255, 255, .12)",
+              "borderRadius": "24px",
+              "backdropFilter": "blur(16px)",
+              "WebkitBackdropFilter": "blur(16px)"
+            }
+          },
+          "tagName": "div",
+          "children": [
+            {
+              "id": "1782799096172_bopt5nlte",
+              "styles": {
+                "properties": {}
+              },
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "1782799096172_xwxwmpgm9",
+                  "styles": {
+                    "properties": {
+                      "display": "flex"
+                    }
+                  },
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "1782799096172_yuo8hvsyx",
+                      "styles": {
+                        "properties": {
+                          "backgroundImage": "url('https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80')"
+                        }
+                      },
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "_viewportId": null,
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "1782799096172_xtkkjdkxe",
+                      "styles": {
+                        "properties": {
+                          "backgroundImage": "url('https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=100&q=80')"
+                        }
+                      },
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "_viewportId": null,
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "1782799096172_tjnnlqsnm",
+                      "styles": {
+                        "properties": {
+                          "backgroundImage": "url('https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=100&q=80')"
+                        }
+                      },
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "_viewportId": null,
+                      "elementType": "text"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "javs",
+                    "aria-hidden": "true"
+                  },
+                  "layoutMode": "flex",
+                  "_viewportId": null,
+                  "elementType": "container"
+                },
+                {
+                  "id": "1782799096172_savum3evu",
+                  "styles": {
+                    "properties": {
+                      "padding": "5px 11px",
+                      "fontSize": "12px",
+                      "background": "rgba(255, 255, 255, .2)",
+                      "fontWeight": "700",
+                      "borderRadius": "999px"
+                    }
+                  },
+                  "content": "25 000+",
+                  "tagName": "span",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "jbadge"
+                  },
+                  "_viewportId": null,
+                  "elementType": "text"
+                },
+                {
+                  "id": "1782799096172_9y67hjew5",
+                  "styles": {
+                    "properties": {
+                      "color": "rgba(255, 255, 255, .9)",
+                      "fontSize": "14px",
+                      "fontWeight": "600"
+                    }
+                  },
+                  "content": "семей с нами",
+                  "tagName": "span",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "jlabel"
+                  },
+                  "_viewportId": null,
+                  "elementType": "text"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "class": "jrow"
+              },
+              "_viewportId": null,
+              "elementType": "container"
+            },
+            {
+              "id": "1782799096172_700f2yz5d",
+              "styles": {
+                "properties": {}
+              },
+              "content": "Golden House создает жилые комплексы, коммерческие пространства и городскую инфраструктуру для комфортной жизни в Ташкенте.",
+              "tagName": "p",
+              "children": [],
+              "metadata": {},
+              "attributes": {},
+              "_viewportId": null,
+              "elementType": "text"
+            },
+            {
+              "id": "1782799096172_1vaqzyos9",
+              "styles": {
+                "properties": {
+                  "gap": "9px",
+                  "color": "var(--white)",
+                  "width": "100%",
+                  "border": "1px solid rgba(253, 184, 42, .82)",
+                  "cursor": "pointer",
+                  "rowGap": "9px",
+                  "display": "inline-flex",
+                  "padding": "11px 13px 11px 20px",
+                  "fontSize": "14px",
+                  "overflow": "hidden",
+                  "position": "relative",
+                  "boxShadow": "0 0 24px rgba(253, 184, 42, .2), inset 0 0 0 1px rgba(255, 255, 255, .5)",
+                  "columnGap": "9px",
+                  "isolation": "isolate",
+                  "minHeight": "48px",
+                  "overflowX": "hidden",
+                  "overflowY": "hidden",
+                  "alignItems": "center",
+                  "background": "var(--white)",
+                  "fontWeight": "600",
+                  "transition": "transform .25s ease, background .25s ease",
+                  "whiteSpace": "nowrap",
+                  "borderWidth": "1px",
+                  "borderRadius": "20px",
+                  "textWrapMode": "nowrap",
+                  "backdropFilter": "none",
+                  "backgroundClip": "initial",
+                  "backgroundSize": "initial",
+                  "borderTopColor": "rgba(253, 184, 42, 0.82)",
+                  "borderTopStyle": "solid",
+                  "borderTopWidth": "1px",
+                  "justifyContent": "center",
+                  "backgroundColor": "rgba(255, 255, 255, 0.2)",
+                  "backgroundImage": "initial",
+                  "borderLeftColor": "rgba(253, 184, 42, 0.82)",
+                  "borderLeftStyle": "solid",
+                  "borderLeftWidth": "1px",
+                  "transitionDelay": "0s, 0s",
+                  "backgroundOrigin": "initial",
+                  "backgroundRepeat": "initial",
+                  "borderImageSlice": "initial",
+                  "borderImageWidth": "initial",
+                  "borderRightColor": "rgba(253, 184, 42, 0.82)",
+                  "borderRightStyle": "solid",
+                  "borderRightWidth": "1px",
+                  "borderBottomColor": "rgba(253, 184, 42, 0.82)",
+                  "borderBottomStyle": "solid",
+                  "borderBottomWidth": "1px",
+                  "borderImageOutset": "initial",
+                  "borderImageRepeat": "initial",
+                  "borderImageSource": "initial",
+                  "transitionBehavior": "normal, normal",
+                  "transitionDuration": "0.25s, 0.25s",
+                  "transitionProperty": "transform, background",
+                  "whiteSpaceCollapse": "collapse",
+                  "backgroundPositionX": "initial",
+                  "backgroundPositionY": "initial",
+                  "WebkitBackdropFilter": "none",
+                  "backgroundAttachment": "initial",
+                  "transitionTimingFunction": "ease, ease"
+                }
+              },
+              "content": "Записаться на просмотр",
+              "tagName": "button",
+              "children": [
+                {
+                  "id": "1782799096172_txagc68du",
+                  "styles": {
+                    "properties": {
+                      "backgroundColor": "rgba(255, 255, 255, 0)"
+                    }
+                  },
+                  "content": "↗",
+                  "tagName": "span",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "arw",
+                    "aria-hidden": "true"
+                  },
+                  "_viewportId": null,
+                  "elementType": "text"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "type": "button",
+                "class": "gbook"
+              },
+              "_viewportId": null,
+              "elementType": "button"
+            }
+          ],
+          "metadata": {},
+          "attributes": {
+            "class": "joincard"
+          },
+          "_viewportId": null,
+          "elementType": "container"
+        },
+        {
+          "id": "1782799096172_53dayostq",
+          "tag": "div",
+          "styles": {
+            "properties": {
+              "gap": "8px",
+              "inset": "0",
+              "display": "flex",
+              "alignItems": "center"
+            }
+          },
+          "tagName": "div",
+          "children": [
+            {
+              "id": "1782799096172_144e7bnbf",
+              "tag": "button",
+              "styles": {
+                "properties": {
+                  "width": "24px",
+                  "border": "none",
+                  "cursor": "pointer",
+                  "height": "8px",
+                  "padding": "0",
+                  "background": "#ffffff",
+                  "borderRadius": "4px"
+                }
+              },
+              "tagName": "button",
+              "children": [],
+              "metadata": {
+                "name": "Точка (активная)"
+              },
+              "attributes": {
+                "data-carousel-dot": "true"
+              },
+              "elementType": "button"
+            },
+            {
+              "id": "1782799096172_x7tpz7lqk",
+              "tag": "button",
+              "styles": {
+                "properties": {
+                  "width": "8px",
+                  "border": "none",
+                  "cursor": "pointer",
+                  "height": "8px",
+                  "padding": "0",
+                  "background": "rgba(255,255,255,0.5)",
+                  "borderRadius": "50%"
+                }
+              },
+              "tagName": "button",
+              "children": [],
+              "metadata": {
+                "name": "Точка"
+              },
+              "attributes": {
+                "data-carousel-dot": "true"
+              },
+              "elementType": "button"
+            }
+          ],
+          "metadata": {
+            "name": "Точки"
+          },
+          "attributes": {
+            "data-carousel-dots": "true"
+          },
+          "elementType": "container"
+        },
+        {
+          "id": "1782799096172_me0ffhyx5",
+          "styles": {
+            "properties": {
+              "gap": "10px",
+              "top": "0",
+              "border": "1px solid rgba(255, 255, 255, .28)",
+              "zIndex": "4",
+              "display": "flex",
+              "padding": "8px",
+              "position": "relative",
+              "alignItems": "center",
+              "background": "rgba(255, 255, 255, .14)",
+              "borderRadius": "999px",
+              "backdropFilter": "blur(12px)",
+              "WebkitBackdropFilter": "blur(12px)"
+            }
+          },
+          "tagName": "div",
+          "children": [
+            {
+              "id": "1782799096172_17yb4ocw1",
+              "styles": {
+                "states": {
+                  "hover": {
+                    "transform": "translateY(-1px)",
+                    "background": "rgba(255, 255, 255, .28)"
+                  }
+                },
+                "properties": {
+                  "color": "var(--white)",
+                  "width": "44px",
+                  "border": "1px solid rgba(255, 255, 255, .34)",
+                  "cursor": "pointer",
+                  "height": "44px",
+                  "display": "inline-flex",
+                  "fontSize": "20px",
+                  "alignItems": "center",
+                  "background": "rgba(255, 255, 255, .16)",
+                  "fontWeight": "700",
+                  "transition": "background .25s ease, transform .25s ease",
+                  "borderRadius": "50%",
+                  "justifyContent": "center"
+                }
+              },
+              "content": "←",
+              "tagName": "button",
+              "children": [],
+              "metadata": {},
+              "attributes": {
+                "id": "prevSlide",
+                "type": "button",
+                "class": "slider-arrow",
+                "aria-label": "Предыдущий слайд",
+                "data-carousel-prev": "true"
+              },
+              "_viewportId": null,
+              "elementType": "button"
+            },
+            {
+              "id": "1782799096172_ncga2cxji",
+              "styles": {
+                "properties": {
+                  "color": "rgba(255, 255, 255, .92)",
+                  "fontSize": "13px",
+                  "minWidth": "58px",
+                  "textAlign": "center",
+                  "fontWeight": "700"
+                }
+              },
+              "content": "01 / 04",
+              "tagName": "span",
+              "children": [],
+              "metadata": {},
+              "attributes": {
+                "id": "slideCounter",
+                "class": "slide-counter",
+                "data-carousel-counter": "true"
+              },
+              "_viewportId": null,
+              "elementType": "text"
+            },
+            {
+              "id": "1782799096172_3uh2pkiyr",
+              "styles": {
+                "states": {
+                  "hover": {
+                    "transform": "translateY(-1px)",
+                    "background": "rgba(255, 255, 255, .28)"
+                  }
+                },
+                "properties": {
+                  "color": "var(--white)",
+                  "width": "44px",
+                  "border": "1px solid rgba(255, 255, 255, .34)",
+                  "cursor": "pointer",
+                  "height": "44px",
+                  "display": "inline-flex",
+                  "fontSize": "20px",
+                  "alignItems": "center",
+                  "background": "rgba(255, 255, 255, .16)",
+                  "fontWeight": "700",
+                  "transition": "background .25s ease, transform .25s ease",
+                  "borderRadius": "50%",
+                  "justifyContent": "center"
+                }
+              },
+              "content": "→",
+              "tagName": "button",
+              "children": [],
+              "metadata": {},
+              "attributes": {
+                "id": "nextSlide",
+                "type": "button",
+                "class": "slider-arrow",
+                "aria-label": "Следующий слайд",
+                "data-carousel-next": "true"
+              },
+              "_viewportId": null,
+              "elementType": "button"
+            }
+          ],
+          "metadata": {},
+          "attributes": {
+            "class": "hero-control-panel",
+            "aria-label": "Управление слайдером"
+          },
+          "layoutMode": "flex",
+          "_viewportId": null,
+          "elementType": "container"
+        }
+      ],
+      "metadata": {},
+      "attributes": {
+        "class": "hero-foot",
+        "data-carousel-slide": "true"
+      },
+      "layoutMode": "flex",
+      "variations": {
+        "mobile": {
+          "inheritedOverrides": {
+            "1782799096172_51n3ybk8v": {
+              "styles": {
+                "flex": "0 1 390px",
+                "border": "1px solid rgba(255, 255, 255, .25)",
+                "display": "none",
+                "padding": "clamp(18px, 2vw, 24px)",
+                "background": "rgba(255, 255, 255, .12)",
+                "borderRadius": "24px",
+                "backdropFilter": "blur(16px)",
+                "WebkitBackdropFilter": "blur(16px)"
+              }
+            }
+          }
+        }
+      },
+      "_viewportId": null,
+      "elementType": "container"
+    }
+  ],
+  "metadata": {
+    "name": "Hero Slider"
+  },
+  "attributes": {
+    "class": "glass",
+    "data-carousel": "true",
+    "data-carousel-mode": "static",
+    "data-carousel-autoplay": "7000",
+    "data-carousel-video-wait": "true"
+  },
+  "layoutMode": "flex",
+  "elementType": "container"
+}

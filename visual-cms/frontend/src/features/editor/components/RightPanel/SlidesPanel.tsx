@@ -12,6 +12,7 @@ import {
   selectBreakpoints,
 } from '@/features/editor/editorSlice'
 import { writeSlideResponsive } from '@/features/editor/utils/slideResponsiveHelper'
+import { hasSlidesWithoutId, slideLangField } from '@/features/editor/utils/slideLangHelper'
 import { selectAllBindings, bumpBindingsVersion } from '@/features/dataBindings/dataBindingsSlice'
 import {
   DndContext,
@@ -224,7 +225,7 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
   )
 
   // Языковые варианты медиа слайдов — pagevar-переводы страницы
-  // (nodeId="pagevar:<var>", field="media:<index>:<sourceField>").
+  // (nodeId="pagevar:<var>", field="media:<_id слайда>:<sourceField>", см. slideLangHelper).
   const { isPage, nonDefaultLangs, activeLocale, activeLang, translationMap, setLocale } =
     usePageTranslations(pageId)
   const localeEnabled = isPage && nonDefaultLangs.length > 0
@@ -245,7 +246,9 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
         setEnvelope(env)
         setSlides(rawSlidesFromEnvelope(env, variableName))
         setSiteId((page as { siteId?: string | null }).siteId ?? null)
-        setDirty(false)
+        // Слайдам без _id панель только что выдала id, но в базе его нет: языковой
+        // вариант привязать не к чему, пока слайды не сохранят.
+        setDirty(hasSlidesWithoutId(env.variables?.find(x => x.name === variableName)?.defaultValue))
       })
       .catch((e: unknown) => {
         if (cancelled) return
@@ -630,16 +633,15 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
                 ))}
                 {slides.map((s, i) => {
                   const id = s._id as string
-                  // Перевод привязан к ИНДЕКСУ слайда в массиве переменной (i),
-                  // не к display-индексу со static-слайдами.
+                  // Перевод привязан к _id слайда: перестановки и удаления его не сдвигают.
                   const lang = effectiveLocale
                     ? {
                         label: `${activeLang?.flag || '🌐'} ${activeLang?.nativeName || effectiveLocale}`,
-                        read: (sf: string) => translationMap[varNodeId]?.[`media:${i}:${sf}`] || '',
+                        read: (sf: string) => translationMap[varNodeId]?.[slideLangField(id, sf)] || '',
                         write: (sf: string, value: string) =>
-                          dispatch(updateTranslationLocally({ nodeId: varNodeId, field: `media:${i}:${sf}`, value })),
+                          dispatch(updateTranslationLocally({ nodeId: varNodeId, field: slideLangField(id, sf), value })),
                         commit: (sf: string, value: string) => {
-                          const field = `media:${i}:${sf}`
+                          const field = slideLangField(id, sf)
                           if (value) {
                             dispatch(saveTranslation({ pageId, locale: effectiveLocale, nodeId: varNodeId, field, value }))
                           } else {
@@ -647,10 +649,9 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
                           }
                         },
                         pick: (sf: string) => setPickerCtx({ slideId: id, sourceField: sf, lang: true }),
-                        // Индексная привязка: пока порядок/состав не сохранён, правка опасна.
-                        disabledReason: dirty
-                          ? 'Сначала сохраните слайды — языковой вариант привязан к номеру слайда.'
-                          : undefined,
+                        // Новый или скопированный слайд ещё не в базе: вариант, привязанный
+                        // к его _id, осиротел бы, если слайды так и не сохранят.
+                        disabledReason: dirty ? 'Сначала сохраните слайды.' : undefined,
                       }
                     : undefined
                   return (
@@ -734,9 +735,9 @@ export const SlidesPanel: React.FC<SlidesPanelProps> = ({ pageId }) => {
         onSelect={asset => {
           if (pickerCtx?.lang) {
             // Языковой вариант — пишем перевод pagevar, не сам слайд.
-            const idx = slides.findIndex(s => s._id === pickerCtx.slideId)
-            if (idx !== -1 && effectiveLocale) {
-              const field = `media:${idx}:${pickerCtx.sourceField}`
+            const exists = slides.some(s => s._id === pickerCtx.slideId)
+            if (exists && effectiveLocale) {
+              const field = slideLangField(pickerCtx.slideId, pickerCtx.sourceField)
               dispatch(updateTranslationLocally({ nodeId: varNodeId, field, value: asset.url }))
               dispatch(saveTranslation({ pageId, locale: effectiveLocale, nodeId: varNodeId, field, value: asset.url }))
             }
