@@ -1,0 +1,644 @@
+{
+  "id": "1783333830712_vlq4p0f87",
+  "styles": {
+    "properties": {
+      "display": "flex",
+      "position": "absolute"
+    }
+  },
+  "tagName": "div",
+  "children": [
+    {
+      "id": "1783407262039_12n69ivq8",
+      "styles": {
+        "properties": {}
+      },
+      "tagName": "nav",
+      "children": [
+        {
+          "id": "1783407262039_y76oy7ql9",
+          "styles": {
+            "properties": {}
+          },
+          "tagName": "a",
+          "children": [
+            {
+              "id": "1783407262039_nrpccst0r",
+              "styles": {
+                "properties": {}
+              },
+              "tagName": "img",
+              "children": [],
+              "metadata": {
+                "name": "Логотип — при белом тексте"
+              },
+              "attributes": {
+                "alt": "Golden House",
+                "src": "/media/762e0b48-40f3-4a61-aa9c-b7dde371b1a4.png",
+                "class": "glogo-light"
+              },
+              "elementType": "image"
+            },
+            {
+              "id": "1783407262039_nrpccst0r-dark",
+              "styles": {
+                "properties": {}
+              },
+              "tagName": "img",
+              "children": [],
+              "metadata": {
+                "name": "Логотип — при тёмном тексте"
+              },
+              "attributes": {
+                "alt": "",
+                "src": "/media/d3505e4a-f939-4941-8416-ef6069df4f29.png",
+                "class": "glogo-dark",
+                "aria-hidden": "true"
+              },
+              "elementType": "image"
+            }
+          ],
+          "metadata": {},
+          "attributes": {
+            "href": "/",
+            "class": "glogo",
+            "data-page-id": "f547f635-b867-412a-81ec-92bbac9de57e"
+          },
+          "variations": {
+            "mobile": {
+              "inheritedOverrides": {
+                "1783333830712_d6mn3ele8": {
+                  "styles": {
+                    "display": "flex",
+                    "flexDirection": "row"
+                  },
+                  "attributes": {
+                    "src": "/media/7551d0d5-9ac0-4c0c-9084-96fed39303f0.png"
+                  }
+                }
+              }
+            }
+          },
+          "elementType": "text"
+        },
+        {
+          "id": "1783407262039_9boidmiy6",
+          "styles": {
+            "properties": {
+              "display": "flex"
+            }
+          },
+          "tagName": "div",
+          "children": [
+            {
+              "id": "1783407262039_xn4gypog7",
+              "styles": {
+                "properties": {}
+              },
+              "content": "Главная",
+              "tagName": "a",
+              "children": [],
+              "metadata": {},
+              "attributes": {
+                "href": "/",
+                "data-page-id": "f547f635-b867-412a-81ec-92bbac9de57e"
+              },
+              "elementType": "text"
+            },
+            {
+              "id": "1783407262039_lznb0ds4m",
+              "styles": {
+                "properties": {}
+              },
+              "content": "Жилые комплексы",
+              "tagName": "a",
+              "children": [],
+              "metadata": {},
+              "attributes": {
+                "href": "index.html#complexes"
+              },
+              "elementType": "text"
+            },
+            {
+              "id": "1783407262039_w3m2jybxy",
+              "styles": {
+                "properties": {}
+              },
+              "content": "Коммерция",
+              "tagName": "a",
+              "children": [],
+              "metadata": {},
+              "attributes": {
+                "href": "/commercev2",
+                "data-page-id": "546876fa-2939-4549-beed-b7064370c2c3"
+              },
+              "elementType": "text"
+            },
+            {
+              "id": "1783407262039_3rgvzxi4e",
+              "styles": {
+                "properties": {}
+              },
+              "content": "Новости",
+              "tagName": "a",
+              "children": [],
+              "metadata": {},
+              "attributes": {
+                "href": "/news",
+                "data-page-id": "a216e4fe-78bb-4094-adaa-c916324aaf28"
+              },
+              "elementType": "text"
+            },
+            {
+              "id": "1783407262039_a9ofydovd",
+              "styles": {
+                "properties": {
+                  "display": "block",
+                  "textAlign": "center"
+                }
+              },
+              "content": "О компании",
+              "tagName": "a",
+              "children": [],
+              "metadata": {},
+              "attributes": {
+                "href": "/about",
+                "data-page-id": "385c861b-a205-4304-aad6-7f1c083ec39c"
+              },
+              "elementType": "text"
+            },
+            {
+              "id": "1783407262039_a6a6z5u9c",
+              "styles": {
+                "properties": {}
+              },
+              "content": "Покупателям",
+              "tagName": "a",
+              "children": [],
+              "metadata": {},
+              "attributes": {
+                "href": "/buyers",
+                "data-page-id": "deaff6cc-b744-4c6d-b54d-338406075871"
+              },
+              "elementType": "text"
+            },
+            {
+              "id": "1783407262039_elue2mxnb",
+              "styles": {
+                "properties": {}
+              },
+              "content": "Контакты",
+              "tagName": "a",
+              "children": [],
+              "metadata": {},
+              "attributes": {
+                "href": "/contact",
+                "data-page-id": "42163d9f-e2e3-456d-9ce9-b155ae2ac2aa"
+              },
+              "elementType": "text"
+            }
+          ],
+          "metadata": {},
+          "attributes": {
+            "class": "gmenu"
+          },
+          "elementType": "container"
+        },
+        {
+          "id": "1783407262039_z4j3yu24t",
+          "styles": {
+            "properties": {
+              "display": "flex",
+              "flexDirection": "row"
+            }
+          },
+          "tagName": "div",
+          "children": [
+            {
+              "id": "1783407262039_c1qb83ob8",
+              "styles": {
+                "properties": {}
+              },
+              "tagName": "a",
+              "children": [
+                {
+                  "id": "1783407262039_gzuoz6dir",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "+998 78 150-11-11",
+                  "tagName": "span",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "label"
+                  },
+                  "elementType": "text"
+                },
+                {
+                  "id": "1783407262039_nnvaon4u3",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "↗",
+                  "tagName": "span",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "arw",
+                    "aria-hidden": "true"
+                  },
+                  "elementType": "text"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "href": "tel:+998781501111",
+                "class": "gbook",
+                "aria-label": "Позвонить в Golden House"
+              },
+              "elementType": "text"
+            },
+            {
+              "id": "1783407262039_u47zf5tn3",
+              "styles": {
+                "properties": {}
+              },
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "1783407262039_31tqqpw2q",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "RU",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "type": "button",
+                    "class": "",
+                    "aria-pressed": "true",
+                    "data-lang-active": "ru",
+                    "data-lang-switch": "ru"
+                  },
+                  "elementType": "button"
+                },
+                {
+                  "id": "1783407262039_jmc2rek03",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "UZ",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "type": "button",
+                    "aria-pressed": "false",
+                    "data-lang-active": "uz",
+                    "data-lang-switch": "uz"
+                  },
+                  "elementType": "button"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "class": "language-switch",
+                "aria-label": "Переключение языка"
+              },
+              "elementType": "container"
+            },
+            {
+              "id": "1783407262039_6h32v4j8q",
+              "styles": {
+                "properties": {}
+              },
+              "tagName": "button",
+              "children": [
+                {
+                  "id": "1783407262039_o9eaq6ifu",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "tagName": "span",
+                  "children": [
+                    {
+                      "id": "1783407262039_98ja7sme9",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "1783407262039_r8hm9mkm6",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "1783407262039_fpmllu09p",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "gburger-lines",
+                    "aria-hidden": "true"
+                  },
+                  "elementType": "text"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "type": "button",
+                "class": "gburger",
+                "aria-label": "Открыть меню",
+                "aria-controls": "gnav-drawer",
+                "aria-expanded": "false"
+              },
+              "elementType": "button"
+            }
+          ],
+          "metadata": {},
+          "attributes": {
+            "class": "nav-actions"
+          },
+          "layoutMode": "flex",
+          "elementType": "container"
+        }
+      ],
+      "metadata": {},
+      "attributes": {
+        "class": "gnav",
+        "aria-label": "Главное меню"
+      },
+      "elementType": "container"
+    },
+    {
+      "id": "1783407262039_l3gzcypes",
+      "styles": {
+        "properties": {}
+      },
+      "tagName": "div",
+      "children": [
+        {
+          "id": "node-1783407897984-bw08qda8o",
+          "styles": {
+            "properties": {}
+          },
+          "tagName": "div",
+          "children": [
+            {
+              "id": "node-1783419364179-t7ac1tpqb",
+              "styles": {
+                "properties": {}
+              },
+              "content": "+998 78\n          150-11-11",
+              "tagName": "a",
+              "children": [],
+              "metadata": {},
+              "attributes": {
+                "href": "tel:+998781501111",
+                "class": "gnav-drawer-phone",
+                "aria-label": "Позвонить в Golden House"
+              },
+              "elementType": "text"
+            },
+            {
+              "id": "node-1783407897984-w47ldhwzn",
+              "styles": {
+                "properties": {}
+              },
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "node-1783407897984-agfdg804m",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "RU",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "type": "button",
+                    "class": "active",
+                    "aria-pressed": "true"
+                  },
+                  "elementType": "button"
+                },
+                {
+                  "id": "node-1783407897984-8mmh9xgga",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "UZ",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "type": "button",
+                    "aria-pressed": "false"
+                  },
+                  "elementType": "button"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "class": "language-switch gnav-drawer-lang",
+                "aria-label": "Переключение языка"
+              },
+              "elementType": "container"
+            },
+            {
+              "id": "node-1783407897984-soa3o5g23",
+              "styles": {
+                "properties": {}
+              },
+              "tagName": "nav",
+              "children": [
+                {
+                  "id": "1783407262039_7ti4s5cz5",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Главная",
+                  "tagName": "a",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "href": "index.html#top"
+                  },
+                  "elementType": "text"
+                },
+                {
+                  "id": "1783407262039_kw6jyuozg",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Жилые комплексы",
+                  "tagName": "a",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "href": "index.html#complexes"
+                  },
+                  "elementType": "text"
+                },
+                {
+                  "id": "1783407262039_rewzvpc79",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Коммерция",
+                  "tagName": "a",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "href": "commerce.html"
+                  },
+                  "elementType": "text"
+                },
+                {
+                  "id": "1783407262039_skqnbfzxh",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Новости",
+                  "tagName": "a",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "href": "news.html"
+                  },
+                  "elementType": "text"
+                },
+                {
+                  "id": "1783407262039_0wjuzik3x",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "О компании",
+                  "tagName": "a",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "href": "about.html"
+                  },
+                  "elementType": "text"
+                },
+                {
+                  "id": "1783407262039_3ggcd45rb",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Покупателям",
+                  "tagName": "a",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "href": "buyers.html"
+                  },
+                  "elementType": "text"
+                },
+                {
+                  "id": "1783407262039_nfe1a1ney",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Контакты",
+                  "tagName": "a",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "href": "contacts.html"
+                  },
+                  "elementType": "text"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "class": "gnav-drawer-menu",
+                "aria-label": "Мобильное меню"
+              },
+              "elementType": "container"
+            }
+          ],
+          "metadata": {},
+          "attributes": {
+            "class": "gnav-drawer-panel"
+          },
+          "elementType": "container"
+        }
+      ],
+      "metadata": {},
+      "attributes": {
+        "id": "gnav-drawer",
+        "role": "dialog",
+        "class": "gnav-drawer",
+        "aria-label": "Меню",
+        "aria-modal": "true"
+      },
+      "elementType": "container"
+    }
+  ],
+  "metadata": {
+    "name": "Navigation",
+    "globalJs": "/* Блок: Шапка сайта + бургер-меню — САМОДОСТАТОЧНЫЙ скрипт блока.\n   Всё поведение шапки: контраст логотипа/текста под текущей секцией, языковой\n   переключатель, подсветка активного пункта (в строке и в drawer), нормализация\n   ссылок и открытие/закрытие полноэкранного бургер-меню.\n   Аналитика (trackEvent) — опциональна: вызывается через window.trackEvent?.(),\n   поэтому блок работает и без common.js. syncLogoContrast экспортируется в window\n   (его дёргает слайдер героя в bloks/hero-stage при смене слайда).\n\n   Контраст (syncLogoContrast) — УНИВЕРСАЛЬНЫЙ, без whitelist классов:\n     1) открытый бургер-drawer → всегда светлый UI (тёмный оверлей);\n     2) явная метка секции data-header-theme=\"dark|light\" (фото/видео — авто их\n        не видит) имеет приоритет;\n     3) иначе — авто по фону под шапкой: сплошной background-color или стопы\n        градиента (см. contrastCore, YIQ-яркость, порог BRIGHT_THRESHOLD);\n     4) ничего не определилось (сплошь медиа без меток) → дефолт тёмный\n        (светлый текст) — правило «над фото текст не чернить». */\n(() => {\n  // Все пункты меню: и в строке (.gmenu), и в полноэкранном drawer.\n  const menuLinks = () => document.querySelectorAll(\".gmenu a, .gnav-drawer-menu a\");\n\n  // --- contrastCore (инлайн из contrastCore.js; правь ТАМ, не здесь) ---\n/* Contrast core — ЧИСТАЯ логика определения «тёмный/светлый фон».\n *\n * Один источник правды:\n *   - тестируется напрямую в contrastCore.test.ts (require этого файла);\n *   - инлайнится в браузерный globalJs шапки: сборщик вырезает node-хвост\n *     (экспорт ниже) и вставляет тело в IIFE на месте маркера ядра.\n * Поэтому: НЕ импортируй сюда ничего, не используй DOM — только строки и числа.\n */\n\n// YIQ-яркость 0..255. Порог BRIGHT_THRESHOLD делит на тёмный/светлый.\nvar BRIGHT_THRESHOLD = 140\n\nfunction relBrightness(r, g, b) {\n  return (r * 299 + g * 587 + b * 114) / 1000\n}\n\n// Разбирает первый rgb()/rgba() из строки в [r,g,b,a] или null.\nfunction parseRgb(str) {\n  var m = /rgba?\\(([^)]+)\\)/.exec(str || '')\n  if (!m) return null\n  var p = m[1].split(',').map(function (s) { return parseFloat(s) })\n  if (p.length < 3) return null\n  if (isNaN(p[0]) || isNaN(p[1]) || isNaN(p[2])) return null\n  return [p[0], p[1], p[2], p.length >= 4 && !isNaN(p[3]) ? p[3] : 1]\n}\n\n// Сплошной background-color → яркость 0..255, или null если прозрачнее .5\n// (полупрозрачный фон не определяет цвет — решает слой под ним).\nfunction colorBrightness(str) {\n  var c = parseRgb(str)\n  if (!c || c[3] < 0.5) return null\n  return relBrightness(c[0], c[1], c[2])\n}\n\n// background-image со стопами градиента → средняя яркость стопов с alpha>=.3,\n// или null (url()-картинка/видео/нет градиента — цвет неопределим).\nfunction gradientBrightness(str) {\n  if (!str || str.indexOf('gradient') === -1) return null\n  var re = /rgba?\\(([^)]+)\\)/g\n  var m, sum = 0, n = 0\n  while ((m = re.exec(str))) {\n    var p = m[1].split(',').map(function (s) { return parseFloat(s) })\n    if (p.length < 3 || isNaN(p[0]) || isNaN(p[1]) || isNaN(p[2])) continue\n    var a = p.length >= 4 && !isNaN(p[3]) ? p[3] : 1\n    if (a < 0.3) continue\n    sum += relBrightness(p[0], p[1], p[2])\n    n++\n  }\n  return n ? sum / n : null\n}\n\n// backgroundColor + backgroundImage (getComputedStyle) → 'dark' | 'light' | null.\n// Цвет приоритетнее градиента. null = фон неопределим (медиа/прозрачно).\nfunction themeFromStyle(backgroundColor, backgroundImage) {\n  var b = colorBrightness(backgroundColor)\n  if (b === null) b = gradientBrightness(backgroundImage)\n  if (b === null) return null\n  return b < BRIGHT_THRESHOLD ? 'dark' : 'light'\n}\n  // --- /contrastCore ---\n\n  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));\n\n  // Тема под точкой (x,y): идём по всему стеку элементов сверху вниз (elementsFromPoint\n  // включает и предков-секции, и слайды под негативным z-index). Первый определившийся\n  // слой побеждает: сам хедер пропускаем; затем метка data-header-theme; затем фон.\n  function themeUnderPoint(x, y) {\n    const stack = document.elementsFromPoint(x, y);\n    for (const el of stack) {\n      if (el.closest(\".gnav\")) continue;\n      const attr = el.getAttribute(\"data-header-theme\");\n      if (attr === \"dark\" || attr === \"light\") return attr;\n      const cs = getComputedStyle(el);\n      const theme = themeFromStyle(cs.backgroundColor, cs.backgroundImage);\n      if (theme) return theme;\n    }\n    return null;\n  }\n\n  function syncLogoContrast() {\n    const nav = document.querySelector(\".gnav\");\n    if (!nav) return;\n\n    // Открытый бургер-drawer = тёмный полноэкранный оверлей → всегда светлый UI.\n    if (document.querySelector(\".gnav-drawer.is-open\")) {\n      nav.classList.add(\"logo-light\");\n      nav.classList.remove(\"logo-dark\");\n      return;\n    }\n\n    const box = nav.getBoundingClientRect();\n    const y = clamp(box.bottom + 12, 1, window.innerHeight - 1);\n    // Три пробы по нижней кромке (лево/центр/право) — устойчивее к колонкам и краям.\n    const xs = [0.15, 0.5, 0.85].map((f) => clamp(box.left + box.width * f, 1, window.innerWidth - 1));\n\n    let dark = 0, light = 0;\n    for (const x of xs) {\n      const t = themeUnderPoint(x, y);\n      if (t === \"dark\") dark++;\n      else if (t === \"light\") light++;\n    }\n    // Ничего не определилось (сплошь медиа без меток) → дефолт тёмный (светлый текст).\n    const isDark = dark + light === 0 ? true : dark >= light;\n\n    nav.classList.toggle(\"logo-light\", isDark);\n    nav.classList.toggle(\"logo-dark\", !isDark);\n  }\n\n  function ensureLanguageOptions() {\n    document.querySelectorAll(\".language-switch\").forEach((switcher) => {\n\n      switcher.querySelectorAll(\"button\").forEach((button) => {\n        if (!button.dataset.lang) {\n          button.dataset.lang = button.textContent.trim().toLowerCase();\n        }\n\n        button.addEventListener(\"click\", () => {\n          switcher.querySelectorAll(\"button\").forEach((item) => {\n            item.classList.toggle(\"active\", item === button);\n            item.setAttribute(\"aria-pressed\", item === button ? \"true\" : \"false\");\n          });\n          document.documentElement.lang = button.dataset.lang === \"uz\" ? \"uz\" : button.dataset.lang;\n          window.trackEvent?.(\"language_change\", { language: button.dataset.lang });\n        });\n      });\n    });\n  }\n\n  function normalizeNavigation() {\n    menuLinks().forEach((link) => {\n      const href = link.getAttribute(\"href\") || \"\";\n      if (href.includes(\"offers.html\")) {\n        link.remove();\n      }\n    });\n\n    document.querySelectorAll(\".nav-actions > .gbook\").forEach((control) => {\n      const phoneHref = \"tel:+998781501111\";\n      const phoneLabel = \"+998 78 150-11-11\";\n\n      if (control.tagName.toLowerCase() === \"a\") {\n        control.href = phoneHref;\n        control.setAttribute(\"aria-label\", \"Позвонить в Golden House\");\n        const label = control.querySelector(\".label\") || control;\n        label.textContent = phoneLabel;\n        return;\n      }\n\n      const phoneLink = document.createElement(\"a\");\n      phoneLink.className = control.className;\n      phoneLink.href = phoneHref;\n      phoneLink.setAttribute(\"aria-label\", \"Позвонить в Golden House\");\n      phoneLink.innerHTML = `<span class=\"label\">${phoneLabel}</span><span class=\"arw\" aria-hidden=\"true\">&#8599;</span>`;\n      control.replaceWith(phoneLink);\n    });\n  }\n\n  function setupActiveNavigation() {\n    const links = Array.from(menuLinks());\n    if (!links.length) return;\n\n    const getFile = (url) => (url.pathname.split(\"/\").pop() || \"index.html\").toLowerCase();\n    const getCurrentFile = () => (location.pathname.split(\"/\").pop() || \"index.html\").toLowerCase();\n\n    const setActive = (activeLink) => {\n      const activeHref = activeLink.getAttribute(\"href\");\n      // Подсвечиваем совпадающие ссылки и в строке, и в drawer.\n      links.forEach((link) => link.classList.toggle(\"active\", link.getAttribute(\"href\") === activeHref));\n    };\n\n    const findByHash = (hash) => links.find((link) => {\n      const url = new URL(link.getAttribute(\"href\"), location.href);\n      return url.hash === hash;\n    });\n\n    const applyActiveFromLocation = () => {\n      const file = getCurrentFile();\n      const hash = location.hash || \"#top\";\n      let activeLink = null;\n\n      if (file === \"complex-detail.html\") {\n        activeLink = findByHash(\"#complexes\");\n      } else if (file === \"offers.html\") {\n        activeLink = links.find((link) => getFile(new URL(link.getAttribute(\"href\"), location.href)) === \"news.html\");\n      } else if (file === \"index.html\") {\n        activeLink = findByHash(hash) || findByHash(\"#top\");\n      } else {\n        activeLink = links.find((link) => {\n          const url = new URL(link.getAttribute(\"href\"), location.href);\n          return getFile(url) === file && !url.hash;\n        });\n      }\n\n      if (activeLink) setActive(activeLink);\n    };\n\n    links.forEach((link) => {\n      link.addEventListener(\"click\", () => setActive(link));\n    });\n\n    window.addEventListener(\"hashchange\", applyActiveFromLocation);\n    applyActiveFromLocation();\n  }\n\n  function setupBurgerMenu() {\n    const burger = document.querySelector(\".gburger\");\n    const drawer = document.querySelector(\".gnav-drawer\");\n    if (!burger || !drawer) return;\n\n    const isOpen = () => drawer.classList.contains(\"is-open\");\n\n    function openMenu() {\n      drawer.classList.add(\"is-open\");\n      burger.classList.add(\"is-active\");\n      burger.setAttribute(\"aria-expanded\", \"true\");\n      burger.setAttribute(\"aria-label\", \"Закрыть меню\");\n      document.body.classList.add(\"gnav-menu-open\");\n      syncLogoContrast();\n      window.trackEvent?.(\"burger_menu_open\");\n    }\n\n    function closeMenu() {\n      drawer.classList.remove(\"is-open\");\n      burger.classList.remove(\"is-active\");\n      burger.setAttribute(\"aria-expanded\", \"false\");\n      burger.setAttribute(\"aria-label\", \"Открыть меню\");\n      document.body.classList.remove(\"gnav-menu-open\");\n      syncLogoContrast();\n    }\n\n    burger.addEventListener(\"click\", () => {\n      isOpen() ? closeMenu() : openMenu();\n    });\n\n    drawer.querySelector(\".gnav-drawer-close\")?.addEventListener(\"click\", closeMenu);\n    drawer.addEventListener(\"click\", (event) => {\n      if (event.target === drawer) closeMenu();\n    });\n    drawer.querySelectorAll(\".gnav-drawer-menu a\").forEach((link) => {\n      link.addEventListener(\"click\", closeMenu);\n    });\n\n    document.addEventListener(\"keydown\", (event) => {\n      if (event.key === \"Escape\" && isOpen()) closeMenu();\n    });\n\n    // На десктопе меню видно в строке — drawer закрываем.\n    window.addEventListener(\"resize\", () => {\n      if (window.innerWidth > 1180 && isOpen()) closeMenu();\n    });\n  }\n\n  function boot() {\n    normalizeNavigation();\n    ensureLanguageOptions();\n    setupActiveNavigation();\n    setupBurgerMenu();\n    syncLogoContrast();\n  }\n\n  // Экспорт для слайдера героя (bloks/hero-stage дёргает при смене слайда).\n  window.syncLogoContrast = syncLogoContrast;\n\n  // rAF-троттлинг: syncLogoContrast теперь дороже (elementsFromPoint + getComputedStyle\n  // по стеку × 3 пробы), поэтому не зовём его на каждый scroll-тик напрямую.\n  let ticking = false;\n  const requestSync = () => {\n    if (ticking) return;\n    ticking = true;\n    requestAnimationFrame(() => {\n      ticking = false;\n      syncLogoContrast();\n    });\n  };\n\n  window.addEventListener(\"scroll\", requestSync, { passive: true });\n  window.addEventListener(\"resize\", requestSync);\n  if (document.readyState === \"loading\") {\n    document.addEventListener(\"DOMContentLoaded\", boot);\n  } else {\n    boot();\n  }\n})();\n",
+    "globalCss": "/* Блок: Шапка сайта (.gnav) — block-уровень globalCss.\n   Зависит от токенов common.css (--gold/--white/--ink). Кнопка .gbook —\n   общий компонент (стили в common.css), здесь только nav-специфика. */\n\n.gnav {\n  position: fixed;\n  top: clamp(10px, 1.45vw, 18px);\n  left: 50%;\n  z-index: 9999;\n  width: min(calc(100% - clamp(20px, 2.9vw, 36px)), 1432px);\n  padding: clamp(12px, 1.3vw, 18px);\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 14px;\n  overflow: hidden;\n  border: 1px solid rgba(253, 184, 42, .82);\n  border-radius: clamp(18px, 2.2vw, 28px);\n  background: rgba(255, 255, 255, .08);\n  box-shadow: 0 18px 44px rgba(0, 0, 0, .18), 0 0 28px rgba(253, 184, 42, .18), inset 0 0 0 1px rgba(255, 255, 255, .08);\n  transform: translateX(-50%);\n  backdrop-filter: blur(18px);\n  -webkit-backdrop-filter: blur(18px);\n}\n\n.gnav::before,\n.gnav::after {\n  content: \"\";\n  position: absolute;\n  pointer-events: none;\n}\n\n.gnav::before {\n  inset: 0;\n  padding: 1px;\n  border-radius: inherit;\n  background: linear-gradient(115deg, #fdb82a, #fff1b6, #c98715, #fdb82a, #fff6cf);\n  background-size: 260% 260%;\n  opacity: .9;\n  animation: navGoldFlow 4.6s ease-in-out infinite;\n  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);\n  -webkit-mask-composite: xor;\n  mask-composite: exclude;\n}\n\n.gnav::after {\n  top: -70%;\n  bottom: -70%;\n  left: -40%;\n  width: 32%;\n  background: linear-gradient(110deg, transparent, rgba(255, 255, 255, .34), transparent);\n  transform: rotate(12deg);\n  animation: navGoldShine 5.4s ease-in-out infinite;\n}\n\n.gnav > * {\n  position: relative;\n  z-index: 1;\n}\n\n@keyframes navGoldFlow {\n  0%,\n  100% {\n    background-position: 0% 50%;\n  }\n\n  50% {\n    background-position: 100% 50%;\n  }\n}\n\n@keyframes navGoldShine {\n  0% {\n    left: -44%;\n    opacity: 0;\n  }\n\n  24% {\n    opacity: .8;\n  }\n\n  52%,\n  100% {\n    left: 112%;\n    opacity: 0;\n  }\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .gnav::before,\n  .gnav::after {\n    animation: none;\n  }\n}\n\n.glogo {\n  display: inline-flex;\n  align-items: center;\n  min-width: 134px;\n}\n\n.glogo img {\n  width: clamp(118px, 10vw, 154px);\n  height: 42px;\n  object-fit: contain;\n  object-position: left center;\n  transform: translateX(5px);\n  filter: drop-shadow(0 2px 16px rgba(0, 0, 0, .2));\n  transition: filter .25s ease, opacity .25s ease, transform .25s ease;\n}\n\n.gnav.logo-light .glogo img {\n  filter: brightness(0) invert(1) drop-shadow(0 2px 16px rgba(0, 0, 0, .28));\n}\n\n.gnav.logo-dark .glogo img {\n  filter: drop-shadow(0 2px 16px rgba(0, 0, 0, .2));\n}\n\n.gnav.logo-dark .gmenu,\n.gnav.logo-dark .gbook,\n.gnav.logo-dark .language-switch,\n.gnav.logo-dark .gburger {\n  border-color: rgba(21, 24, 29, .08);\n  background: rgba(255, 255, 255, .58);\n}\n\n.gnav.logo-dark .gmenu a:not(.active),\n.gnav.logo-dark .gbook,\n.gnav.logo-dark .language-switch button:not(.active),\n.gnav.logo-dark .gburger {\n  color: rgba(21, 24, 29, .72);\n}\n\n.gmenu {\n  display: flex;\n  align-items: center;\n  gap: 2px;\n  max-width: min(860px, 58vw);\n  padding: 5px;\n  overflow-x: auto;\n  border: 1px solid rgba(255, 255, 255, .28);\n  border-radius: 999px;\n  background: rgba(255, 255, 255, .14);\n  scrollbar-width: none;\n  backdrop-filter: blur(12px);\n  -webkit-backdrop-filter: blur(12px);\n}\n\n.gmenu::-webkit-scrollbar {\n  display: none;\n}\n\n.gmenu a {\n  padding: 9px 13px;\n  border-radius: 999px;\n  color: rgba(255, 255, 255, .9);\n  font-size: 13px;\n  transition: background .25s ease, color .25s ease;\n  white-space: nowrap;\n}\n\n.gmenu a.active {\n  background: var(--white);\n  color: var(--ink);\n  font-weight: 700;\n}\n\n.gmenu a:not(.active):hover {\n  background: rgba(255, 255, 255, .16);\n}\n\n.nav-actions {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n}\n\n/* Кнопка-телефон .gbook. Дублируется из common.css, чтобы шапка была\n   самодостаточна (в редакторе блока / без site-CSS common.css не подгружен). */\n.nav-actions .gbook {\n  min-height: 48px;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  gap: 9px;\n  padding: 11px 13px 11px 20px;\n  border: 1px solid rgba(255, 255, 255, .3);\n  border-radius: 999px;\n  background: rgba(255, 255, 255, .16);\n  color: var(--white, #fff);\n  cursor: pointer;\n  font-size: 14px;\n  font-weight: 700;\n  white-space: nowrap;\n  transition: transform .25s ease, background .25s ease;\n  backdrop-filter: blur(12px);\n  -webkit-backdrop-filter: blur(12px);\n}\n\n.nav-actions .gbook:hover {\n  background: rgba(255, 255, 255, .26);\n  transform: translateY(-1px);\n}\n\n.nav-actions .gbook .arw {\n  width: 26px;\n  height: 26px;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  border-radius: 50%;\n  background: var(--white, #fff);\n  color: var(--ink, #15181d);\n  font-size: 15px;\n  font-weight: 900;\n}\n\n.language-switch {\n  min-width: 86px;\n  min-height: 48px;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  gap: 4px;\n  padding: 6px;\n  border: 1px solid rgba(255, 255, 255, .3);\n  border-radius: 999px;\n  background: rgba(255, 255, 255, .16);\n  backdrop-filter: blur(12px);\n  -webkit-backdrop-filter: blur(12px);\n}\n\n.language-switch button {\n  width: 34px;\n  height: 34px;\n  border: 0;\n  border-radius: 50%;\n  background: transparent;\n  color: rgba(255, 255, 255, .82);\n  cursor: pointer;\n  font-size: 12px;\n  font-weight: 800;\n}\n\n.language-switch button.active {\n  background: var(--white);\n  color: var(--ink);\n}\n\n/* --- Кнопка-бургер (видна ≤1180px; drawer и его стили — в common.css) --- */\n.gburger {\n  display: none;\n  width: 48px;\n  height: 48px;\n  flex: 0 0 auto;\n  align-items: center;\n  justify-content: center;\n  border: 1px solid rgba(255, 255, 255, .3);\n  border-radius: 50%;\n  background: rgba(255, 255, 255, .16);\n  color: rgba(255, 255, 255, .92);\n  cursor: pointer;\n  transition: background .25s ease;\n  backdrop-filter: blur(12px);\n  -webkit-backdrop-filter: blur(12px);\n}\n\n.gburger:hover {\n  background: rgba(255, 255, 255, .26);\n}\n\n.gburger-lines {\n  position: relative;\n  display: block;\n  width: 22px;\n  height: 14px;\n}\n\n.gburger-lines span {\n  position: absolute;\n  left: 0;\n  width: 100%;\n  height: 2px;\n  border-radius: 2px;\n  background: currentColor;\n  transition: top .3s ease, bottom .3s ease, transform .3s ease, opacity .2s ease;\n}\n\n.gburger-lines span:nth-child(1) {\n  top: 0;\n}\n\n.gburger-lines span:nth-child(2) {\n  top: 50%;\n  transform: translateY(-50%);\n}\n\n.gburger-lines span:nth-child(3) {\n  bottom: 0;\n}\n\n/* Открыто → бургер превращается в крестик */\n.gburger.is-active .gburger-lines span:nth-child(1) {\n  top: 50%;\n  transform: translateY(-50%) rotate(45deg);\n}\n\n.gburger.is-active .gburger-lines span:nth-child(2) {\n  opacity: 0;\n}\n\n.gburger.is-active .gburger-lines span:nth-child(3) {\n  top: 50%;\n  bottom: auto;\n  transform: translateY(-50%) rotate(-45deg);\n}\n\n@media (prefers-reduced-motion: reduce) {\n  .gburger-lines span {\n    transition: none;\n  }\n}\n\n/* =============================== RESPONSIVE ============================== */\n@media (max-width: 1360px) {\n  .gnav {\n    gap: 10px;\n  }\n\n  .gmenu {\n    max-width: min(760px, 52vw);\n  }\n\n  .nav-actions {\n    flex-shrink: 0;\n  }\n}\n\n@media (max-width: 1180px) {\n  /* Меню не помещается в строку — прячем меню и языковой переключатель, всё\n     уходит в бургер-drawer. !important — чтобы перебить возможный инлайн base\n     display (импорт до фикса parseStylesheet мог заинлайнить .gmenu/.language-switch). */\n  .gmenu,\n  .nav-actions > .language-switch {\n    display: none !important;\n  }\n\n  .gburger {\n    display: inline-flex !important;\n  }\n}\n\n@media (max-width: 980px) {\n  .gmenu {\n    justify-content: flex-start;\n    max-width: 100%;\n  }\n}\n\n@media (max-width: 680px) {\n  .glogo {\n    min-width: 118px;\n  }\n\n  .glogo img {\n    width: 118px;\n    height: 38px;\n  }\n\n  /* Телефон целиком в drawer — без огрызка-иконки .arw в строке. */\n  .nav-actions > .gbook {\n    display: none !important;\n  }\n\n  .language-switch {\n    min-width: 78px;\n    min-height: 44px;\n  }\n\n  .language-switch button {\n    width: 31px;\n    height: 31px;\n  }\n\n  .gmenu a {\n    padding: 8px 12px;\n    font-size: 12px;\n  }\n}\n\n@media (max-width: 560px) {\n  .gnav {\n    top: 8px;\n    width: calc(100% - 16px);\n    padding: 10px;\n    gap: 8px;\n    border-radius: 20px;\n  }\n\n  .gmenu {\n    padding: 4px;\n  }\n\n  .gmenu a {\n    min-height: 34px;\n    padding: 7px 10px;\n  }\n}\n\n@media (max-width: 380px) {\n  .glogo {\n    min-width: 106px;\n  }\n\n  .glogo img {\n    width: 106px;\n  }\n\n  .language-switch {\n    min-width: 72px;\n  }\n\n  .gmenu a {\n    padding: 7px 9px;\n  }\n}\n\n/* ===================== ПОЛНОЭКРАННОЕ БУРГЕР-МЕНЮ (drawer) ===================== */\n.gnav-drawer {\n  position: fixed;\n  inset: 0;\n  z-index: 9990;\n  display: flex;\n  visibility: hidden;\n  opacity: 0;\n  pointer-events: none;\n  background: rgba(13, 15, 18, .92);\n  backdrop-filter: blur(22px);\n  -webkit-backdrop-filter: blur(22px);\n  transition: opacity .35s ease, visibility .35s ease;\n}\n\n.gnav-drawer.is-open {\n  visibility: visible;\n  opacity: 1;\n  pointer-events: auto;\n}\n\n.gnav-drawer-panel {\n  position: relative;\n  width: 100%;\n  max-width: 1500px;\n  margin: 0 auto;\n  padding: clamp(92px, 13vh, 140px) clamp(20px, 6vw, 60px) clamp(28px, 6vh, 64px);\n  display: flex;\n  flex-direction: column;\n  overflow-y: auto;\n}\n\n.gnav-drawer-close {\n  align-self: flex-end;\n  min-height: 46px;\n  display: inline-flex;\n  align-items: center;\n  gap: 10px;\n  padding: 10px 14px 10px 22px;\n  border: 1px solid rgba(255, 255, 255, .28);\n  border-radius: 999px;\n  background: rgba(255, 255, 255, .12);\n  color: #fff;\n  cursor: pointer;\n  font-size: 14px;\n  font-weight: 800;\n  transition: background .25s ease;\n  backdrop-filter: blur(12px);\n  -webkit-backdrop-filter: blur(12px);\n}\n\n.gnav-drawer-close:hover {\n  background: rgba(255, 255, 255, .22);\n}\n\n.gnav-drawer-close span {\n  width: 28px;\n  height: 28px;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  border-radius: 50%;\n  background: #fff;\n  color: var(--ink);\n  font-size: 18px;\n  font-weight: 900;\n  line-height: 1;\n}\n\n.gnav-drawer-phone {\n  align-self: flex-start;\n  margin-top: clamp(16px, 3vh, 28px);\n  color: #fff;\n  font-size: clamp(22px, 5vw, 32px);\n  font-weight: 800;\n}\n\n.gnav-drawer-lang {\n  align-self: flex-start;\n  margin-top: clamp(16px, 3vh, 28px);\n}\n\n.gnav-drawer-menu {\n  display: flex;\n  flex-direction: column;\n  margin-top: clamp(20px, 3vh, 32px);\n}\n\n.gnav-drawer-menu a {\n  padding: clamp(12px, 2.2vh, 20px) 4px;\n  border-bottom: 1px solid rgba(255, 255, 255, .1);\n  color: rgba(255, 255, 255, .92);\n  font-size: clamp(28px, 6vw, 54px);\n  font-weight: 700;\n  line-height: 1.1;\n  transition: color .2s ease, padding-left .2s ease;\n}\n\n.gnav-drawer-menu a:hover,\n.gnav-drawer-menu a.active {\n  color: var(--gold);\n  padding-left: 14px;\n}\n\nbody.gnav-menu-open {\n  overflow: hidden;\n}\n\n/* Появление пунктов меню каскадом */\n@keyframes gnavDrawerLinkIn {\n  from {\n    opacity: 0;\n    transform: translateY(16px);\n  }\n\n  to {\n    opacity: 1;\n    transform: none;\n  }\n}\n\n.gnav-drawer.is-open .gnav-drawer-menu a {\n  animation: gnavDrawerLinkIn .45s ease both;\n}\n\n.gnav-drawer.is-open .gnav-drawer-menu a:nth-child(2) { animation-delay: .05s; }\n.gnav-drawer.is-open .gnav-drawer-menu a:nth-child(3) { animation-delay: .1s; }\n.gnav-drawer.is-open .gnav-drawer-menu a:nth-child(4) { animation-delay: .15s; }\n.gnav-drawer.is-open .gnav-drawer-menu a:nth-child(5) { animation-delay: .2s; }\n.gnav-drawer.is-open .gnav-drawer-menu a:nth-child(6) { animation-delay: .25s; }\n.gnav-drawer.is-open .gnav-drawer-menu a:nth-child(7) { animation-delay: .3s; }\n.gnav-drawer.is-open .gnav-drawer-menu a:nth-child(n+8) { animation-delay: .35s; }\n\n@media (prefers-reduced-motion: reduce) {\n  .gnav-drawer {\n    transition: none;\n  }\n\n  .gnav-drawer.is-open .gnav-drawer-menu a {\n    animation: none;\n  }\n}\n\n/* ==== nav-logo-theme v2 ====\n   Логотип под цвет текста шапки: .glogo-light — при белом тексте (logo-light\n   и до первого срабатывания скрипта), .glogo-dark — при тёмном (logo-dark).\n   Тёмная картинка наложена на светлую: размер и сдвиг у обеих общие\n   (.glogo img), смена — прозрачностью за то же время, что и у текста шапки\n   (transition у .glogo img в CSS блока). Картинки меняются в CMS;\n   перекрашивать их фильтром не нужно, поэтому у светлой темы только тень. */\n.glogo {\n  position: relative;\n}\n\n.glogo .glogo-dark {\n  position: absolute;\n  top: 0;\n  bottom: 0;\n  left: 0;\n  margin: auto 0;\n  opacity: 0;\n  pointer-events: none;\n}\n\n.gnav.logo-dark .glogo .glogo-light {\n  opacity: 0;\n}\n\n.gnav.logo-dark .glogo .glogo-dark {\n  opacity: 1;\n}\n\n.gnav.logo-light .glogo img {\n  filter: drop-shadow(0 2px 16px rgba(0, 0, 0, .28));\n}\n"
+  },
+  "attributes": {
+    "class": "site-header"
+  },
+  "layoutMode": "flex",
+  "variations": {
+    "mobile": {
+      "inheritedOverrides": {
+        "1783333830712_egumtvloc": {
+          "styles": {
+            "gap": "12px",
+            "top": "0",
+            "display": "flex",
+            "flexWrap": "nowrap",
+            "alignItems": "center",
+            "justifyItems": "start",
+            "flexDirection": "row",
+            "justifyContent": "space-between",
+            "gridTemplateRows": "auto",
+            "gridTemplateColumns": "repeat(2, 1fr)"
+          }
+        }
+      }
+    },
+    "tablet": {
+      "inheritedOverrides": {
+        "node-1782985531430-1sffc5rfb": {
+          "styles": {
+            "display": "flex",
+            "alignItems": "flex-start",
+            "flexDirection": "row",
+            "justifyContent": "center"
+          }
+        }
+      }
+    }
+  },
+  "elementType": "container"
+}
