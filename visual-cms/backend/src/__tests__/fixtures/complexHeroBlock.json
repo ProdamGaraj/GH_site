@@ -1,0 +1,213 @@
+{
+  "id": "1783408382104_rs5rc11kp",
+  "styles": {
+    "properties": {
+      "display": "flex",
+      "minWidth": "100vw",
+      "marginTop": "120px",
+      "--hero-image": "url(\"{{item.heroImages.0}}\")"
+    }
+  },
+  "tagName": "section",
+  "children": [
+    {
+      "id": "node-1783404858548-h2e82wn3j",
+      "styles": {
+        "properties": {
+          "backgroundImage": "url(\"{{item.heroImages.0}}\")"
+        }
+      },
+      "_repeat": {
+        "source": "item.heroImages"
+      },
+      "tagName": "div",
+      "children": [
+        {
+          "id": "beh-div-33",
+          "styles": {
+            "properties": {
+              "--image": "url(\"{{$}}\")"
+            }
+          },
+          "content": "",
+          "tagName": "div",
+          "children": [],
+          "metadata": {
+            "name": "Overlay"
+          },
+          "attributes": {
+            "class": "complex-hero-slide",
+            "data-carousel-slide": "true"
+          },
+          "elementType": "text"
+        }
+      ],
+      "metadata": {},
+      "attributes": {
+        "id": "complexHeroSlider",
+        "class": "complex-hero-slider",
+        "aria-hidden": "true",
+        "data-carousel-track": "true"
+      },
+      "elementType": "container"
+    },
+    {
+      "id": "node-1783404858548-yr3qizewb",
+      "styles": {
+        "properties": {
+          "backgroundImage": "url(\"{{item.heroImages.0}}\")"
+        }
+      },
+      "tagName": "video",
+      "children": [],
+      "metadata": {},
+      "attributes": {
+        "id": "complexHeroVideo",
+        "src": "{{item.aboutVideo}}",
+        "loop": "",
+        "class": "complex-hero-video",
+        "muted": "",
+        "preload": "auto",
+        "aria-hidden": "true",
+        "playsinline": ""
+      },
+      "elementType": "video"
+    },
+    {
+      "id": "node-1783404858548-xi3ubyddd",
+      "styles": {
+        "properties": {}
+      },
+      "tagName": "div",
+      "children": [
+        {
+          "id": "node-1783404858548-r3pps519e",
+          "styles": {
+            "properties": {}
+          },
+          "content": "{{item.className}}",
+          "tagName": "span",
+          "children": [],
+          "metadata": {},
+          "attributes": {
+            "id": "projectClass",
+            "class": "badge"
+          },
+          "elementType": "text"
+        },
+        {
+          "id": "node-1783404858548-35vmssbx3",
+          "styles": {
+            "properties": {}
+          },
+          "content": "{{item.name}}",
+          "tagName": "h1",
+          "children": [],
+          "metadata": {},
+          "attributes": {
+            "id": "projectName"
+          },
+          "elementType": "text"
+        },
+        {
+          "id": "node-1783404858548-o82omuvre",
+          "styles": {
+            "properties": {}
+          },
+          "content": "{{item.intro}}",
+          "tagName": "p",
+          "children": [],
+          "metadata": {},
+          "attributes": {
+            "id": "projectIntro"
+          },
+          "elementType": "text"
+        }
+      ],
+      "metadata": {},
+      "attributes": {
+        "class": "complex-hero-copy"
+      },
+      "elementType": "container"
+    },
+    {
+      "id": "node-1783404858549-9guq25d2s",
+      "styles": {
+        "properties": {}
+      },
+      "tagName": "div",
+      "children": [
+        {
+          "id": "node-1783404858549-8sexwri96",
+          "styles": {
+            "properties": {}
+          },
+          "content": "01 / 01",
+          "tagName": "button",
+          "children": [],
+          "metadata": {},
+          "attributes": {
+            "id": "heroCount",
+            "type": "button",
+            "data-carousel-counter": "true"
+          },
+          "elementType": "button"
+        },
+        {
+          "id": "node-1783404858549-3s9oxmowt",
+          "styles": {
+            "properties": {}
+          },
+          "content": "‹",
+          "tagName": "button",
+          "children": [],
+          "metadata": {},
+          "attributes": {
+            "id": "heroPrev",
+            "type": "button",
+            "aria-label": "Предыдущий слайд",
+            "data-carousel-prev": "true"
+          },
+          "elementType": "button"
+        },
+        {
+          "id": "node-1783404858549-8ingrlpcn",
+          "styles": {
+            "properties": {}
+          },
+          "content": "›",
+          "tagName": "button",
+          "children": [],
+          "metadata": {},
+          "attributes": {
+            "id": "heroNext",
+            "type": "button",
+            "aria-label": "Следующий слайд",
+            "data-carousel-next": "true"
+          },
+          "elementType": "button"
+        }
+      ],
+      "metadata": {},
+      "attributes": {
+        "class": "hero-tools"
+      },
+      "elementType": "container"
+    }
+  ],
+  "metadata": {
+    "globalJs": "",
+    "globalCss": ".complex-hero-slider {position: absolute;\n  inset: 0;\n  z-index: 0;\n  overflow: hidden;}\n\n.complex-hero-video {position: absolute;\n  inset: 0;\n  z-index: 0;\n  width: 100%;\n  height: 100%;\n  object-fit: cover;\n  opacity: 0;\n  pointer-events: none;}\n\n.complex-hero-slide {position: absolute;\n  inset: 0;\n  background: var(--image) center / cover no-repeat;\n  opacity: 0;\n  transform: scale(1.02);\n  transition: opacity .8s ease, transform 6s ease;}\n\n.complex-hero-copy {position: relative;\n  z-index: 2;\n  width: min(100%, 1220px);\n  margin: 0 auto;\n  padding: 0 0 clamp(28px, 6vw, 74px);}\n\n.project-logo-mark {display: block;\n  width: min(420px, 58vw);\n  height: auto;\n  object-fit: contain;\n  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, .28));}\n\n.hero-tools {position: absolute;\n  right: clamp(18px, 4vw, 72px);\n  bottom: clamp(22px, 4vw, 60px);\n  z-index: 3;\n  display: flex;\n  align-items: center;\n  gap: 10px;}\n\n/* ============================================================\n   БЛОК: HERO — обложка жилого комплекса (слайдер/видео,\n   название проекта, инструменты слайдера).\n   Содержимое (фото, название, класс) подставляет page.js\n   по параметру ?project= из URL.\n   ============================================================ */\n\n.complex-hero-detail {\n  position: relative;\n  min-height: clamp(520px, 62vw, 720px);\n  display: flex;\n  align-items: flex-end;\n  padding: clamp(18px, 3vw, 42px);\n  background: var(--hero-image) center / cover no-repeat;\n  color: #fff;\n  isolation: isolate;\n  overflow: hidden;\n}\n\n.complex-hero-detail::before {\n  content: \"\";\n  position: absolute;\n  inset: 0;\n  z-index: 1;\n  background: linear-gradient(180deg, rgba(13, 15, 18, .22), rgba(13, 15, 18, .68));\n}\n\n.complex-hero-detail.has-video .complex-hero-video {\n  opacity: 1;\n  object-position: center top;\n}\n\n.complex-hero-detail.has-video .complex-hero-slider,\n.complex-hero-detail.has-video .hero-tools {\n  display: none;\n}\n\n.complex-hero-slide.is-active {\n  opacity: 1;\n  transform: scale(1);\n}\n\n.complex-hero-copy .badge {\n  display: inline-flex;\n  margin-bottom: 14px;\n  padding: 9px 14px;\n  border-radius: 999px;\n  background: rgba(255, 255, 255, .18);\n  color: #fff;\n  font-size: 13px;\n  font-weight: 800;\n  backdrop-filter: blur(12px);\n}\n\n.complex-hero-copy h1 {\n  max-width: 680px;\n  font-size: clamp(48px, 8vw, 104px);\n  line-height: .9;\n  letter-spacing: 0;\n}\n\n.project-logo-mark.logo-dostlik {\n  width: min(460px, 64vw);\n  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, .28));\n}\n\n.complex-hero-copy p {\n  max-width: 560px;\n  margin-top: 20px;\n  color: rgba(255, 255, 255, .78);\n  font-size: clamp(16px, 1.4vw, 20px);\n  line-height: 1.5;\n}\n\n.hero-tools button {\n  min-height: 46px;\n  border: 1px solid rgba(255, 255, 255, .24);\n  border-radius: 15px;\n  background: rgba(255, 255, 255, .18);\n  color: #fff;\n  padding: 0 16px;\n  font-weight: 800;\n  cursor: pointer;\n  backdrop-filter: blur(14px);\n}\n\n@media (max-width: 980px) {\n  .complex-hero-detail {\n    min-height: 560px;\n  }\n}\n\n@media (max-width: 760px) {\n  .complex-hero-detail {\n    min-height: 620px;\n  }\n\n  .hero-tools {\n    right: 18px;\n    left: 18px;\n    justify-content: space-between;\n  }\n}\n\n@media (max-width: 560px) {\n  .complex-hero-detail {\n    min-height: 520px;\n    padding: 18px;\n  }\n\n  .complex-hero-copy {\n    padding-bottom: 70px;\n  }\n\n  .complex-hero-copy h1 {\n    font-size: 52px;\n    line-height: .95;\n  }\n\n  .complex-hero-copy p {\n    max-width: 100%;\n    font-size: 16px;\n  }\n\n  .hero-tools {\n    right: 12px;\n    bottom: 14px;\n    left: 12px;\n    gap: 8px;\n  }\n\n  .gallery-count,\n  .hero-tools button {\n    min-height: 42px;\n  }\n}\n\n@media (max-width: 380px) {\n  .complex-hero-copy h1 {\n    font-size: 46px;\n  }\n}"
+  },
+  "attributes": {
+    "id": "top",
+    "class": "complex-hero-detail",
+    "data-carousel": "true",
+    "data-header-theme": "dark",
+    "data-carousel-mode": "static",
+    "data-carousel-swipe": "tablet,mobile",
+    "data-carousel-effect": "fade",
+    "data-carousel-autoplay": "5200"
+  },
+  "elementType": "container"
+}

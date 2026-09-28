@@ -8,6 +8,7 @@ import {
 } from '../../dataBindings'
 import { pageDataSettingsApi } from '@/shared/api'
 import { PageAdditionalSources } from './PageAdditionalSources'
+import { PagePublishData } from './PagePublishData'
 
 /**
  * Объединённая конфигурация данных страницы
@@ -41,7 +42,7 @@ interface PageSettingsDataTabProps {
   useApi?: boolean
 }
 
-type TabId = 'sources' | 'variables' | 'cache' | 'additional'
+type TabId = 'sources' | 'variables' | 'cache' | 'additional' | 'publish'
 
 /**
  * Вкладка "Data" в настройках страницы
@@ -212,6 +213,15 @@ export const PageSettingsDataTab: React.FC<PageSettingsDataTabProps> = ({
       icon: (
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+      )
+    },
+    {
+      id: 'publish',
+      label: 'Данные при публикации',
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
         </svg>
       )
     }
@@ -447,6 +457,13 @@ export const PageSettingsDataTab: React.FC<PageSettingsDataTabProps> = ({
         )}
         {activeTab === 'additional' && (!pageId || pageId === 'current') && (
           <p className="text-sm text-gray-400 italic">Сохраните страницу, чтобы настроить доп.источники.</p>
+        )}
+
+        {activeTab === 'publish' && pageId && pageId !== 'current' && (
+          <PagePublishData pageId={pageId} />
+        )}
+        {activeTab === 'publish' && (!pageId || pageId === 'current') && (
+          <p className="text-sm text-gray-400 italic">Сохраните страницу, чтобы настроить данные при публикации.</p>
         )}
       </div>
 

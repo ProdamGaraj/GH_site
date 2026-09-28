@@ -1,20 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Plus, Eye, ChevronDown, ChevronRight, Save } from 'lucide-react'
-import { api } from '@/shared/api'
 import {
+  fetchDataSourceOptions,
   pageAdditionalSourcesApi,
+  type DataSourceOption,
   type PageAdditionalSource,
   type PageInputBinding,
   type PageRequestPreview,
   type PageRequestPreviewStep,
 } from '@/shared/api'
 import { EndpointConfigEditor, DEFAULT_ENDPOINT_CONFIG } from '@/features/dataBindings/components/EndpointConfigEditor'
-
-interface DataSourceOption {
-  id: string
-  name: string
-  url?: string
-}
 
 const METHOD_COLORS: Record<string, string> = {
   GET: 'bg-green-500',
@@ -115,16 +110,15 @@ export const PageAdditionalSources: React.FC<PageAdditionalSourcesProps> = ({ pa
     let cancelled = false
     ;(async () => {
       try {
-        const [settings, bindings, dsResp] = await Promise.all([
+        const [settings, bindings, options] = await Promise.all([
           pageAdditionalSourcesApi.get(pageId),
           pageAdditionalSourcesApi.inputBindings(pageId),
-          api.get<{ items?: any[] } | any[]>(`/data-sources`),
+          fetchDataSourceOptions(),
         ])
         if (cancelled) return
         setSources(settings.additionalSources || [])
         setInputBindings(Array.isArray(bindings) ? bindings : [])
-        const rawDs: any[] = Array.isArray(dsResp) ? dsResp : (dsResp as any).items || []
-        setDataSources(rawDs.map(ds => ({ id: ds.id, name: ds.name, url: ds.config?.url || ds.config?.baseUrl || '' })))
+        setDataSources(options)
       } catch (err) {
         console.error('Failed to load page additional sources:', err)
       }

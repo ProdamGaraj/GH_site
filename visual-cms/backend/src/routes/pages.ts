@@ -32,5 +32,6 @@ router.put('/:id/variables', validate(updatePageVariablesSchema), pageController
 // Доп.источники данных страницы (пикер привязок + превью)
 router.get('/:id/input-bindings', pageController.getInputBindings)
 router.get('/:id/request-preview', pageController.previewRequest)
+router.get('/:id/publish-data-preview', pageController.previewPublishData)
 
 export default router

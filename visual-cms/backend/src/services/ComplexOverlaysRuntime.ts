@@ -199,6 +199,12 @@ const RUNTIME_JS = (L: OverlayLabels) => `<script>
     }
     return '';
   }
+  // Распроданный проект: вместо цены — «Распродано» на языке страницы. Подпись
+  // приходит из данных проекта атрибутом секции; пусто — проект продаётся.
+  function soldLabelOf(card) {
+    var section = card.closest('[data-sold-label]');
+    return section ? (section.getAttribute('data-sold-label') || '').trim() : '';
+  }
   function openPlan(card) {
     if (!modal || !card) return;
     closeLightbox();
@@ -216,7 +222,7 @@ const RUNTIME_JS = (L: OverlayLabels) => `<script>
     var floor = metaText.match(floorRe);
 
     setText('planModalTitle', titleText || ${JSON.stringify(L.plan)});
-    setText('planModalPrice', price || ${JSON.stringify(L.priceOnRequest)});
+    setText('planModalPrice', soldLabelOf(card) || price || ${JSON.stringify(L.priceOnRequest)});
     setText('planModalProject', project ? project.textContent.trim() : '');
     setText('planModalFloor', floor ? floor[0] : ${JSON.stringify(L.floorUnknown)});
     setText('planModalDeadline', parts.length > 1 ? parts[parts.length - 1].trim() : ${JSON.stringify(L.deadlineUnknown)});

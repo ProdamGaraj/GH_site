@@ -614,3 +614,45 @@ export const pageAdditionalSourcesApi = {
     api.get<PageRequestPreview>(`/pages/${pageId}/request-preview`),
 }
 
+// --- Данные страницы при публикации ---
+
+/** Источник, который деплой запрашивает и подставляет в разметку как item.<name>. */
+export interface PagePublishDataDef {
+  name: string
+  dataSourceId: string
+  arrayPath?: string
+}
+
+/** Что получат блоки: число элементов и первый элемент, либо ошибка источника. */
+export interface PublishDataPreview {
+  name: string
+  count: number | null
+  sample: unknown
+  error?: string
+}
+
+export const pagePublishDataApi = {
+  get: (pageId: string) =>
+    api.get<{ publishData?: PagePublishDataDef[] }>(`/pages/${pageId}/data-settings`),
+
+  update: (pageId: string, publishData: PagePublishDataDef[]) =>
+    api.put<{ publishData: PagePublishDataDef[] }>(`/pages/${pageId}/data-settings`, { publishData }),
+
+  preview: (pageId: string) =>
+    api.get<PublishDataPreview[]>(`/pages/${pageId}/publish-data-preview`),
+}
+
+/** Источник данных в выпадающем списке страницы. */
+export interface DataSourceOption {
+  id: string
+  name: string
+  url?: string
+}
+
+/** Все источники данных — для выбора на странице (доп.источники, данные при публикации). */
+export async function fetchDataSourceOptions(): Promise<DataSourceOption[]> {
+  const resp = await api.get<{ items?: any[] } | any[]>(`/data-sources`)
+  const raw: any[] = Array.isArray(resp) ? resp : resp.items || []
+  return raw.map(ds => ({ id: ds.id, name: ds.name, url: ds.config?.url || ds.config?.baseUrl || '' }))
+}
+

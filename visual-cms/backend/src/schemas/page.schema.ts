@@ -70,9 +70,21 @@ const pageAdditionalSourceSchema = z.object({
   extract: z.record(z.string().max(512)).optional(),
 })
 
+// Данные страницы при публикации: item.<name> в разметке блоков.
+const pagePublishDataSchema = z.object({
+  name: z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Имя — латиница, цифры и _, с буквы'),
+  dataSourceId: z.string().uuid('Invalid data source ID'),
+  arrayPath: z.string().max(255).optional(),
+})
+
 // PUT /api/pages/:id/data-settings
 export const updateDataSettingsSchema = z.object({
   dataSources: z.record(z.unknown()).optional(),
   variables: z.record(z.unknown()).optional(),
   additionalSources: z.array(pageAdditionalSourceSchema).optional(),
+  publishData: z
+    .array(pagePublishDataSchema)
+    .max(10)
+    .refine((defs) => new Set(defs.map((d) => d.name)).size === defs.length, 'Имена данных не должны повторяться')
+    .optional(),
 })

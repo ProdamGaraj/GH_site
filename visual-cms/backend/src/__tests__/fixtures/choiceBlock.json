@@ -1,0 +1,1495 @@
+{
+  "id": "node-1783405103287-vc7z7z2zr",
+  "styles": {
+    "properties": {
+      "display": "grid"
+    }
+  },
+  "tagName": "section",
+  "children": [
+    {
+      "id": "node-1783405103287-2zdc463ty",
+      "styles": {
+        "properties": {}
+      },
+      "tagName": "div",
+      "children": [
+        {
+          "id": "node-1783405103287-xmydtkfzt",
+          "styles": {
+            "properties": {}
+          },
+          "tagName": "div",
+          "children": [
+            {
+              "id": "node-1783405103287-p1hp6n4y0",
+              "styles": {
+                "properties": {}
+              },
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "node-1783405103287-sqemsu54f",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Выбрать",
+                  "tagName": "h2",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {},
+                  "elementType": "text"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "class": "section-copy"
+              },
+              "elementType": "container"
+            },
+            {
+              "id": "node-1783405103287-kw2z9om93",
+              "styles": {
+                "properties": {}
+              },
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "node-1783405103287-s26wr3k1b",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Комнатность",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "type": "button",
+                    "class": "filter-trigger",
+                    "data-panel": "rooms"
+                  },
+                  "elementType": "button"
+                },
+                {
+                  "id": "node-1783405103287-mhky2layv",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Срок сдачи",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "type": "button",
+                    "class": "filter-trigger",
+                    "data-panel": "deadline"
+                  },
+                  "elementType": "button"
+                },
+                {
+                  "id": "node-1783405103287-q0yzrtwmh",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Цена",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "type": "button",
+                    "class": "filter-trigger",
+                    "data-panel": "price"
+                  },
+                  "elementType": "button"
+                },
+                {
+                  "id": "node-1783405103287-pg088xgx4",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Вид из окна",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "type": "button",
+                    "class": "filter-trigger",
+                    "data-panel": "windowViews"
+                  },
+                  "elementType": "button"
+                },
+                {
+                  "id": "node-1783405103287-z735jdm45",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Все фильтры",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "type": "button",
+                    "class": "filter-trigger",
+                    "data-panel": "all"
+                  },
+                  "elementType": "button"
+                },
+                {
+                  "id": "node-1783405103287-2e56ded86",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Сбросить",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "type": "button",
+                    "class": "reset-filter"
+                  },
+                  "elementType": "button"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "class": "filter-main"
+              },
+              "elementType": "container"
+            }
+          ],
+          "metadata": {},
+          "attributes": {},
+          "elementType": "container"
+        },
+        {
+          "id": "flt-div-11",
+          "styles": {
+            "properties": {}
+          },
+          "content": "",
+          "tagName": "div",
+          "children": [
+            {
+              "id": "flt-div-7",
+              "styles": {
+                "properties": {}
+              },
+              "content": "",
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "flt-h3-1",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Комнатность",
+                  "tagName": "h3",
+                  "children": [],
+                  "metadata": {
+                    "name": "Filter"
+                  },
+                  "attributes": {},
+                  "elementType": "text"
+                },
+                {
+                  "id": "flt-div-6",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "_repeat": {
+                    "source": "item.planRooms"
+                  },
+                  "content": "",
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "flt-btn-2",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "{{$}}",
+                      "tagName": "button",
+                      "children": [],
+                      "metadata": {
+                        "name": "Filter button"
+                      },
+                      "attributes": {
+                        "type": "button",
+                        "class": "",
+                        "data-value": "{{$}}",
+                        "data-filter": "rooms"
+                      },
+                      "elementType": "button"
+                    }
+                  ],
+                  "metadata": {
+                    "name": "Filter"
+                  },
+                  "attributes": {
+                    "class": "chip-row",
+                    "data-filter-group": "rooms"
+                  },
+                  "elementType": "container"
+                }
+              ],
+              "metadata": {
+                "name": "Filter"
+              },
+              "attributes": {
+                "class": "filter-group"
+              },
+              "elementType": "container"
+            },
+            {
+              "id": "flt-div-10",
+              "styles": {
+                "properties": {}
+              },
+              "content": "",
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "flt-btn-8",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Сбросить",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {
+                    "name": "Filter button"
+                  },
+                  "attributes": {
+                    "type": "button",
+                    "class": "filter-reset",
+                    "data-filter-action": "reset"
+                  },
+                  "elementType": "button"
+                },
+                {
+                  "id": "flt-btn-9",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Показать",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {
+                    "name": "Filter button"
+                  },
+                  "attributes": {
+                    "type": "button",
+                    "class": "filter-apply",
+                    "data-filter-action": "apply"
+                  },
+                  "elementType": "button"
+                }
+              ],
+              "metadata": {
+                "name": "Filter"
+              },
+              "attributes": {
+                "class": "panel-actions"
+              },
+              "elementType": "container"
+            }
+          ],
+          "metadata": {
+            "name": "Filter"
+          },
+          "attributes": {
+            "class": "filter-panel",
+            "data-panel": "rooms"
+          },
+          "elementType": "container"
+        },
+        {
+          "id": "flt-div-19",
+          "styles": {
+            "properties": {}
+          },
+          "content": "",
+          "tagName": "div",
+          "children": [
+            {
+              "id": "flt-div-15",
+              "styles": {
+                "properties": {}
+              },
+              "content": "",
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "flt-h3-12",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Срок сдачи",
+                  "tagName": "h3",
+                  "children": [],
+                  "metadata": {
+                    "name": "Filter"
+                  },
+                  "attributes": {},
+                  "elementType": "text"
+                },
+                {
+                  "id": "flt-div-14",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "_repeat": {
+                    "source": "item.deadlines"
+                  },
+                  "content": "",
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "flt-btn-13",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "{{$}}",
+                      "tagName": "button",
+                      "children": [],
+                      "metadata": {
+                        "name": "Filter button"
+                      },
+                      "attributes": {
+                        "type": "button",
+                        "class": "",
+                        "data-value": "{{$}}",
+                        "data-filter": "deadline"
+                      },
+                      "elementType": "button"
+                    }
+                  ],
+                  "metadata": {
+                    "name": "Filter"
+                  },
+                  "attributes": {
+                    "class": "chip-row",
+                    "data-filter-group": "deadline"
+                  },
+                  "elementType": "container"
+                }
+              ],
+              "metadata": {
+                "name": "Filter"
+              },
+              "attributes": {
+                "class": "filter-group"
+              },
+              "elementType": "container"
+            },
+            {
+              "id": "flt-div-18",
+              "styles": {
+                "properties": {}
+              },
+              "content": "",
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "flt-btn-16",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Сбросить",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {
+                    "name": "Filter button"
+                  },
+                  "attributes": {
+                    "type": "button",
+                    "class": "filter-reset",
+                    "data-filter-action": "reset"
+                  },
+                  "elementType": "button"
+                },
+                {
+                  "id": "flt-btn-17",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Показать",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {
+                    "name": "Filter button"
+                  },
+                  "attributes": {
+                    "type": "button",
+                    "class": "filter-apply",
+                    "data-filter-action": "apply"
+                  },
+                  "elementType": "button"
+                }
+              ],
+              "metadata": {
+                "name": "Filter"
+              },
+              "attributes": {
+                "class": "panel-actions"
+              },
+              "elementType": "container"
+            }
+          ],
+          "metadata": {
+            "name": "Filter"
+          },
+          "attributes": {
+            "class": "filter-panel",
+            "data-panel": "deadline"
+          },
+          "elementType": "container"
+        },
+        {
+          "id": "flt-div-30",
+          "styles": {
+            "properties": {}
+          },
+          "content": "",
+          "tagName": "div",
+          "children": [
+            {
+              "id": "flt-div-26",
+              "styles": {
+                "properties": {}
+              },
+              "content": "",
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "flt-h3-20",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Цена, UZS",
+                  "tagName": "h3",
+                  "children": [],
+                  "metadata": {
+                    "name": "Filter"
+                  },
+                  "attributes": {},
+                  "elementType": "text"
+                },
+                {
+                  "id": "flt-div-25",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "",
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "flt-input-21",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "",
+                      "tagName": "input",
+                      "children": [],
+                      "metadata": {
+                        "name": "Filter"
+                      },
+                      "attributes": {
+                        "type": "number",
+                        "inputmode": "numeric",
+                        "data-filter": "priceMin",
+                        "placeholder": "от"
+                      },
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "flt-span-22",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "—",
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {
+                        "name": "Filter"
+                      },
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "flt-input-23",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "",
+                      "tagName": "input",
+                      "children": [],
+                      "metadata": {
+                        "name": "Filter"
+                      },
+                      "attributes": {
+                        "type": "number",
+                        "inputmode": "numeric",
+                        "data-filter": "priceMax",
+                        "placeholder": "до"
+                      },
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "flt-span-24",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "UZS",
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {
+                        "name": "Filter"
+                      },
+                      "attributes": {},
+                      "elementType": "text"
+                    }
+                  ],
+                  "metadata": {
+                    "name": "Filter"
+                  },
+                  "attributes": {
+                    "class": "range-box"
+                  },
+                  "elementType": "container"
+                }
+              ],
+              "metadata": {
+                "name": "Filter"
+              },
+              "attributes": {
+                "class": "filter-group"
+              },
+              "elementType": "container"
+            },
+            {
+              "id": "flt-div-29",
+              "styles": {
+                "properties": {}
+              },
+              "content": "",
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "flt-btn-27",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Сбросить",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {
+                    "name": "Filter button"
+                  },
+                  "attributes": {
+                    "type": "button",
+                    "class": "filter-reset",
+                    "data-filter-action": "reset"
+                  },
+                  "elementType": "button"
+                },
+                {
+                  "id": "flt-btn-28",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Показать",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {
+                    "name": "Filter button"
+                  },
+                  "attributes": {
+                    "type": "button",
+                    "class": "filter-apply",
+                    "data-filter-action": "apply"
+                  },
+                  "elementType": "button"
+                }
+              ],
+              "metadata": {
+                "name": "Filter"
+              },
+              "attributes": {
+                "class": "panel-actions"
+              },
+              "elementType": "container"
+            }
+          ],
+          "metadata": {
+            "name": "Filter"
+          },
+          "attributes": {
+            "class": "filter-panel",
+            "data-panel": "price"
+          },
+          "elementType": "container"
+        },
+        {
+          "id": "flt-div-38",
+          "styles": {
+            "properties": {}
+          },
+          "content": "",
+          "tagName": "div",
+          "children": [
+            {
+              "id": "flt-div-34",
+              "styles": {
+                "properties": {}
+              },
+              "content": "",
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "flt-h3-31",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Вид из окна",
+                  "tagName": "h3",
+                  "children": [],
+                  "metadata": {
+                    "name": "Filter"
+                  },
+                  "attributes": {},
+                  "elementType": "text"
+                },
+                {
+                  "id": "flt-div-33",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "_repeat": {
+                    "source": "item.planViews"
+                  },
+                  "content": "",
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "flt-btn-32",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "{{$}}",
+                      "tagName": "button",
+                      "children": [],
+                      "metadata": {
+                        "name": "Filter button"
+                      },
+                      "attributes": {
+                        "type": "button",
+                        "class": "",
+                        "data-value": "{{$}}",
+                        "data-filter": "windowViews"
+                      },
+                      "elementType": "button"
+                    }
+                  ],
+                  "metadata": {
+                    "name": "Filter"
+                  },
+                  "attributes": {
+                    "class": "chip-row",
+                    "data-filter-group": "windowViews"
+                  },
+                  "elementType": "container"
+                }
+              ],
+              "metadata": {
+                "name": "Filter"
+              },
+              "attributes": {
+                "class": "filter-group"
+              },
+              "elementType": "container"
+            },
+            {
+              "id": "flt-div-37",
+              "styles": {
+                "properties": {}
+              },
+              "content": "",
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "flt-btn-35",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Сбросить",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {
+                    "name": "Filter button"
+                  },
+                  "attributes": {
+                    "type": "button",
+                    "class": "filter-reset",
+                    "data-filter-action": "reset"
+                  },
+                  "elementType": "button"
+                },
+                {
+                  "id": "flt-btn-36",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Показать",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {
+                    "name": "Filter button"
+                  },
+                  "attributes": {
+                    "type": "button",
+                    "class": "filter-apply",
+                    "data-filter-action": "apply"
+                  },
+                  "elementType": "button"
+                }
+              ],
+              "metadata": {
+                "name": "Filter"
+              },
+              "attributes": {
+                "class": "panel-actions"
+              },
+              "elementType": "container"
+            }
+          ],
+          "metadata": {
+            "name": "Filter"
+          },
+          "attributes": {
+            "class": "filter-panel",
+            "data-panel": "windowViews"
+          },
+          "elementType": "container"
+        },
+        {
+          "id": "flt-div-66",
+          "styles": {
+            "properties": {}
+          },
+          "content": "",
+          "tagName": "div",
+          "children": [
+            {
+              "id": "flt-h3-39",
+              "styles": {
+                "properties": {}
+              },
+              "content": "Все фильтры",
+              "tagName": "h3",
+              "children": [],
+              "metadata": {
+                "name": "Filter"
+              },
+              "attributes": {},
+              "elementType": "text"
+            },
+            {
+              "id": "flt-div-62",
+              "styles": {
+                "properties": {}
+              },
+              "content": "",
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "flt-div-46",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "",
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "flt-h3-40",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "Комнатность",
+                      "tagName": "h3",
+                      "children": [],
+                      "metadata": {
+                        "name": "Filter"
+                      },
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "flt-div-45",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "_repeat": {
+                        "source": "item.planRooms"
+                      },
+                      "content": "",
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "id": "flt-btn-41",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "{{$}}",
+                          "tagName": "button",
+                          "children": [],
+                          "metadata": {
+                            "name": "Filter button"
+                          },
+                          "attributes": {
+                            "type": "button",
+                            "class": "",
+                            "data-value": "{{$}}",
+                            "data-filter": "rooms"
+                          },
+                          "elementType": "button"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Filter"
+                      },
+                      "attributes": {
+                        "class": "chip-row",
+                        "data-filter-group": "rooms"
+                      },
+                      "elementType": "container"
+                    }
+                  ],
+                  "metadata": {
+                    "name": "Filter"
+                  },
+                  "attributes": {
+                    "class": "filter-group"
+                  },
+                  "elementType": "container"
+                },
+                {
+                  "id": "flt-div-53",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "",
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "flt-h3-47",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "Цена, UZS",
+                      "tagName": "h3",
+                      "children": [],
+                      "metadata": {
+                        "name": "Filter"
+                      },
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "flt-div-52",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "",
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "id": "flt-input-48",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "",
+                          "tagName": "input",
+                          "children": [],
+                          "metadata": {
+                            "name": "Filter"
+                          },
+                          "attributes": {
+                            "type": "number",
+                            "inputmode": "numeric",
+                            "data-filter": "priceMin",
+                            "placeholder": "от"
+                          },
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "flt-span-49",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "—",
+                          "tagName": "span",
+                          "children": [],
+                          "metadata": {
+                            "name": "Filter"
+                          },
+                          "attributes": {},
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "flt-input-50",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "",
+                          "tagName": "input",
+                          "children": [],
+                          "metadata": {
+                            "name": "Filter"
+                          },
+                          "attributes": {
+                            "type": "number",
+                            "inputmode": "numeric",
+                            "data-filter": "priceMax",
+                            "placeholder": "до"
+                          },
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "flt-span-51",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "UZS",
+                          "tagName": "span",
+                          "children": [],
+                          "metadata": {
+                            "name": "Filter"
+                          },
+                          "attributes": {},
+                          "elementType": "text"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Filter"
+                      },
+                      "attributes": {
+                        "class": "range-box"
+                      },
+                      "elementType": "container"
+                    }
+                  ],
+                  "metadata": {
+                    "name": "Filter"
+                  },
+                  "attributes": {
+                    "class": "filter-group"
+                  },
+                  "elementType": "container"
+                },
+                {
+                  "id": "flt-div-57",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "",
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "flt-h3-54",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "Срок сдачи",
+                      "tagName": "h3",
+                      "children": [],
+                      "metadata": {
+                        "name": "Filter"
+                      },
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "flt-div-56",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "_repeat": {
+                        "source": "item.deadlines"
+                      },
+                      "content": "",
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "id": "flt-btn-55",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "{{$}}",
+                          "tagName": "button",
+                          "children": [],
+                          "metadata": {
+                            "name": "Filter button"
+                          },
+                          "attributes": {
+                            "type": "button",
+                            "class": "",
+                            "data-value": "{{$}}",
+                            "data-filter": "deadline"
+                          },
+                          "elementType": "button"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Filter"
+                      },
+                      "attributes": {
+                        "class": "chip-row",
+                        "data-filter-group": "deadline"
+                      },
+                      "elementType": "container"
+                    }
+                  ],
+                  "metadata": {
+                    "name": "Filter"
+                  },
+                  "attributes": {
+                    "class": "filter-group"
+                  },
+                  "elementType": "container"
+                },
+                {
+                  "id": "flt-div-61",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "",
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "flt-h3-58",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "Вид из окна",
+                      "tagName": "h3",
+                      "children": [],
+                      "metadata": {
+                        "name": "Filter"
+                      },
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "flt-div-60",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "_repeat": {
+                        "source": "item.planViews"
+                      },
+                      "content": "",
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "id": "flt-btn-59",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "{{$}}",
+                          "tagName": "button",
+                          "children": [],
+                          "metadata": {
+                            "name": "Filter button"
+                          },
+                          "attributes": {
+                            "type": "button",
+                            "class": "",
+                            "data-value": "{{$}}",
+                            "data-filter": "windowViews"
+                          },
+                          "elementType": "button"
+                        }
+                      ],
+                      "metadata": {
+                        "name": "Filter"
+                      },
+                      "attributes": {
+                        "class": "chip-row",
+                        "data-filter-group": "windowViews"
+                      },
+                      "elementType": "container"
+                    }
+                  ],
+                  "metadata": {
+                    "name": "Filter"
+                  },
+                  "attributes": {
+                    "class": "filter-group"
+                  },
+                  "elementType": "container"
+                }
+              ],
+              "metadata": {
+                "name": "Filter"
+              },
+              "attributes": {
+                "class": "all-filter-grid"
+              },
+              "elementType": "container"
+            },
+            {
+              "id": "flt-div-65",
+              "styles": {
+                "properties": {}
+              },
+              "content": "",
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "flt-btn-63",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Сбросить",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {
+                    "name": "Filter button"
+                  },
+                  "attributes": {
+                    "type": "button",
+                    "class": "filter-reset",
+                    "data-filter-action": "reset"
+                  },
+                  "elementType": "button"
+                },
+                {
+                  "id": "flt-btn-64",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Показать",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {
+                    "name": "Filter button"
+                  },
+                  "attributes": {
+                    "type": "button",
+                    "class": "filter-apply",
+                    "data-filter-action": "apply"
+                  },
+                  "elementType": "button"
+                }
+              ],
+              "metadata": {
+                "name": "Filter"
+              },
+              "attributes": {
+                "class": "panel-actions"
+              },
+              "elementType": "container"
+            }
+          ],
+          "metadata": {
+            "name": "Filter"
+          },
+          "attributes": {
+            "class": "filter-panel",
+            "data-panel": "all"
+          },
+          "elementType": "container"
+        }
+      ],
+      "metadata": {},
+      "attributes": {
+        "class": "apartment-toolbar"
+      },
+      "elementType": "container"
+    },
+    {
+      "id": "node-1783405103287-8d5i7aehv",
+      "styles": {
+        "properties": {}
+      },
+      "_repeat": {
+        "source": "item.planTypes"
+      },
+      "tagName": "div",
+      "children": [
+        {
+          "id": "node-1783405103287-fnkx2lhwy",
+          "styles": {
+            "states": {
+              "hover": {
+                "boxShadow": "0 18px 46px rgba(21, 24, 29, .1)",
+                "transform": "translateY(-3px)"
+              }
+            },
+            "properties": {}
+          },
+          "tagName": "article",
+          "children": [
+            {
+              "id": "node-1783405103287-6thg0lq7v",
+              "styles": {
+                "properties": {
+                  "flex": "1",
+                  "display": "flex",
+                  "padding": "18px",
+                  "flexDirection": "column"
+                }
+              },
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "node-1783405103287-p4984rq6t",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "{{$.title}}",
+                  "tagName": "h3",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {},
+                  "elementType": "text"
+                },
+                {
+                  "id": "node-1783405103287-6p15bdmiq",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "node-1783405103287-tsw9cexrm",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "{{item.className}}",
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {
+                        "data-apartment-class": ""
+                      },
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "node-1783405103287-1r7mgyik8",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "{{$.areaLabel}}",
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "apartment-badges"
+                  },
+                  "elementType": "container"
+                },
+                {
+                  "id": "node-1783405103287-riki61rln",
+                  "styles": {
+                    "properties": {
+                      "background": "#f4f1ea"
+                    }
+                  },
+                  "_repeat": {
+                    "source": "$.cover"
+                  },
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "tplnode-an4emxs4k",
+                      "styles": {
+                        "properties": {
+                          "top": "0",
+                          "left": "0",
+                          "width": "100%",
+                          "height": "100%",
+                          "position": "absolute",
+                          "backgroundSize": "contain",
+                          "backgroundColor": "#f4f1ea",
+                          "backgroundImage": "url(\"{{$.image}}\")",
+                          "backgroundRepeat": "no-repeat",
+                          "backgroundPosition": "center"
+                        }
+                      },
+                      "content": "",
+                      "tagName": "div",
+                      "children": [],
+                      "metadata": {
+                        "name": "Plan image"
+                      },
+                      "attributes": {
+                        "aria-hidden": "true"
+                      },
+                      "elementType": "container"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "plan-visual is-render"
+                  },
+                  "elementType": "container"
+                },
+                {
+                  "id": "node-1783405103287-suhmyxm63",
+                  "styles": {
+                    "properties": {
+                      "color": "#15181d",
+                      "fontSize": "22px",
+                      "marginTop": "14px",
+                      "fontWeight": "900",
+                      "lineHeight": "1.1"
+                    }
+                  },
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "node-1783405103287-2wjiif2v2",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "{{$.priceLabel}}",
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "apartment-price"
+                  },
+                  "elementType": "container"
+                },
+                {
+                  "id": "node-1783405103287-l0s6cd1nv",
+                  "styles": {
+                    "properties": {
+                      "color": "rgba(21, 24, 29, .58)",
+                      "fontSize": "14px",
+                      "marginTop": "8px",
+                      "fontWeight": "700",
+                      "lineHeight": "1.45"
+                    }
+                  },
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "node-1783405103287-wi5g659hl",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "{{item.name}}",
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {
+                        "data-card-project": ""
+                      },
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "node-1783405103287-g0qsig261",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "tagName": "br",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "container"
+                    },
+                    {
+                      "id": "node-1783405103287-kf4nr1p7e",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "{{$.floorsLabel}}",
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "pt-br-1790138227820",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "tagName": "br",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "container"
+                    },
+                    {
+                      "id": "pt-entr-1790138227820",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "{{$.entranceLabel}}",
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "apartment-meta"
+                  },
+                  "elementType": "container"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "class": "apartment-card-body"
+              },
+              "layoutMode": "flex",
+              "elementType": "container"
+            }
+          ],
+          "metadata": {},
+          "attributes": {
+            "class": "apartment-card",
+            "data-price": "{{$.priceMin}}",
+            "data-rooms": "{{$.rooms}}",
+            "data-deadline": "{{$.deadline}}",
+            "data-price-max": "{{$.priceMax}}",
+            "data-plan-images": "{{$.imagesAttr}}",
+            "data-windowViews": "{{$.windowViewsAttr}}"
+          },
+          "elementType": "container"
+        }
+      ],
+      "metadata": {},
+      "attributes": {
+        "class": "apartments-grid",
+        "aria-label": "Карточки квартир"
+      },
+      "elementType": "container"
+    }
+  ],
+  "metadata": {
+    "globalJs": "/* Фильтры квартир (#choice), v5. Работают по data-атрибутам уже\n   отрисованных карточек: разметка приходит с деплоя через _repeat, браузер\n   ничего не грузит.\n   Выбранные чипсы одного поля объединяются по ИЛИ, разные поля — по И.\n   Варианты сужаются под остальные условия: чипс, который при них ничего не\n   покажет, выключается; выбранный остаётся кликабельным, чтобы его можно было\n   снять. Цена карточки — диапазон «от priceMin до priceMax»: карточка подходит,\n   если он пересекается с заданным.\n   На десктопе комнатность и цена стоят строкой, без панелей; на телефоне —\n   кнопки, панель открывается под своей кнопкой. */\n(function () {\n  var section = document.getElementById('choice');\n  if (!section) return;\n  var toolbar = section.querySelector('.apartment-toolbar');\n  var grid = section.querySelector('.apartments-grid');\n  if (!toolbar || !grid) return;\n\n  var TEXTS = {\n    ru: { empty: 'По выбранным условиям планировок нет. Измените фильтры или сбросьте их.', from: 'от {n}', to: 'до {n}', found: 'Найдено: {n}' },\n    uz: { empty: \"Tanlangan shartlarga mos rejalar yo'q. Filtrlarni o'zgartiring yoki tozalang.\", from: '{n} dan', to: '{n} gacha', found: 'Topildi: {n}' },\n    en: { empty: 'No layouts match these filters. Change or reset them.', from: 'from {n}', to: 'up to {n}', found: 'Found: {n}' }\n  };\n  var lang = (document.documentElement.getAttribute('lang') || 'ru').slice(0, 2).toLowerCase();\n  var T = TEXTS[lang] || TEXTS.ru;\n\n  /* Строка фильтров для десктопа. Собирается из копий тех же чипсов и полей\n     цены, что и в панелях: состояние у них общее (выбор хранится по полю, поля\n     цены синхронизируются), так что строка и панели — одно и то же. Что\n     показать — строку или кнопки с панелями, — решает CSS по ширине экрана.\n     Поле без вариантов в строку не попадает. */\n  var INLINE_PANELS = ['rooms', 'price'];\n  var main = toolbar.querySelector('.filter-main');\n  var inline = document.createElement('div');\n  inline.className = 'filter-inline';\n  INLINE_PANELS.forEach(function (name) {\n    var panel = toolbar.querySelector('.filter-panel[data-panel=\"' + name + '\"]');\n    var control = panel && (panel.querySelector('.chip-row') || panel.querySelector('.range-box'));\n    if (!control) return;\n    if (control.classList.contains('chip-row') && !control.querySelector('[data-value]')) return;\n    var group = document.createElement('div');\n    group.className = 'filter-inline-group';\n    group.setAttribute('data-panel', name);\n    var title = panel.querySelector('h3');\n    if (title) {\n      var label = document.createElement('span');\n      label.className = 'filter-inline-label';\n      label.textContent = title.textContent;\n      group.appendChild(label);\n    }\n    group.appendChild(control.cloneNode(true));\n    inline.appendChild(group);\n  });\n  /* Счётчик и «Сбросить» — одна пара: когда строка переносится (много\n     комнатностей + кнопка вида из окна), они уходят на новую строку вместе,\n     а не «Сбросить» в одиночку. На телефоне пара прозрачна для раскладки\n     (display: contents), и кнопка встаёт в сетку, как раньше. */\n  var countLabel = null;\n  if (main && inline.children.length) {\n    main.insertBefore(inline, main.firstChild);\n    var summary = document.createElement('span');\n    summary.className = 'filter-summary';\n    var resetInMain = main.querySelector(':scope > .reset-filter');\n    main.insertBefore(summary, resetInMain);\n    countLabel = document.createElement('span');\n    countLabel.className = 'filter-count';\n    summary.appendChild(countLabel);\n    if (resetInMain) summary.appendChild(resetInMain);\n  }\n\n  var triggers = toolbar.querySelectorAll('.filter-trigger[data-panel]');\n  var panels = toolbar.querySelectorAll('.filter-panel');\n  var priceInputs = toolbar.querySelectorAll('[data-filter=\"priceMin\"], [data-filter=\"priceMax\"]');\n  var applyButtons = toolbar.querySelectorAll('[data-filter-action=\"apply\"]');\n\n  /* Чипсы разворачиваются из данных проекта (срок сдачи, виды из окон), и у\n     проекта их может не быть. Пустую группу прячем и в своей панели, и в\n     «Все фильтры»; кнопку панели, в которой не осталось ничего, — тоже. */\n  toolbar.querySelectorAll('.filter-group').forEach(function (group) {\n    var row = group.querySelector('.chip-row');\n    if (row && !row.querySelector('[data-value]')) group.hidden = true;\n  });\n  /* display, а не [hidden]: правило вида .filter-trigger { display: flex }\n     перебивает скрытие из браузерной таблицы стилей. */\n  triggers.forEach(function (trigger) {\n    var panel = toolbar.querySelector('.filter-panel[data-panel=\"' + trigger.getAttribute('data-panel') + '\"]');\n    if (!panel) return;\n    var usable = panel.querySelector('[data-filter][data-value]') || panel.querySelector('.range-box');\n    if (!usable) trigger.style.display = 'none';\n  });\n\n  function closePanels() {\n    triggers.forEach(function (t) { t.classList.remove('is-open'); });\n    panels.forEach(function (p) { p.classList.remove('is-open'); });\n  }\n\n  function panelFor(trigger) {\n    return toolbar.querySelector('.filter-panel[data-panel=\"' + trigger.getAttribute('data-panel') + '\"]');\n  }\n\n  /* Панель открывается прямо под своей кнопкой. В первых версиях она стояла\n     под всем тулбаром (ниже его отступа и нижней границы) и на фиксированном\n     left — выглядела оторванной, а «Все фильтры» уезжали к правому краю.\n     На узком экране ширину задаёт CSS (во всю ширину тулбара), здесь — только\n     высота. */\n  var narrow = window.matchMedia ? window.matchMedia('(max-width: 760px)') : null;\n  function placePanel(trigger, panel) {\n    var box = toolbar.getBoundingClientRect();\n    var t = trigger.getBoundingClientRect();\n    panel.style.top = Math.round(t.bottom - box.top + 8) + 'px';\n    if (narrow && narrow.matches) {\n      panel.style.left = '';\n      panel.style.right = '';\n      return;\n    }\n    var left = t.left - box.left;\n    var overflow = left + panel.offsetWidth - box.width;\n    if (overflow > 0) left = Math.max(0, left - overflow);\n    panel.style.left = Math.round(left) + 'px';\n    panel.style.right = 'auto';\n  }\n\n  triggers.forEach(function (trigger) {\n    trigger.addEventListener('click', function (event) {\n      event.stopPropagation();\n      var panel = panelFor(trigger);\n      var wasOpen = trigger.classList.contains('is-open');\n      closePanels();\n      if (!wasOpen && panel) {\n        trigger.classList.add('is-open');\n        panel.classList.add('is-open');\n        placePanel(trigger, panel);\n      }\n    });\n  });\n  window.addEventListener('resize', function () {\n    var open = toolbar.querySelector('.filter-trigger.is-open');\n    var panel = open && panelFor(open);\n    if (panel) placePanel(open, panel);\n  });\n  /* Клик внутри панели её не закрывает. В первой версии это делал\n     stopPropagation на самой панели — и заодно глушил клики по чипсам:\n     делегат на toolbar их не получал, и выбор в панелях не срабатывал. */\n  document.addEventListener('click', function (event) {\n    var target = event.target;\n    if (target && target.closest && target.closest('.filter-panel')) return;\n    closePanels();\n  });\n  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePanels(); });\n\n  /* Чипсы одного поля живут в нескольких панелях (своя + «Все фильтры»),\n     поэтому состояние храним в наборе значений, а не в DOM одной кнопки. */\n  var selected = {};\n  var fields = [];\n  toolbar.querySelectorAll('[data-filter][data-value]').forEach(function (chip) {\n    var field = chip.getAttribute('data-filter');\n    if (fields.indexOf(field) === -1) fields.push(field);\n  });\n  function chipsFor(field) {\n    return toolbar.querySelectorAll('[data-filter=\"' + field + '\"][data-value]');\n  }\n  function syncChips(field) {\n    var set = selected[field] || [];\n    chipsFor(field).forEach(function (chip) {\n      chip.classList.toggle('active', set.indexOf(chip.getAttribute('data-value')) !== -1);\n    });\n  }\n\n  toolbar.addEventListener('click', function (event) {\n    var chip = event.target.closest('[data-filter][data-value]');\n    if (!chip || !toolbar.contains(chip) || chip.disabled) return;\n    var field = chip.getAttribute('data-filter');\n    var value = chip.getAttribute('data-value');\n    var set = selected[field] || (selected[field] = []);\n    var at = set.indexOf(value);\n    if (at === -1) set.push(value); else set.splice(at, 1);\n    syncChips(field);\n    apply();\n  });\n\n  /* Поле цены тоже есть в двух панелях: ввод в одной копируется в другую,\n     иначе фильтр зависел бы от того, какое поле заполнено последним. */\n  priceInputs.forEach(function (input) {\n    input.setAttribute('data-placeholder', input.getAttribute('placeholder') || '');\n    input.addEventListener('input', function () {\n      var kind = input.getAttribute('data-filter');\n      toolbar.querySelectorAll('[data-filter=\"' + kind + '\"]').forEach(function (other) {\n        if (other !== input) other.value = input.value;\n      });\n      apply();\n    });\n  });\n\n  function readPrice(kind) {\n    var input = toolbar.querySelector('[data-filter=\"' + kind + '\"]');\n    if (!input || input.value === '') return null;\n    var n = Number(input.value);\n    return isFinite(n) ? n : null;\n  }\n\n  function cardPrice(card) {\n    var min = Number(card.getAttribute('data-price')) || 0;\n    var max = Number(card.getAttribute('data-price-max')) || 0;\n    return { min: min, max: Math.max(min, max) };\n  }\n\n  function priceOk(card) {\n    var min = readPrice('priceMin');\n    var max = readPrice('priceMax');\n    if (min === null && max === null) return true;\n    var p = cardPrice(card);\n    /* Карточка без цены под ценовой фильтр не попадает: «0 UZS» — это\n       отсутствие цены, а не бесплатная квартира. */\n    if (!(p.min > 0)) return false;\n    if (max !== null && p.min > max) return false;\n    if (min !== null && p.max < min) return false;\n    return true;\n  }\n\n  function valuesOf(card, field) {\n    var raw = card.getAttribute('data-' + field);\n    /* Карточка типа планировки объединяет квартиры с разными видами из окон и\n       этажами, поэтому значение атрибута — множество через «|». */\n    return raw ? raw.split('|') : [];\n  }\n\n  /* skip — поле, которое не учитываем: так считаются доступные варианты этого\n     поля при всех остальных условиях. */\n  function matches(card, skip) {\n    for (var i = 0; i < fields.length; i++) {\n      var field = fields[i];\n      if (field === skip) continue;\n      var set = selected[field];\n      if (!set || !set.length) continue;\n      var values = valuesOf(card, field);\n      var hit = set.some(function (v) { return values.indexOf(v) !== -1; });\n      if (!hit) return false;\n    }\n    return skip === 'price' || priceOk(card);\n  }\n\n  function groupDigits(n) {\n    return String(Math.round(n)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ' ');\n  }\n\n  function refreshFacets(cards) {\n    fields.forEach(function (field) {\n      var available = {};\n      cards.forEach(function (card) {\n        if (!matches(card, field)) return;\n        valuesOf(card, field).forEach(function (v) { available[v] = true; });\n      });\n      var set = selected[field] || [];\n      chipsFor(field).forEach(function (chip) {\n        var value = chip.getAttribute('data-value');\n        chip.disabled = set.indexOf(value) === -1 && !available[value];\n      });\n    });\n\n    /* Подсказка в полях цены — реальный диапазон при остальных условиях. */\n    var lo = Infinity;\n    var hi = 0;\n    cards.forEach(function (card) {\n      if (!matches(card, 'price')) return;\n      var p = cardPrice(card);\n      if (!(p.min > 0)) return;\n      if (p.min < lo) lo = p.min;\n      if (p.max > hi) hi = p.max;\n    });\n    priceInputs.forEach(function (input) {\n      var isMin = input.getAttribute('data-filter') === 'priceMin';\n      var hint = hi > 0\n        ? (isMin ? T.from : T.to).replace('{n}', groupDigits(isMin ? lo : hi))\n        : input.getAttribute('data-placeholder');\n      input.setAttribute('placeholder', hint);\n    });\n  }\n\n  function refreshTriggers() {\n    var priceSet = readPrice('priceMin') !== null || readPrice('priceMax') !== null;\n    var anySet = priceSet || fields.some(function (f) { return selected[f] && selected[f].length > 0; });\n    triggers.forEach(function (trigger) {\n      var name = trigger.getAttribute('data-panel');\n      var on = name === 'all' ? anySet : name === 'price' ? priceSet : !!(selected[name] && selected[name].length);\n      trigger.classList.toggle('has-value', on);\n    });\n  }\n\n  function reset() {\n    selected = {};\n    toolbar.querySelectorAll('[data-filter][data-value]').forEach(function (c) { c.classList.remove('active'); });\n    priceInputs.forEach(function (i) { i.value = ''; });\n    apply();\n  }\n  toolbar.querySelectorAll('[data-filter-action=\"reset\"], .reset-filter').forEach(function (b) {\n    b.addEventListener('click', function (e) { e.stopPropagation(); reset(); });\n  });\n  applyButtons.forEach(function (b) {\n    b.setAttribute('data-label', b.textContent.trim());\n    b.addEventListener('click', function (e) { e.stopPropagation(); closePanels(); });\n  });\n\n  var empty = null;\n  function apply() {\n    var cards = Array.prototype.slice.call(grid.querySelectorAll('.apartment-card'));\n    var shown = 0;\n    cards.forEach(function (card) {\n      var ok = matches(card, null);\n      card.hidden = !ok;\n      if (ok) shown++;\n    });\n    refreshFacets(cards);\n    refreshTriggers();\n    /* «Показать · 3»: сколько останется, видно до закрытия панели. */\n    applyButtons.forEach(function (b) {\n      b.textContent = b.getAttribute('data-label') + ' · ' + shown;\n    });\n    if (countLabel) countLabel.textContent = T.found.replace('{n}', shown);\n    if (!empty) {\n      empty = document.createElement('p');\n      empty.className = 'apartments-empty';\n      empty.textContent = T.empty;\n      grid.parentNode.insertBefore(empty, grid.nextSibling);\n    }\n    empty.hidden = shown !== 0 || cards.length === 0;\n  }\n\n  apply();\n})();",
+    "globalCss": ".filter-main {display: flex;\n  align-items: center;\n  gap: 8px;\n  flex-wrap: wrap;}\n\n.filter-trigger {border: 1px solid rgba(21, 24, 29, .16);\n  background: #fff;\n  color: #15181d;}\n\n.reset-filter {border: 0;\n  background: transparent;\n  color: rgba(21, 24, 29, .52);}\n\n.choose-property {display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  text-decoration: none;}\n\n.filter-reset {border: 1px solid rgba(21, 24, 29, .16);\n  background: #fff;\n  color: #15181d;}\n\n.filter-panel {position: absolute;\n  top: calc(100% + 10px);\n  left: 20px;\n  width: min(780px, calc(100vw - 42px));\n  display: none;\n  padding: 22px;\n  border-radius: 24px;\n  background: #fff;\n  box-shadow: 0 22px 60px rgba(21, 24, 29, .16);}\n\n.queue-option {display: flex;\n  align-items: center;\n  gap: 12px;\n  padding: 15px;\n  border-radius: 16px;\n  background: #f5f6f8;\n  color: #15181d;\n  font-weight: 800;}\n\n.filter-tabs {padding: 5px;\n  border-radius: 16px;\n  background: #f2f2f3;}\n\n.filter-group {margin-top: 18px;}\n\n.range-box {display: grid;\n  grid-template-columns: 1fr auto 1fr auto;\n  gap: 12px;\n  align-items: center;\n  min-height: 58px;\n  padding: 0 16px;\n  border: 1px solid rgba(21, 24, 29, .14);\n  border-radius: 14px;\n  background: #fff;\n  color: rgba(21, 24, 29, .82);}\n\n.all-filter-grid {display: grid;\n  grid-template-columns: 1fr 1fr;\n  gap: 22px;}\n\n.divider {border-left: 1px solid rgba(21, 24, 29, .12);\n  padding-left: 22px;}\n\n.apartment-toolbar {display: flex;\n  align-items: flex-start;\n  justify-content: space-between;\n  gap: 16px;\n  margin-bottom: 30px;\n  padding-bottom: 26px;\n  border-bottom: 1px solid rgba(21, 24, 29, .08);}\n\n.view-toggle {display: inline-flex;\n  padding: 5px;\n  border-radius: 13px;\n  background: #fff;\n  box-shadow: 0 10px 26px rgba(21, 24, 29, .06);}\n\n.complex-banner {min-height: 150px;\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 18px;\n  margin-bottom: 24px;\n  padding: 28px;\n  border-radius: 24px;\n  background:\n    linear-gradient(90deg, rgba(13, 15, 18, .78), rgba(13, 15, 18, .22)),\n    var(--hero-image) center / cover no-repeat;\n  color: #fff;}\n\n.apartments-grid {display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));\n  gap: 18px;}\n\n.apartment-card {overflow: hidden;\n  display: flex;\n  flex-direction: column;\n  border-radius: 22px;\n  background: #fff;\n  box-shadow: 0 14px 36px rgba(21, 24, 29, .06);\n  cursor: pointer;\n  transition: transform .25s ease, box-shadow .25s ease;}\n\n.apartment-badges {display: flex;\n  gap: 6px;\n  margin-top: 12px;\n  flex-wrap: wrap;}\n\n.plan-visual {position: relative;\n  height: 190px;\n  flex: 1 0 190px;\n  margin-top: 16px;\n  border: 1px solid rgba(21, 24, 29, .1);\n  border-radius: 14px;\n  background:\n    linear-gradient(90deg, transparent 48%, rgba(21, 24, 29, .12) 49%, rgba(21, 24, 29, .12) 51%, transparent 52%),\n    linear-gradient(0deg, transparent 46%, rgba(21, 24, 29, .12) 47%, rgba(21, 24, 29, .12) 49%, transparent 50%),\n    #fbfbfc;}\n\n.apartment-offer {position: relative;\n  overflow: hidden;\n  margin: 0 14px 14px;\n  padding: 13px 18px;\n  border: 1px solid transparent;\n  border-radius: 16px;\n  background:\n    linear-gradient(135deg, rgba(253, 184, 42, .08), rgba(255, 255, 255, .72)) padding-box,\n    linear-gradient(115deg, #fdb82a, #fff1b6, #c98715, #fdb82a, #fff6cf) border-box;\n  background-size: 100% 100%, 260% 260%;\n  color: #15181d;\n  font-size: 14px;\n  font-weight: 900;\n  text-align: center;\n  animation: planOfferGoldFlow 4.6s ease-in-out infinite;}\n\n/* ============================================================\n   БЛОК: CHOICE — «Выбрать»: панель фильтров, баннер проекта,\n   карточки квартир с планировками.\n   Зависимости: page.css (.detail-section, .section-copy,\n   keyframes planOfferGoldFlow), header.css (keyframes\n   navGoldShine для .apartment-offer::after).\n   Клик по карточке открывает модалку планировки (page.js).\n   ============================================================ */\n\n.filter-shell {\n  position: sticky;\n  top: 108px;\n  z-index: 30;\n  display: flex;\n  align-items: center;\n  justify-content: space-between;\n  gap: 16px;\n  margin-bottom: 34px;\n  padding: 20px;\n  border-radius: 24px;\n  background: #fff;\n  box-shadow: 0 18px 44px rgba(21, 24, 29, .08);\n}\n\n.filter-trigger,\n.reset-filter,\n.choose-property,\n.filter-apply,\n.filter-reset {\n  min-height: 48px;\n  border-radius: 13px;\n  padding: 0 18px;\n  font-weight: 800;\n  cursor: pointer;\n}\n\n.filter-trigger.is-open {\n  border-color: #15181d;\n  background: #15181d;\n  color: #fff;\n}\n\n.choose-property,\n.filter-apply {\n  border: 0;\n  background: #15181d;\n  color: #fff;\n}\n\n.filter-panel.is-open {\n  display: block;\n}\n\n.filter-panel[data-panel=\"price\"] {\n  left: min(360px, 28vw);\n  width: min(620px, calc(100vw - 42px));\n}\n\n.filter-panel[data-panel=\"all\"] {\n  left: auto;\n  right: 20px;\n  width: min(880px, calc(100vw - 42px));\n}\n\n.filter-panel h3 {\n  margin-bottom: 16px;\n  font-size: 24px;\n  line-height: 1.1;\n}\n\n.panel-actions,\n.filter-actions {\n  display: grid;\n  grid-template-columns: 1fr 1fr;\n  gap: 12px;\n  margin-top: 20px;\n}\n\n.queue-option input {\n  width: 22px;\n  height: 22px;\n  accent-color: #15181d;\n}\n\n.queue-option span {\n  display: block;\n  color: rgba(21, 24, 29, .56);\n  font-size: 13px;\n  font-weight: 600;\n}\n\n.filter-tabs,\n.chip-row {\n  display: flex;\n  gap: 8px;\n  flex-wrap: wrap;\n}\n\n.filter-tabs button,\n.chip-row button {\n  min-height: 44px;\n  border: 1px solid rgba(21, 24, 29, .14);\n  border-radius: 999px;\n  background: #fff;\n  color: #15181d;\n  padding: 0 18px;\n  font-weight: 800;\n  cursor: pointer;\n}\n\n.filter-tabs button {\n  flex: 1;\n  border-radius: 12px;\n}\n\n.filter-tabs button.active,\n.chip-row button.active {\n  border-color: #15181d;\n  background: #15181d;\n  color: #fff;\n}\n\n.filter-group label,\n.filter-group b {\n  display: block;\n  margin-bottom: 10px;\n  font-size: 14px;\n  font-weight: 800;\n}\n\n.range-box input {\n  width: 100%;\n  border: 0;\n  background: transparent;\n  outline: 0;\n  font-weight: 800;\n}\n\n.apartment-toolbar .filter-main {\n  gap: 10px;\n  margin-top: 22px;\n}\n\n.apartment-toolbar .section-copy h2 {\n  margin-bottom: 0;\n}\n\n.view-toggle button {\n  min-height: 38px;\n  border: 0;\n  border-radius: 10px;\n  background: transparent;\n  color: rgba(21, 24, 29, .62);\n  padding: 0 14px;\n  font-weight: 900;\n  cursor: pointer;\n}\n\n.view-toggle button.active {\n  background: #15181d;\n  color: #fff;\n}\n\n.complex-banner h3 {\n  font-size: 34px;\n  line-height: 1;\n}\n\n.complex-banner p {\n  margin-top: 8px;\n  color: rgba(255, 255, 255, .76);\n  font-weight: 700;\n}\n\n.complex-banner a {\n  min-height: 48px;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  padding: 0 18px;\n  border-radius: 13px;\n  background: #15181d;\n  color: #fff;\n  font-weight: 900;\n  white-space: nowrap;\n}\n\n.apartment-card h3 {\n  font-size: 22px;\n  line-height: 1.1;\n}\n\n.apartment-badges span {\n  padding: 7px 10px;\n  border-radius: 9px;\n  background: #15181d;\n  color: #fff;\n  font-size: 12px;\n  font-weight: 900;\n}\n\n.apartment-badges span:last-child {\n  background: #f4f1ea;\n  color: rgba(21, 24, 29, .78);\n}\n\n.plan-visual::before,\n.plan-visual::after {\n  content: \"\";\n  position: absolute;\n  border: 4px solid #e54d42;\n  border-radius: 4px;\n}\n\n.plan-visual::before {\n  inset: 26px 24px 48px 38px;\n}\n\n.plan-visual::after {\n  top: 42px;\n  right: 42px;\n  width: 72px;\n  height: 78px;\n  border-color: #34a2d6;\n}\n\n.plan-visual.is-render {\n  background: var(--plan-image) center / cover no-repeat, #f4f1ea;\n}\n\n.plan-visual.is-render::before,\n.plan-visual.is-render::after {\n  display: none;\n}\n\n.apartment-offer::after {\n  content: \"\";\n  position: absolute;\n  top: -120%;\n  bottom: -120%;\n  left: -45%;\n  width: 34%;\n  background: linear-gradient(110deg, transparent, rgba(255, 255, 255, .42), transparent);\n  transform: rotate(12deg);\n  animation: navGoldShine 5.4s ease-in-out infinite;\n  pointer-events: none;\n}\n\n@media (max-width: 1180px) {\n  .filter-shell,\n  .apartment-toolbar {\n    align-items: stretch;\n    flex-direction: column;\n  }\n\n  .choose-property,\n  .view-toggle {\n    width: 100%;\n  }\n\n  .apartments-grid {\n    grid-template-columns: repeat(2, 1fr);\n  }\n}\n\n@media (max-width: 980px) {\n  .filter-shell {\n    position: relative;\n    top: auto;\n  }\n\n  .filter-main {\n    flex-wrap: wrap;\n  }\n\n  .choose-property {\n    width: 100%;\n    justify-content: center;\n    margin-left: 0;\n  }\n\n  .apartments-grid {\n    grid-template-columns: repeat(2, 1fr);\n  }\n}\n\n@media (max-width: 760px) {\n  .filter-shell {\n    position: relative;\n    top: auto;\n  }\n\n  .filter-panel,\n  .filter-panel[data-panel=\"price\"],\n  .filter-panel[data-panel=\"all\"] {\n    left: 12px;\n    right: 12px;\n    width: auto;\n  }\n\n  .all-filter-grid,\n  .panel-actions,\n  .filter-actions {\n    grid-template-columns: 1fr;\n  }\n\n  .divider {\n    border-left: 0;\n    border-top: 1px solid rgba(21, 24, 29, .12);\n    padding-left: 0;\n    padding-top: 18px;\n  }\n\n  .apartments-grid {\n    grid-template-columns: 1fr;\n  }\n\n  .complex-banner {\n    align-items: flex-start;\n    flex-direction: column;\n  }\n\n  .complex-banner a {\n    width: 100%;\n  }\n}\n\n@media (max-width: 560px) {\n  .filter-shell {\n    padding: 14px;\n    border-radius: 22px;\n  }\n\n  .filter-main,\n  .apartment-toolbar .filter-main {\n    display: grid;\n    grid-template-columns: 1fr 1fr;\n    width: 100%;\n  }\n\n  .filter-trigger,\n  .reset-filter,\n  .choose-property {\n    width: 100%;\n    min-height: 46px;\n    justify-content: center;\n    padding: 0 12px;\n  }\n\n  .filter-panel,\n  .filter-panel[data-panel=\"price\"],\n  .filter-panel[data-panel=\"all\"] {\n    left: 8px;\n    right: 8px;\n    width: auto;\n    max-height: min(78vh, 620px);\n    overflow: auto;\n    padding: 18px;\n    border-radius: 22px;\n  }\n\n  .filter-tabs,\n  .chip-row {\n    flex-wrap: wrap;\n  }\n\n  .filter-tabs button,\n  .chip-row button {\n    min-height: 40px;\n  }\n\n  .apartments-grid {\n    grid-template-columns: 1fr;\n  }\n\n  .apartment-toolbar {\n    gap: 18px;\n  }\n\n  .apartment-toolbar .section-copy h2 {\n    font-size: 42px;\n    line-height: 1;\n  }\n\n  .complex-banner {\n    padding: 20px;\n    border-radius: 22px;\n  }\n\n  .complex-banner h3 {\n    font-size: 30px;\n  }\n\n  .plan-visual {\n    height: 176px;\n  }\n}\n\n@media (max-width: 380px) {\n  .filter-main,\n  .apartment-toolbar .filter-main {\n    grid-template-columns: 1fr;\n  }\n}\n\n/* Восстановлено из дизайна complex-detail.html */\n.apartment-card:hover {transform: translateY(-3px); box-shadow: 0 18px 46px rgba(21, 24, 29, .1);}\n.apartment-card-body {flex: 1; display: flex; flex-direction: column; padding: 18px;}\n.apartment-price {margin-top: 14px; color: #15181d; font-size: 22px; font-weight: 900; line-height: 1.1;}\n.old-price {margin-left: 5px; color: rgba(21, 24, 29, .28); font-size: 14px; text-decoration: line-through;}\n.apartment-meta {margin-top: 8px; color: rgba(21, 24, 29, .58); font-size: 14px; line-height: 1.45; font-weight: 700;}\n\n/* Панели фильтров: позиционируются от тулбара, а не от .filter-shell дизайна —\n   он sticky и сместил бы всю шапку секции. */\n.apartment-toolbar {position: relative;}\n.filter-group + .filter-group {margin-top: 22px;}\n.filter-group h3 {margin-bottom: 12px; font-size: 18px; line-height: 1.2;}\n.panel-actions {display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px;}\n.apartments-empty {margin: 24px 0 0; color: rgba(21, 24, 29, .58); font-size: 15px; font-weight: 700;}\n.apartment-card[hidden] {display: none;}\n\n/* ==== choice-filters v6 ====\n   Поверх исходного CSS блока (scripts/migrate-choice-filters.ts): панель\n   фильтров поверх карточек и под своей кнопкой, веса под Inter, галочка\n   вместо символа «⌄», выключенные варианты. Секция должна оставаться\n   последней в globalCss: обновление заменяет её до конца. */\n\n/* Секция обрезала панель, когда после фильтра карточек оставалось мало и\n   «Все фильтры» оказывались выше самой секции. */\n#choice.detail-section {\n  overflow: visible;\n}\n\n/* Без z-index панель рисовалась под карточками: у них позиционированные\n   потомки, и они идут в разметке позже. Линия и большой отступ под\n   фильтрами убраны: карточки идут сразу, панель может на них заезжать. */\n.apartment-toolbar {\n  z-index: 20;\n  margin-bottom: 22px;\n  padding-bottom: 0;\n  border-bottom: 0;\n}\n\n.filter-trigger,\n.reset-filter,\n.filter-apply,\n.filter-reset,\n.chip-row button,\n.view-toggle button {\n  font-weight: 700;\n  letter-spacing: 0;\n}\n\n.filter-trigger {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  gap: 10px;\n}\n\n.filter-trigger:not([data-panel=\"all\"])::after {\n  content: \"\";\n  width: 6px;\n  height: 6px;\n  border-right: 2px solid currentColor;\n  border-bottom: 2px solid currentColor;\n  transform: translateY(-2px) rotate(45deg);\n  transition: transform .2s ease;\n}\n\n.filter-trigger.is-open:not([data-panel=\"all\"])::after {\n  transform: translateY(1px) rotate(-135deg);\n}\n\n.filter-trigger.has-value:not(.is-open) {\n  border-color: #15181d;\n  box-shadow: inset 0 0 0 1px #15181d;\n}\n\n.chip-row button:disabled {\n  border-style: dashed;\n  background: #fff;\n  color: rgba(21, 24, 29, .3);\n  cursor: not-allowed;\n}\n\n.filter-group[hidden] {\n  display: none;\n}\n\n.range-box input {\n  font-weight: 600;\n}\n\n.range-box input::placeholder {\n  color: rgba(21, 24, 29, .38);\n  font-weight: 500;\n}\n\n/* Высоту и левый край панели ставит скрипт — прямо под её кнопкой. */\n.filter-panel,\n.filter-panel[data-panel=\"price\"],\n.filter-panel[data-panel=\"all\"] {\n  top: 0;\n}\n\n/* В панелях с чипсами пара кнопок — на 780 px это была пустая плашка. */\n.filter-panel[data-panel=\"rooms\"],\n.filter-panel[data-panel=\"deadline\"],\n.filter-panel[data-panel=\"windowViews\"] {\n  width: min(420px, calc(100vw - 42px));\n}\n\n/* «Все фильтры» в одну колонку: в две поля цены сжимались до «от 376 5…». */\n.filter-panel[data-panel=\"all\"] {\n  left: 0;\n  right: auto;\n  width: min(560px, calc(100vw - 42px));\n}\n\n.all-filter-grid {\n  grid-template-columns: 1fr;\n  gap: 0;\n}\n\n.all-filter-grid .filter-group + .filter-group {\n  margin-top: 22px;\n}\n\n/* На телефоне — во всю ширину тулбара. Селекторы панелей с чипсами\n   перечислены явно: иначе их width: 420px (выше) побеждал по специфичности\n   и панель вылезала за край экрана. */\n@media (max-width: 760px) {\n  .filter-panel,\n  .filter-panel[data-panel=\"price\"],\n  .filter-panel[data-panel=\"all\"],\n  .filter-panel[data-panel=\"rooms\"],\n  .filter-panel[data-panel=\"deadline\"],\n  .filter-panel[data-panel=\"windowViews\"] {\n    left: 0;\n    right: 0;\n    width: auto;\n  }\n}\n\n/* На телефоне поля цены друг под другом: в два столбца подсказка\n   «от 376 511 429» обрезалась. «—» и «UZS» убираем, валюта уже есть в\n   заголовке группы. */\n@media (max-width: 560px) {\n  .range-box {\n    grid-template-columns: 1fr;\n    gap: 8px;\n    padding: 10px 12px;\n  }\n\n  .range-box > span {\n    display: none;\n  }\n}\n\n/* ---- Десктоп: комнатность и цена строкой, без панелей ----\n   Строку собирает скрипт из копий чипсов и полей цены. На десктопе прячем\n   кнопки этих панелей и «Все фильтры» (всё основное уже на виду; срок сдачи и\n   вид из окна, если они есть у проекта, остаются своими кнопками). */\n.filter-inline,\n.filter-count {\n  display: none;\n}\n\n.filter-inline {\n  align-items: center;\n  flex-wrap: wrap;\n  gap: 12px 28px;\n}\n\n.filter-inline-group {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n}\n\n.filter-inline-label {\n  color: rgba(21, 24, 29, .56);\n  font-size: 14px;\n  font-weight: 600;\n  white-space: nowrap;\n}\n\n.filter-inline .chip-row {\n  flex-wrap: nowrap;\n}\n\n/* В строке поля цены стоят сами по себе, без общей рамки вокруг: рамка\n   вокруг полей с рамками выглядела двойной. Ширина — под самую длинную\n   подсказку: узбекское «4 789 163 414 gacha» в 170 px обрезалось. */\n.filter-inline .range-box {\n  min-height: 0;\n  grid-template-columns: 190px auto 190px;\n  gap: 8px;\n  padding: 0;\n  border: 0;\n  background: transparent;\n}\n\n.filter-inline .range-box input {\n  min-height: 44px;\n  padding: 0 12px;\n  font-size: 15px;\n  border: 1px solid rgba(21, 24, 29, .16);\n  border-radius: 13px;\n  background: #fff;\n}\n\n/* «UZS» уже в подписи группы. */\n.filter-inline .range-box > span:last-child {\n  display: none;\n}\n\n.filter-summary {\n  display: contents;\n}\n\n.filter-count {\n  color: rgba(21, 24, 29, .56);\n  font-size: 14px;\n  font-weight: 600;\n  white-space: nowrap;\n}\n\n/* Строка фильтров — во всю ширину тулбара. Переключатель «Плитка /\n   Шахматка» убран (v6): шахматки не будет, а колонкой рядом со строкой он\n   отнимал у неё ~200 px. */\n@media (min-width: 1181px) {\n  .apartment-toolbar > :first-child {\n    flex: 1 1 auto;\n  }\n}\n\n@media (min-width: 761px) {\n  .filter-inline {\n    display: flex;\n  }\n\n  /* Счётчик и «Сбросить» идут сразу за последним фильтром и не\n     разрываются: прижатые вправо, они повисали посреди второй строки. */\n  .filter-summary {\n    display: inline-flex;\n    align-items: center;\n    gap: 4px;\n    margin-left: 8px;\n    white-space: nowrap;\n  }\n\n  .filter-count {\n    display: inline;\n  }\n\n  .filter-trigger[data-panel=\"rooms\"],\n  .filter-trigger[data-panel=\"price\"],\n  .filter-trigger[data-panel=\"all\"] {\n    display: none;\n  }\n}\n"
+  },
+  "attributes": {
+    "id": "choice",
+    "class": "detail-section detail-section-pad"
+  },
+  "elementType": "container"
+}

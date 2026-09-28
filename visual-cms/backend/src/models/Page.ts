@@ -2,6 +2,13 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, Up
 import { Group } from './Group'
 import { Site } from './Site'
 
+/** Источник данных страницы при публикации: item.<name> = ответ (или arrayPath в нём). */
+export interface PagePublishDataDef {
+  name: string
+  dataSourceId: string
+  arrayPath?: string
+}
+
 @Entity('pages')
 export class Page {
   @PrimaryGeneratedColumn('uuid')
@@ -110,6 +117,13 @@ export class Page {
     // dot-notation пути для извлечения значений из ответа → {{extract.name}} в следующих источниках.
     extract?: Record<string, string>
   }>
+
+  // --- Данные страницы при публикации ---
+  // Источник запрашивается на деплое (на языке страницы, {{lang}} в адресе) и
+  // подставляется в разметку тем же движком, что у страниц коллекции: блок
+  // повторяет узел по item.<name>, поля — {{$.поле}}.
+  @Column('jsonb', { nullable: true })
+  publishData?: PagePublishDataDef[]
 
   @CreateDateColumn()
   createdAt!: Date

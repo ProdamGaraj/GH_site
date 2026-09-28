@@ -252,7 +252,7 @@ export class PageController {
 
     const page = await pageRepository.findOne({
       where: { id },
-      select: ['id', 'dataSources', 'variables', 'additionalSources']
+      select: ['id', 'dataSources', 'variables', 'additionalSources', 'publishData']
     })
 
     if (!page) {
@@ -266,13 +266,14 @@ export class PageController {
         cachePolicy: 'cache-first'
       },
       variables: page.variables || { variables: [] },
-      additionalSources: page.additionalSources || []
+      additionalSources: page.additionalSources || [],
+      publishData: page.publishData || []
     })
   })
 
   updateDataSettings = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params
-    const { dataSources, variables, additionalSources } = req.body
+    const { dataSources, variables, additionalSources, publishData } = req.body
 
     const page = await pageRepository.findOne({ where: { id } })
 
@@ -289,6 +290,9 @@ export class PageController {
     if (additionalSources !== undefined) {
       page.additionalSources = additionalSources
     }
+    if (publishData !== undefined) {
+      page.publishData = publishData
+    }
 
     await pageRepository.save(page)
 
@@ -296,7 +300,8 @@ export class PageController {
       success: true,
       dataSources: page.dataSources,
       variables: page.variables,
-      additionalSources: page.additionalSources
+      additionalSources: page.additionalSources,
+      publishData: page.publishData
     })
   })
 
@@ -306,6 +311,14 @@ export class PageController {
     const { deployService } = await import('../services/DeployService')
     const bindings = await deployService.getPageInputBindings(id)
     res.json(bindings)
+  })
+
+  // GET /api/pages/:id/publish-data-preview?lang= — что получат блоки из данных при публикации
+  previewPublishData = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params
+    const lang = typeof req.query.lang === 'string' ? req.query.lang : undefined
+    const { deployService } = await import('../services/DeployService')
+    res.json(await deployService.previewPublishData(id, lang))
   })
 
   // GET /api/pages/:id/request-preview — превью цепочки доп.запросов страницы

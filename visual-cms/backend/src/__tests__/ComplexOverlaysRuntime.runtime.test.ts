@@ -7,8 +7,8 @@
  */
 import { generateComplexOverlays } from '../services/ComplexOverlaysRuntime'
 
-function mount(card: string, lang = 'ru') {
-  const cards = `<div class="apartments-grid">${card}</div>`
+function mount(card: string, lang = 'ru', sectionAttrs = '') {
+  const cards = `<section id="choice" ${sectionAttrs}><div class="apartments-grid">${card}</div></section>`
   const out = generateComplexOverlays(cards, lang)
   const script = out.slice(out.indexOf('<script>') + 8, out.lastIndexOf('</script>'))
   document.body.innerHTML = cards + out.slice(0, out.indexOf('<script>'))
@@ -51,4 +51,24 @@ it('цены нет или она пустая — «Цена по запрос�
     .toBe('Цена по запросу')
   expect(mount('<article class="apartment-card"><h3>A</h3></article>', 'uz')('planModalPrice'))
     .toBe('Narx so‘rov bo‘yicha')
+})
+
+describe('распроданный проект (data-sold-label секции «Выбрать»)', () => {
+  const card = '<article class="apartment-card"><h3>2-комн. 55 м²</h3><div class="apartment-price"><span></span></div></article>'
+
+  it('вместо цены — подпись из данных проекта, а не «Цена по запросу»', () => {
+    expect(mount(card, 'ru', 'data-sold-label="Распродано"')('planModalPrice')).toBe('Распродано')
+    expect(mount(card, 'uz', 'data-sold-label="Sotilgan"')('planModalPrice')).toBe('Sotilgan')
+  })
+
+  it('подпись важнее цены, если та вдруг осталась в карточке', () => {
+    const priced = '<article class="apartment-card"><h3>A</h3><div class="apartment-price"><span>от 1 UZS</span></div></article>'
+    expect(mount(priced, 'ru', 'data-sold-label="Распродано"')('planModalPrice')).toBe('Распродано')
+  })
+
+  it('пустой атрибут — проект продаётся: цена как обычно', () => {
+    const priced = '<article class="apartment-card"><h3>A</h3><div class="apartment-price"><span>от 1 UZS</span></div></article>'
+    expect(mount(priced, 'ru', 'data-sold-label=""')('planModalPrice')).toBe('от 1 UZS')
+    expect(mount(card, 'ru', 'data-sold-label=" "')('planModalPrice')).toBe('Цена по запросу')
+  })
 })

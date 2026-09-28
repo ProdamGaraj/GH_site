@@ -7,7 +7,7 @@ import * as path from 'path'
 import { htmlGenerator, type ResolvedNavItem, type GeneratePageOptions } from './HtmlGenerator'
 import { responsiveImageService } from './ResponsiveImageService'
 import { AppDataSource } from '../config/database'
-import { Page } from '../models/Page'
+import { Page, PagePublishDataDef } from '../models/Page'
 import { Block } from '../models/Block'
 import { Site } from '../models/Site'
 import { Collection } from '../models/Collection'
@@ -102,6 +102,16 @@ export interface PageRequestPreview {
   /** Данные, вшиваемые в целевые привязки: подпись привязки → данные. */
   finalDataStore: Record<string, unknown>
   warnings: string[]
+}
+
+// Данные страницы при публикации: что получит разметка из источника.
+export interface PublishDataPreview {
+  name: string
+  /** Число элементов, если источник отдал массив; иначе null. */
+  count: number | null
+  /** Первый элемент массива (или сам ответ) — по нему видно, какие поля есть. */
+  sample: unknown
+  error?: string
 }
 
 // Input-привязка страницы для UI-пикера.
@@ -281,6 +291,9 @@ export class DeployService {
       const activeLanguages = await languageService.getActive()
       const translationLocales = await translationService.getPageLocales(page.id)
       const defaultLang = activeLanguages.find(l => l.isDefault)
+
+      // Данные при публикации — до языковых префиксов: ссылки из данных тоже их получат.
+      const pageStructure = await this.applyPublishData(page, updatedStructure, defaultLang?.code)
       let availableLangsForSwitcher: { code: string; name: string; flag: string; isDefault: boolean; direction: string }[] | undefined
       if (translationLocales.length > 0) {
         availableLangsForSwitcher = activeLanguages
@@ -295,7 +308,7 @@ export class DeployService {
       // Ссылки языка по умолчанию тоже получают префикс: он теперь есть у
       // каждого языка, а корень занят распознавателем.
       const { value: localizedStructure } = localizeInternalLinks(
-        updatedStructure,
+        pageStructure,
         langPrefix(defaultLang?.code || '')
       )
 
@@ -472,6 +485,14 @@ export class DeployService {
     }
 
     const isHome = this.isHomePage(page, page.site)
+    // Превью с теми же данными, что получит публикация. Источник не ответил —
+    // превью всё равно открывается, просто без этих данных (деплой бы упал).
+    try {
+      structure = await this.applyPublishData(page, structure, lang || defaultLang?.code)
+    } catch (err: any) {
+      logger.warn('Preview: publish data unavailable', { pageId: page.id, error: err.message })
+      structure = this.substituteItemData(structure, {})
+    }
 
     const html = await this.generatePageHtml(structure, {
       metadata: page.metadata || { title: page.name, description: '', keywords: [] },
@@ -571,11 +592,12 @@ export class DeployService {
           }
           
           const isHome = this.isHomePage(page, page.site)
+          const pageStructure = await this.applyPublishData(page, updatedStructure, defLang?.code)
 
           // Ссылки языка по умолчанию тоже получают префикс: он теперь есть у
       // каждого языка, а корень занят распознавателем.
       const { value: localizedStructure } = localizeInternalLinks(
-        updatedStructure,
+        pageStructure,
         langPrefix(defLang?.code || '')
       )
 
@@ -712,11 +734,12 @@ export class DeployService {
           }
 
           const isHome = this.isHomePage(page, site)
+          const pageStructure = await this.applyPublishData(page, updatedStructure, defLang?.code)
 
           // Ссылки языка по умолчанию тоже получают префикс: он теперь есть у
       // каждого языка, а корень занят распознавателем.
       const { value: localizedStructure } = localizeInternalLinks(
-        updatedStructure,
+        pageStructure,
         langPrefix(defLang?.code || '')
       )
 
@@ -1287,15 +1310,16 @@ export class DeployService {
    * Строит FetchConfig + AuthConfig для основного запроса коллекции (с учётом endpointConfig).
    * Вынесено отдельно, чтобы переиспользовать в fetchCollectionApiData и previewCollectionRequest.
    */
-  private async buildCollectionFetchConfig(
-    collection: Collection,
-    lang?: string
+  /**
+   * Запрос к источнику данных как он настроен (URL, метод, заголовки) и его
+   * расшифрованная авторизация. Общая основа запросов коллекции, доп.источников
+   * и данных страницы при публикации — дальше каждый дополняет своим.
+   */
+  private async dataSourceFetchConfig(
+    ds: DataSourceEntity
   ): Promise<{ fetchConfig: FetchConfig; authConfig?: AuthConfig }> {
-    const ds = collection.dataSource
-    if (!ds) throw new Error('Data source not loaded')
-
     const config = ds.config as any
-    if (!config?.url) throw new Error('Data source has no URL')
+    if (!config?.url) throw new Error(`Data source has no URL: ${ds.id}`)
 
     let authConfig: AuthConfig | undefined
     if (ds.authConfig) {
@@ -1304,7 +1328,18 @@ export class DeployService {
       )) as unknown as AuthConfig
     }
 
-    const fetchConfig: FetchConfig = { type: ds.type as FetchConfig['type'], ...config }
+    return { fetchConfig: { type: ds.type as FetchConfig['type'], ...config }, authConfig }
+  }
+
+  private async buildCollectionFetchConfig(
+    collection: Collection,
+    lang?: string
+  ): Promise<{ fetchConfig: FetchConfig; authConfig?: AuthConfig }> {
+    const ds = collection.dataSource
+    if (!ds) throw new Error('Data source not loaded')
+
+    const { fetchConfig, authConfig } = await this.dataSourceFetchConfig(ds)
+    const config = ds.config as any
 
     const ec = collection.endpointConfig
     if (ec) {
@@ -1666,20 +1701,8 @@ export class DeployService {
     const ds = await this.dataSourceRepository.findOne({ where: { id: source.dataSourceId } })
     if (!ds) throw new Error(`DataSource not found: ${source.dataSourceId}`)
 
+    const { fetchConfig, authConfig } = await this.dataSourceFetchConfig(ds)
     const config = ds.config as any
-    if (!config?.url) throw new Error(`DataSource has no URL: ${source.dataSourceId}`)
-
-    let authConfig: AuthConfig | undefined
-    if (ds.authConfig) {
-      authConfig = (await CredentialsManager.decryptAuthConfig(
-        ds.authConfig as Record<string, unknown>
-      )) as unknown as AuthConfig
-    }
-
-    const fetchConfig: FetchConfig = {
-      type: ds.type as FetchConfig['type'],
-      ...config,
-    }
 
     const ec = source.endpointConfig
     if (ec) {
@@ -2438,6 +2461,62 @@ export class DeployService {
   }
 
   /**
+   * Данные страницы при публикации (page.publishData).
+   *
+   * Источники запрашиваются на деплое, на языке этой версии страницы ({{lang}}
+   * в адресе источника), и подставляются в разметку тем же движком, что у
+   * страниц коллекции: блок повторяет узел по item.<имя>, поля — {{$.поле}}.
+   * Карточки и ссылки сразу в HTML, без запроса из браузера.
+   *
+   * Источник не ответил — страница не публикуется (ошибка деплоя, на сайте
+   * остаётся прежний файл): пустой каталог на главной хуже вчерашнего.
+   */
+  private async applyPublishData(page: Page, structure: any, lang?: string): Promise<any> {
+    const defs = page.publishData ?? []
+    if (defs.length === 0) return structure
+    const item: Record<string, unknown> = {}
+    for (const def of defs) item[def.name] = await this.fetchPublishData(def, lang)
+    return this.substituteItemData(structure, item)
+  }
+
+  private async fetchPublishData(def: PagePublishDataDef, lang?: string): Promise<unknown> {
+    const ds = await this.dataSourceRepository.findOne({ where: { id: def.dataSourceId } })
+    if (!ds) throw new Error(`Данные страницы «${def.name}»: источник ${def.dataSourceId} не найден`)
+    const { fetchConfig, authConfig } = await this.dataSourceFetchConfig(ds)
+    if (lang) this.applyLangPlaceholder(fetchConfig, lang)
+    const result = await secureDataSourceService.fetchData(fetchConfig, authConfig)
+    if (!result.success) {
+      throw new Error(`Данные страницы «${def.name}»: ${result.error?.message || 'источник не ответил'}`)
+    }
+    return def.arrayPath ? this.getNestedValue(result.data, def.arrayPath) : result.data
+  }
+
+  /**
+   * Что получат блоки из данных при публикации: для каждого источника — число
+   * элементов и первый элемент (по нему видно, какие поля есть), либо ошибка.
+   * Реальные запросы; файлов не пишет.
+   */
+  async previewPublishData(pageId: string, lang?: string): Promise<PublishDataPreview[]> {
+    const page = await this.pageRepository.findOne({ where: { id: pageId } })
+    if (!page) throw new Error('Page not found')
+    const previewLang = lang || (await languageService.getActive()).find(l => l.isDefault)?.code
+    const out: PublishDataPreview[] = []
+    for (const def of page.publishData ?? []) {
+      try {
+        const data = await this.fetchPublishData(def, previewLang)
+        out.push({
+          name: def.name,
+          count: Array.isArray(data) ? data.length : null,
+          sample: Array.isArray(data) ? data[0] ?? null : data,
+        })
+      } catch (err: any) {
+        out.push({ name: def.name, count: null, sample: null, error: err.message })
+      }
+    }
+    return out
+  }
+
+  /**
    * Превью цепочки доп.запросов страницы (реальные вызовы). Не пишет файлов, не деплоит.
    */
   async previewPageRequest(pageId: string): Promise<PageRequestPreview> {
@@ -2773,10 +2852,13 @@ export class DeployService {
               page.metadata || { title: page.name, description: '', keywords: [] }
             )
 
+          // Данные при публикации — на языке этой версии страницы.
+          const withData = await this.applyPublishData(page, translatedStructure, lang.code)
+
           // Внутренние ссылки уводят на язык страницы: без этого клик по меню
           // на /uz/ возвращал посетителя на русскую версию.
           const { value: linkedStructure, count: relinked } = localizeInternalLinks(
-            translatedStructure,
+            withData,
             langPrefix(lang.code)
           )
           if (relinked > 0) logger.info(`Page "${page.name}" [${lang.code}]: ссылок локализовано ${relinked}`)

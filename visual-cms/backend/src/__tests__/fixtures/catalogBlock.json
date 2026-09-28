@@ -1,0 +1,2036 @@
+{
+  "id": "node-1782187948710-j4dpxrzqa",
+  "styles": {
+    "properties": {
+      "color": "var(--ink)",
+      "padding": "0 clamp(16px, 4vw, 54px) clamp(64px, 8vw, 110px)",
+      "background": "#f4f1ea"
+    }
+  },
+  "tagName": "section",
+  "children": [
+    {
+      "id": "node-1782187948710-hwab8oa03",
+      "styles": {
+        "properties": {
+          "margin": "0 auto",
+          "maxWidth": "1500px"
+        }
+      },
+      "tagName": "div",
+      "children": [
+        {
+          "id": "node-1782187948708-hiqfuqpk8",
+          "styles": {
+            "properties": {
+              "gap": "20px",
+              "display": "grid",
+              "alignItems": "end",
+              "marginBottom": "clamp(18px, 2.2vw, 30px)",
+              "gridTemplateColumns": "minmax(0, 1fr) auto"
+            }
+          },
+          "tagName": "div",
+          "children": [
+            {
+              "id": "node-1782187948708-21m6n3p9c",
+              "styles": {
+                "properties": {}
+              },
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "node-1782187948708-5ubeilwcd",
+                  "styles": {
+                    "properties": {
+                      "color": "rgba(21, 24, 29, .7)",
+                      "display": "inline-flex",
+                      "padding": "8px 18px",
+                      "fontSize": "13px",
+                      "minHeight": "36px",
+                      "alignItems": "center",
+                      "background": "#ffffff",
+                      "fontWeight": "800",
+                      "borderRadius": "999px",
+                      "letterSpacing": ".04em",
+                      "textTransform": "uppercase"
+                    }
+                  },
+                  "content": "Каталог проектов",
+                  "tagName": "span",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "complexes-kicker"
+                  },
+                  "elementType": "text"
+                },
+                {
+                  "id": "node-1782187948708-43zp5o6fx",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Жилые комплексы",
+                  "tagName": "h2",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {},
+                  "elementType": "text"
+                },
+                {
+                  "id": "node-1782187948708-3a3hofkyi",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Подберите проект по классу, преимуществам и условиям покупки. Карточки показывают ключевую информацию без лишнего шума.",
+                  "tagName": "p",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {},
+                  "elementType": "text"
+                }
+              ],
+              "metadata": {},
+              "attributes": {},
+              "elementType": "container"
+            },
+            {
+              "id": "node-1782187948708-4ggnb45cy",
+              "styles": {
+                "properties": {
+                  "gap": "8px",
+                  "border": "1px solid rgba(21, 24, 29, .08)",
+                  "display": "flex",
+                  "padding": "6px",
+                  "flexWrap": "wrap",
+                  "boxShadow": "0 14px 34px rgba(21, 24, 29, .06)",
+                  "background": "#ffffff",
+                  "borderRadius": "999px",
+                  "justifyContent": "flex-end"
+                }
+              },
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "node-1782187948708-q96kqxx12",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Все",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "type": "button",
+                    "class": "active",
+                    "data-title": "Подборка всех проектов",
+                    "data-video": "https://assets.mixkit.co/videos/preview/mixkit-aerial-view-of-city-buildings-4429-large.mp4",
+                    "data-filter": "all"
+                  },
+                  "elementType": "button"
+                },
+                {
+                  "id": "node-1782187948708-0ntqcgcu4",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Комфорт",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "type": "button",
+                    "data-title": "Проекты комфорт-класса",
+                    "data-video": "https://assets.mixkit.co/videos/preview/mixkit-modern-building-with-glass-facade-3975-large.mp4",
+                    "data-filter": "comfort"
+                  },
+                  "elementType": "button"
+                },
+                {
+                  "id": "node-1782187948708-ynz8h7u5g",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Бизнес",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "type": "button",
+                    "data-title": "Бизнес-класс",
+                    "data-video": "https://assets.mixkit.co/videos/preview/mixkit-city-buildings-seen-from-below-4431-large.mp4",
+                    "data-filter": "business"
+                  },
+                  "elementType": "button"
+                },
+                {
+                  "id": "node-1782187948708-6hwa10lgw",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Премиум",
+                  "tagName": "button",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "type": "button",
+                    "data-title": "Премиум проекты",
+                    "data-video": "https://assets.mixkit.co/videos/preview/mixkit-luxury-house-with-a-pool-3513-large.mp4",
+                    "data-filter": "premium"
+                  },
+                  "elementType": "button"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "class": "class-filter",
+                "aria-label": "Фильтр по классу"
+              },
+              "layoutMode": "flex",
+              "elementType": "container"
+            }
+          ],
+          "metadata": {},
+          "attributes": {
+            "class": "complexes-head"
+          },
+          "layoutMode": "grid",
+          "variations": {
+            "mobile": {
+              "inheritedOverrides": {
+                "node-1782187948708-4ggnb45cy": {
+                  "styles": {
+                    "justifyContent": "center"
+                  }
+                }
+              }
+            },
+            "tablet": {
+              "inheritedOverrides": {
+                "node-1782187948708-4ggnb45cy": {
+                  "styles": {
+                    "alignItems": "stretch",
+                    "flexDirection": "row",
+                    "justifyContent": "flex-end"
+                  }
+                }
+              }
+            }
+          },
+          "elementType": "container"
+        },
+        {
+          "id": "node-1782187948708-dgrhdo4im",
+          "styles": {
+            "properties": {
+              "color": "var(--white)",
+              "display": "flex",
+              "padding": "clamp(22px, 3vw, 44px)",
+              "overflow": "hidden",
+              "position": "relative",
+              "boxShadow": "0 18px 48px rgba(21, 24, 29, .08)",
+              "minHeight": "clamp(390px, 42vw, 640px)",
+              "alignItems": "flex-end",
+              "background": "#15181d",
+              "borderRadius": "30px",
+              "marginBottom": "clamp(18px, 2vw, 30px)"
+            }
+          },
+          "tagName": "article",
+          "children": [
+            {
+              "id": "node-1782187948708-915fkyz8p",
+              "styles": {
+                "properties": {
+                  "inset": "0",
+                  "width": "100%",
+                  "height": "100%",
+                  "position": "absolute",
+                  "objectFit": "cover"
+                }
+              },
+              "tagName": "video",
+              "children": [],
+              "metadata": {},
+              "attributes": {
+                "id": "complexesVideo",
+                "src": "/media/5ae4a707-dff0-4037-8ab3-e99234838ecb.mp4",
+                "loop": "true",
+                "class": "complexes-video",
+                "muted": "true",
+                "width": "100%",
+                "height": "100%",
+                "preload": "metadata",
+                "autoplay": "true"
+              },
+              "elementType": "video"
+            },
+            {
+              "id": "node-1782187948708-t9mrfp67g",
+              "styles": {
+                "properties": {
+                  "zIndex": "1",
+                  "maxWidth": "760px",
+                  "position": "relative"
+                }
+              },
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "node-1782187948708-dnsgovmg6",
+                  "styles": {
+                    "properties": {}
+                  },
+                  "content": "Подборка всех проектов",
+                  "tagName": "h3",
+                  "children": [],
+                  "metadata": {},
+                  "attributes": {
+                    "id": "complexesVideoTitle"
+                  },
+                  "elementType": "text"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "class": "complexes-hero-content"
+              },
+              "elementType": "container"
+            }
+          ],
+          "metadata": {},
+          "attributes": {
+            "class": "complexes-hero"
+          },
+          "layoutMode": "flex",
+          "elementType": "container"
+        },
+        {
+          "id": "node-1782187948710-4xcm9j2sb",
+          "styles": {
+            "properties": {
+              "gap": "clamp(16px, 2vw, 28px)",
+              "display": "grid",
+              "gridTemplateColumns": "repeat(3, minmax(0, 1fr))"
+            }
+          },
+          "tagName": "div",
+          "children": [
+            {
+              "id": "node-1782187948709-0a2b2fe2u",
+              "styles": {
+                "properties": {
+                  "border": "1px solid rgba(21, 24, 29, .08)",
+                  "cursor": "pointer",
+                  "overflow": "hidden",
+                  "boxShadow": "0 18px 44px rgba(21, 24, 29, .07)",
+                  "background": "#ffffff",
+                  "borderRadius": "26px"
+                }
+              },
+              "tagName": "article",
+              "children": [
+                {
+                  "id": "node-1782187948709-x0kq4rhtz",
+                  "styles": {
+                    "properties": {
+                      "--image": "url('/media/d65851c0-0bcf-4901-87d7-4d91c77738c3.jpg')",
+                      "position": "relative",
+                      "minHeight": "230px",
+                      "background": "var(--image) center / cover"
+                    }
+                  },
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "node-1782187948709-vul2b66v1",
+                      "styles": {
+                        "properties": {
+                          "top": "16px",
+                          "left": "16px",
+                          "color": "var(--white)",
+                          "padding": "8px 16px",
+                          "fontSize": "12px",
+                          "position": "absolute",
+                          "background": "rgba(21, 24, 29, .52)",
+                          "fontWeight": "900",
+                          "borderRadius": "999px",
+                          "letterSpacing": ".04em",
+                          "textTransform": "uppercase",
+                          "backdropFilter": "blur(10px)",
+                          "WebkitBackdropFilter": "blur(10px)"
+                        }
+                      },
+                      "content": "Комфорт+",
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {
+                        "class": "project-class"
+                      },
+                      "elementType": "text"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "project-image"
+                  },
+                  "elementType": "container"
+                },
+                {
+                  "id": "node-1782187948709-sy61dcv28",
+                  "styles": {
+                    "properties": {
+                      "padding": "clamp(20px, 2vw, 28px)"
+                    }
+                  },
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "node-1782187948709-wajswazs3",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "Assalom Do'stlik",
+                      "tagName": "h3",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "node-1782187948709-mezfia1uj",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "Комплекс с закрытой территорией, прогулочными зонами, отделкой в подарок и удобным доступом к городским сервисам.",
+                      "tagName": "p",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "node-1782187948709-g52n45b96",
+                      "styles": {
+                        "properties": {
+                          "gap": "8px",
+                          "display": "flex",
+                          "flexWrap": "wrap",
+                          "marginTop": "18px"
+                        }
+                      },
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "id": "node-1782187948709-7j4b0g5m5",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "Ремонт в подарок",
+                          "tagName": "span",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {},
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1782187948709-upq0ipuw1",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "Скидка",
+                          "tagName": "span",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {},
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1782187948709-njuewh9e5",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "Акция",
+                          "tagName": "span",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {},
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1782187948709-vtha7bhq5",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "Ипотека",
+                          "tagName": "span",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {},
+                          "elementType": "text"
+                        }
+                      ],
+                      "metadata": {},
+                      "attributes": {
+                        "class": "project-tags"
+                      },
+                      "layoutMode": "flex",
+                      "elementType": "container"
+                    },
+                    {
+                      "id": "node-1782187948709-g99k0aj79",
+                      "styles": {
+                        "properties": {
+                          "gap": "14px",
+                          "display": "flex",
+                          "marginTop": "24px",
+                          "alignItems": "center",
+                          "justifyContent": "space-between"
+                        }
+                      },
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "id": "node-1782187948709-2b86zmadg",
+                          "styles": {
+                            "properties": {
+                              "color": "rgba(21, 24, 29, .82)",
+                              "fontSize": "14px",
+                              "fontWeight": "700",
+                              "lineHeight": "1.35"
+                            }
+                          },
+                          "content": "Цена позапросу",
+                          "tagName": "span",
+                          "children": [
+                            {
+                              "id": "node-1782187948709-6ar94nj44",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "tagName": "br",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "container"
+                            }
+                          ],
+                          "metadata": {},
+                          "attributes": {
+                            "class": "project-price"
+                          },
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1782187948709-qzu1g2ahb",
+                          "styles": {
+                            "properties": {
+                              "gap": "10px",
+                              "color": "var(--white)",
+                              "display": "inline-flex",
+                              "padding": "10px 12px 10px 18px",
+                              "fontSize": "14px",
+                              "minHeight": "44px",
+                              "alignItems": "center",
+                              "background": "var(--ink)",
+                              "fontWeight": "800",
+                              "whiteSpace": "nowrap",
+                              "borderRadius": "999px"
+                            }
+                          },
+                          "content": "Подробнее",
+                          "tagName": "a",
+                          "children": [
+                            {
+                              "id": "node-1782187948709-r3tbydxf1",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "content": "→",
+                              "tagName": "span",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "text"
+                            }
+                          ],
+                          "metadata": {},
+                          "attributes": {
+                            "href": "/complex/assalom-dostlik",
+                            "class": "project-more",
+                            "data-page-id": "35c718b5-6718-4d51-bffc-9c047dc830ff"
+                          },
+                          "elementType": "text"
+                        }
+                      ],
+                      "metadata": {},
+                      "attributes": {
+                        "class": "project-foot"
+                      },
+                      "layoutMode": "flex",
+                      "elementType": "container"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "project-body"
+                  },
+                  "elementType": "container"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "class": "project-card",
+                "data-href": "/complex/assalom-dostlik",
+                "data-class": "comfort"
+              },
+              "elementType": "container"
+            },
+            {
+              "id": "node-1782187948709-9wnr5b45c",
+              "styles": {
+                "properties": {
+                  "border": "1px solid rgba(21, 24, 29, .08)",
+                  "cursor": "pointer",
+                  "overflow": "hidden",
+                  "boxShadow": "0 18px 44px rgba(21, 24, 29, .07)",
+                  "background": "#ffffff",
+                  "borderRadius": "26px"
+                }
+              },
+              "tagName": "article",
+              "children": [
+                {
+                  "id": "node-1782187948709-9yjc835n0",
+                  "styles": {
+                    "properties": {
+                      "--image": "url('/media/21249019-a9a9-4b90-bfef-d2f883388d77.jpg')",
+                      "position": "relative",
+                      "minHeight": "230px",
+                      "background": "var(--image) center / cover"
+                    }
+                  },
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "node-1782187948709-zvionc9sz",
+                      "styles": {
+                        "properties": {
+                          "top": "16px",
+                          "left": "16px",
+                          "color": "var(--white)",
+                          "padding": "8px 16px",
+                          "fontSize": "12px",
+                          "position": "absolute",
+                          "background": "rgba(21, 24, 29, .52)",
+                          "fontWeight": "900",
+                          "borderRadius": "999px",
+                          "letterSpacing": ".04em",
+                          "textTransform": "uppercase",
+                          "backdropFilter": "blur(10px)",
+                          "WebkitBackdropFilter": "blur(10px)"
+                        }
+                      },
+                      "content": "Бизнес",
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {
+                        "class": "project-class"
+                      },
+                      "elementType": "text"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "project-image"
+                  },
+                  "elementType": "container"
+                },
+                {
+                  "id": "node-1782187948709-9mopr7kaf",
+                  "styles": {
+                    "properties": {
+                      "padding": "clamp(20px, 2vw, 28px)"
+                    }
+                  },
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "node-1782187948709-c19ximdvd",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "O'zMakon Business",
+                      "tagName": "h3",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "node-1782187948709-qqk0j5z7h",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "Бизнес-квартал Golden House с выразительной европейской архитектурой и приватной городской средой",
+                      "tagName": "p",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "node-1782187948709-xi0npw3n2",
+                      "styles": {
+                        "properties": {
+                          "gap": "8px",
+                          "display": "flex",
+                          "flexWrap": "wrap",
+                          "marginTop": "18px"
+                        }
+                      },
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "id": "node-1782187948709-w12gdk2bk",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "Акция",
+                          "tagName": "span",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {},
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1782187948709-510rt0e9y",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "Рассрочка",
+                          "tagName": "span",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {},
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1782187948709-tbyymo2gg",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "Ипотека",
+                          "tagName": "span",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {},
+                          "elementType": "text"
+                        }
+                      ],
+                      "metadata": {},
+                      "attributes": {
+                        "class": "project-tags"
+                      },
+                      "layoutMode": "flex",
+                      "elementType": "container"
+                    },
+                    {
+                      "id": "node-1782187948709-zluebf8om",
+                      "styles": {
+                        "properties": {
+                          "gap": "14px",
+                          "display": "flex",
+                          "marginTop": "24px",
+                          "alignItems": "center",
+                          "justifyContent": "space-between"
+                        }
+                      },
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "id": "node-1782187948709-s8b963754",
+                          "styles": {
+                            "properties": {
+                              "color": "rgba(21, 24, 29, .82)",
+                              "fontSize": "14px",
+                              "fontWeight": "700",
+                              "lineHeight": "1.35"
+                            }
+                          },
+                          "content": "Цена позапросу",
+                          "tagName": "span",
+                          "children": [
+                            {
+                              "id": "node-1782187948709-p13zp0wg2",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "tagName": "br",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "container"
+                            }
+                          ],
+                          "metadata": {},
+                          "attributes": {
+                            "class": "project-price"
+                          },
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1782187948709-oy1ooa55t",
+                          "styles": {
+                            "properties": {
+                              "gap": "10px",
+                              "color": "var(--white)",
+                              "display": "inline-flex",
+                              "padding": "10px 12px 10px 18px",
+                              "fontSize": "14px",
+                              "minHeight": "44px",
+                              "alignItems": "center",
+                              "background": "var(--ink)",
+                              "fontWeight": "800",
+                              "whiteSpace": "nowrap",
+                              "borderRadius": "999px"
+                            }
+                          },
+                          "content": "Подробнее",
+                          "tagName": "a",
+                          "children": [
+                            {
+                              "id": "node-1782187948709-jn5n60rlz",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "content": "→",
+                              "tagName": "span",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "text"
+                            }
+                          ],
+                          "metadata": {},
+                          "attributes": {
+                            "href": "/complex/ozmakon-business",
+                            "class": "project-more",
+                            "data-page-id": "96f7c0f9-8618-4f2d-94fe-a4ea75bdbc45"
+                          },
+                          "elementType": "text"
+                        }
+                      ],
+                      "metadata": {},
+                      "attributes": {
+                        "class": "project-foot"
+                      },
+                      "layoutMode": "flex",
+                      "elementType": "container"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "project-body"
+                  },
+                  "elementType": "container"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "class": "project-card",
+                "data-href": "/complex/ozmakon-business",
+                "data-class": "business"
+              },
+              "elementType": "container"
+            },
+            {
+              "id": "node-1790061004794-0",
+              "styles": {
+                "properties": {
+                  "border": "1px solid rgba(21, 24, 29, .08)",
+                  "cursor": "pointer",
+                  "overflow": "hidden",
+                  "boxShadow": "0 18px 44px rgba(21, 24, 29, .07)",
+                  "background": "#ffffff",
+                  "borderRadius": "26px"
+                }
+              },
+              "tagName": "article",
+              "children": [
+                {
+                  "id": "node-1790061004794-1",
+                  "styles": {
+                    "properties": {
+                      "--image": "url('/media/e271d545-b5d1-49fe-ab4d-5bf090b2d98e.jpg')",
+                      "position": "relative",
+                      "minHeight": "230px",
+                      "background": "var(--image) center / cover"
+                    }
+                  },
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "node-1790061004794-2",
+                      "styles": {
+                        "properties": {
+                          "top": "16px",
+                          "left": "16px",
+                          "color": "var(--white)",
+                          "padding": "8px 16px",
+                          "fontSize": "12px",
+                          "position": "absolute",
+                          "background": "rgba(21, 24, 29, .52)",
+                          "fontWeight": "900",
+                          "borderRadius": "999px",
+                          "letterSpacing": ".04em",
+                          "textTransform": "uppercase",
+                          "backdropFilter": "blur(10px)",
+                          "WebkitBackdropFilter": "blur(10px)"
+                        }
+                      },
+                      "content": "Бизнес",
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {
+                        "class": "project-class"
+                      },
+                      "elementType": "text"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "project-image"
+                  },
+                  "elementType": "container"
+                },
+                {
+                  "id": "node-1790061004794-3",
+                  "styles": {
+                    "properties": {
+                      "padding": "clamp(20px, 2vw, 28px)"
+                    }
+                  },
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "node-1790061004794-4",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "Harizma",
+                      "tagName": "h3",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "node-1790061004794-5",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "Жилой квартал бизнес-класса Golden House с зелёной территорией без машин и квартирами с готовой отделкой",
+                      "tagName": "p",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "node-1790061004794-6",
+                      "styles": {
+                        "properties": {
+                          "gap": "8px",
+                          "display": "flex",
+                          "flexWrap": "wrap",
+                          "marginTop": "18px"
+                        }
+                      },
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "id": "node-1790061004794-g",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "Рассрочка",
+                          "tagName": "span",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {},
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1790061004794-h",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "Ипотека",
+                          "tagName": "span",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {},
+                          "elementType": "text"
+                        }
+                      ],
+                      "metadata": {},
+                      "attributes": {
+                        "class": "project-tags"
+                      },
+                      "layoutMode": "flex",
+                      "elementType": "container"
+                    },
+                    {
+                      "id": "node-1790061004794-b",
+                      "styles": {
+                        "properties": {
+                          "gap": "14px",
+                          "display": "flex",
+                          "marginTop": "24px",
+                          "alignItems": "center",
+                          "justifyContent": "space-between"
+                        }
+                      },
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "id": "node-1790061004794-c",
+                          "styles": {
+                            "properties": {
+                              "color": "rgba(21, 24, 29, .82)",
+                              "fontSize": "14px",
+                              "fontWeight": "700",
+                              "lineHeight": "1.35"
+                            }
+                          },
+                          "content": "Цена позапросу",
+                          "tagName": "span",
+                          "children": [
+                            {
+                              "id": "node-1790061004794-d",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "tagName": "br",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "container"
+                            }
+                          ],
+                          "metadata": {},
+                          "attributes": {
+                            "class": "project-price"
+                          },
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1790061004794-e",
+                          "styles": {
+                            "properties": {
+                              "gap": "10px",
+                              "color": "var(--white)",
+                              "display": "inline-flex",
+                              "padding": "10px 12px 10px 18px",
+                              "fontSize": "14px",
+                              "minHeight": "44px",
+                              "alignItems": "center",
+                              "background": "var(--ink)",
+                              "fontWeight": "800",
+                              "whiteSpace": "nowrap",
+                              "borderRadius": "999px"
+                            }
+                          },
+                          "content": "Подробнее",
+                          "tagName": "a",
+                          "children": [
+                            {
+                              "id": "node-1790061004794-f",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "content": "→",
+                              "tagName": "span",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "text"
+                            }
+                          ],
+                          "metadata": {},
+                          "attributes": {
+                            "href": "/complex/harizma",
+                            "class": "project-more",
+                            "data-page-id": "35c718b5-6718-4d51-bffc-9c047dc830ff"
+                          },
+                          "elementType": "text"
+                        }
+                      ],
+                      "metadata": {},
+                      "attributes": {
+                        "class": "project-foot"
+                      },
+                      "layoutMode": "flex",
+                      "elementType": "container"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "project-body"
+                  },
+                  "elementType": "container"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "class": "project-card",
+                "data-href": "/complex/harizma",
+                "data-class": "business"
+              },
+              "elementType": "container"
+            },
+            {
+              "id": "node-1790061004794-i",
+              "styles": {
+                "properties": {
+                  "border": "1px solid rgba(21, 24, 29, .08)",
+                  "cursor": "pointer",
+                  "overflow": "hidden",
+                  "boxShadow": "0 18px 44px rgba(21, 24, 29, .07)",
+                  "background": "#ffffff",
+                  "borderRadius": "26px"
+                }
+              },
+              "tagName": "article",
+              "children": [
+                {
+                  "id": "node-1790061004794-j",
+                  "styles": {
+                    "properties": {
+                      "--image": "url('/media/40e7e690-b2a6-454b-bfaf-fffa29050612.jpg')",
+                      "position": "relative",
+                      "minHeight": "230px",
+                      "background": "var(--image) center / cover"
+                    }
+                  },
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "node-1790061004794-k",
+                      "styles": {
+                        "properties": {
+                          "top": "16px",
+                          "left": "16px",
+                          "color": "var(--white)",
+                          "padding": "8px 16px",
+                          "fontSize": "12px",
+                          "position": "absolute",
+                          "background": "rgba(21, 24, 29, .52)",
+                          "fontWeight": "900",
+                          "borderRadius": "999px",
+                          "letterSpacing": ".04em",
+                          "textTransform": "uppercase",
+                          "backdropFilter": "blur(10px)",
+                          "WebkitBackdropFilter": "blur(10px)"
+                        }
+                      },
+                      "content": "Бизнес",
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {
+                        "class": "project-class"
+                      },
+                      "elementType": "text"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "project-image"
+                  },
+                  "elementType": "container"
+                },
+                {
+                  "id": "node-1790061004794-l",
+                  "styles": {
+                    "properties": {
+                      "padding": "clamp(20px, 2vw, 28px)"
+                    }
+                  },
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "node-1790061004794-m",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "O'zMahal",
+                      "tagName": "h3",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "node-1790061004794-n",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "Бизнес-класс Golden House с авторской архитектурой, приватным двором без машин и продуманной городской средой",
+                      "tagName": "p",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "node-1790061004794-o",
+                      "styles": {
+                        "properties": {
+                          "gap": "8px",
+                          "display": "flex",
+                          "flexWrap": "wrap",
+                          "marginTop": "18px"
+                        }
+                      },
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "id": "node-1790061004794-y",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "Рассрочка",
+                          "tagName": "span",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {},
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1790061004794-z",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "Ипотека",
+                          "tagName": "span",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {},
+                          "elementType": "text"
+                        }
+                      ],
+                      "metadata": {},
+                      "attributes": {
+                        "class": "project-tags"
+                      },
+                      "layoutMode": "flex",
+                      "elementType": "container"
+                    },
+                    {
+                      "id": "node-1790061004794-t",
+                      "styles": {
+                        "properties": {
+                          "gap": "14px",
+                          "display": "flex",
+                          "marginTop": "24px",
+                          "alignItems": "center",
+                          "justifyContent": "space-between"
+                        }
+                      },
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "id": "node-1790061004794-u",
+                          "styles": {
+                            "properties": {
+                              "color": "rgba(21, 24, 29, .82)",
+                              "fontSize": "14px",
+                              "fontWeight": "700",
+                              "lineHeight": "1.35"
+                            }
+                          },
+                          "content": "Цена позапросу",
+                          "tagName": "span",
+                          "children": [
+                            {
+                              "id": "node-1790061004794-v",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "tagName": "br",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "container"
+                            }
+                          ],
+                          "metadata": {},
+                          "attributes": {
+                            "class": "project-price"
+                          },
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1790061004794-w",
+                          "styles": {
+                            "properties": {
+                              "gap": "10px",
+                              "color": "var(--white)",
+                              "display": "inline-flex",
+                              "padding": "10px 12px 10px 18px",
+                              "fontSize": "14px",
+                              "minHeight": "44px",
+                              "alignItems": "center",
+                              "background": "var(--ink)",
+                              "fontWeight": "800",
+                              "whiteSpace": "nowrap",
+                              "borderRadius": "999px"
+                            }
+                          },
+                          "content": "Подробнее",
+                          "tagName": "a",
+                          "children": [
+                            {
+                              "id": "node-1790061004794-x",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "content": "→",
+                              "tagName": "span",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "text"
+                            }
+                          ],
+                          "metadata": {},
+                          "attributes": {
+                            "href": "/complex/ozmahal",
+                            "class": "project-more",
+                            "data-page-id": "35c718b5-6718-4d51-bffc-9c047dc830ff"
+                          },
+                          "elementType": "text"
+                        }
+                      ],
+                      "metadata": {},
+                      "attributes": {
+                        "class": "project-foot"
+                      },
+                      "layoutMode": "flex",
+                      "elementType": "container"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "project-body"
+                  },
+                  "elementType": "container"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "class": "project-card",
+                "data-href": "/complex/ozmahal",
+                "data-class": "business"
+              },
+              "elementType": "container"
+            }
+          ],
+          "metadata": {},
+          "attributes": {
+            "class": "project-grid"
+          },
+          "layoutMode": "grid",
+          "elementType": "container"
+        },
+        {
+          "id": "node-1782187948710-egwb0rcrx",
+          "styles": {
+            "properties": {
+              "marginTop": "clamp(30px, 4vw, 56px)"
+            }
+          },
+          "tagName": "section",
+          "children": [
+            {
+              "id": "node-1782187948710-avii4e6oi",
+              "styles": {
+                "properties": {
+                  "gap": "20px",
+                  "width": "100%",
+                  "display": "flex",
+                  "alignItems": "end",
+                  "marginBottom": "clamp(18px, 2.4vw, 30px)",
+                  "flexDirection": "row",
+                  "justifyContent": "space-between"
+                }
+              },
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "node-1782187948710-76der3yts",
+                  "styles": {
+                    "properties": {
+                      "width": "100%",
+                      "display": "flex",
+                      "alignItems": "center",
+                      "justifyContent": "space-between"
+                    }
+                  },
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "id": "node-1782187948710-h2jahh0lq",
+                      "styles": {
+                        "properties": {
+                          "color": "rgba(21, 24, 29, .7)",
+                          "height": "0",
+                          "display": "inline-flex",
+                          "padding": "8px 18px",
+                          "fontSize": "13px",
+                          "minHeight": "36px",
+                          "alignItems": "center",
+                          "background": "#ffffff",
+                          "fontWeight": "800",
+                          "borderRadius": "999px",
+                          "letterSpacing": ".04em",
+                          "textTransform": "uppercase"
+                        }
+                      },
+                      "content": "Сервисы Golden House",
+                      "tagName": "span",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {
+                        "class": "complexes-kicker"
+                      },
+                      "elementType": "text"
+                    },
+                    {
+                      "id": "node-1782187948710-u5fgaw5mc",
+                      "styles": {
+                        "properties": {}
+                      },
+                      "content": "Акции и поддержка клиентов",
+                      "tagName": "h2",
+                      "children": [],
+                      "metadata": {},
+                      "attributes": {},
+                      "elementType": "text"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {},
+                  "variations": {
+                    "mobile": {
+                      "inheritedOverrides": {
+                        "node-1782187948710-h2jahh0lq": {
+                          "styles": {
+                            "display": "flex",
+                            "flexWrap": "nowrap",
+                            "alignItems": "stretch",
+                            "flexDirection": "row",
+                            "justifyContent": "flex-start",
+                            "gridTemplateRows": "auto",
+                            "gridTemplateColumns": "repeat(2, 1fr)"
+                          }
+                        },
+                        "node-1782187948710-u5fgaw5mc": {
+                          "styles": {
+                            "display": "flex",
+                            "justifyContent": "space-between"
+                          }
+                        }
+                      }
+                    },
+                    "tablet": {
+                      "inheritedOverrides": {
+                        "node-1782187948710-u5fgaw5mc": {
+                          "styles": {
+                            "display": "flex"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "elementType": "container"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "class": "home-pages-head"
+              },
+              "layoutMode": "flex",
+              "variations": {
+                "mobile": {
+                  "inheritedOverrides": {
+                    "node-1782187948710-76der3yts": {
+                      "styles": {
+                        "alignItems": "stretch"
+                      }
+                    }
+                  }
+                },
+                "tablet": {
+                  "inheritedOverrides": {
+                    "node-1782187948710-76der3yts": {
+                      "styles": {
+                        "gap": "24px",
+                        "width": "100%",
+                        "display": "flex",
+                        "alignItems": "center",
+                        "justifyContent": "space-between",
+                        "gridTemplateRows": "auto",
+                        "gridTemplateColumns": "repeat(2, 1fr)"
+                      }
+                    }
+                  }
+                }
+              },
+              "elementType": "container"
+            },
+            {
+              "id": "node-1782187948710-r1su89c5p",
+              "styles": {
+                "properties": {
+                  "gap": "clamp(16px, 2vw, 28px)",
+                  "display": "grid",
+                  "gridTemplateColumns": "repeat(2, minmax(0, 1fr))"
+                }
+              },
+              "tagName": "div",
+              "children": [
+                {
+                  "id": "node-1782187948710-ceryi23wy",
+                  "styles": {
+                    "properties": {
+                      "color": "var(--white)",
+                      "border": "1px solid rgba(21, 24, 29, .1)",
+                      "display": "flex",
+                      "padding": "clamp(22px, 3vw, 42px)",
+                      "overflow": "hidden",
+                      "position": "relative",
+                      "boxShadow": "0 18px 48px rgba(21, 24, 29, .08)",
+                      "minHeight": "clamp(380px, 34vw, 560px)",
+                      "alignItems": "flex-end",
+                      "background": "linear-gradient(180deg, rgba(13, 15, 18, .08) 20%, rgba(13, 15, 18, .76) 100%),\n        var(--page-image) center / cover",
+                      "--page-image": "url('/media/93c3912b-d7a1-4be3-9b65-d64ec9c6f3b9.png')",
+                      "borderRadius": "30px",
+                      "backgroundImage": "url(\"/media/73a99934-6fa7-42df-bf28-7e3dd023d55f.png\")"
+                    }
+                  },
+                  "tagName": "article",
+                  "children": [
+                    {
+                      "id": "node-1782187948710-x1tlin8hi",
+                      "styles": {
+                        "properties": {
+                          "zIndex": "1",
+                          "maxWidth": "620px",
+                          "position": "relative"
+                        }
+                      },
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "id": "node-1782187948710-rypdhl7e0",
+                          "styles": {
+                            "properties": {
+                              "color": "rgba(255, 255, 255, .92)",
+                              "border": "1px solid rgba(255, 255, 255, .3)",
+                              "display": "inline-flex",
+                              "padding": "8px 18px",
+                              "fontSize": "13px",
+                              "minHeight": "36px",
+                              "alignItems": "center",
+                              "background": "rgba(255, 255, 255, .16)",
+                              "fontWeight": "700",
+                              "borderRadius": "999px",
+                              "backdropFilter": "blur(12px)",
+                              "WebkitBackdropFilter": "blur(12px)"
+                            }
+                          },
+                          "content": "Акции",
+                          "tagName": "span",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {
+                            "class": "section-pill"
+                          },
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1782187948710-h0xyjzmv7",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "Специальные предложения",
+                          "tagName": "h3",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {},
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1782187948710-10rwp35wn",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "Рассрочка, ипотека, ремонт в подарок и сезонные условия по жилым комплексам Golden House.",
+                          "tagName": "p",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {},
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1782187948710-h745b11a5",
+                          "styles": {
+                            "properties": {
+                              "gap": "8px",
+                              "display": "flex",
+                              "flexWrap": "wrap",
+                              "marginTop": "20px"
+                            }
+                          },
+                          "tagName": "div",
+                          "children": [
+                            {
+                              "id": "node-1782187948710-cbwuaolth",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "content": "Период действия",
+                              "tagName": "span",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "text"
+                            },
+                            {
+                              "id": "node-1782187948710-xh7tfe5k6",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "content": "ЖК",
+                              "tagName": "span",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "text"
+                            },
+                            {
+                              "id": "node-1782187948710-tst4pl7ey",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "content": "Условия покупки",
+                              "tagName": "span",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "text"
+                            }
+                          ],
+                          "metadata": {},
+                          "attributes": {
+                            "class": "home-page-tags"
+                          },
+                          "layoutMode": "flex",
+                          "elementType": "container"
+                        },
+                        {
+                          "id": "node-1782187948710-6naa70582",
+                          "styles": {
+                            "properties": {
+                              "gap": "10px",
+                              "color": "var(--ink)",
+                              "display": "inline-flex",
+                              "padding": "11px 14px 11px 20px",
+                              "fontSize": "14px",
+                              "marginTop": "24px",
+                              "minHeight": "48px",
+                              "alignItems": "center",
+                              "background": "var(--white)",
+                              "fontWeight": "900",
+                              "whiteSpace": "nowrap",
+                              "borderRadius": "999px"
+                            }
+                          },
+                          "content": "Смотреть акции",
+                          "tagName": "a",
+                          "children": [
+                            {
+                              "id": "node-1782187948710-sarj4mm33",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "content": "↗",
+                              "tagName": "span",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "text"
+                            }
+                          ],
+                          "metadata": {},
+                          "attributes": {
+                            "href": "offers.html",
+                            "class": "home-page-action"
+                          },
+                          "elementType": "text"
+                        }
+                      ],
+                      "metadata": {},
+                      "attributes": {
+                        "class": "home-page-content"
+                      },
+                      "elementType": "container"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "home-page-card"
+                  },
+                  "layoutMode": "flex",
+                  "elementType": "container"
+                },
+                {
+                  "id": "node-1782187948710-al9pjlna1",
+                  "styles": {
+                    "properties": {
+                      "color": "var(--white)",
+                      "border": "1px solid rgba(21, 24, 29, .1)",
+                      "display": "flex",
+                      "padding": "clamp(22px, 3vw, 42px)",
+                      "overflow": "hidden",
+                      "position": "relative",
+                      "boxShadow": "0 18px 48px rgba(21, 24, 29, .08)",
+                      "minHeight": "clamp(380px, 34vw, 560px)",
+                      "alignItems": "flex-end",
+                      "background": "linear-gradient(180deg, rgba(13, 15, 18, .08) 20%, rgba(13, 15, 18, .76) 100%),\n        var(--page-image) center / cover",
+                      "--page-image": "url('/media/968e5407-9af7-47ea-a05f-742d19397f5b.png')",
+                      "borderRadius": "30px",
+                      "backgroundImage": "url(\"/media/e637b0de-0651-49cc-98a0-0b45fc7b8fbb.jpg\")"
+                    }
+                  },
+                  "tagName": "article",
+                  "children": [
+                    {
+                      "id": "node-1782187948710-gpfkxk1m5",
+                      "styles": {
+                        "properties": {
+                          "zIndex": "1",
+                          "maxWidth": "620px",
+                          "position": "relative"
+                        }
+                      },
+                      "tagName": "div",
+                      "children": [
+                        {
+                          "id": "node-1782187948710-re8g5imi6",
+                          "styles": {
+                            "properties": {
+                              "color": "rgba(255, 255, 255, .92)",
+                              "border": "1px solid rgba(255, 255, 255, .3)",
+                              "display": "inline-flex",
+                              "padding": "8px 18px",
+                              "fontSize": "13px",
+                              "minHeight": "36px",
+                              "alignItems": "center",
+                              "background": "rgba(255, 255, 255, .16)",
+                              "fontWeight": "700",
+                              "borderRadius": "999px",
+                              "backdropFilter": "blur(12px)",
+                              "WebkitBackdropFilter": "blur(12px)"
+                            }
+                          },
+                          "content": "Клиентский сервис",
+                          "tagName": "span",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {
+                            "class": "section-pill"
+                          },
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1782187948710-6yqkuv8gr",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "Поддержка после покупки",
+                          "tagName": "h3",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {},
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1782187948710-iw4jhnndc",
+                          "styles": {
+                            "properties": {}
+                          },
+                          "content": "Контакты отдела сервиса, обращения по гарантии, прием заявок и сопровождение жителей Golden House.",
+                          "tagName": "p",
+                          "children": [],
+                          "metadata": {},
+                          "attributes": {},
+                          "elementType": "text"
+                        },
+                        {
+                          "id": "node-1782187948710-7ff5uo07m",
+                          "styles": {
+                            "properties": {
+                              "gap": "8px",
+                              "display": "flex",
+                              "flexWrap": "wrap",
+                              "marginTop": "20px"
+                            }
+                          },
+                          "tagName": "div",
+                          "children": [
+                            {
+                              "id": "node-1782187948710-nyisc7xlt",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "content": "Гарантия",
+                              "tagName": "span",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "text"
+                            },
+                            {
+                              "id": "node-1782187948710-rjgukxxs0",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "content": "Передача ключей",
+                              "tagName": "span",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "text"
+                            },
+                            {
+                              "id": "node-1782187948710-9d7z6jiyx",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "content": "Онлайн-заявка",
+                              "tagName": "span",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "text"
+                            }
+                          ],
+                          "metadata": {},
+                          "attributes": {
+                            "class": "home-page-tags"
+                          },
+                          "layoutMode": "flex",
+                          "elementType": "container"
+                        },
+                        {
+                          "id": "node-1782187948710-2np6z0ipx",
+                          "styles": {
+                            "properties": {
+                              "gap": "10px",
+                              "color": "var(--ink)",
+                              "display": "inline-flex",
+                              "padding": "11px 14px 11px 20px",
+                              "fontSize": "14px",
+                              "marginTop": "24px",
+                              "minHeight": "48px",
+                              "alignItems": "center",
+                              "background": "var(--white)",
+                              "fontWeight": "900",
+                              "whiteSpace": "nowrap",
+                              "borderRadius": "999px"
+                            }
+                          },
+                          "content": "Перейти в сервис",
+                          "tagName": "a",
+                          "children": [
+                            {
+                              "id": "node-1782187948710-lj8yq14k7",
+                              "styles": {
+                                "properties": {}
+                              },
+                              "content": "↗",
+                              "tagName": "span",
+                              "children": [],
+                              "metadata": {},
+                              "attributes": {},
+                              "elementType": "text"
+                            }
+                          ],
+                          "metadata": {},
+                          "attributes": {
+                            "href": "buyers.html#service",
+                            "class": "home-page-action"
+                          },
+                          "elementType": "text"
+                        }
+                      ],
+                      "metadata": {},
+                      "attributes": {
+                        "class": "home-page-content"
+                      },
+                      "elementType": "container"
+                    }
+                  ],
+                  "metadata": {},
+                  "attributes": {
+                    "class": "home-page-card"
+                  },
+                  "layoutMode": "flex",
+                  "elementType": "container"
+                }
+              ],
+              "metadata": {},
+              "attributes": {
+                "class": "home-pages-grid"
+              },
+              "layoutMode": "grid",
+              "variations": {
+                "mobile": {
+                  "inheritedOverrides": {
+                    "node-1782187948710-al9pjlna1": {
+                      "styles": {
+                        "justifyContent": "space-between",
+                        "backgroundImage": "url(\"/media/afc89a02-3da5-4b99-b898-0779a5227b56.png\")"
+                      }
+                    },
+                    "node-1782187948710-ceryi23wy": {
+                      "styles": {
+                        "justifyContent": "space-between"
+                      }
+                    }
+                  }
+                }
+              },
+              "elementType": "container"
+            }
+          ],
+          "metadata": {},
+          "attributes": {
+            "class": "home-pages-block",
+            "aria-label": "Акции и клиентский сервис"
+          },
+          "variations": {
+            "mobile": {
+              "inheritedOverrides": {
+                "node-1782187948710-r1su89c5p": {
+                  "styles": {
+                    "gap": "clamp(16px, 2vw, 28px)",
+                    "display": "grid",
+                    "gridTemplateRows": "auto",
+                    "gridTemplateColumns": "repeat(1, 1fr)"
+                  }
+                }
+              }
+            },
+            "tablet": {
+              "inheritedOverrides": {
+                "node-1782187948710-r1su89c5p": {
+                  "styles": {
+                    "display": "flex",
+                    "alignItems": "stretch",
+                    "justifyItems": "center",
+                    "justifyContent": "space-between",
+                    "gridTemplateRows": "auto",
+                    "gridTemplateColumns": "repeat(2, 1fr)"
+                  }
+                }
+              }
+            }
+          },
+          "elementType": "container"
+        }
+      ],
+      "metadata": {},
+      "attributes": {
+        "class": "complexes-wrap"
+      },
+      "variations": {
+        "mobile": {
+          "inheritedOverrides": {
+            "node-1782187948708-hiqfuqpk8": {
+              "styles": {
+                "gridTemplateRows": "auto",
+                "gridTemplateColumns": "repeat(2, 1fr)"
+              }
+            },
+            "node-1782187948710-4xcm9j2sb": {
+              "styles": {
+                "gap": "clamp(16px, 2vw, 28px)",
+                "display": "grid",
+                "gridTemplateRows": "auto",
+                "gridTemplateColumns": "repeat(1, 1fr)"
+              }
+            },
+            "node-1782187948710-egwb0rcrx": {
+              "styles": {}
+            }
+          }
+        },
+        "tablet": {
+          "inheritedOverrides": {
+            "node-1782187948708-hiqfuqpk8": {
+              "styles": {
+                "display": "flex",
+                "alignItems": "flex-start",
+                "flexDirection": "column",
+                "justifyContent": "space-between",
+                "gridTemplateRows": "auto",
+                "gridTemplateColumns": "repeat(2, 1fr)"
+              }
+            },
+            "node-1782187948710-4xcm9j2sb": {
+              "styles": {
+                "gridTemplateRows": "auto",
+                "gridTemplateColumns": "repeat(2, 1fr)"
+              }
+            },
+            "node-1782187948710-egwb0rcrx": {
+              "styles": {
+                "display": "grid"
+              }
+            }
+          }
+        }
+      },
+      "elementType": "container"
+    }
+  ],
+  "metadata": {
+    "name": "Complexes"
+  },
+  "attributes": {
+    "id": "complexes",
+    "class": "complexes-section",
+    "aria-label": "Жилые комплексы"
+  },
+  "variations": {
+    "mobile": {
+      "inheritedOverrides": {
+        "node-1782187948710-hwab8oa03": {
+          "styles": {
+            "gridTemplateRows": "auto",
+            "gridTemplateColumns": "repeat(2, 1fr)"
+          }
+        }
+      }
+    }
+  },
+  "elementType": "container"
+}
