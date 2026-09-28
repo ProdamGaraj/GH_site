@@ -188,7 +188,7 @@ describe('на странице — после подстановки данны
   it('без отдела продаж — карта есть, кнопок поездки нет', () => {
     const html = render({ ...ITEM, mapOffices: [] })
     expect(html).toContain('data-map=""')
-    expect(html).not.toContain('Вызвать такси')
+    expect(html).not.toMatch(/<a[^>]*location-trip-taxi/)
   })
 
   it('ни одно поле шаблона не осталось неподставленным', () => {

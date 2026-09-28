@@ -19,6 +19,9 @@
  *   [data-map-icon]          SVG иконки типа внутри кнопки легенды; метка
  *                            места берёт иконку отсюда
  *
+ * Здесь же — ссылки такси Яндекс Go на странице (кнопки поездки в отдел
+ * продаж): на Android они ведут прямо в приложение, см. yandexGoIntent().
+ *
  * Пути к MapLibre, pmtiles.js и стилю берутся из /map/manifest.json — его
  * пишет scripts/map/build-map-assets.sh. Всё, что касается самой библиотеки,
  * собрано в draw(); тесты подкладывают поддельные maplibregl и pmtiles.
@@ -40,10 +43,11 @@
   var SINGLE_POINT_ZOOM = 15
   /**
    * Поля вокруг точек при показе всех сразу. Подписи дома и отдела продаж
-   * стоят над точкой и шириной до ~200 px: сверху — легенда и высота подписи,
-   * по бокам — половина подписи, иначе на телефоне её обрезает край карты.
+   * шириной до ~200 px стоят над точкой или под ней (splitLabels): сверху —
+   * легенда и высота подписи, снизу — подпись, по бокам — её половина, иначе
+   * на телефоне подпись обрезает край карты.
    */
-  var FIT_PADDING = { top: 110, right: 100, bottom: 30, left: 100 }
+  var FIT_PADDING = { top: 110, right: 100, bottom: 70, left: 100 }
   /** Насколько за рамку тайлов можно увести карту, градусы (~5 км). */
   var PAN_MARGIN = 0.05
 
@@ -113,9 +117,29 @@
         distance: el.getAttribute('data-distance') || '',
         lat: lat,
         lng: lng,
+        below: false,
       })
     })
+    splitLabels(points)
     return points
+  }
+
+  /**
+   * Подписи дома и отдела продаж стоят над точкой, и когда точки рядом, одна
+   * накрывала другую. Поэтому подписи расходятся: у южной из двух точек
+   * подпись висит под ней. Одна широта — под точкой дом: отдел продаж
+   * главнее, его подпись остаётся на обычном месте.
+   */
+  function splitLabels(points) {
+    var house = points.filter(function (p) { return p.kind === 'house' })[0]
+    var office = points.filter(function (p) { return p.kind === 'office' })[0]
+    if (house && office) (office.lat < house.lat ? office : house).below = true
+  }
+
+  /** Место стоит центром на точке, подпись — остриём хвостика. */
+  function anchorOf(point) {
+    if (point.kind === 'place') return 'center'
+    return point.below ? 'top' : 'bottom'
   }
 
   /** SVG иконок из легенды: тип → узел <svg>. Метки получают копию узла, не строку. */
@@ -177,7 +201,7 @@
    */
   function markerElement(point, icon) {
     var wrap = document.createElement('div')
-    wrap.className = 'project-map-marker project-map-marker--' + point.kind
+    wrap.className = 'project-map-marker project-map-marker--' + point.kind + (point.below ? ' project-map-marker--below' : '')
     wrap.setAttribute('data-map-marker', point.id)
     var label = point.distance ? point.name + ', ' + point.distance : point.name
 
@@ -225,8 +249,8 @@
     closeTips(view)
     if (!open) return
     marker.classList.add('is-open')
-    // Открытая подсказка — поверх соседних меток.
-    marker.style.zIndex = '3'
+    // Открытая подсказка — поверх соседних меток, включая подписи дома и офиса.
+    marker.style.zIndex = '4'
   }
 
   // --- Легенда ---
@@ -390,7 +414,7 @@
             toggleTip(view, el)
           })
         }
-        new maplibregl.Marker({ element: el, anchor: point.kind === 'place' ? 'center' : 'bottom' })
+        new maplibregl.Marker({ element: el, anchor: anchorOf(point) })
           .setLngLat([point.lng, point.lat])
           .addTo(map)
       })
@@ -480,8 +504,42 @@
     return view
   }
 
+  // --- Такси ---
+
+  /** Ссылка Яндекс Go через AppMetrica (кнопка «Вызвать такси в отдел продаж»). */
+  var YANDEX_GO_LINK = /^https:\/\/3\.redirect\.appmetrica\.yandex\.com\/route\?/
+  var YANDEX_GO_PACKAGE = 'ru.yandex.taxi'
+
+  /**
+   * Та же поездка ссылкой прямо в приложение. AppMetrica решает, куда вести, по
+   * браузеру: Chrome и Яндекс Браузер получают приложение, а встроенные
+   * браузеры (Telegram, Instagram — любой WebView) и Firefox — сразу Play
+   * Market, даже когда приложение установлено. intent:// открывает приложение
+   * в любом из них; нет приложения — браузер уходит на исходную ссылку
+   * AppMetrica (магазин и учёт установки).
+   */
+  function yandexGoIntent(href) {
+    return (
+      'intent://route?' + href.slice(href.indexOf('?') + 1) +
+      '#Intent;scheme=yandextaxi;package=' + YANDEX_GO_PACKAGE +
+      ';S.browser_fallback_url=' + encodeURIComponent(href) + ';end'
+    )
+  }
+
+  function setupTaxiLinks() {
+    if (!/Android/i.test(navigator.userAgent)) return
+    document.querySelectorAll('a[href]').forEach(function (link) {
+      var href = link.getAttribute('href')
+      if (!YANDEX_GO_LINK.test(href)) return
+      link.setAttribute('href', yandexGoIntent(href))
+      // Приложение открывается из этой же вкладки: новая осталась бы пустой.
+      link.removeAttribute('target')
+    })
+  }
+
   function init() {
     document.querySelectorAll('[data-map]').forEach(mount)
+    setupTaxiLinks()
   }
 
   // Снаружи: проверка на стенде (scripts/map/check-project-map.js) читает

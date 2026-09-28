@@ -56,7 +56,7 @@ export const YANDEX_ROUTE_HREF = 'https://yandex.uz/maps/?rtext=~{{$.lat}},{{$.l
 export const GOOGLE_ROUTE_HREF = 'https://www.google.com/maps/dir/?api=1&destination={{$.lat}},{{$.lng}}'
 
 const CSS_HEAD = '/* ==== project-map'
-export const PROJECT_MAP_CSS_MARKER = `${CSS_HEAD} v1 ====`
+export const PROJECT_MAP_CSS_MARKER = `${CSS_HEAD} v2 ====`
 export const PROJECT_MAP_CSS = `${PROJECT_MAP_CSS_MARKER} */
 /* Карта проекта вместо фото-заглушки с метками в процентах.
    Рантайм — backend/src/services/runtime/map-runtime.js, данные — estate:
@@ -158,10 +158,14 @@ export const PROJECT_MAP_CSS = `${PROJECT_MAP_CSS_MARKER} */
 
 /* --- Метки. Внешний элемент метки двигает MapLibre, оформление — внутри. --- */
 
-/* Дом и отдел продаж — поверх мест: на мелком масштабе места их не закрывают. */
-.project-map-marker--house,
-.project-map-marker--office {
+/* Слои: места, над ними дом, выше всех — отдел продаж (он главнее);
+   открытая подсказка места — поверх всего (z-index 4 ставит рантайм). */
+.project-map-marker--house {
   z-index: 2;
+}
+
+.project-map-marker--office {
+  z-index: 3;
 }
 
 .project-map-marker--house .project-map-pin,
@@ -220,6 +224,28 @@ export const PROJECT_MAP_CSS = `${PROJECT_MAP_CSS_MARKER} */
   border-top-color: #fdb82a;
 }
 
+/* Подпись под точкой (рантайм: южная из двух точек, дома и отдела продаж,
+   чтобы близкие подписи не накрывали друг друга). Якорь — top. */
+.project-map-marker--below .project-map-pin {
+  margin-top: 7px;
+  margin-bottom: 0;
+}
+
+.project-map-marker--below .project-map-pin::after {
+  top: auto;
+  bottom: 100%;
+  border: 7px solid transparent;
+  border-top: 0;
+}
+
+.project-map-marker--house.project-map-marker--below .project-map-pin::after {
+  border-bottom-color: #15181d;
+}
+
+.project-map-marker--office.project-map-marker--below .project-map-pin::after {
+  border-bottom-color: #fdb82a;
+}
+
 .project-map-marker--place .project-map-pin {
   display: flex;
   align-items: center;
@@ -243,7 +269,7 @@ export const PROJECT_MAP_CSS = `${PROJECT_MAP_CSS_MARKER} */
 }
 
 .project-map-marker--place:hover {
-  z-index: 3;
+  z-index: 4;
 }
 
 .project-map-marker--place:hover .project-map-pin,

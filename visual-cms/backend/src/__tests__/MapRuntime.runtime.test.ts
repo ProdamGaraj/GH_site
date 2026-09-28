@@ -43,7 +43,7 @@ interface Point {
 }
 
 const HOUSE: Point = { id: 'house', kind: 'house', type: '', name: 'Doʼstlik', lat: 41.3, lng: 69.28, color: '', distance: '' }
-const OFFICE: Point = { id: 'office', kind: 'office', type: '', name: 'Отдел продаж', lat: 41.3, lng: 69.29, color: '', distance: '≈ 840 м' }
+const OFFICE: Point = { id: 'office', kind: 'office', type: '', name: 'Отдел продаж', lat: 41.299, lng: 69.29, color: '', distance: '≈ 840 м' }
 const SCHOOL: Point = { id: 'p1', kind: 'place', type: 'school', name: 'Школа №1', lat: 41.301, lng: 69.28, color: '#2f6fdf', distance: '≈ 110 м' }
 const PARK: Point = { id: 'p2', kind: 'place', type: 'park', name: 'Парк', lat: 41.302, lng: 69.281, color: '#3f9b4f', distance: '≈ 230 м' }
 
@@ -270,10 +270,10 @@ describe('карта', () => {
     await flush()
     const { options } = fake.maps[0]
     expect(options.bounds).toEqual([
-      [69.28, 41.3],
+      [69.28, 41.299],
       [69.29, 41.302],
     ])
-    expect(options.fitBoundsOptions).toEqual({ padding: { top: 110, right: 100, bottom: 30, left: 100 }, maxZoom: 16 })
+    expect(options.fitBoundsOptions).toEqual({ padding: { top: 110, right: 100, bottom: 70, left: 100 }, maxZoom: 16 })
     expect(options.maxBounds[0][0]).toBeCloseTo(69.0)
     expect(options.maxBounds[0][1]).toBeCloseTo(41.1)
     expect(options.maxBounds[1][0]).toBeCloseTo(69.6)
@@ -356,7 +356,7 @@ describe('метки', () => {
     const map = fake.maps[0]
     expect(map.markers.map((m) => [m.options.element.getAttribute('data-map-marker'), m.options.anchor, m.lngLat])).toEqual([
       ['house', 'bottom', [69.28, 41.3]],
-      ['office', 'bottom', [69.29, 41.3]],
+      ['office', 'top', [69.29, 41.299]],
       ['p1', 'center', [69.28, 41.301]],
     ])
 
@@ -373,6 +373,42 @@ describe('метки', () => {
     expect(map.marker('p1').querySelector('.project-map-tip')!.textContent).toBe('Школа №1≈ 110 м')
     // Иконка скопирована, а не перенесена: в легенде она осталась.
     expect(filter('school').querySelector('svg')).not.toBeNull()
+  })
+
+  it('подписи дома и отдела продаж расходятся: у южной из двух точек — под точкой', async () => {
+    mockFetch()
+    const sides = async (points: Point[]) => {
+      document.body.innerHTML = mapHtml(points)
+      if (!(window as any).ghProjectMap) run()
+      else (window as any).ghProjectMap.mount(document.querySelector('[data-map]'))
+      await flush()
+      const map = fake.maps[fake.maps.length - 1]
+      return map.markers.map((m) => [
+        m.options.element.getAttribute('data-map-marker'),
+        m.options.anchor,
+        m.options.element.classList.contains('project-map-marker--below'),
+      ])
+    }
+    // Отдел продаж южнее — его подпись под точкой.
+    expect(await sides([HOUSE, OFFICE])).toEqual([
+      ['house', 'bottom', false],
+      ['office', 'top', true],
+    ])
+    // Дом южнее — под точкой подпись дома.
+    expect(await sides([HOUSE, { ...OFFICE, lat: 41.31 }])).toEqual([
+      ['house', 'top', true],
+      ['office', 'bottom', false],
+    ])
+    // Одна широта — отдел продаж главнее, его подпись на обычном месте.
+    expect(await sides([HOUSE, { ...OFFICE, lat: 41.3 }])).toEqual([
+      ['house', 'top', true],
+      ['office', 'bottom', false],
+    ])
+    // Без отдела продаж подпись дома над точкой.
+    expect(await sides([HOUSE, SCHOOL])).toEqual([
+      ['house', 'bottom', false],
+      ['p1', 'center', false],
+    ])
   })
 
   it('название попадает в метку текстом, а не разметкой', async () => {
@@ -394,6 +430,16 @@ describe('метки', () => {
     expect(pin.querySelector('svg')).toBeNull()
   })
 
+  it('открытая подсказка — поверх подписей дома и отдела продаж', async () => {
+    mockFetch()
+    page([HOUSE, OFFICE, SCHOOL])
+    run()
+    await flush()
+    const school = fake.maps[0].marker('p1')
+    ;(school.querySelector('button') as HTMLElement).click()
+    expect(school.style.zIndex).toBe('4')
+  })
+
   it('подсказка: нажатие открывает, открыта одна; клик по карте закрывает, по метке — нет', async () => {
     mockFetch()
     page([HOUSE, SCHOOL, PARK])
@@ -404,7 +450,7 @@ describe('метки', () => {
     const park = map.marker('p2')
     ;(school.querySelector('button') as HTMLElement).click()
     expect(school.classList.contains('is-open')).toBe(true)
-    expect(school.style.zIndex).toBe('3')
+    expect(school.style.zIndex).toBe('4')
 
     ;(park.querySelector('button') as HTMLElement).click()
     expect(school.classList.contains('is-open')).toBe(false)
@@ -544,5 +590,57 @@ describe('сбой — список мест вместо карты', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
     expect(fake.maps).toHaveLength(1)
     expect(state(second.firstElementChild as Element)).toBe('loading')
+  })
+})
+
+describe('такси Яндекс Go', () => {
+  const TAXI =
+    'https://3.redirect.appmetrica.yandex.com/route?end-lat=41.298308&end-lon=69.341936&ref=gh.uz&appmetrica_tracking_id=1178268795219780156'
+  const ANDROID_CHROME = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36'
+  const TELEGRAM =
+    'Mozilla/5.0 (Linux; Android 14; SM-S911B; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/128.0.0.0 Mobile Safari/537.36 Telegram-Android/11.0.0'
+  const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
+
+  function withAgent(agent: string): void {
+    Object.defineProperty(window.navigator, 'userAgent', { value: agent, configurable: true })
+  }
+
+  function links(): HTMLAnchorElement[] {
+    mockFetch()
+    document.body.innerHTML =
+      mapHtml([HOUSE, OFFICE]) +
+      `<div class="location-actions"><a class="location-trip-taxi" href="${TAXI.replace(/&/g, '&amp;')}" target="_blank" rel="noopener">Такси</a>` +
+      `<a href="https://yandex.uz/maps/?rtext=~41.298308,69.341936&amp;rtt=auto" target="_blank">Маршрут</a></div>`
+    run()
+    return [...document.querySelectorAll('.location-actions a')] as HTMLAnchorElement[]
+  }
+
+  afterEach(() => {
+    delete (window.navigator as any).userAgent
+  })
+
+  it.each([
+    ['Chrome', ANDROID_CHROME],
+    ['встроенный браузер Telegram', TELEGRAM],
+  ])('Android (%s): прямо в приложение, без приложения — прежняя ссылка AppMetrica', (_name, agent) => {
+    withAgent(agent)
+    const [taxi, route] = links()
+    const href = taxi.getAttribute('href')!
+    expect(href).toBe(
+      'intent://route?end-lat=41.298308&end-lon=69.341936&ref=gh.uz&appmetrica_tracking_id=1178268795219780156' +
+        '#Intent;scheme=yandextaxi;package=ru.yandex.taxi;S.browser_fallback_url=' + encodeURIComponent(TAXI) + ';end'
+    )
+    expect(decodeURIComponent(href.match(/S\.browser_fallback_url=([^;]+)/)![1])).toBe(TAXI)
+    expect(taxi.hasAttribute('target')).toBe(false)
+    // Остальные ссылки не трогаются.
+    expect(route.getAttribute('href')).toBe('https://yandex.uz/maps/?rtext=~41.298308,69.341936&rtt=auto')
+    expect(route.getAttribute('target')).toBe('_blank')
+  })
+
+  it('iPhone и компьютер — ссылка AppMetrica как есть: там она сама открывает приложение или сайт', () => {
+    withAgent(IPHONE)
+    const [taxi] = links()
+    expect(taxi.getAttribute('href')).toBe(TAXI)
+    expect(taxi.getAttribute('target')).toBe('_blank')
   })
 })

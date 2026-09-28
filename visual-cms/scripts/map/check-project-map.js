@@ -14,7 +14,7 @@
  *   - меток столько же, сколько точек, и они не плывут при масштабировании;
  *   - легенда прячет и возвращает места своего типа;
  *   - нажатие на место открывает подсказку;
- *   - кнопки поездки ведут к отделу продаж;
+ *   - кнопки поездки ведут к отделу продаж, такси на Android — прямо в приложение;
  *   - если /map/ недоступен — вместо карты список мест.
  * Скриншоты секции — компьютер и телефон. Код выхода 1, если что-то не так.
  */
@@ -76,9 +76,10 @@ function markerDrift(page) {
     for (const p of view.points) {
       if (!p.marker || p.marker.hidden) continue
       const r = p.marker.getBoundingClientRect()
-      // Место стоит центром на точке, дом и отдел продаж — остриём снизу.
+      // Место стоит центром на точке, подписи дома и отдела продаж — остриём
+      // хвостика: снизу, а у подписи под точкой (p.below) — сверху.
       const x = r.left + r.width / 2
-      const y = p.kind === 'place' ? r.top + r.height / 2 : r.bottom
+      const y = p.kind === 'place' ? r.top + r.height / 2 : p.below ? r.top : r.bottom
       const q = view.map.project([p.lng, p.lat])
       worst = Math.max(worst, Math.hypot(x - (box.left + q.x), y - (box.top + q.y)))
     }
@@ -175,10 +176,24 @@ async function checkDesktop(browser) {
   await page.close()
 }
 
+const ANDROID_CHROME = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36'
+
 async function checkMobile(browser) {
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 })
+  const page = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 2,
+    userAgent: ANDROID_CHROME,
+  })
   await openMap(page)
   check('телефон: карта отрисовалась', (await mapState(page)) === 'ready')
+  const taxi = page.locator('a.location-trip-taxi').first()
+  if ((await taxi.count()) > 0) {
+    const href = (await taxi.getAttribute('href')) || ''
+    const ok = href.startsWith('intent://route?') && href.includes('package=ru.yandex.taxi') && href.includes('S.browser_fallback_url=')
+    check('Android: такси — прямо в приложение Yandex Go', ok, href.slice(0, 90))
+  }
   await page.waitForTimeout(1500)
   await page.locator('#location').screenshot({ path: path.join(outDir, 'mobile.png') })
   await page.close()
