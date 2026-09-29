@@ -7,6 +7,15 @@ import { LOCALES, LOCALE_LABELS } from '../types'
 export const inputCls =
   'w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500'
 
+/**
+ * Однострочное поле (ввод, число, список) в строке сетки: метка сверху,
+ * поле ввода прижато к низу ячейки. Подсказка у метки может перенестись на
+ * вторую строку — поле ввода всё равно на одной линии с соседями. Вне сетки
+ * (или в сетке с items-start) ничего не меняется: ячейка по высоте содержимого.
+ */
+const lineFieldCls = 'flex flex-col'
+const lineInputCls = cn(inputCls, 'mt-auto')
+
 export const Label: React.FC<{ children: React.ReactNode; hint?: string }> = ({ children, hint }) => (
   <label className="block text-sm font-medium text-gray-700 mb-1">
     {children}
@@ -43,10 +52,10 @@ export const TextField: React.FC<{
   hint?: string
   disabled?: boolean
 }> = ({ label, value, onChange, placeholder, hint, disabled }) => (
-  <div>
+  <div className={lineFieldCls}>
     <Label hint={hint}>{label}</Label>
     <input
-      className={inputCls}
+      className={lineInputCls}
       value={value}
       placeholder={placeholder}
       disabled={disabled}
@@ -81,11 +90,11 @@ export const NumberField: React.FC<{
   onChange: (v: number | null) => void
   hint?: string
 }> = ({ label, value, onChange, hint }) => (
-  <div>
+  <div className={lineFieldCls}>
     <Label hint={hint}>{label}</Label>
     <input
       type="number"
-      className={inputCls}
+      className={lineInputCls}
       value={value === null || value === undefined ? '' : String(value)}
       onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
     />
@@ -98,9 +107,9 @@ export const SelectField: React.FC<{
   options: Array<{ value: string; label: string }>
   onChange: (v: string) => void
 }> = ({ label, value, options, onChange }) => (
-  <div>
+  <div className={lineFieldCls}>
     <Label>{label}</Label>
-    <select className={inputCls} value={value} onChange={(e) => onChange(e.target.value)}>
+    <select className={lineInputCls} value={value} onChange={(e) => onChange(e.target.value)}>
       {options.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}
