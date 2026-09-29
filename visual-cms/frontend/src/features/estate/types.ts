@@ -162,6 +162,38 @@ export interface PlanGroupingConfig {
   groups?: Array<{ plans: string[] }>
   /** Планировки, которые никогда ни с чем не склеиваются. */
   keepSeparate?: string[]
+  /** Скрытые с сайта планировки: группа скрыта, если в ней есть такая. */
+  hidden?: string[]
+  /** Ручные данные групп поверх CRM — по «якорной» (главной) планировке группы. */
+  overrides?: Record<string, PlanGroupOverride>
+}
+
+/** Бейджи группы по языкам; пустой uz/en — на сайте ru. */
+export interface PlanGroupBadges {
+  ru?: string[]
+  uz?: string[]
+  en?: string[]
+}
+
+/** Ручные данные группы: поле есть — главнее CRM, нет — значение CRM. */
+export interface PlanGroupOverride {
+  priceMin?: number
+  priceMax?: number
+  areaMin?: number
+  areaMax?: number
+  floors?: number[]
+  entrances?: number[]
+  badges?: PlanGroupBadges
+}
+
+/** Данные карточки, которые можно поправить вручную. */
+export interface PlanGroupValues {
+  priceMin: number
+  priceMax: number
+  areaMin: number
+  areaMax: number
+  floors: number[]
+  entrances: number[]
 }
 
 /** Одна планировка внутри карточки предпросмотра. */
@@ -181,15 +213,21 @@ export interface PlanPreview {
 }
 
 /** Карточка витрины в предпросмотре. */
-export interface PlanGroupPreview {
+export interface PlanGroupPreview extends PlanGroupValues {
   manual: boolean
   rooms: number
   isStudio: boolean
-  areaMin: number
-  areaMax: number
-  floors: number[]
-  entrances: number[]
   apartmentsCount: number
+  /** Значения из CRM — рядом с итоговыми видно, что поправлено. */
+  crm: PlanGroupValues
+  /** Главная планировка группы: под этим именем сохранится новая правка. */
+  anchor: string
+  hidden: boolean
+  /** Применённая правка и её ключ; null — всё из CRM. */
+  overrideKey: string | null
+  override: PlanGroupOverride | null
+  /** Правки других планировок группы, которые не применяются. */
+  ignoredOverrides: string[]
   plans: PlanPreview[]
 }
 

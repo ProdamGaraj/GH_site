@@ -1,12 +1,20 @@
 import React, { useState } from 'react'
-import { Save, Trash2, Plus, ChevronDown, ChevronRight } from 'lucide-react'
+import { Save, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
 import type { House, Locale } from '../types'
 import { estateApi } from '../api'
+import { apartmentSummary } from '../houseSummary'
+import { SECTION } from '../sections'
 import { getT, setT, isRu } from './tfield'
 import { TextField, NumberField } from './fields'
-import { ApartmentForm } from './ApartmentForm'
 
-/** Карточка дома/корпуса: поля + список квартир. Сохраняет/удаляет себя. */
+/**
+ * Карточка дома/корпуса: поля дома и сводка по квартирам. Сохраняет/удаляет
+ * себя.
+ *
+ * Квартир списком здесь нет: они приходят из CRM, и синхронизация перезаписала
+ * бы ручную правку цены или статуса. Данные для сайта правятся у групп
+ * планировок — раздел «Планировки на сайте».
+ */
 export const HouseCard: React.FC<{
   house: House
   locale: Locale
@@ -44,17 +52,6 @@ export const HouseCard: React.FC<{
     onChanged()
   }
 
-  const addApartment = async () => {
-    await estateApi.createApartment(house.id, {
-      rooms: 1,
-      areaM2: 0,
-      price: 0,
-      number: '',
-      order: (house.apartments?.length || 0),
-    })
-    onChanged()
-  }
-
   return (
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="flex items-center justify-between p-4 border-b border-gray-100">
@@ -78,7 +75,7 @@ export const HouseCard: React.FC<{
 
       {open && (
         <div className="p-4 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
             <TextField label="Название" {...tprops('name')} />
             <TextField label="Этажность" hint='напр. "16" или "9 и 16"' {...tprops('floors')} />
             <TextField label="Срок сдачи" {...tprops('deadline')} />
@@ -91,20 +88,13 @@ export const HouseCard: React.FC<{
             )}
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-gray-500 uppercase">Квартиры</h4>
-              <button onClick={addApartment} className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-800">
-                <Plus size={15} /> Добавить квартиру
-              </button>
-            </div>
-            {(form.apartments || []).map((apt) => (
-              <ApartmentForm key={apt.id} apartment={apt} locale={locale} onChanged={onChanged} />
-            ))}
-            {(form.apartments || []).length === 0 && (
-              <p className="text-sm text-gray-400">Пока нет квартир.</p>
-            )}
-          </div>
+          <p className="text-sm text-gray-500" data-testid="house-apartments">
+            {apartmentSummary(form.apartments)}. Цены, этажи, подъезды и бейджи для сайта — у групп в разделе{' '}
+            <a href={`#${SECTION.plans}`} className="text-primary-700 hover:underline">
+              «Планировки на сайте»
+            </a>
+            .
+          </p>
         </div>
       )}
     </div>

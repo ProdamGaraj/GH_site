@@ -15,11 +15,11 @@
 
 import type { PlanTypeRow } from './i18n'
 import {
+  PlanGroupOverride,
   PlanGroupingConfig,
   isShownPlanType,
-  mergeGroup,
   normalizeConfig,
-  planGroups,
+  resolvePlanGroups,
 } from './planGrouping'
 
 /** Одна планировка внутри карточки. */
@@ -41,17 +41,41 @@ export interface PlanPreview {
   separated: boolean
 }
 
+/** Данные карточки, которые можно поправить вручную. */
+export interface PlanGroupValues {
+  priceMin: number
+  priceMax: number
+  areaMin: number
+  areaMax: number
+  floors: number[]
+  entrances: number[]
+}
+
 /** Карточка витрины: то, что покупатель увидит одной плиткой. */
 export interface PlanGroupPreview {
   /** Склеена вручную из настройки, а не автоматически по площади. */
   manual: boolean
   rooms: number
   isStudio: boolean
+  /** Итоговые значения карточки — с ручной правкой, как на сайте. */
   areaMin: number
   areaMax: number
+  priceMin: number
+  priceMax: number
   floors: number[]
   entrances: number[]
   apartmentsCount: number
+  /** Значения из CRM — видно, что именно поправлено. */
+  crm: PlanGroupValues
+  /** Главная планировка группы: под этим именем сохранится новая правка. */
+  anchor: string
+  /** Скрыта с сайта. */
+  hidden: boolean
+  /** Применённая правка и её ключ; null — все данные из CRM. */
+  overrideKey: string | null
+  override: PlanGroupOverride | null
+  /** Правки других планировок группы, которые не применяются. */
+  ignoredOverrides: string[]
   plans: PlanPreview[]
 }
 
@@ -115,27 +139,45 @@ function duplicateNames(rows: PlanTypeRow[]): string[] {
 
 function unknownNames(rows: PlanTypeRow[], config: Required<PlanGroupingConfig>): string[] {
   const known = new Set(rows.map((r) => r.planName))
-  const referenced = [...config.groups.flatMap((g) => g.plans), ...config.keepSeparate]
+  const referenced = [
+    ...config.groups.flatMap((g) => g.plans),
+    ...config.keepSeparate,
+    ...config.hidden,
+    ...Object.keys(config.overrides),
+  ]
   return [...new Set(referenced.filter((name) => !known.has(name)))].sort()
+}
+
+function values(row: PlanTypeRow): PlanGroupValues {
+  return {
+    priceMin: num(row.priceMin),
+    priceMax: num(row.priceMax),
+    areaMin: num(row.areaMin),
+    areaMax: num(row.areaMax),
+    floors: Array.isArray(row.floors) ? row.floors : [],
+    entrances: Array.isArray(row.entrances) ? row.entrances : [],
+  }
 }
 
 /**
  * Собирает предпросмотр по всем типам ЖК.
  *
  * `rows` — все типы, в том числе без квартир: фильтр витрины применяется
- * здесь, тем же предикатом, что и на сайте.
+ * здесь, тем же предикатом, что и на сайте. У распроданного проекта сайт
+ * показывает и типы без квартир — предпросмотр тоже (`soldOut`).
  */
 export function previewPlanGrouping(
   rows: PlanTypeRow[],
   config: PlanGroupingConfig | null | undefined,
-  houseNames: ReadonlyMap<string, string> = new Map()
+  houseNames: ReadonlyMap<string, string> = new Map(),
+  options: { soldOut?: boolean } = {}
 ): PlanGroupingPreview {
-  const shown = rows.filter(isShownPlanType)
+  const shown = options.soldOut ? rows : rows.filter(isShownPlanType)
   const cfg = normalizeConfig(config)
   const separated = new Set(cfg.keepSeparate)
 
-  const groups = planGroups(shown, cfg).map((group) => {
-    const merged = mergeGroup(group.rows)
+  const groups = resolvePlanGroups(shown, cfg).map((resolved): PlanGroupPreview => {
+    const { group, merged } = resolved
     // Внутри карточки — по площади: так соседние варианты стоят рядом и
     // разницу между ними видно сразу.
     const plans = [...group.rows]
@@ -145,11 +187,14 @@ export function previewPlanGrouping(
       manual: group.manual,
       rooms: merged.rooms,
       isStudio: merged.isStudio,
-      areaMin: num(merged.areaMin),
-      areaMax: num(merged.areaMax),
-      floors: Array.isArray(merged.floors) ? merged.floors : [],
-      entrances: Array.isArray(merged.entrances) ? merged.entrances : [],
+      ...values(merged),
       apartmentsCount: merged.apartmentsCount || 0,
+      crm: values(resolved.crm),
+      anchor: resolved.anchor,
+      hidden: resolved.hidden,
+      overrideKey: resolved.overrideKey,
+      override: resolved.override,
+      ignoredOverrides: resolved.ignoredOverrides,
       plans,
     }
   })

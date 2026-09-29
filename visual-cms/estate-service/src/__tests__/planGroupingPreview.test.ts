@@ -75,7 +75,7 @@ describe('previewPlanGrouping', () => {
 
   it('отдаёт нормализованную настройку, а не присланную как есть', () => {
     const preview = previewPlanGrouping(rows, { areaTolerance: -3, groups: [{ plans: ['13'] }] })
-    expect(preview.config).toEqual({ areaTolerance: 0, groups: [], keepSeparate: [] })
+    expect(preview.config).toEqual({ areaTolerance: 0, groups: [], keepSeparate: [], hidden: [], overrides: {} })
   })
 
   it('миниатюра — thumbUrl, а без него — сам чертёж', () => {

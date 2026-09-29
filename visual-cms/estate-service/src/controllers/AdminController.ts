@@ -9,7 +9,7 @@ import { PlanType } from '../models/PlanType'
 import { PlaceType } from '../models/PlaceType'
 import { logger } from '../services/Logger'
 import { buildComplexAdmin, buildTranslationRows, TranslationsByLocale } from '../services/adminSerialize'
-import { distinctValues, PlanTypeRow, TrRow } from '../services/i18n'
+import { distinctValues, isSoldOut, PlanTypeRow, TrRow } from '../services/i18n'
 import { previewPlanGrouping } from '../services/planGroupingPreview'
 import { isShownPlanType } from '../services/planGrouping'
 import { MAP_ICONS, iconSvg } from '../services/mapIcons'
@@ -205,7 +205,9 @@ export class AdminController {
           : []
       const houseNames = new Map(houses.map((h) => [h.id, h.name]))
       res.json(
-        previewPlanGrouping(planTypes as unknown as PlanTypeRow[], req.body.planGrouping, houseNames)
+        previewPlanGrouping(planTypes as unknown as PlanTypeRow[], req.body.planGrouping, houseNames, {
+          soldOut: isSoldOut(complex),
+        })
       )
     } catch (err) {
       logger.error('admin.previewPlanGroups failed', err instanceof Error ? err : undefined)

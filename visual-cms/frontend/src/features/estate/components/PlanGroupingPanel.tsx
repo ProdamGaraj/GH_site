@@ -1,18 +1,36 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Merge, RotateCcw, Save, Split, Undo2 } from 'lucide-react'
+import { AlertTriangle, Eye, EyeOff, Merge, Pencil, RotateCcw, Save, Split, Undo2 } from 'lucide-react'
 import { resolveMediaUrl } from '@/shared/api/mediaApi'
-import type { PlanGroupingConfig, PlanGroupPreview, PlanGroupingPreview, PlanPreview } from '../types'
+import { cn } from '@/shared/utils'
+import type { PlanGroupOverride, PlanGroupingConfig, PlanGroupPreview, PlanGroupingPreview, PlanPreview } from '../types'
 import { estateApi } from '../api'
 import {
+  BADGE_LOCALES,
+  BadgeLocale,
+  OverrideListField,
+  OverrideNumberField,
+  Parsed,
   PlanGroupingDraft,
   dropNames,
+  forgetOverride,
   formatAreaRange,
-  formatNumberRange,
+  formatMoney,
+  formatNumberList,
+  hasCrmOverride,
   mergeCards,
+  overrideProblems,
+  parseArea,
+  parseBadges,
+  parseMoney,
+  parseNumberList,
+  resetToCrm,
   restorePlan,
   roomsLabel,
   sameConfig,
   separatePlan,
+  setBadges,
+  setGroupHidden,
+  setOverrideField,
   setTolerance,
   toDraft,
   toPayload,
@@ -47,10 +65,14 @@ export const PlanGroupingPanel: React.FC<{
   const [msg, setMsg] = useState<string | null>(null)
 
   const dirty = !sameConfig(saved, draft)
+  // «От» больше «до» в ручных данных: сервер такое не примет — ни пересчёта, ни сохранения.
+  const problems = useMemo(() => overrideProblems(draft), [draft])
+  const blocked = Object.keys(problems).length > 0
 
   // Пересчёт при каждой правке черновика. Устаревший ответ отменяется, чтобы
   // медленный запрос не перетёр более свежий.
   useEffect(() => {
+    if (blocked) return
     const controller = new AbortController()
     setLoading(true)
     const timer = setTimeout(() => {
@@ -71,6 +93,7 @@ export const PlanGroupingPanel: React.FC<{
       clearTimeout(timer)
       controller.abort()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [complexId, draft])
 
   // Состав карточек поменялся — старый выбор больше ничего не значит.
@@ -149,7 +172,7 @@ export const PlanGroupingPanel: React.FC<{
           </button>
           <button
             onClick={save}
-            disabled={!dirty || saving}
+            disabled={!dirty || saving || blocked}
             className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-md text-sm hover:bg-primary-700 disabled:opacity-50"
           >
             <Save size={16} /> Сохранить
@@ -157,6 +180,9 @@ export const PlanGroupingPanel: React.FC<{
         </div>
       </div>
       {msg && <p className="text-sm text-gray-600">{msg}</p>}
+      {blocked && (
+        <p className="text-sm text-red-600">Исправьте ручные данные групп — пока в них ошибка, сохранить нельзя.</p>
+      )}
 
       <div className="flex flex-wrap items-end gap-4">
         <label className="block">
@@ -203,16 +229,26 @@ export const PlanGroupingPanel: React.FC<{
       <div className={`grid xl:grid-cols-2 2xl:grid-cols-3 gap-3 items-start ${loading ? 'opacity-60' : ''}`}>
         {preview?.groups.map((group) => {
           const key = cardKey(group)
+          const names = group.plans.map((p) => p.planName)
+          // Правка группы: та, что применилась, или новая — под главной планировкой.
+          const overrideKey = group.overrideKey ?? group.anchor
           return (
             <PlanCard
               key={key}
               group={group}
+              override={draft.overrides[overrideKey] ?? null}
+              problem={problems[overrideKey]}
               checked={selected.has(key)}
               showHouse={multipleHouses}
               onToggle={() => toggle(key)}
               onSeparate={(name) => edit(separatePlan(draft, name))}
               onRestore={(name) => edit(restorePlan(draft, name))}
-              onUngroup={() => edit(ungroupCard(draft, group.plans.map((p) => p.planName)))}
+              onUngroup={() => edit(ungroupCard(draft, names))}
+              onHidden={(hidden) => edit(setGroupHidden(draft, names, hidden))}
+              onField={(field, value) => edit(setOverrideField(draft, overrideKey, field, value))}
+              onBadges={(locale, list) => edit(setBadges(draft, overrideKey, locale, list))}
+              onResetCrm={() => edit(resetToCrm(draft, overrideKey))}
+              onForget={(name) => edit(forgetOverride(draft, name))}
             />
           )
         })}
@@ -262,42 +298,142 @@ const Warnings: React.FC<{
 
 const PlanCard: React.FC<{
   group: PlanGroupPreview
+  /** Ручные данные группы из черновика; null — всё из CRM. */
+  override: PlanGroupOverride | null
+  /** Ошибка в ручных данных («от» больше «до»). */
+  problem?: string
   checked: boolean
   showHouse: boolean
   onToggle: () => void
   onSeparate: (name: string) => void
   onRestore: (name: string) => void
   onUngroup: () => void
-}> = ({ group, checked, showHouse, onToggle, onSeparate, onRestore, onUngroup }) => {
+  onHidden: (hidden: boolean) => void
+  onField: (field: OverrideNumberField | OverrideListField, value: number | number[] | undefined) => void
+  onBadges: (locale: BadgeLocale, list: string[]) => void
+  onResetCrm: () => void
+  onForget: (name: string) => void
+}> = ({
+  group,
+  override,
+  problem,
+  checked,
+  showHouse,
+  onToggle,
+  onSeparate,
+  onRestore,
+  onUngroup,
+  onHidden,
+  onField,
+  onBadges,
+  onResetCrm,
+  onForget,
+}) => {
+  const [editing, setEditing] = useState(false)
   const several = group.plans.length > 1
+  const local = (field: keyof PlanGroupOverride) => override?.[field] !== undefined
+  const badges = override?.badges?.ru ?? []
   return (
     <div
-      className={`rounded-lg border p-4 flex gap-3 ${
-        checked ? 'border-primary-400 ring-2 ring-primary-100' : 'border-gray-200'
-      }`}
+      data-testid="plan-group"
+      className={cn(
+        'rounded-lg border p-4 flex gap-3',
+        checked ? 'border-primary-400 ring-2 ring-primary-100' : 'border-gray-200',
+        group.hidden && 'bg-gray-50'
+      )}
     >
-      <input type="checkbox" checked={checked} onChange={onToggle} className="mt-1 h-4 w-4 shrink-0" />
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onToggle}
+        aria-label="Выбрать для объединения"
+        className="mt-1 h-4 w-4 shrink-0"
+      />
       <div className="flex-1 min-w-0 space-y-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="font-medium text-gray-900">
+          <span className={cn('font-medium', group.hidden ? 'text-gray-400' : 'text-gray-900')}>
             {roomsLabel(group.rooms, group.isStudio)} {formatAreaRange(group.areaMin, group.areaMax)}
           </span>
           {group.manual && (
             <span className="px-2 py-0.5 rounded bg-primary-50 text-primary-700 text-xs">вручную</span>
           )}
-          <span className="text-sm text-gray-500">
-            квартир {group.apartmentsCount} · этажи {formatNumberRange(group.floors)} · подъезды{' '}
-            {group.entrances.join(', ') || '—'}
-          </span>
-          {group.manual && (
+          <div className="ml-auto flex items-center gap-3">
+            {group.manual && (
+              <button onClick={onUngroup} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800">
+                <Undo2 size={14} /> Распустить
+              </button>
+            )}
             <button
-              onClick={onUngroup}
-              className="ml-auto flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800"
+              onClick={() => onHidden(!group.hidden)}
+              aria-pressed={!group.hidden}
+              title={group.hidden ? 'Вернуть группу на сайт' : 'Скрыть группу с сайта'}
+              className={cn(
+                'flex items-center gap-1 text-sm px-2 py-1 rounded-md',
+                group.hidden ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'text-green-700 hover:bg-green-50'
+              )}
             >
-              <Undo2 size={14} /> Распустить
+              {group.hidden ? <EyeOff size={14} /> : <Eye size={14} />}
+              {group.hidden ? 'Скрыта' : 'На сайте'}
+            </button>
+          </div>
+        </div>
+
+        <dl className={cn('flex flex-wrap gap-x-4 gap-y-1 text-sm', group.hidden ? 'text-gray-400' : 'text-gray-600')}>
+          <Fact label="Цена" local={local('priceMin') || local('priceMax')}>
+            {group.priceMin > 0 ? `${formatMoney(group.priceMin)} – ${formatMoney(group.priceMax)} UZS` : '—'}
+          </Fact>
+          <Fact label="Этажи" local={local('floors')}>
+            {formatNumberList(group.floors)}
+          </Fact>
+          <Fact label="Подъезды" local={local('entrances')}>
+            {formatNumberList(group.entrances)}
+          </Fact>
+          <Fact label="В продаже">{group.apartmentsCount}</Fact>
+          {(local('areaMin') || local('areaMax')) && <Fact label="Площадь" local>{formatAreaRange(group.areaMin, group.areaMax)}</Fact>}
+        </dl>
+
+        {badges.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {badges.map((badge) => (
+              <span key={badge} className="px-2 py-0.5 rounded bg-amber-100 text-amber-900 text-xs font-medium">
+                {badge}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {group.ignoredOverrides.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
+            <AlertTriangle size={14} />
+            В группе есть ещё ручные данные планировок {group.ignoredOverrides.join(', ')} — они не применяются.
+            {group.ignoredOverrides.map((name) => (
+              <button key={name} onClick={() => onForget(name)} className="underline hover:no-underline">
+                Забыть {name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setEditing((v) => !v)}
+            aria-expanded={editing}
+            className="flex items-center gap-1 text-sm text-primary-700 hover:text-primary-900"
+          >
+            <Pencil size={14} /> {editing ? 'Свернуть' : 'Изменить данные'}
+          </button>
+          {hasCrmOverride(override) && (
+            <button onClick={onResetCrm} className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
+              <RotateCcw size={14} /> Подставить значения из CRM
             </button>
           )}
         </div>
+        {problem && <p className="text-sm text-red-600">{problem}</p>}
+
+        {editing && (
+          <GroupEditor group={group} override={override} onField={onField} onBadges={onBadges} />
+        )}
+
         <div className="flex flex-wrap gap-3">
           {group.plans.map((plan) => (
             <PlanTile
@@ -311,6 +447,195 @@ const PlanCard: React.FC<{
         </div>
       </div>
     </div>
+  )
+}
+
+/** Значение карточки с пометкой, откуда оно: из CRM или ручное. */
+const Fact: React.FC<{ label: string; local?: boolean; children: React.ReactNode }> = ({ label, local, children }) => (
+  <div className="flex items-center gap-1">
+    <dt className="text-gray-400">{label}</dt>
+    <dd className={cn(local && 'font-medium text-amber-800')}>{children}</dd>
+    {local && <span className="px-1 rounded bg-amber-100 text-amber-800 text-[10px] uppercase">локально</span>}
+  </div>
+)
+
+/**
+ * Ручные данные группы. Пустое поле — значение из CRM (серым в поле),
+ * заполненное — главнее CRM, рядом видно значение CRM.
+ */
+const GroupEditor: React.FC<{
+  group: PlanGroupPreview
+  override: PlanGroupOverride | null
+  onField: (field: OverrideNumberField | OverrideListField, value: number | number[] | undefined) => void
+  onBadges: (locale: BadgeLocale, list: string[]) => void
+}> = ({ group, override, onField, onBadges }) => {
+  const crm = group.crm
+  const money = (n: number) => (n > 0 ? formatMoney(n) : '')
+  return (
+    <div className="rounded-md border border-gray-200 bg-gray-50 p-3 space-y-3" data-testid="group-editor">
+      <div className="grid grid-cols-2 gap-3">
+        <OverrideInput
+          label="Цена от, UZS"
+          crmText={money(crm.priceMin)}
+          value={override?.priceMin}
+          format={formatMoney}
+          parse={parseMoney}
+          onCommit={(v) => onField('priceMin', v)}
+        />
+        <OverrideInput
+          label="Цена до, UZS"
+          crmText={money(crm.priceMax)}
+          value={override?.priceMax}
+          format={formatMoney}
+          parse={parseMoney}
+          onCommit={(v) => onField('priceMax', v)}
+        />
+        <OverrideInput
+          label="Площадь от, м²"
+          crmText={String(crm.areaMin)}
+          value={override?.areaMin}
+          format={String}
+          parse={parseArea}
+          onCommit={(v) => onField('areaMin', v)}
+        />
+        <OverrideInput
+          label="Площадь до, м²"
+          crmText={String(crm.areaMax)}
+          value={override?.areaMax}
+          format={String}
+          parse={parseArea}
+          onCommit={(v) => onField('areaMax', v)}
+        />
+        <OverrideInput
+          label="Этажи"
+          hint="«2–16» или «2, 5, 7»"
+          crmText={formatNumberList(crm.floors)}
+          value={override?.floors}
+          format={formatNumberList}
+          parse={parseNumberList}
+          onCommit={(v) => onField('floors', v)}
+        />
+        <OverrideInput
+          label="Подъезды"
+          hint="«1, 3»"
+          crmText={formatNumberList(crm.entrances)}
+          value={override?.entrances}
+          format={formatNumberList}
+          parse={parseNumberList}
+          onCommit={(v) => onField('entrances', v)}
+        />
+      </div>
+      <div className="space-y-2">
+        <span className="block text-xs font-medium text-gray-700">
+          Бейджи на карточке <span className="font-normal text-gray-400">через запятую; пустой UZ/EN — на сайте RU</span>
+        </span>
+        {BADGE_LOCALES.map((locale) => (
+          <BadgesInput
+            key={locale}
+            locale={locale}
+            value={override?.badges?.[locale] ?? []}
+            onCommit={(list) => onBadges(locale, list)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const inputCls =
+  'w-full px-2.5 py-1.5 border rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500'
+
+/**
+ * Поле ручного значения. Текст живёт в поле; в черновик уходит только
+ * разобранное значение: недописанное («2–») не портит данные, поле подсвечено.
+ */
+function OverrideInput<T>({
+  label,
+  hint,
+  crmText,
+  value,
+  format,
+  parse,
+  onCommit,
+}: {
+  label: string
+  hint?: string
+  crmText: string
+  value: T | undefined
+  format: (v: T) => string
+  parse: (text: string) => Parsed<T>
+  onCommit: (v: T | undefined) => void
+}) {
+  const external = value === undefined ? '' : format(value)
+  const [text, setText] = useState(external)
+  const parsed = parse(text)
+  // Внешняя смена (сброс к CRM, другой черновик) — переписываем поле, но не
+  // перебиваем то, что человек сейчас набирает и что значит то же самое.
+  useEffect(() => {
+    const mine = parsed.ok && parsed.value !== undefined ? format(parsed.value) : ''
+    if (mine !== external) setText(external)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [external])
+
+  const local = value !== undefined
+  return (
+    <label className="block">
+      <span className="flex items-center gap-2 text-xs font-medium text-gray-700 mb-1">
+        {label}
+        {local ? (
+          <span className="px-1 rounded bg-amber-100 text-amber-800 text-[10px] uppercase">локально</span>
+        ) : (
+          <span className="px-1 rounded bg-gray-200 text-gray-600 text-[10px] uppercase">CRM</span>
+        )}
+      </span>
+      <input
+        className={cn(inputCls, parsed.ok ? (local ? 'border-amber-300' : 'border-gray-300') : 'border-red-400')}
+        value={text}
+        placeholder={crmText || '—'}
+        aria-label={label}
+        aria-invalid={!parsed.ok}
+        onChange={(e) => {
+          const next = e.target.value
+          setText(next)
+          const result = parse(next)
+          if (result.ok) onCommit(result.value)
+        }}
+      />
+      {/* Под полем: у ручного значения — что в CRM, иначе — формат ввода. */}
+      {(local || hint) && (
+        <span className="mt-0.5 block text-[11px] text-gray-400">{local ? `CRM: ${crmText || '—'}` : hint}</span>
+      )}
+    </label>
+  )
+}
+
+const LOCALE_LABELS: Record<BadgeLocale, string> = { ru: 'RU', uz: 'UZ', en: 'EN' }
+
+const BadgesInput: React.FC<{ locale: BadgeLocale; value: string[]; onCommit: (list: string[]) => void }> = ({
+  locale,
+  value,
+  onCommit,
+}) => {
+  const external = value.join(', ')
+  const [text, setText] = useState(external)
+  useEffect(() => {
+    if (parseBadges(text).join(', ') !== external) setText(external)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [external])
+  return (
+    <label className="flex items-center gap-2">
+      <span className="w-7 text-xs font-medium text-gray-500">{LOCALE_LABELS[locale]}</span>
+      <input
+        className={cn(inputCls, 'border-gray-300')}
+        value={text}
+        placeholder={locale === 'ru' ? 'Акция, Последняя планировка' : 'пусто — как RU'}
+        aria-label={`Бейджи ${LOCALE_LABELS[locale]}`}
+        onChange={(e) => {
+          setText(e.target.value)
+          onCommit(parseBadges(e.target.value))
+        }}
+      />
+    </label>
   )
 }
 

@@ -22,11 +22,39 @@ const locationLabelSchema = z.object({
  * CRM нет, а допустимый разброс площади у проектов свой. Подбирается в
  * админке (раздел «Планировки на сайте») или scripts/preview-plan-groups.ts.
  */
+/** Бейджи группы планировок на одном языке: до 10 плашек по 40 символов. */
+const planBadgesSchema = z.array(z.string().trim().min(1).max(40)).max(10)
+
+/**
+ * Ручные данные группы планировок поверх CRM (services/planGrouping.ts).
+ * Этажи — целые, подвал бывает минусовым; подъезды — целые с нуля.
+ */
+const planGroupOverrideSchema = z
+  .object({
+    priceMin: z.number().min(0).max(1e13).optional(),
+    priceMax: z.number().min(0).max(1e13).optional(),
+    areaMin: z.number().min(0).max(10000).optional(),
+    areaMax: z.number().min(0).max(10000).optional(),
+    floors: z.array(z.number().int().min(-10).max(300)).max(310).optional(),
+    entrances: z.array(z.number().int().min(0).max(100)).max(100).optional(),
+    badges: z
+      .object({ ru: planBadgesSchema.optional(), uz: planBadgesSchema.optional(), en: planBadgesSchema.optional() })
+      .optional(),
+  })
+  .refine((o) => o.priceMin === undefined || o.priceMax === undefined || o.priceMin <= o.priceMax, {
+    message: 'Цена «от» больше цены «до»',
+  })
+  .refine((o) => o.areaMin === undefined || o.areaMax === undefined || o.areaMin <= o.areaMax, {
+    message: 'Площадь «от» больше площади «до»',
+  })
+
 const planGroupingSchema = z
   .object({
     areaTolerance: z.number().min(0).max(50).optional(),
     groups: z.array(z.object({ plans: z.array(z.string().min(1)).min(2) })).optional(),
     keepSeparate: z.array(z.string().min(1)).optional(),
+    hidden: z.array(z.string().min(1)).max(500).optional(),
+    overrides: z.record(z.string().min(1), planGroupOverrideSchema).optional(),
   })
   .nullable()
 

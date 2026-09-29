@@ -8,7 +8,7 @@
  * Всё здесь — чистые функции (без БД), покрываются unit-тестами.
  */
 
-import { isShownPlanType, mergePlanTypes, PlanGroupingConfig } from './planGrouping'
+import { badgesFor, isShownPlanType, PlanGroupingConfig, PlanTypeCard, sitePlanTypes } from './planGrouping'
 import { aboutSlides, GalleryItem, galleryUrls, MediaSlide, toSlides } from './mediaSlides'
 import { buildProjectMap, GeoPoint, MapPlace, PlaceTypeRow, ProjectMapDTO, SalesOffice } from './projectMap'
 
@@ -641,6 +641,8 @@ export interface PlanTypeDTO {
   floors: number[]
   entrances: number[]
   windowViews: string[]
+  /** Бейджи группы на языке страницы («Акция», «Последняя планировка»). */
+  badges: string[]
 }
 
 export interface ComplexListItemDTO {
@@ -743,7 +745,7 @@ export function translateViews(
 }
 
 export function buildPlanTypeDTO(
-  planType: PlanTypeRow,
+  planType: PlanTypeCard,
   locale: Locale,
   index: Map<string, string>,
   /** Срок сдачи дома этого типа, уже с наложенным переводом. */
@@ -802,6 +804,8 @@ export function buildPlanTypeDTO(
     floors,
     entrances,
     windowViews,
+    // Бейджи группы: ручные, на языке страницы (нет перевода — ru).
+    badges: badgesFor(planType.badges, locale),
   }
 }
 
@@ -886,7 +890,8 @@ export function buildComplexDetail(
   // склейки каталог показывал до семи неотличимых плиток подряд. Правило
   // берётся из настройки ЖК — см. services/planGrouping.ts.
   const soldOut = isSoldOut(complex)
-  const shownPlanTypes = mergePlanTypes(
+  // Ручные правки групп и скрытие с сайта — из той же настройки ЖК.
+  const shownPlanTypes = sitePlanTypes(
     soldOut ? planTypes : planTypes.filter(isShownPlanType),
     complex.planGrouping
   )

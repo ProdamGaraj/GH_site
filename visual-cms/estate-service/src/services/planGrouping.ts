@@ -20,6 +20,10 @@
  * сохраняется, правило меняется без пересинка, чертежи всех вариантов
  * собираются в галерею одной карточки.
  *
+ * Там же — ручные правки групп и скрытие с сайта (`overrides`, `hidden`):
+ * данные CRM в базе не трогаются, ручное значение накладывается поверх при
+ * чтении и так же снимается («Подставить значения из CRM»).
+ *
  * Чистый модуль без БД.
  */
 
@@ -39,13 +43,51 @@ export interface PlanGroupingConfig {
   groups?: Array<{ plans: string[] }>
   /** Никогда не склеивать эти планировки ни с чем. */
   keepSeparate?: string[]
+  /**
+   * Скрытые с сайта планировки (по `planName`). Карточка не показывается,
+   * если в её группе есть скрытая планировка: скрывают группу целиком, и при
+   * пересборке (другой допуск, новая планировка из CRM) скрытие не теряется.
+   */
+  hidden?: string[]
+  /**
+   * Ручные данные групп поверх CRM, по «якорной» планировке — главной в
+   * группе на момент правки. Правка применяется к той группе, где якорь
+   * окажется после пересборки (см. resolvePlanGroups).
+   */
+  overrides?: Record<string, PlanGroupOverride>
 }
+
+/** Бейджи группы по языкам сайта; нет перевода — берутся ru. */
+export interface PlanGroupBadges {
+  ru?: string[]
+  uz?: string[]
+  en?: string[]
+}
+
+/**
+ * Ручные данные карточки планировки. Поле есть — оно главнее CRM, нет —
+ * значение из CRM. Бейджей в CRM нет: они всегда ручные.
+ */
+export interface PlanGroupOverride {
+  priceMin?: number
+  priceMax?: number
+  areaMin?: number
+  areaMax?: number
+  floors?: number[]
+  entrances?: number[]
+  badges?: PlanGroupBadges
+}
+
+/** Поля, которые «Подставить значения из CRM» возвращает к данным CRM. */
+export const CRM_OVERRIDE_FIELDS = ['priceMin', 'priceMax', 'areaMin', 'areaMax', 'floors', 'entrances'] as const
 
 /** Значения по умолчанию: ничего не склеиваем сверх точных совпадений. */
 export const DEFAULT_GROUPING: Required<PlanGroupingConfig> = {
   areaTolerance: 0,
   groups: [],
   keepSeparate: [],
+  hidden: [],
+  overrides: {},
 }
 
 export function normalizeConfig(config?: PlanGroupingConfig | null): Required<PlanGroupingConfig> {
@@ -56,7 +98,57 @@ export function normalizeConfig(config?: PlanGroupingConfig | null): Required<Pl
       ? config!.groups!.filter((g) => Array.isArray(g?.plans) && g.plans.length > 1)
       : [],
     keepSeparate: Array.isArray(config?.keepSeparate) ? config!.keepSeparate!.filter(Boolean) : [],
+    hidden: Array.isArray(config?.hidden) ? config!.hidden!.filter((n) => typeof n === 'string' && n) : [],
+    overrides: normalizeOverrides(config?.overrides),
   }
+}
+
+function finiteOrUndefined(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+function numberList(value: unknown): number[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return uniqueSortedNumbers(value.filter((v): v is number => typeof v === 'number'))
+}
+
+function badgeList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const list = uniqueStrings(value.filter((v): v is string => typeof v === 'string'))
+  return list.length ? list : undefined
+}
+
+/**
+ * Правки из базы — в строгую форму: чужие поля и мусор отбрасываются, пустая
+ * правка удаляется. Настройка могла быть записана старой версией.
+ */
+function normalizeOverrides(raw: unknown): Record<string, PlanGroupOverride> {
+  if (!raw || typeof raw !== 'object') return {}
+  const out: Record<string, PlanGroupOverride> = {}
+  for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!name || !value || typeof value !== 'object') continue
+    const v = value as Record<string, unknown>
+    const o: PlanGroupOverride = {}
+    for (const key of ['priceMin', 'priceMax', 'areaMin', 'areaMax'] as const) {
+      const n = finiteOrUndefined(v[key])
+      if (n !== undefined) o[key] = n
+    }
+    const floors = numberList(v.floors)
+    if (floors) o.floors = floors
+    const entrances = numberList(v.entrances)
+    if (entrances) o.entrances = entrances
+    if (v.badges && typeof v.badges === 'object') {
+      const b = v.badges as Record<string, unknown>
+      const badges: PlanGroupBadges = {}
+      for (const locale of ['ru', 'uz', 'en'] as const) {
+        const list = badgeList(b[locale])
+        if (list) badges[locale] = list
+      }
+      if (Object.keys(badges).length) o.badges = badges
+    }
+    if (Object.keys(o).length) out[name] = o
+  }
+  return out
 }
 
 /**
@@ -243,10 +335,95 @@ export function planGroups(rows: PlanTypeRow[], config?: PlanGroupingConfig | nu
   )
 }
 
-/** Склеивает типы планировок по настройке ЖК. */
+/** Склеивает типы планировок по настройке ЖК (без ручных правок и скрытия). */
 export function mergePlanTypes(
   rows: PlanTypeRow[],
   config?: PlanGroupingConfig | null
 ): PlanTypeRow[] {
   return planGroups(rows, config).map((g) => mergeGroup(g.rows))
+}
+
+/** Группа с ручными правками: что даёт CRM и что увидит покупатель. */
+export interface ResolvedPlanGroup {
+  group: PlanGroup
+  /** Главная планировка группы (первая по order): ключ для новой правки. */
+  anchor: string
+  /** Слитые данные CRM, без правок. */
+  crm: PlanTypeRow
+  /** То, что уйдёт на сайт: CRM с наложенной правкой. */
+  merged: PlanTypeRow
+  /** Скрыта с сайта: в группе есть скрытая планировка. */
+  hidden: boolean
+  /** Ключ применённой правки (якорь, под которым она сохранена). */
+  overrideKey: string | null
+  override: PlanGroupOverride | null
+  /**
+   * Другие правки, чьи якоря оказались в этой же группе (склеили две
+   * группы с правками). Не применяются: действует одна правка на карточку.
+   */
+  ignoredOverrides: string[]
+}
+
+/** CRM-значения группы, поверх которых легла правка. */
+export function applyOverride(merged: PlanTypeRow, override: PlanGroupOverride | null): PlanTypeRow {
+  if (!override) return merged
+  return {
+    ...merged,
+    priceMin: override.priceMin ?? merged.priceMin,
+    priceMax: override.priceMax ?? merged.priceMax,
+    areaMin: override.areaMin ?? merged.areaMin,
+    areaMax: override.areaMax ?? merged.areaMax,
+    floors: override.floors ?? merged.floors,
+    entrances: override.entrances ?? merged.entrances,
+  }
+}
+
+/**
+ * Группы с ручными правками и скрытием.
+ *
+ * Правка ищется по якорям среди планировок группы. Если их несколько, главнее
+ * правка главной планировки группы, иначе — самой ранней по order; остальные
+ * возвращаются в `ignoredOverrides`, чтобы админка их показала.
+ */
+export function resolvePlanGroups(
+  rows: PlanTypeRow[],
+  config?: PlanGroupingConfig | null
+): ResolvedPlanGroup[] {
+  const cfg = normalizeConfig(config)
+  const hidden = new Set(cfg.hidden)
+  return planGroups(rows, cfg).map((group) => {
+    const ordered = [...group.rows].sort((a, b) => a.order - b.order)
+    const anchor = ordered[0].planName
+    const keys = uniqueStrings(ordered.map((r) => r.planName).filter((name) => cfg.overrides[name]))
+    const overrideKey = keys.includes(anchor) ? anchor : keys[0] ?? null
+    const override = overrideKey ? cfg.overrides[overrideKey] : null
+    const crm = mergeGroup(group.rows)
+    return {
+      group,
+      anchor,
+      crm,
+      merged: applyOverride(crm, override),
+      hidden: group.rows.some((r) => hidden.has(r.planName)),
+      overrideKey,
+      override,
+      ignoredOverrides: keys.filter((k) => k !== overrideKey),
+    }
+  })
+}
+
+/** Карточка планировки для сайта: слитый тип с правкой и бейджами группы. */
+export type PlanTypeCard = PlanTypeRow & { badges?: PlanGroupBadges }
+
+/** Типы планировок для сайта: склейка, ручные правки, без скрытых групп. */
+export function sitePlanTypes(rows: PlanTypeRow[], config?: PlanGroupingConfig | null): PlanTypeCard[] {
+  return resolvePlanGroups(rows, config)
+    .filter((g) => !g.hidden)
+    .map((g) => (g.override?.badges ? { ...g.merged, badges: g.override.badges } : g.merged))
+}
+
+/** Бейджи на языке страницы: своего перевода нет — ru. */
+export function badgesFor(badges: PlanGroupBadges | undefined, locale: string): string[] {
+  if (!badges) return []
+  const own = badges[locale as keyof PlanGroupBadges]
+  return own && own.length ? own : badges.ru ?? []
 }

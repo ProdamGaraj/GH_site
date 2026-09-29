@@ -103,22 +103,6 @@ export const estateApi = {
   deleteHouse: (id: string) =>
     apiFetch(`${BASE}/houses/${id}`, { method: 'DELETE' }).then((r) => json<{ ok: boolean }>(r)),
 
-  createApartment: (houseId: string, body: Record<string, unknown>) =>
-    apiFetch(`${BASE}/houses/${houseId}/apartments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }).then((r) => json<{ id: string }>(r)),
-
-  updateApartment: (id: string, body: Record<string, unknown>) =>
-    apiFetch(`${BASE}/apartments/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }).then((r) => json<{ ok: boolean }>(r)),
-
-  deleteApartment: (id: string) =>
-    apiFetch(`${BASE}/apartments/${id}`, { method: 'DELETE' }).then((r) => json<{ ok: boolean }>(r)),
 }
 
 export interface ProvisionResult {
