@@ -23,7 +23,9 @@ export const ComplexForm: React.FC<{
   complex: ComplexDetail
   locale: Locale
   actionsSlot?: HTMLElement | null
-}> = ({ complex, locale, actionsSlot }) => {
+  /** После сохранения: странице нужны свежие данные (режим каталога — домам). */
+  onSaved?: () => void
+}> = ({ complex, locale, actionsSlot, onSaved }) => {
   const [form, setForm] = useState<ComplexDetail>(complex)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -51,6 +53,7 @@ export const ComplexForm: React.FC<{
       const { id, houses, planGrouping, windowViews, ...rest } = form as any
       await estateApi.updateComplex(complex.id, rest)
       setMsg('Сохранено')
+      onSaved?.()
     } catch (e: any) {
       setMsg(e?.message || 'Ошибка сохранения')
     } finally {
@@ -82,7 +85,8 @@ export const ComplexForm: React.FC<{
       {/* Языконезависимые поля — только на вкладке ru */}
       {isRu(locale) && (
         <FormSection id={SECTION.basic} title="Основное">
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          {/* ID из MacroCRM — у домов (раздел «Дома / корпуса»): проект их объединяет. */}
+          <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
             <TextField label="Slug" hint="a-z, 0-9, дефис" value={form.slug} onChange={setField('slug')} />
             <SelectField
               label="Статус"
@@ -94,12 +98,6 @@ export const ComplexForm: React.FC<{
               onChange={setField('status')}
             />
             <NumberField label="Порядок" hint="на главной" value={form.order} onChange={(v) => setForm((f) => ({ ...f, order: v ?? 0 }))} />
-            <NumberField
-              label="ID дома в MacroCRM"
-              hint="пусто — без синхронизации"
-              value={form.externalHouseId ?? null}
-              onChange={(v) => setForm((f) => ({ ...f, externalHouseId: v ?? null }))}
-            />
           </div>
         </FormSection>
       )}

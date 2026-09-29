@@ -27,13 +27,9 @@ export class Complex {
   id!: string
 
   /**
-   * ID ДОМА в MacroCRM (houseId), а не ЖК.
-   *
-   * У нас «комплекс» соответствует дому в CRM: квартира 5139781 приходит с
-   * houseId 5139395 и complexId 5139393, и 5139395 — это наш ozmakon-business.
-   * Поэтому квартиры тянутся запросом с houseIds, а не complexIds.
-   *
-   * null — проект не сопоставлен с CRM, синк его пропускает.
+   * Устарело: связь с MacroCRM теперь у дома (House.externalId), проект —
+   * объединение домов. Миграция 009 перенесла значения на дома; поле больше
+   * не читается и уйдёт следующей миграцией.
    */
   @Index({ unique: true })
   @Column({ type: 'int', nullable: true })
@@ -70,6 +66,13 @@ export class Complex {
   /** Теги карточки на главной — переводимый список. */
   @Column({ type: 'jsonb', default: () => "'[]'" })
   cardTags!: string[]
+
+  /**
+   * Как проект стоит на главной: 'project' — одной карточкой, 'houses' —
+   * карточкой на каждый его дом (services/i18n.ts, buildCatalogItems).
+   */
+  @Column({ length: 20, default: 'project' })
+  catalogMode!: string
 
   // --- Переводимые текстовые поля (ru = база) ---
   @Column({ length: 200 })

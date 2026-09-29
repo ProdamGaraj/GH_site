@@ -140,18 +140,20 @@ export function whyDisabled(
 
 /**
  * Почему недоступна кнопка «Синхронизировать проект». Пустая строка —
- * доступна. Кроме общих причин — у проекта должен быть ID дома в MacroCRM:
- * синхронизация идёт по нему.
+ * доступна. Кроме общих причин — у проекта должен быть хоть один дом с ID из
+ * MacroCRM: синхронизация идёт по домам.
  */
 export function whyProjectSyncDisabled(
   state: MacroSyncState | null,
   busy: boolean,
   starting: boolean,
-  externalHouseId: number | null | undefined
+  externalHouseIds: readonly number[]
 ): string {
   const common = whyDisabled(state, busy, starting)
   if (common) return common
-  if (!externalHouseId) return 'У проекта нет ID дома в MacroCRM — задайте его в разделе «Основное» и сохраните ЖК'
+  if (externalHouseIds.length === 0) {
+    return 'Ни у одного дома проекта нет ID из MacroCRM — добавьте его в разделе «Дома / корпуса»'
+  }
   return ''
 }
 

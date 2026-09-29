@@ -57,7 +57,7 @@ export const apartmentInputSchema = z.object({
 })
 
 export const syncHouseSchema = z.object({
-  /** ID дома в MacroCRM. По нему находится наш «комплекс». */
+  /** ID дома в MacroCRM. По нему находится наш дом (House.externalId). */
   externalHouseId: z.number().int().positive(),
   /** Сведения о доме из estateHouses/list. Пустой объект допустим. */
   house: z
@@ -65,6 +65,10 @@ export const syncHouseSchema = z.object({
       name: z.string().max(120).default(''),
       floorsCount: z.number().int().positive().nullable().default(null),
       address: z.string().max(500).default(''),
+      // Срок сдачи. Поля нет — CRM про дом не спрашивали, срок не трогаем;
+      // null — в CRM срока нет, стираем прежний.
+      inServiceYear: z.number().int().min(1900).max(2200).nullable().optional(),
+      inServiceMonth: z.number().int().min(1).max(12).nullable().optional(),
     })
     .default({}),
   planTypes: z.array(planTypeInputSchema).default([]),

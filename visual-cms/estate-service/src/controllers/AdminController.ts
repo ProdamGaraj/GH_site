@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { In, EntityManager } from 'typeorm'
+import { In, EntityManager, IsNull, Not } from 'typeorm'
 import { AppDataSource } from '../config/database'
 import { Complex } from '../models/Complex'
 import { House } from '../models/House'
@@ -46,6 +46,35 @@ export class AdminController {
     if (missing.length > 0) throw Object.assign(new Error('unknown place types'), { status: 400, types: missing })
   }
 
+  /**
+   * ID дома из MacroCRM уникален: один дом CRM — один дом у нас, иначе
+   * синхронизация не знала бы, куда писать. Занят — 409 с названием проекта,
+   * чтобы было понятно, где он уже заведён.
+   */
+  private static async assertExternalIdFree(
+    m: EntityManager,
+    externalId: unknown,
+    ownHouseId: string | null
+  ): Promise<void> {
+    if (typeof externalId !== 'number') return
+    const taken = await m.getRepository(House).findOne({ where: { externalId }, relations: { complex: true } })
+    if (taken && taken.id !== ownHouseId) {
+      throw Object.assign(new Error('externalId taken'), {
+        status: 409,
+        externalIdTaken: { externalId, complex: taken.complex?.name ?? '', house: taken.name },
+      })
+    }
+  }
+
+  private static externalIdTakenResponse(res: Response, err: any): boolean {
+    if (err?.status !== 409 || !err.externalIdTaken) return false
+    const { externalId, complex, house } = err.externalIdTaken
+    res.status(409).json({
+      error: `Дом с ID ${externalId} из MacroCRM уже есть: «${house || 'без названия'}» в проекте «${complex}»`,
+    })
+    return true
+  }
+
   private static unknownTypesResponse(res: Response, err: any): boolean {
     if (err?.status !== 400 || !err.types) return false
     res.status(400).json({ error: 'Неизвестный тип места', types: err.types })
@@ -56,6 +85,12 @@ export class AdminController {
   static async listComplexes(_req: Request, res: Response): Promise<void> {
     try {
       const complexes = await AppDataSource.getRepository(Complex).find({ order: { order: 'ASC' } })
+      const linked = await AppDataSource.getRepository(House).find({
+        where: { externalId: Not(IsNull()) },
+        select: { id: true, complexId: true },
+      })
+      const crmHousesByComplex = new Map<string, number>()
+      for (const h of linked) crmHousesByComplex.set(h.complexId, (crmHousesByComplex.get(h.complexId) ?? 0) + 1)
       res.json(
         complexes.map((c) => ({
           id: c.id,
@@ -66,8 +101,9 @@ export class AdminController {
           showOnSite: c.showOnSite,
           order: c.order,
           // Без этого поля в списке не видно, какие проекты вообще участвуют
-          // в синхронизации с CRM, — а пустое значение её молча отключает.
-          externalHouseId: c.externalHouseId ?? null,
+          // в синхронизации с CRM: связь теперь у домов, и проект без домов
+          // с ID из CRM синхронизация обходит.
+          crmHouses: crmHousesByComplex.get(c.id) ?? 0,
         }))
       )
     } catch (err) {
@@ -251,6 +287,7 @@ export class AdminController {
       const created = await AppDataSource.transaction(async (m) => {
         const complex = await m.getRepository(Complex).findOne({ where: { id: complexId } })
         if (!complex) throw Object.assign(new Error('no complex'), { status: 404 })
+        await AdminController.assertExternalIdFree(m, base.externalId, null)
         const repo = m.getRepository(House)
         const house: House = await repo.save(repo.create({ ...base, complexId } as House))
         await AdminController.writeTranslations(m, 'house', house.id, translations)
@@ -258,6 +295,7 @@ export class AdminController {
       })
       res.status(201).json({ id: created.id })
     } catch (err: any) {
+      if (AdminController.externalIdTakenResponse(res, err)) return
       if (err?.status === 404) {
         res.status(404).json({ error: 'Complex not found' })
         return
@@ -274,6 +312,7 @@ export class AdminController {
         const repo = m.getRepository(House)
         const house = await repo.findOne({ where: { id: req.params.id } })
         if (!house) return false
+        await AdminController.assertExternalIdFree(m, base.externalId, house.id)
         Object.assign(house, base)
         await repo.save(house)
         if (translations !== undefined) {
@@ -287,6 +326,7 @@ export class AdminController {
       }
       res.json({ ok: true })
     } catch (err) {
+      if (AdminController.externalIdTakenResponse(res, err)) return
       logger.error('admin.updateHouse failed', err instanceof Error ? err : undefined)
       res.status(500).json({ error: 'Internal error' })
     }

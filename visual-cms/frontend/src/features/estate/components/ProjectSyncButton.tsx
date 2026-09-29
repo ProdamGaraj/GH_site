@@ -6,15 +6,16 @@ import { useMacroSync } from '../useMacroSync'
 
 /**
  * «Синхронизировать проект»: тот же прогон MacroCRM, что в списке ЖК, но
- * только по дому этого проекта. После прогона коллекция пересобирается сама
+ * только по домам этого проекта. После прогона коллекция пересобирается сама
  * (бэкенд), а редактор подтягивает свежие данные — `onFinished`.
  */
 export const ProjectSyncButton: React.FC<{
-  externalHouseId: number | null | undefined
+  /** ID домов проекта в MacroCRM. */
+  externalHouseIds: readonly number[]
   onFinished?: () => void
-}> = ({ externalHouseId, onFinished }) => {
+}> = ({ externalHouseIds, onFinished }) => {
   const { state, busy, error, starting, running, start } = useMacroSync(onFinished)
-  const reason = whyProjectSyncDisabled(state, busy, starting, externalHouseId)
+  const reason = whyProjectSyncDisabled(state, busy, starting, externalHouseIds)
   const enabled = !reason
 
   return (
@@ -26,9 +27,9 @@ export const ProjectSyncButton: React.FC<{
       )}
       <button
         type="button"
-        onClick={() => externalHouseId && start({ externalHouseIds: [externalHouseId] })}
+        onClick={() => start({ externalHouseIds: [...externalHouseIds] })}
         disabled={!enabled}
-        title={reason || 'Квартиры, планировки и картинки этого проекта из MacroCRM'}
+        title={reason || 'Квартиры, планировки, картинки и сроки сдачи домов этого проекта из MacroCRM'}
         className={cn(
           'flex items-center gap-2 px-3 py-2 rounded-md text-sm border',
           enabled

@@ -145,8 +145,8 @@ export class MacroSyncRunner {
         })
       ))
 
-    // Нечего синхронизировать — это не успех, а недонастройка: у проектов не
-    // заполнен externalHouseId. Отметить такой прогон успешным значит спрятать
+    // Нечего синхронизировать — это не успех, а недонастройка: ни у одного
+    // дома нет ID из MacroCRM. Отметить такой прогон успешным значит спрятать
     // от пользователя единственное, что ему надо исправить.
     if (houseIds.length === 0) {
       return this.finish(run, {
@@ -156,8 +156,8 @@ export class MacroSyncRunner {
         planTypesUpserted: 0,
         imagesDownloaded: 0,
         error:
-          'Ни одного проекта с ID дома в MacroCRM. Откройте ЖК и заполните поле ' +
-          '«ID дома в MacroCRM» — без него синхронизировать нечего.',
+          'Ни одного дома с ID дома в MacroCRM. Откройте ЖК и в разделе «Дома / корпуса» ' +
+          'добавьте дом с его ID из MacroCRM — без него синхронизировать нечего.',
       })
     }
 
@@ -222,12 +222,10 @@ export class MacroSyncRunner {
     })
   }
 
-  /** Дома берём из estate-service: синхронизируем только сопоставленные с CRM. */
+  /** Дома берём из estate-service: все дома с ID из MacroCRM, без повторов. */
   private async discoverHouses(): Promise<number[]> {
-    const complexes = await this.estateApi().listSyncableComplexes()
-    return complexes
-      .map((complex) => complex.externalHouseId)
-      .filter((id): id is number => id !== null)
+    const houses = await this.estateApi().listSyncableHouses()
+    return [...new Set(houses.map((house) => house.externalHouseId))]
   }
 
   private async saveCursor(runId: string, cursor: MacroSyncCursor): Promise<void> {

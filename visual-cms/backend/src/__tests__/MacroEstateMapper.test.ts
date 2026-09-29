@@ -13,6 +13,7 @@ import {
   type MacroSellItem,
 } from '../services/MacroEstateMapper'
 import { priceFromMinorUnits, areaOrNull } from '../services/macroUnits'
+import { houseServiceDate } from '../services/MacroEstateMapper'
 
 const FIXTURE: MacroSellItem[] = require('./fixtures/macro/02-apartments.json')
 const ALL_STATUSES: MacroSellItem[] = require('./fixtures/macro/03-apartments-all.json')
@@ -257,5 +258,31 @@ describe('пачка на живой выдаче', () => {
   it('externalId уникальны — на них стоит upsert синка', () => {
     const { apartments } = mapApartments(FIXTURE)
     expect(new Set(apartments.map((a) => a.externalId)).size).toBe(apartments.length)
+  })
+})
+
+describe('срок сдачи дома', () => {
+  const date = (over: Partial<{ inServiceYear: number | null; inServiceMonth: number | null; inServiceDate: string | null }>) =>
+    houseServiceDate({ inServiceYear: null, inServiceMonth: null, inServiceDate: null, ...over })
+
+  it('год и месяц из полей CRM', () => {
+    expect(date({ inServiceYear: 2028, inServiceMonth: 5 })).toEqual({ year: 2028, month: 5 })
+    expect(date({ inServiceYear: 2029 })).toEqual({ year: 2029, month: null })
+  })
+
+  it('нет полей — из даты', () => {
+    expect(date({ inServiceDate: '2027-10-01' })).toEqual({ year: 2027, month: 10 })
+    expect(date({ inServiceDate: '2027-10-01T00:00:00+05:00' })).toEqual({ year: 2027, month: 10 })
+  })
+
+  it('поля главнее даты', () => {
+    expect(date({ inServiceYear: 2028, inServiceMonth: 2, inServiceDate: '2027-10-01' })).toEqual({ year: 2028, month: 2 })
+  })
+
+  it('пусто и непохожее на правду — как незаполненное', () => {
+    expect(date({})).toEqual({ year: null, month: null })
+    expect(date({ inServiceYear: 20, inServiceMonth: 5 })).toEqual({ year: null, month: null })
+    expect(date({ inServiceYear: 2028, inServiceMonth: 13 })).toEqual({ year: 2028, month: null })
+    expect(date({ inServiceDate: 'скоро' })).toEqual({ year: null, month: null })
   })
 })

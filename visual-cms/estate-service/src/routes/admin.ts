@@ -52,6 +52,7 @@ router.delete('/houses/:id', AdminController.deleteHouse)
 // Синхронизация дома из MacroCRM: весь дом одним запросом и одной транзакцией.
 // Поштучное админ-API здесь не годится — 339 квартир дали бы 339 запросов и
 // полусостояние базы при обрыве на середине.
+router.get('/sync/houses', SyncController.syncableHouses)
 router.get('/sync/house/:externalHouseId/state', SyncController.houseState)
 router.post('/sync/house', validate(syncHouseSchema), SyncController.syncHouse)
 

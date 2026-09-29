@@ -60,6 +60,9 @@ export const HOUSE_TR_FIELDS: FieldMap = {
   floors: 'string',
   deadline: 'string',
   className: 'string',
+  // Карточка дома на главной — свои тексты у каждого дома проекта.
+  intro: 'string',
+  cardTags: 'json',
 }
 export const APARTMENT_TR_FIELDS: FieldMap = {
   apartmentClass: 'string',
@@ -149,6 +152,8 @@ export interface ComplexRow {
   filterClass?: string
   cardImage?: string
   cardTags?: string[]
+  /** 'project' — одна карточка на главной, 'houses' — карточка на каждый дом. */
+  catalogMode?: string
 }
 
 export interface HouseRow {
@@ -160,6 +165,18 @@ export interface HouseRow {
   deadline: string
   className: string
   entrances?: number | null
+  /** ID дома в MacroCRM. */
+  externalId?: number | null
+  /** Срок сдачи из CRM: год и месяц (месяц может быть неизвестен). */
+  crmServiceYear?: number | null
+  crmServiceMonth?: number | null
+  // Карточка дома на главной; пустое — как у проекта.
+  showOnSite?: boolean
+  status?: string
+  intro?: string
+  cardImage?: string
+  cardTags?: string[]
+  filterClass?: string
 }
 
 export interface ApartmentRow {
@@ -646,6 +663,11 @@ export interface PlanTypeDTO {
 }
 
 export interface ComplexListItemDTO {
+  /** Карточка проекта или одного его дома (проект показывается домами). */
+  kind: 'project' | 'house'
+  /** Дом карточки; у карточки проекта — null. */
+  houseId: string | null
+  /** Slug проекта: карточка дома ведёт на страницу своего проекта. */
   slug: string
   externalHouseId: number | null
   name: string
@@ -682,6 +704,44 @@ export function isSoldOut(complex: { status: string }): boolean {
 /** Тег «Распродано» массивом 0..1 — шаблон повторяет по нему бейдж. */
 export function soldOutTags(complex: { status: string }, locale: Locale): Array<{ label: string }> {
   return isSoldOut(complex) ? [{ label: SOLD_OUT_LABEL[locale] }] : []
+}
+
+// --- Срок сдачи дома ---
+
+/**
+ * Срок сдачи из CRM (inServiceYear/Month) на языке страницы: квартал, если
+ * месяц известен, иначе только год. Нет года — пусто.
+ */
+export function formatServiceDate(
+  year: number | null | undefined,
+  month: number | null | undefined,
+  locale: Locale
+): string {
+  if (!year) return ''
+  const quarter = month && month >= 1 && month <= 12 ? Math.ceil(month / 3) : null
+  if (locale === 'uz') return quarter ? `${year}-yil ${quarter}-chorak` : `${year}-yil`
+  if (locale === 'en') return quarter ? `Q${quarter} ${year}` : String(year)
+  return quarter ? `${quarter} кв. ${year}` : String(year)
+}
+
+/**
+ * Срок сдачи дома: ручной (уже с переводом) главнее, иначе из CRM на языке
+ * страницы. Ручной пишут, когда в CRM срока нет или он не тот.
+ */
+export function houseDeadline(
+  translated: { deadline?: string },
+  house: Pick<HouseRow, 'crmServiceYear' | 'crmServiceMonth'>,
+  locale: Locale
+): string {
+  const manual = (translated.deadline ?? '').trim()
+  return manual || formatServiceDate(house.crmServiceYear, house.crmServiceMonth, locale)
+}
+
+/** Теги карточки: строки без пустых. */
+function cleanTags(tags: unknown): string[] {
+  return (Array.isArray(tags) ? tags : [])
+    .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+    .filter(Boolean)
 }
 
 // --- Сборщики ответа ---
@@ -867,7 +927,7 @@ export function buildComplexDetail(
       name: h.name,
       floors: h.floors,
       entrances: h.entrances ?? null,
-      deadline: h.deadline,
+      deadline: houseDeadline(h, house, locale),
       className: h.className,
       apartments: apts,
     }
@@ -992,6 +1052,8 @@ export function buildComplexListItem(
   const index = indexTranslations(translations)
   const c = applyOverlay(complex, 'complex', complex.id, locale, COMPLEX_TR_FIELDS, index)
   return {
+    kind: 'project',
+    houseId: null,
     slug: c.slug,
     externalHouseId: c.externalHouseId ?? null,
     name: c.name,
@@ -1001,10 +1063,56 @@ export function buildComplexListItem(
     status: c.status,
     order: c.order,
     filterClass: c.filterClass || 'business',
-    tags: (Array.isArray(c.cardTags) ? c.cardTags : [])
-      .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
-      .filter(Boolean),
+    tags: cleanTags(c.cardTags),
     soldOut: soldOutTags(c, locale),
     cardClass: isSoldOut(c) ? 'is-sold-visible' : '',
   }
+}
+
+/** Проект показывается на главной карточками своих домов. */
+export const CATALOG_BY_HOUSES = 'houses'
+
+/**
+ * Карточки проекта на главной.
+ *
+ * Обычно — одна карточка проекта. В режиме «домами» — по карточке на каждый
+ * дом с галочкой «на сайте», в том же виде: своё поле дома главнее, пустое
+ * берётся из карточки проекта. Ссылка — на страницу проекта (своих страниц у
+ * домов нет). Распродан проект — распроданы и все его дома.
+ *
+ * Нет ни одного дома на сайте — нет и карточек: так решил админ, сняв галочки.
+ */
+export function buildCatalogItems(
+  complex: ComplexRow,
+  houses: HouseRow[],
+  translations: TrRow[],
+  locale: Locale
+): ComplexListItemDTO[] {
+  const project = buildComplexListItem(complex, translations, locale)
+  if (complex.catalogMode !== CATALOG_BY_HOUSES) return [project]
+
+  const index = indexTranslations(translations)
+  return [...houses]
+    .filter((house) => house.complexId === complex.id && house.showOnSite !== false)
+    .sort((a, b) => a.order - b.order)
+    .map((house): ComplexListItemDTO => {
+      const h = applyOverlay(house, 'house', house.id, locale, HOUSE_TR_FIELDS, index)
+      const soldOut = isSoldOut(complex) || isSoldOut({ status: house.status ?? '' })
+      const tags = cleanTags(h.cardTags)
+      return {
+        ...project,
+        kind: 'house',
+        houseId: house.id,
+        externalHouseId: house.externalId ?? null,
+        name: (h.name ?? '').trim() || project.name,
+        className: (h.className ?? '').trim() || project.className,
+        intro: (h.intro ?? '').trim() || project.intro,
+        cardImage: house.cardImage || project.cardImage,
+        filterClass: house.filterClass || project.filterClass,
+        tags: tags.length ? tags : project.tags,
+        status: soldOut ? SOLD_OUT_STATUS : project.status,
+        soldOut: soldOut ? [{ label: SOLD_OUT_LABEL[locale] }] : [],
+        cardClass: soldOut ? 'is-sold-visible' : '',
+      }
+    })
 }

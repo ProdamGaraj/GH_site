@@ -46,18 +46,17 @@ function state(over: Partial<MacroSyncState> = {}): MacroSyncState {
 }
 
 describe('кнопка «Синхронизировать проект»', () => {
-  it('настроено, не идёт, есть ID дома — можно', () => {
-    expect(whyProjectSyncDisabled(state(), false, false, 5139395)).toBe('')
+  it('настроено, не идёт, есть дома с ID из CRM — можно', () => {
+    expect(whyProjectSyncDisabled(state(), false, false, [5139395, 5622025])).toBe('')
   })
 
-  it('без ID дома в MacroCRM — нельзя, с подсказкой где его задать', () => {
-    expect(whyProjectSyncDisabled(state(), false, false, null)).toMatch(/нет ID дома в MacroCRM.*«Основное»/)
-    expect(whyProjectSyncDisabled(state(), false, false, 0)).not.toBe('')
+  it('ни у одного дома нет ID из MacroCRM — нельзя, с подсказкой где его задать', () => {
+    expect(whyProjectSyncDisabled(state(), false, false, [])).toMatch(/нет ID из MacroCRM.*«Дома \/ корпуса»/)
   })
 
   it('общие причины важнее: идёт другой прогон, не настроено', () => {
-    expect(whyProjectSyncDisabled(state({ running: true }), false, false, 1)).toBe('Прогон уже идёт')
-    expect(whyProjectSyncDisabled(state({ configured: false, missing: ['MACRO_TOKEN'] }), false, false, 1)).toMatch(
+    expect(whyProjectSyncDisabled(state({ running: true }), false, false, [1])).toBe('Прогон уже идёт')
+    expect(whyProjectSyncDisabled(state({ configured: false, missing: ['MACRO_TOKEN'] }), false, false, [1])).toMatch(
       /MACRO_TOKEN/
     )
   })

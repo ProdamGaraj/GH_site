@@ -163,6 +163,26 @@ export function mapApartment(
  * «12/15», если этажность дома известна, иначе «12». Пустая строка, когда
  * этажа нет: «null/15» на карточке хуже, чем отсутствие строки.
  */
+/**
+ * Срок сдачи дома из CRM: год и месяц. CRM заполняет то год с месяцем, то
+ * дату целиком, то ничего; дата — запасной источник. Непохожее на правду
+ * (месяц 13, год 20) — как незаполненное.
+ */
+export function houseServiceDate(house: {
+  inServiceYear: number | null
+  inServiceMonth: number | null
+  inServiceDate: string | null
+}): { year: number | null; month: number | null } {
+  const fromDate = /^(\d{4})-(\d{2})/.exec(house.inServiceDate ?? '')
+  const year = house.inServiceYear ?? (fromDate ? Number(fromDate[1]) : null)
+  const month = house.inServiceMonth ?? (fromDate ? Number(fromDate[2]) : null)
+  const validYear = year !== null && year >= 1900 && year <= 2200 ? year : null
+  return {
+    year: validYear,
+    month: validYear !== null && month !== null && month >= 1 && month <= 12 ? month : null,
+  }
+}
+
 export function formatFloor(floor: number | null, floorsCount: number | null): string {
   if (floor === null) return ''
   if (floorsCount === null || floorsCount <= 0) return String(floor)

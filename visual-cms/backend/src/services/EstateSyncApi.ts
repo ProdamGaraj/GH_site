@@ -9,10 +9,12 @@
  * запросов и полусостояние базы при обрыве на середине.
  */
 
-export interface EstateComplexSummary {
-  slug: string
+/** Дом, связанный с MacroCRM: его и синхронизируем. */
+export interface EstateHouseSummary {
+  externalHouseId: number
+  houseId: string
   name: string
-  externalHouseId: number | null
+  complexSlug: string
 }
 
 /** Что estate-service уже знает о квартире дома. */
@@ -47,7 +49,14 @@ export interface HouseState {
 
 export interface SyncHousePayload {
   externalHouseId: number
-  house: { name: string; floorsCount: number | null; address: string }
+  house: {
+    name: string
+    floorsCount: number | null
+    address: string
+    /** Срок сдачи из CRM; поля нет — дом в этом прогоне не получили. */
+    inServiceYear?: number | null
+    inServiceMonth?: number | null
+  }
   planTypes: unknown[]
   apartments: unknown[]
 }
@@ -94,18 +103,21 @@ export class EstateSyncApi {
     this.fetchImpl = opts.fetchImpl ?? fetch
   }
 
-  /** Проекты с заведённым внешним id дома — только их и синхронизируем. */
-  async listSyncableComplexes(): Promise<EstateComplexSummary[]> {
-    const json = await this.request<any>('GET', '/api/complexes')
-    const items: any[] = Array.isArray(json) ? json : json?.items ?? json?.data ?? []
+  /**
+   * Дома с ID из MacroCRM — во всех проектах, в том числе снятых с сайта:
+   * данные готовятся заранее. Связь с CRM — у дома, проект их объединяет.
+   */
+  async listSyncableHouses(): Promise<EstateHouseSummary[]> {
+    const json = await this.request<any>('GET', '/api/admin/sync/houses')
+    const items: any[] = Array.isArray(json) ? json : []
     return items
+      .filter((item) => Number.isInteger(item?.externalHouseId) && item.externalHouseId > 0)
       .map((item) => ({
-        slug: String(item?.slug ?? ''),
+        externalHouseId: item.externalHouseId,
+        houseId: String(item?.houseId ?? ''),
         name: String(item?.name ?? ''),
-        externalHouseId:
-          typeof item?.externalHouseId === 'number' ? item.externalHouseId : null,
+        complexSlug: String(item?.complexSlug ?? ''),
       }))
-      .filter((item) => item.slug !== '' && item.externalHouseId !== null)
   }
 
   async getHouseState(externalHouseId: number): Promise<HouseState> {

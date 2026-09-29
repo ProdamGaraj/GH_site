@@ -27,6 +27,10 @@ export interface MacroHouse {
   floorsCount: number | null
   address: string
   description: string
+  /** Срок сдачи: год, месяц или дата — что из них заполнено в CRM. */
+  inServiceYear: number | null
+  inServiceMonth: number | null
+  inServiceDate: string | null
 }
 
 /** Файл планировки. */
@@ -98,6 +102,9 @@ export class MacroSellClient {
         floorsCount: intOrNull(item.floorsCount),
         address: str(item.address),
         description: str(item.description),
+        inServiceYear: intOrNull(item.inServiceYear),
+        inServiceMonth: intOrNull(item.inServiceMonth),
+        inServiceDate: str(item.inServiceDate) || null,
       })
     }
     return out

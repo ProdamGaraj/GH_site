@@ -152,6 +152,20 @@ describe('возобновление прогона', () => {
   })
 })
 
+describe('какие дома синхронизировать', () => {
+  it('все дома с ID из MacroCRM из estate, без повторов', async () => {
+    const runner = makeRunner()
+    ;(runner as any).estateApi = () => ({
+      listSyncableHouses: async () => [
+        { externalHouseId: 5622025, houseId: 'h1', name: 'Дустлик-4', complexSlug: 'assalom-dostlik' },
+        { externalHouseId: 5139395, houseId: 'h2', name: 'OʼzMakon', complexSlug: 'ozmakon-business' },
+        { externalHouseId: 5622025, houseId: 'h1', name: 'Дустлик-4', complexSlug: 'assalom-dostlik' },
+      ],
+    })
+    expect(await (runner as any).discoverHouses()).toEqual([5622025, 5139395])
+  })
+})
+
 describe('прогон без домов', () => {
   it('помечается провалившимся, а не успешным — это недонастройка', async () => {
     const runner = makeRunner()

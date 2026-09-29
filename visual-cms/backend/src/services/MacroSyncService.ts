@@ -20,7 +20,7 @@
  */
 
 import { MacroSellClient, type MacroHouse, type MacroFlatPlan } from './MacroSellClient'
-import { mapApartments, type ApartmentPayload } from './MacroEstateMapper'
+import { houseServiceDate, mapApartments, type ApartmentPayload } from './MacroEstateMapper'
 import {
   groupPlanTypes,
   selectProbeTargets,
@@ -178,12 +178,16 @@ export class MacroSyncService {
     const folderPath = [PLAN_FOLDER_ROOT, projectName]
     const withImages = await this.importImages(planTypes, folderPath)
 
+    // Срок сдачи шлём, только если дом из CRM получили: иначе estate стёр бы
+    // прежний срок из-за сбоя одного запроса.
+    const serviceDate = house ? houseServiceDate(house) : null
     const result = await this.estate.syncHouse({
       externalHouseId,
       house: {
         name: house?.name ?? '',
         floorsCount: house?.floorsCount ?? null,
         address: house?.address ?? '',
+        ...(serviceDate ? { inServiceYear: serviceDate.year, inServiceMonth: serviceDate.month } : {}),
       },
       planTypes: withImages.map((planType) => ({
         signature: planType.signature,

@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import type { ComplexDetail, Locale } from '../types'
 import { estateApi } from '../api'
 import { SECTION, sectionsFor } from '../sections'
 import { LocaleTabs } from './fields'
 import { ComplexForm } from './ComplexForm'
-import { HouseCard } from './HouseCard'
+import { AddHouseForm, HouseCard } from './HouseCard'
+import { isRu } from './tfield'
 import { PlanGroupingPanel } from './PlanGroupingPanel'
 import { ProjectSyncButton } from './ProjectSyncButton'
 import { SectionNav } from './SectionNav'
@@ -49,20 +50,17 @@ export const EstateEditor: React.FC = () => {
     load()
   }, [load])
 
-  const reload = async () => {
+  // После синхронизации дома получили данные CRM (название, этажность, срок):
+  // карточки домов перечитывают их заново, превью планировок пересчитывается.
+  const onSynced = useCallback(async () => {
     await load()
     setVersion((v) => v + 1)
-  }
-
-  const onSynced = useCallback(() => {
-    load()
     setSyncToken((t) => t + 1)
   }, [load])
 
-  const addHouse = async () => {
-    await estateApi.createHouse(id, { name: 'Новый корпус', order: complex?.houses.length || 0 })
-    reload()
-  }
+  const houseIds = (complex?.houses ?? [])
+    .map((h) => h.externalId)
+    .filter((externalId): externalId is number => typeof externalId === 'number')
 
   if (loading && !complex) return <div className="p-8 text-gray-500">Загрузка…</div>
   if (!complex) return <div className="p-8 text-red-600">{error ?? 'ЖК не найден'}</div>
@@ -81,7 +79,7 @@ export const EstateEditor: React.FC = () => {
           <div className="flex flex-wrap items-center gap-4">
             {error && <span className="text-sm text-red-600">{error}</span>}
             <LocaleTabs active={locale} onChange={setLocale} className="mb-0 border-b-0" />
-            <ProjectSyncButton externalHouseId={complex.externalHouseId} onFinished={onSynced} />
+            <ProjectSyncButton externalHouseIds={houseIds} onFinished={onSynced} />
             <div ref={setActionsSlot} data-testid="estate-actions" />
           </div>
         </div>
@@ -95,7 +93,13 @@ export const EstateEditor: React.FC = () => {
               перемонтируют форму комплекса, иначе несохранённые правки проекта
               затираются серверными данными. Комплекс правится только своей кнопкой
               «Сохранить ЖК». */}
-          <ComplexForm key={`complex-${complex.id}`} complex={complex} locale={locale} actionsSlot={actionsSlot} />
+          <ComplexForm
+            key={`complex-${complex.id}`}
+            complex={complex}
+            locale={locale}
+            actionsSlot={actionsSlot}
+            onSaved={load}
+          />
 
           {/* Склейка не зависит от языка и сохраняется своей кнопкой; ключ по id
               по той же причине, что у формы: reload после правки домов не должен
@@ -110,19 +114,25 @@ export const EstateEditor: React.FC = () => {
           </div>
 
           <div id={SECTION.houses} className="space-y-4 scroll-mt-24">
-            <div className="flex items-center justify-between">
+            <div>
               <h2 className="text-lg font-semibold text-gray-900">Дома / корпуса</h2>
-              <button
-                onClick={addHouse}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-md text-sm hover:bg-gray-200"
-              >
-                <Plus size={16} /> Добавить дом
-              </button>
+              <p className="text-sm text-gray-500">
+                Дом — единица MacroCRM; проект их объединяет в одну страницу и, по выбору, одну карточку на главной.
+              </p>
             </div>
             {complex.houses.map((house) => (
-              <HouseCard key={`${house.id}-${version}`} house={house} locale={locale} onChanged={reload} />
+              <HouseCard
+                key={`${house.id}-${version}`}
+                house={house}
+                project={complex}
+                locale={locale}
+                onChanged={load}
+              />
             ))}
             {complex.houses.length === 0 && <p className="text-sm text-gray-400">Пока нет домов.</p>}
+            {isRu(locale) && (
+              <AddHouseForm complexId={complex.id} nextOrder={complex.houses.length} onAdded={load} />
+            )}
           </div>
         </div>
       </div>

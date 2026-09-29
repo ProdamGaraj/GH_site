@@ -23,8 +23,8 @@ export interface ComplexListItem {
   /** Проект на сайте (карточка на главной и страница). */
   showOnSite: boolean
   order: number
-  /** ID дома в MacroCRM; null — проект не синхронизируется. */
-  externalHouseId: number | null
+  /** Сколько домов проекта связано с MacroCRM; 0 — проект не синхронизируется. */
+  crmHouses: number
 }
 
 export interface Apartment {
@@ -47,18 +47,39 @@ export interface Apartment {
   translations: TranslationsByLocale
 }
 
+/**
+ * Дом / корпус — единица MacroCRM. Проект объединяет дома; своё поле дома
+ * главнее, пустое берётся из проекта.
+ */
 export interface House {
   id: string
   complexId: string
   order: number
+  /** ID дома в MacroCRM — связь с CRM; null — дом не синхронизируется. */
+  externalId: number | null
   name: string
   floors: string
+  /** Ручной срок сдачи; пусто — срок из CRM (`crmDeadline`). */
   deadline: string
+  /** Срок сдачи из CRM строкой (ru), только для показа; пусто — в CRM нет. */
+  crmDeadline?: string
   className: string
   entrances: number | null
+  // Карточка дома на главной (проект показывается домами).
+  showOnSite: boolean
+  /** active | sold_out */
+  status: string
+  intro: string
+  cardImage: string
+  cardTags: string[]
+  /** '' — как у проекта. */
+  filterClass: string
   translations: TranslationsByLocale
   apartments: Apartment[]
 }
+
+/** Как проект стоит на главной: одной карточкой или карточками своих домов. */
+export type CatalogMode = 'project' | 'houses'
 
 export interface ComplexDetail {
   id: string
@@ -73,6 +94,8 @@ export interface ComplexDetail {
   cardImage: string
   /** Теги карточки на главной (переводимые). */
   cardTags: string[]
+  /** На главной: одна карточка проекта ('project') или карточки домов ('houses'). */
+  catalogMode?: CatalogMode
   /**
    * ID ДОМА в MacroCRM (houseId), не ЖК.
    *

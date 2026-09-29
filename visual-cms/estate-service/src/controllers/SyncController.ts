@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { EntityManager } from 'typeorm'
+import { EntityManager, IsNull, Not } from 'typeorm'
 import { AppDataSource } from '../config/database'
 import { Complex } from '../models/Complex'
 import { House } from '../models/House'
@@ -116,7 +116,7 @@ export class SyncController {
       logger.info('House synced', { externalHouseId: body.externalHouseId, ...summary })
       res.json(summary)
     } catch (err) {
-      if (err instanceof ComplexNotFound) {
+      if (err instanceof HouseNotFound) {
         res.status(404).json({ error: err.message })
         return
       }
@@ -125,18 +125,45 @@ export class SyncController {
     }
   }
 
+  /**
+   * GET /api/admin/sync/houses — дома, связанные с MacroCRM: их и
+   * синхронизируем. Все проекты, в том числе снятые с сайта: данные
+   * готовятся заранее, до публикации.
+   */
+  static async syncableHouses(_req: Request, res: Response): Promise<void> {
+    try {
+      const houses = await AppDataSource.getRepository(House).find({
+        where: { externalId: Not(IsNull()) },
+        relations: { complex: true },
+        order: { order: 'ASC' },
+      })
+      res.json(
+        houses.map((h) => ({
+          externalHouseId: h.externalId,
+          houseId: h.id,
+          name: h.name,
+          complexSlug: h.complex?.slug ?? '',
+        }))
+      )
+    } catch (err) {
+      logger.error('Syncable houses failed', err instanceof Error ? err : undefined)
+      res.status(500).json({ error: 'Failed to list houses' })
+    }
+  }
+
   private static async apply(m: EntityManager, body: SyncHouseBody) {
-    const complex = await m.getRepository(Complex).findOne({
-      where: { externalHouseId: body.externalHouseId },
+    const house = await m.getRepository(House).findOne({
+      where: { externalId: body.externalHouseId },
+      relations: { complex: true },
     })
-    if (!complex) {
-      throw new ComplexNotFound(
-        `Нет проекта с externalHouseId ${body.externalHouseId}. ` +
-          'Проект заводится вручную — синк создаёт только квартиры и планировки.'
+    if (!house || !house.complex) {
+      throw new HouseNotFound(
+        `Нет дома с ID ${body.externalHouseId} из MacroCRM. ` +
+          'Дом заводится в проекте вручную — синк только наполняет его квартирами и планировками.'
       )
     }
-
-    const house = await SyncController.ensureHouse(m, complex, body)
+    const complex = house.complex
+    await SyncController.updateHouseFromCrm(m, house, body)
 
     const plans = await SyncController.applyPlanTypes(m, complex, house, body)
     const apartmentsDiff = await SyncController.applyApartments(
@@ -150,45 +177,18 @@ export class SyncController {
   }
 
   /**
-   * Находит дом по внешнему id или заводит новый в этом проекте.
-   *
-   * У проекта может быть дом, заведённый руками до подключения CRM. Такой дом
-   * подхватывается по совпадению порядка, только если он единственный и без
-   * внешнего id: иначе синк создал бы дубль рядом с сидом, и на странице
-   * появились бы два одинаковых корпуса.
+   * Сведения о доме из CRM. Название — только в пустое: ручное не перетираем.
+   * Этажность и срок сдачи — из CRM (ручной срок живёт в `deadline` отдельно
+   * и главнее на сайте). Срок пишем, только если CRM про дом спрашивали.
    */
-  private static async ensureHouse(
-    m: EntityManager,
-    complex: Complex,
-    body: SyncHouseBody
-  ): Promise<House> {
-    const repo = m.getRepository(House)
-
-    const byExternal = await repo.findOne({ where: { externalId: body.externalHouseId } })
-    if (byExternal) {
-      byExternal.externalId = body.externalHouseId
-      if (body.house.name) byExternal.name = byExternal.name || body.house.name
-      if (body.house.floorsCount) byExternal.floors = String(body.house.floorsCount)
-      return repo.save(byExternal)
+  private static async updateHouseFromCrm(m: EntityManager, house: House, body: SyncHouseBody): Promise<void> {
+    if (body.house.name && !house.name) house.name = body.house.name
+    if (body.house.floorsCount) house.floors = String(body.house.floorsCount)
+    if (body.house.inServiceYear !== undefined) {
+      house.crmServiceYear = body.house.inServiceYear ?? null
+      house.crmServiceMonth = body.house.inServiceMonth ?? null
     }
-
-    const ownHouses = await repo.find({ where: { complexId: complex.id } })
-    const adoptable = ownHouses.length === 1 && !ownHouses[0].externalId ? ownHouses[0] : null
-    if (adoptable) {
-      adoptable.externalId = body.externalHouseId
-      if (body.house.floorsCount) adoptable.floors = String(body.house.floorsCount)
-      return repo.save(adoptable)
-    }
-
-    return repo.save(
-      repo.create({
-        complexId: complex.id,
-        externalId: body.externalHouseId,
-        name: body.house.name,
-        floors: body.house.floorsCount ? String(body.house.floorsCount) : '',
-        order: ownHouses.length,
-      })
-    )
+    await m.getRepository(House).save(house)
   }
 
   private static async applyPlanTypes(
@@ -279,4 +279,4 @@ export class SyncController {
   }
 }
 
-class ComplexNotFound extends Error {}
+class HouseNotFound extends Error {}

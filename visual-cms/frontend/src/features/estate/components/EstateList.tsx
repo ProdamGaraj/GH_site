@@ -146,12 +146,12 @@ export const EstateList: React.FC = () => {
                     не на сайте
                   </span>
                 )}
-                {/* Пустой ID дома молча выключает проект из синхронизации —
+                {/* Проект без домов с ID из CRM молча выпадает из синхронизации —
                     без пометки это видно только по нулям в журнале прогона. */}
-                {item.externalHouseId === null && (
+                {!item.crmHouses && (
                   <span
                     className="ml-2 text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded"
-                    title="Не заполнен ID дома в MacroCRM — синхронизация обходит проект стороной"
+                    title="Ни у одного дома проекта нет ID из MacroCRM — синхронизация обходит проект стороной"
                   >
                     без CRM
                   </span>

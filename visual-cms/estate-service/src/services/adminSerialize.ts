@@ -10,6 +10,7 @@ import {
   HOUSE_TR_FIELDS,
   APARTMENT_TR_FIELDS,
   TrRow,
+  formatServiceDate,
 } from './i18n'
 
 type FieldKind = 'string' | 'json'
@@ -147,6 +148,12 @@ export function buildComplexAdmin(
     .filter((h) => h.complexId === complex.id)
     .map((h) => ({
       ...withTranslations(h, trMap),
+      // Срок из CRM строкой — админка показывает его рядом с ручным.
+      crmDeadline: formatServiceDate(
+        h.crmServiceYear as number | null | undefined,
+        h.crmServiceMonth as number | null | undefined,
+        'ru'
+      ),
       apartments: sortByOrder(aptsByHouse.get(h.id) || []).map((a) => withTranslations(a, trMap)),
     }))
 

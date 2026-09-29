@@ -19,7 +19,16 @@ const HOUSE = 5139395
  * planPer — сколько квартир делят одну планировку.
  */
 function makeMacro(
-  options: { apartments?: any[]; planPer?: number; failPlanFor?: number[]; houseName?: string } = {}
+  options: {
+    apartments?: any[]
+    planPer?: number
+    failPlanFor?: number[]
+    houseName?: string
+    /** Поля дома в CRM сверх обязательных (срок сдачи). */
+    houseExtra?: Record<string, unknown>
+    /** estateHouses/list падает — дом из CRM не получен. */
+    housesFail?: boolean
+  } = {}
 ) {
   const apartments = options.apartments ?? FIXTURE.slice(0, 10)
   const planPer = options.planPer ?? 5
@@ -31,6 +40,7 @@ function makeMacro(
     const body = JSON.parse(String(init.body))
 
     if (path.endsWith('/estateHouses/list')) {
+      if (options.housesFail) return json({ error: 'boom' }, 500)
       return json({
         data: [
           {
@@ -38,6 +48,7 @@ function makeMacro(
             complexId: 5139393,
             name: options.houseName !== undefined ? options.houseName : 'Дом',
             floorsCount: 15,
+            ...options.houseExtra,
           },
         ],
         meta: { next: null },
@@ -87,7 +98,7 @@ function json(body: any, status = 200) {
 function makeEstate(known: KnownApartment[] = [], planTypes: any[] = []) {
   const sent: any[] = []
   const api = {
-    listSyncableComplexes: jest.fn(async () => []),
+    listSyncableHouses: jest.fn(async () => []),
     getHouseState: jest.fn(async () => ({ known, planTypes })),
     syncHouse: jest.fn(async (payload: any) => {
       sent.push(payload)
@@ -719,5 +730,29 @@ describe('сводка прогона', () => {
     expect(summary.apartmentsSeen).toBe(20)
     expect(summary.plansProbed).toBe(20)
     expect(summary.planTypesUpserted).toBe(4)
+  })
+})
+
+describe('срок сдачи дома из CRM', () => {
+  it('год и месяц из CRM доезжают до estate', async () => {
+    const { client } = makeMacro({ houseExtra: { inServiceYear: 2028, inServiceMonth: 5 } })
+    const { api, sent } = makeEstate()
+    await new MacroSyncService({ client, estate: api, importer: makeImporter() }).syncHouse(HOUSE)
+    expect(sent[0].house).toMatchObject({ inServiceYear: 2028, inServiceMonth: 5 })
+  })
+
+  it('в CRM срока нет — шлём null: estate сотрёт устаревший', async () => {
+    const { client } = makeMacro()
+    const { api, sent } = makeEstate()
+    await new MacroSyncService({ client, estate: api, importer: makeImporter() }).syncHouse(HOUSE)
+    expect(sent[0].house).toMatchObject({ inServiceYear: null, inServiceMonth: null })
+  })
+
+  it('дом из CRM не получили — срок не шлём вовсе, прежний в estate цел', async () => {
+    const { client } = makeMacro({ housesFail: true })
+    const { api, sent } = makeEstate()
+    await new MacroSyncService({ client, estate: api, importer: makeImporter() }).syncHouse(HOUSE)
+    expect(sent[0].house).not.toHaveProperty('inServiceYear')
+    expect(sent[0].house).not.toHaveProperty('inServiceMonth')
   })
 })
