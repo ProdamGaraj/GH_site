@@ -5,11 +5,8 @@ import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-li
 vi.mock('../api', () => ({
   estateApi: { updateHouse: vi.fn(async () => ({ ok: true })), deleteHouse: vi.fn(async () => ({ ok: true })) },
 }))
-vi.mock('@/features/media/MediaPicker', () => ({ MediaPicker: () => null }))
-vi.mock('@/features/media/useProjectVariantWidths', () => ({ useProjectVariantWidths: () => [] }))
 
 import { estateApi } from '../api'
-import { testComplex } from '../testComplex.fixture'
 import type { House, Locale } from '../types'
 import { HouseCard } from './HouseCard'
 
@@ -25,23 +22,16 @@ function house(over: Partial<House> = {}): House {
     crmDeadline: '2 кв. 2028',
     className: '',
     entrances: null,
-    showOnSite: true,
-    status: 'active',
-    intro: '',
-    cardImage: '',
-    cardTags: [],
-    filterClass: '',
     translations: {},
     apartments: [{ status: 'available' }, { status: 'sold' }] as any,
     ...over,
   }
 }
 
-const byHouses = testComplex({ catalogMode: 'houses', cardTags: ['Рассрочка'], intro: 'Текст проекта' })
 const onChanged = vi.fn()
 
-function mount(h: House, project = byHouses, locale: Locale = 'ru') {
-  render(<HouseCard house={h} project={project} locale={locale} onChanged={onChanged} />)
+function mount(h: House, locale: Locale = 'ru') {
+  render(<HouseCard house={h} locale={locale} onChanged={onChanged} />)
   return screen.getByTestId('house-card')
 }
 
@@ -67,45 +57,60 @@ describe('HouseCard', () => {
     expect(within(card).getByText('вручную · CRM: 2 кв. 2028')).toBeTruthy()
   })
 
-  it('проект одной карточкой — полей карточки дома нет, есть подсказка, где переключить', () => {
-    const card = mount(house(), testComplex({ catalogMode: 'project' }))
-    expect(within(card).queryByTestId('house-card-fields')).toBeNull()
-    expect(within(card).getByText(/«Сайт и карточка» → «На главной»/)).toBeTruthy()
+  it('полей проекта у дома нет: ни карточки на главной, ни страницы, ни адреса', () => {
+    const card = mount(house())
+    for (const testId of ['house-card-fields', 'house-card-unused', 'house-page']) {
+      expect(within(card).queryByTestId(testId)).toBeNull()
+    }
+    expect(within(card).queryByLabelText(/Показывать на сайте/)).toBeNull()
+    expect(within(card).queryByText(/Адрес страницы дома/)).toBeNull()
+    // ru: ID, название, срок, класс, порядок — и больше ничего.
+    expect(within(card).getAllByRole('textbox')).toHaveLength(3)
+    expect(within(card).getAllByRole('spinbutton')).toHaveLength(2)
   })
 
-  it('проект домами — карточка дома с подсказками «как у проекта»', () => {
-    const card = mount(house())
-    const fields = within(card).getByTestId('house-card-fields')
-    expect(within(fields).getByText(/пусто — как у проекта: Рассрочка/)).toBeTruthy()
-    expect((within(fields).getByLabelText(/Показывать на главной/) as HTMLInputElement).checked).toBe(true)
-    expect((within(fields).getByDisplayValue(/Как у проекта/) as HTMLSelectElement).value).toBe('')
+  it('класс дома: своё поле дома, сохраняется в доме', async () => {
+    const card = mount(house({ className: 'Комфорт' }))
+    const cls = within(card).getByDisplayValue('Комфорт')
+    fireEvent.change(cls, { target: { value: 'Комфорт+' } })
+    fireEvent.click(within(card).getByRole('button', { name: /Сохранить/ }))
+    await waitFor(() => expect(estateApi.updateHouse).toHaveBeenCalled())
+    expect(vi.mocked(estateApi.updateHouse).mock.calls[0][1]).toMatchObject({ className: 'Комфорт+' })
   })
 
-  it('сохранение: ID из CRM и поля карточки; срок из CRM и квартиры не отправляются', async () => {
+  it('сводка квартир и этажность — со ссылкой на группы планировок', () => {
+    const text = within(mount(house())).getByTestId('house-apartments').textContent ?? ''
+    expect(text).toMatch(/этажей 16/)
+    expect(text).toMatch(/«Планировки на сайте»/)
+  })
+
+  it('сохранение: ID из CRM, название, срок; срок из CRM и квартиры не отправляются', async () => {
     const card = mount(house())
-    const fields = within(card).getByTestId('house-card-fields')
-    fireEvent.click(within(fields).getByLabelText(/Показывать на главной/))
-    fireEvent.change(within(fields).getByDisplayValue('Продаётся'), { target: { value: 'sold_out' } })
+    const [name] = within(card).getAllByRole('textbox')
+    fireEvent.change(name, { target: { value: 'Дустлик-4А' } })
     fireEvent.click(within(card).getByRole('button', { name: /Сохранить/ }))
     await waitFor(() => expect(estateApi.updateHouse).toHaveBeenCalled())
     const [id, body] = vi.mocked(estateApi.updateHouse).mock.calls[0] as unknown as [string, Record<string, unknown>]
     expect(id).toBe('h1')
-    expect(body).toMatchObject({ externalId: 5622025, showOnSite: false, status: 'sold_out' })
+    expect(body).toMatchObject({ externalId: 5622025, name: 'Дустлик-4А' })
     for (const key of ['apartments', 'crmDeadline', 'crmServiceYear', 'crmServiceMonth', 'id', 'complexId']) {
       expect(body).not.toHaveProperty(key)
     }
     expect(onChanged).toHaveBeenCalled()
   })
 
-  it('перевод: название, срок и тексты карточки — в translations.uz', async () => {
-    const card = mount(house(), byHouses, 'uz')
-    const [name] = within(card).getAllByRole('textbox')
+  it('перевод: название, срок и класс — в translations.uz; ID и порядок только на ru', async () => {
+    const card = mount(house({ className: 'Комфорт' }), 'uz')
+    expect(within(card).queryAllByRole('spinbutton')).toHaveLength(0)
+    const [name, , cls] = within(card).getAllByRole('textbox') as HTMLInputElement[]
+    expect(cls.placeholder).toBe('Комфорт')
     fireEvent.change(name, { target: { value: 'Doʼstlik-4' } })
+    fireEvent.change(cls, { target: { value: 'Komfort' } })
     fireEvent.click(within(card).getByRole('button', { name: /Сохранить/ }))
     await waitFor(() => expect(estateApi.updateHouse).toHaveBeenCalled())
     const body = vi.mocked(estateApi.updateHouse).mock.calls[0][1] as any
-    expect(body.translations.uz.name).toBe('Doʼstlik-4')
-    expect(body.name).toBe('Дустлик-4')
+    expect(body.translations.uz).toMatchObject({ name: 'Doʼstlik-4', className: 'Komfort' })
+    expect(body).toMatchObject({ name: 'Дустлик-4', className: 'Комфорт' })
   })
 
   it('ошибка сохранения (занятый ID) видна в шапке', async () => {

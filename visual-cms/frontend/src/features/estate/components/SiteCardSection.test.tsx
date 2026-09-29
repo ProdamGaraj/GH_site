@@ -61,14 +61,6 @@ describe('SiteCardSection — ru', () => {
     expect(form.current.filterClass).toBe('comfort')
   })
 
-  it('«На главной»: одной карточкой проекта (по умолчанию) или карточками домов', () => {
-    const form = setup(complex())
-    const select = section().getByDisplayValue('Одной карточкой проекта') as HTMLSelectElement
-    expect(Array.from(select.options).map((o) => o.value)).toEqual(['project', 'houses'])
-    fireEvent.change(select, { target: { value: 'houses' } })
-    expect(form.current.catalogMode).toBe('houses')
-  })
-
   it('картинка и теги карточки', () => {
     const form = setup(complex())
     fireEvent.change(section().getByLabelText('Картинка карточки'), { target: { value: '/media/card.jpg' } })

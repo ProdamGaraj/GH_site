@@ -31,11 +31,12 @@ import { estateApi } from '../api'
 import { testComplex } from '../testComplex.fixture'
 import { EstateEditor } from './EstateEditor'
 
-/** «Добавить дом»: ID из MacroCRM и кнопка. */
+/** «Добавить дом»: раскрыть форму, ID из MacroCRM, «Добавить». */
 function addHouse(externalId: string) {
+  if (!screen.queryByTestId('add-house')) fireEvent.click(screen.getByTestId('add-house-open'))
   const form = screen.getByTestId('add-house')
   fireEvent.change(within(form).getByRole('spinbutton'), { target: { value: externalId } })
-  fireEvent.click(within(form).getByRole('button', { name: /Добавить дом/ }))
+  fireEvent.click(within(form).getByRole('button', { name: /^Добавить$/ }))
 }
 
 function mount() {
@@ -84,15 +85,20 @@ describe('EstateEditor', () => {
     expect(screen.getByLabelText('Логотип')).toBeTruthy()
   })
 
-  it('«Добавить дом» без ID из CRM недоступен; занятый ID — сообщение сервера', async () => {
+  it('«Добавить дом» свёрнут в кнопку; без ID из CRM не добавить; занятый ID — сообщение сервера', async () => {
     mount()
-    const form = await screen.findByTestId('add-house')
-    expect((within(form).getByRole('button', { name: /Добавить дом/ }) as HTMLButtonElement).disabled).toBe(true)
+    // Свёрнута: полей «ID» и «Название» под домами не видно.
+    fireEvent.click(await screen.findByTestId('add-house-open'))
+    const form = screen.getByTestId('add-house')
+    expect((within(form).getByRole('button', { name: /^Добавить$/ }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(within(form).getByRole('button', { name: 'Отмена' }))
+    expect(screen.queryByTestId('add-house')).toBeNull()
     vi.mocked(estateApi.createHouse).mockRejectedValueOnce(
       new Error('Дом с ID 5622025 из MacroCRM уже есть: «Дустлик-4» в проекте «Doʼstlik»')
     )
     addHouse('5622025')
-    expect(await within(form).findByText(/уже есть: «Дустлик-4»/)).toBeTruthy()
+    // Форма раскрыта заново — ищем в новой.
+    expect(await within(screen.getByTestId('add-house')).findByText(/уже есть: «Дустлик-4»/)).toBeTruthy()
   })
 
   it('кнопка проекта синхронизирует его дома с ID из CRM', async () => {

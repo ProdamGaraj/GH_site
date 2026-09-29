@@ -117,17 +117,12 @@ export const EstateEditor: React.FC = () => {
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Дома / корпуса</h2>
               <p className="text-sm text-gray-500">
-                Дом — единица MacroCRM; проект их объединяет в одну страницу и, по выбору, одну карточку на главной.
+                Дом — единица MacroCRM: даёт странице проекта квартиры, планировки и срок сдачи. Страница и
+                карточка на главной — у проекта.
               </p>
             </div>
             {complex.houses.map((house) => (
-              <HouseCard
-                key={`${house.id}-${version}`}
-                house={house}
-                project={complex}
-                locale={locale}
-                onChanged={load}
-              />
+              <HouseCard key={`${house.id}-${version}`} house={house} locale={locale} onChanged={load} />
             ))}
             {complex.houses.length === 0 && <p className="text-sm text-gray-400">Пока нет домов.</p>}
             {isRu(locale) && (

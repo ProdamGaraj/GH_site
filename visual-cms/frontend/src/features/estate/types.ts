@@ -48,8 +48,8 @@ export interface Apartment {
 }
 
 /**
- * Дом / корпус — единица MacroCRM. Проект объединяет дома; своё поле дома
- * главнее, пустое берётся из проекта.
+ * Дом / корпус — единица MacroCRM. Проект объединяет дома; полей проекта дом
+ * не меняет — даёт странице проекта квартиры, планировки и срок сдачи.
  */
 export interface House {
   id: string
@@ -65,21 +65,9 @@ export interface House {
   crmDeadline?: string
   className: string
   entrances: number | null
-  // Карточка дома на главной (проект показывается домами).
-  showOnSite: boolean
-  /** active | sold_out */
-  status: string
-  intro: string
-  cardImage: string
-  cardTags: string[]
-  /** '' — как у проекта. */
-  filterClass: string
   translations: TranslationsByLocale
   apartments: Apartment[]
 }
-
-/** Как проект стоит на главной: одной карточкой или карточками своих домов. */
-export type CatalogMode = 'project' | 'houses'
 
 export interface ComplexDetail {
   id: string
@@ -94,8 +82,6 @@ export interface ComplexDetail {
   cardImage: string
   /** Теги карточки на главной (переводимые). */
   cardTags: string[]
-  /** На главной: одна карточка проекта ('project') или карточки домов ('houses'). */
-  catalogMode?: CatalogMode
   /**
    * ID ДОМА в MacroCRM (houseId), не ЖК.
    *

@@ -1,37 +1,33 @@
 import React, { useState } from 'react'
 import { Save, Trash2, ChevronDown, ChevronRight, Plus } from 'lucide-react'
-import type { ComplexDetail, House, Locale } from '../types'
+import type { House, Locale } from '../types'
 import { estateApi } from '../api'
 import { apartmentSummary } from '../houseSummary'
 import { SECTION } from '../sections'
 import { getT, setT, isRu } from './tfield'
-import { CheckboxField, NumberField, SelectField, StringListField, TextArea, TextField } from './fields'
-import { MediaField } from './mediaFields'
-import { FILTER_CLASSES } from './SiteCardSection'
+import { NumberField, TextField } from './fields'
 
 /**
  * Дом / корпус — единица MacroCRM; проект объединяет дома.
  *
  * Из CRM: ID (по нему синхронизация), этажность, квартиры, срок сдачи. Срок
- * можно вписать вручную — он главнее CRM. Когда проект стоит на главной
- * карточками домов, у дома своя карточка: пустое поле берётся из проекта.
+ * можно вписать вручную — он главнее CRM. Полей проекта дом не меняет:
+ * страница и карточка на главной — у проекта, дом даёт им квартиры,
+ * планировки и срок сдачи.
  *
  * Квартир списком здесь нет: они приходят из CRM, данные для сайта правятся у
  * групп планировок.
  */
 export const HouseCard: React.FC<{
   house: House
-  /** Проект дома: режим каталога и значения «как у проекта». */
-  project: ComplexDetail
   locale: Locale
   onChanged: () => void
-}> = ({ house, project, locale, onChanged }) => {
+}> = ({ house, locale, onChanged }) => {
   const [form, setForm] = useState<House>(house)
   const [open, setOpen] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const ru = isRu(locale)
-  const byHouses = project.catalogMode === 'houses'
 
   // Переводимое поле: на ru — база, на uz/en — перевод с подсказкой-оригиналом.
   const tprops = (field: keyof House, fallback = '') => ({
@@ -46,8 +42,7 @@ export const HouseCard: React.FC<{
     setMsg(null)
     try {
       // Срок из CRM и квартиры пишет синхронизация, не форма.
-      const { id, complexId, apartments, translations, crmDeadline, crmServiceYear, crmServiceMonth, ...base } =
-        form as any
+      const { id, complexId, apartments, translations, crmDeadline, crmServiceYear, crmServiceMonth, ...base } = form as any
       await estateApi.updateHouse(house.id, { ...base, translations })
       setMsg('✓ сохранён')
       onChanged()
@@ -95,9 +90,6 @@ export const HouseCard: React.FC<{
               без CRM
             </span>
           )}
-          {byHouses && house.showOnSite === false && (
-            <span className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-600">не на главной</span>
-          )}
         </button>
         <div className="flex items-center gap-3">
           {msg && <span className="text-xs text-gray-500 max-w-[20rem] truncate" title={msg}>{msg}</span>}
@@ -116,7 +108,7 @@ export const HouseCard: React.FC<{
 
       {open && (
         <div className="p-4 space-y-4">
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
             {ru && (
               <NumberField
                 label="ID дома в MacroCRM"
@@ -131,6 +123,7 @@ export const HouseCard: React.FC<{
               {...tprops('deadline', crmDeadline)}
               hint={ru ? deadlineHint : 'перевод (пусто = ru, потом CRM)'}
             />
+            <TextField label="Класс" {...tprops('className')} />
             {ru && (
               <NumberField
                 label="Порядок"
@@ -150,89 +143,7 @@ export const HouseCard: React.FC<{
             </a>
             .
           </p>
-
-          {byHouses ? (
-            <HouseCardFields form={form} setForm={setForm} project={project} locale={locale} tprops={tprops} />
-          ) : (
-            <p className="text-xs text-gray-400">
-              Проект стоит на главной одной карточкой — карточка дома не используется. Показать дома отдельными
-              карточками: «Сайт и карточка» → «На главной».
-            </p>
-          )}
         </div>
-      )}
-    </div>
-  )
-}
-
-/** Карточка дома на главной: своё поле главнее, пустое — как у проекта. */
-const HouseCardFields: React.FC<{
-  form: House
-  setForm: React.Dispatch<React.SetStateAction<House>>
-  project: ComplexDetail
-  locale: Locale
-  tprops: (field: keyof House, fallback?: string) => {
-    value: string
-    onChange: (v: string) => void
-    placeholder: string
-    hint: string | undefined
-  }
-}> = ({ form, setForm, project, locale, tprops }) => {
-  const ru = isRu(locale)
-  const projectTags = project.cardTags ?? []
-  const houseTags = ((ru ? form.cardTags : getT(form, 'cardTags', locale)) as string[] | undefined) ?? []
-  const tagsHint = `пусто — как у проекта${projectTags.length ? `: ${projectTags.join(', ')}` : ''}`
-  const projectFilter = FILTER_CLASSES.find((c) => c.value === (project.filterClass || 'business'))?.label ?? ''
-
-  return (
-    <div className="rounded-md border border-gray-200 bg-gray-50 p-4 space-y-4" data-testid="house-card-fields">
-      <h4 className="text-xs font-semibold uppercase text-gray-500">
-        Карточка дома на главной{ru ? '' : ' — перевод'}
-      </h4>
-      {ru && (
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 items-end">
-          <CheckboxField
-            label="Показывать на главной"
-            checked={form.showOnSite !== false}
-            onChange={(v) => setForm((f) => ({ ...f, showOnSite: v }))}
-          />
-          <SelectField
-            label="Статус"
-            value={form.status || 'active'}
-            options={[
-              { value: 'active', label: 'Продаётся' },
-              { value: 'sold_out', label: 'Распродано' },
-            ]}
-            onChange={(v) => setForm((f) => ({ ...f, status: v }))}
-          />
-          <SelectField
-            label="Класс для фильтра"
-            value={form.filterClass || ''}
-            options={[{ value: '', label: `Как у проекта (${projectFilter})` }, ...FILTER_CLASSES]}
-            onChange={(v) => setForm((f) => ({ ...f, filterClass: v }))}
-          />
-          <TextField label="Класс на карточке" {...tprops('className', project.className)} />
-        </div>
-      )}
-      {!ru && <TextField label="Класс на карточке" {...tprops('className', project.className)} />}
-      <div className="grid xl:grid-cols-2 gap-4 items-start">
-        <TextArea label="Описание" rows={3} {...tprops('intro', project.intro)} />
-        <StringListField
-          label="Теги"
-          hint={tagsHint}
-          value={houseTags}
-          onChange={(v) =>
-            setForm((f) => (ru ? { ...f, cardTags: v } : setT(f, 'cardTags', locale, v.length ? v : undefined)))
-          }
-        />
-      </div>
-      {ru && (
-        <MediaField
-          label="Картинка карточки"
-          hint="пусто — как у проекта"
-          value={form.cardImage ?? ''}
-          onChange={(v) => setForm((f) => ({ ...f, cardImage: v }))}
-        />
       )}
     </div>
   )
@@ -247,10 +158,20 @@ export const AddHouseForm: React.FC<{
   nextOrder: number
   onAdded: () => void
 }> = ({ complexId, nextOrder, onAdded }) => {
+  // Свёрнута в кнопку: открытая форма с полями «ID» и «Название» выглядела
+  // как ещё один дом под настоящими.
+  const [open, setOpen] = useState(false)
   const [externalId, setExternalId] = useState<number | null>(null)
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const close = () => {
+    setOpen(false)
+    setExternalId(null)
+    setName('')
+    setError(null)
+  }
 
   const add = async () => {
     if (!externalId) return
@@ -258,8 +179,7 @@ export const AddHouseForm: React.FC<{
     setError(null)
     try {
       await estateApi.createHouse(complexId, { externalId, name: name.trim(), order: nextOrder })
-      setExternalId(null)
-      setName('')
+      close()
       onAdded()
     } catch (e: any) {
       setError(e?.message || 'Не удалось добавить дом')
@@ -268,8 +188,21 @@ export const AddHouseForm: React.FC<{
     }
   }
 
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        data-testid="add-house-open"
+        className="flex items-center gap-2 px-4 py-2 rounded-md text-sm text-primary-700 border border-dashed border-primary-300 hover:bg-primary-50"
+      >
+        <Plus size={16} /> Добавить дом
+      </button>
+    )
+  }
+
   return (
-    <div className="bg-white rounded-lg border border-dashed border-gray-300 p-4 space-y-2" data-testid="add-house">
+    <div className="bg-primary-50/40 rounded-lg border border-dashed border-primary-300 p-4 space-y-3" data-testid="add-house">
+      <h3 className="text-sm font-semibold text-gray-700">Новый дом</h3>
       <div className="flex flex-wrap items-end gap-3">
         <div className="w-48">
           <NumberField label="ID дома в MacroCRM" value={externalId} onChange={setExternalId} />
@@ -280,9 +213,12 @@ export const AddHouseForm: React.FC<{
         <button
           onClick={add}
           disabled={!externalId || busy}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-md text-sm hover:bg-gray-200 disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-md text-sm hover:bg-primary-700 disabled:opacity-50"
         >
-          <Plus size={16} /> Добавить дом
+          <Plus size={16} /> Добавить
+        </button>
+        <button onClick={close} className="px-3 py-2 text-sm text-gray-500 hover:text-gray-800">
+          Отмена
         </button>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}

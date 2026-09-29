@@ -1,20 +1,15 @@
 import React from 'react'
-import type { CatalogMode, ComplexDetail, Locale } from '../types'
+import type { ComplexDetail, Locale } from '../types'
 import { getT, isRu, setT } from './tfield'
 import { SECTION } from '../sections'
 import { CheckboxField, FormSection, SelectField, StringListField } from './fields'
 import { MediaField } from './mediaFields'
 
 /** Класс карточки для фильтра на главной — те же ключи, что у кнопок фильтра. */
-export const FILTER_CLASSES = [
+const FILTER_CLASSES = [
   { value: 'comfort', label: 'Комфорт' },
   { value: 'business', label: 'Бизнес' },
   { value: 'premium', label: 'Премиум' },
-]
-
-const CATALOG_MODES: Array<{ value: CatalogMode; label: string }> = [
-  { value: 'project', label: 'Одной карточкой проекта' },
-  { value: 'houses', label: 'Карточками домов' },
 ]
 
 /**
@@ -63,14 +58,6 @@ export const SiteCardSection: React.FC<{
             value={form.filterClass || 'business'}
             options={FILTER_CLASSES}
             onChange={(v) => setForm((f) => ({ ...f, filterClass: v }))}
-          />
-          {/* Проект объединяет дома: на главной он может стоять одной карточкой
-              или карточками своих домов — их данные в «Дома / корпуса». */}
-          <SelectField
-            label="На главной"
-            value={form.catalogMode ?? 'project'}
-            options={CATALOG_MODES}
-            onChange={(v) => setForm((f) => ({ ...f, catalogMode: v as CatalogMode }))}
           />
         </div>
         <MediaField

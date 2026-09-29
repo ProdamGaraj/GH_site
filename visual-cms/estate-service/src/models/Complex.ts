@@ -67,13 +67,6 @@ export class Complex {
   @Column({ type: 'jsonb', default: () => "'[]'" })
   cardTags!: string[]
 
-  /**
-   * Как проект стоит на главной: 'project' — одной карточкой, 'houses' —
-   * карточкой на каждый его дом (services/i18n.ts, buildCatalogItems).
-   */
-  @Column({ length: 20, default: 'project' })
-  catalogMode!: string
-
   // --- Переводимые текстовые поля (ru = база) ---
   @Column({ length: 200 })
   name!: string

@@ -126,8 +126,6 @@ describe('buildComplexListItem', () => {
   it('builds catalog card, cardImage from media', () => {
     const item = buildComplexListItem(complex, [], 'ru')
     expect(item).toEqual({
-      kind: 'project',
-      houseId: null,
       slug: 'assalom-dostlik',
       externalHouseId: 1042,
       name: 'Assalom Doʼstlik',

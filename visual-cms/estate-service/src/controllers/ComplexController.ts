@@ -9,8 +9,8 @@ import { EstateTranslation } from '../models/EstateTranslation'
 import { PlaceType } from '../models/PlaceType'
 import { logger } from '../services/Logger'
 import {
-  buildCatalogItems,
   buildComplexDetail,
+  buildComplexListItem,
   normalizeLocale,
   Locale,
   TrRow,
@@ -26,9 +26,9 @@ const ON_SITE = { showOnSite: true }
 export class ComplexController {
   /**
    * GET /api/complexes?lang=[&full=1]
-   * По умолчанию — лёгкие карточки каталога: у проекта «домами» — по карточке
-   * на дом (buildCatalogItems). С `full=1` — массив полных деталей
-   * (houses[]+apartments[]) для Collection: одна привязка на шаблон.
+   * По умолчанию — лёгкие карточки каталога. С `full=1` — массив полных
+   * деталей (houses[]+apartments[]) для Collection: одна привязка на шаблон,
+   * repeater по item.apartments.
    */
   static async list(req: Request, res: Response): Promise<void> {
     try {
@@ -47,20 +47,14 @@ export class ComplexController {
       }
 
       const ids = complexes.map((c) => c.id)
-      // Дома — для проектов, которые стоят на главной карточками домов.
-      const houses =
-        ids.length > 0
-          ? await AppDataSource.getRepository(House).find({ where: { complexId: In(ids) } })
-          : []
-      const entityIds = [...ids, ...houses.map((h) => h.id)]
       const translations =
-        entityIds.length > 0
+        ids.length > 0
           ? await AppDataSource.getRepository(EstateTranslation).find({
-              where: { entityType: In(['complex', 'house']), entityId: In(entityIds), locale },
+              where: { entityType: 'complex', entityId: In(ids), locale },
             })
           : []
       const trRows = translations as unknown as TrRow[]
-      const items = complexes.flatMap((c) => buildCatalogItems(c as any, houses as any, trRows, locale))
+      const items = complexes.map((c) => buildComplexListItem(c as any, trRows, locale))
       res.json({ locale, items })
     } catch (err) {
       logger.error('complex.list failed', err instanceof Error ? err : undefined)

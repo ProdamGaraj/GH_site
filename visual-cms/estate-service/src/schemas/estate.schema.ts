@@ -110,9 +110,6 @@ export const createPlaceTypeSchema = z.object({
 })
 export const updatePlaceTypeSchema = z.object(placeTypeFields).partial()
 
-/** Теги карточки на главной — у проекта и у дома одни правила. */
-const cardTagsSchema = z.array(z.string().max(60)).max(12)
-
 // --- Complex ---
 const complexBase = {
   slug: z.string().min(1).max(160).regex(/^[a-z0-9-]+$/, 'slug: только a-z, 0-9, дефис'),
@@ -123,9 +120,7 @@ const complexBase = {
   showOnSite: z.boolean().optional(),
   filterClass: z.enum(['comfort', 'business', 'premium']).optional(),
   cardImage: z.string().max(500).optional(),
-  cardTags: cardTagsSchema.optional(),
-  /** На главной: одна карточка проекта или карточки его домов. */
-  catalogMode: z.enum(['project', 'houses']).optional(),
+  cardTags: z.array(z.string().max(60)).max(12).optional(),
   name: z.string().min(1).max(200),
   className: z.string().max(60).optional(),
   intro: z.string().optional(),
@@ -176,13 +171,6 @@ const houseBase = {
   deadline: z.string().max(60).optional(),
   className: z.string().max(60).optional(),
   entrances: z.number().int().nullable().optional(),
-  // Карточка дома на главной; пустое — как у проекта.
-  showOnSite: z.boolean().optional(),
-  status: z.enum(['active', 'sold_out']).optional(),
-  intro: z.string().max(2000).optional(),
-  cardImage: z.string().max(500).optional(),
-  cardTags: cardTagsSchema.optional(),
-  filterClass: z.enum(['', 'comfort', 'business', 'premium']).optional(),
   translations: translationsSchema,
 }
 export const createHouseSchema = z.object(houseBase)
