@@ -65,6 +65,25 @@ export const EstateEditor: React.FC = () => {
   if (loading && !complex) return <div className="p-8 text-gray-500">Загрузка…</div>
   if (!complex) return <div className="p-8 text-red-600">{error ?? 'ЖК не найден'}</div>
 
+  // Дома правятся своими кнопками и перечитываются (load + version) отдельно от
+  // черновика формы ЖК; форма только ставит раздел под «Основное».
+  const housesSection = (
+    <div id={SECTION.houses} className="space-y-4 scroll-mt-24">
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900">Дома / корпуса</h2>
+        <p className="text-sm text-gray-500">
+          Дом — единица MacroCRM: даёт странице проекта квартиры, планировки и срок сдачи. Страница и
+          карточка на главной — у проекта.
+        </p>
+      </div>
+      {complex.houses.map((house) => (
+        <HouseCard key={`${house.id}-${version}`} house={house} locale={locale} onChanged={load} />
+      ))}
+      {complex.houses.length === 0 && <p className="text-sm text-gray-400">Пока нет домов.</p>}
+      {isRu(locale) && <AddHouseForm complexId={complex.id} nextOrder={complex.houses.length} onAdded={load} />}
+    </div>
+  )
+
   return (
     <div className="min-h-full bg-gray-50">
       <div className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50/95 backdrop-blur">
@@ -98,6 +117,7 @@ export const EstateEditor: React.FC = () => {
             complex={complex}
             locale={locale}
             actionsSlot={actionsSlot}
+            housesSection={housesSection}
             onSaved={load}
           />
 
@@ -111,23 +131,6 @@ export const EstateEditor: React.FC = () => {
               initial={complex.planGrouping}
               refreshToken={syncToken}
             />
-          </div>
-
-          <div id={SECTION.houses} className="space-y-4 scroll-mt-24">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Дома / корпуса</h2>
-              <p className="text-sm text-gray-500">
-                Дом — единица MacroCRM: даёт странице проекта квартиры, планировки и срок сдачи. Страница и
-                карточка на главной — у проекта.
-              </p>
-            </div>
-            {complex.houses.map((house) => (
-              <HouseCard key={`${house.id}-${version}`} house={house} locale={locale} onChanged={load} />
-            ))}
-            {complex.houses.length === 0 && <p className="text-sm text-gray-400">Пока нет домов.</p>}
-            {isRu(locale) && (
-              <AddHouseForm complexId={complex.id} nextOrder={complex.houses.length} onAdded={load} />
-            )}
           </div>
         </div>
       </div>

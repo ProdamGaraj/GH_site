@@ -24,7 +24,12 @@ function mount(locale: Locale, withSlot = true) {
   document.body.appendChild(slot)
   render(
     <MemoryRouter>
-      <ComplexForm complex={COMPLEX} locale={locale} actionsSlot={withSlot ? slot : null} />
+      <ComplexForm
+        complex={COMPLEX}
+        locale={locale}
+        actionsSlot={withSlot ? slot : null}
+        housesSection={<section id={SECTION.houses} />}
+      />
     </MemoryRouter>
   )
   return slot
@@ -42,20 +47,23 @@ afterEach(() => {
 })
 
 describe('ComplexForm — разделы', () => {
-  // Планировки и дома — разделы страницы (EstateEditor), не формы.
+  // Планировки — раздел страницы (EstateEditor) под формой; дома страница
+  // отдаёт форме (housesSection), и та ставит их на место из меню.
   const formPart = (locale: Locale) =>
     sectionsFor(locale)
       .map((s) => s.id)
-      .filter((id) => id !== SECTION.plans && id !== SECTION.houses)
+      .filter((id) => id !== SECTION.plans)
 
-  it('ru: на странице ровно разделы меню, в том же порядке', () => {
+  it('ru: на странице ровно разделы меню, в том же порядке; дома — сразу под «Основным»', () => {
     mount('ru')
     expect(renderedSections()).toEqual(formPart('ru'))
+    expect(renderedSections().slice(0, 2)).toEqual([SECTION.basic, SECTION.houses])
   })
 
-  it('uz: без «Основное» и «Медиа» — как в меню', () => {
+  it('uz: без «Основное» и «Медиа» — как в меню; дома первыми', () => {
     mount('uz')
     expect(renderedSections()).toEqual(formPart('uz'))
+    expect(renderedSections()[0]).toBe(SECTION.houses)
   })
 
   it('медиаполя — компактные строки с миниатюрой, списки — с миниатюрами', () => {

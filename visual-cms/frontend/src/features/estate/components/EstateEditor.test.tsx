@@ -28,6 +28,7 @@ vi.mock('@/features/media/MediaPicker', () => ({ MediaPicker: () => null }))
 vi.mock('@/features/media/useProjectVariantWidths', () => ({ useProjectVariantWidths: () => [] }))
 
 import { estateApi } from '../api'
+import { SECTION, sectionsFor } from '../sections'
 import { testComplex } from '../testComplex.fixture'
 import { EstateEditor } from './EstateEditor'
 
@@ -60,6 +61,15 @@ describe('EstateEditor', () => {
     const bar = await screen.findByTestId('estate-actions')
     expect(bar.parentElement!.textContent).toMatch(/Синхронизировать проект/)
     expect(bar.textContent).toMatch(/Сохранить ЖК/)
+  })
+
+  it('разделы на странице — в порядке меню слева; «Дома / корпуса» сразу под «Основным»', async () => {
+    mount()
+    await screen.findByLabelText('Логотип')
+    const onPage = Array.from(document.querySelectorAll('[id^="estate-"]')).map((el) => el.id)
+    expect(onPage).toEqual(sectionsFor('ru').map((s) => s.id))
+    expect(onPage.indexOf(SECTION.houses)).toBe(onPage.indexOf(SECTION.basic) + 1)
+    expect(document.getElementById(SECTION.houses)!.textContent).toMatch(/Добавить дом/)
   })
 
   it('повторная загрузка (добавили дом) не стирает несохранённые правки формы ЖК', async () => {

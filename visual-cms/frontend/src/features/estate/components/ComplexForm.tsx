@@ -23,9 +23,14 @@ export const ComplexForm: React.FC<{
   complex: ComplexDetail
   locale: Locale
   actionsSlot?: HTMLElement | null
-  /** После сохранения: странице нужны свежие данные (режим каталога — домам). */
+  /**
+   * Раздел «Дома / корпуса» — сразу под «Основным». Его собирает страница:
+   * дома сохраняются своими кнопками и перечитываются без черновика формы.
+   */
+  housesSection?: React.ReactNode
+  /** После сохранения: странице нужны свежие данные (название в шапке). */
   onSaved?: () => void
-}> = ({ complex, locale, actionsSlot, onSaved }) => {
+}> = ({ complex, locale, actionsSlot, housesSection, onSaved }) => {
   const [form, setForm] = useState<ComplexDetail>(complex)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -101,6 +106,8 @@ export const ComplexForm: React.FC<{
           </div>
         </FormSection>
       )}
+
+      {housesSection}
 
       <SiteCardSection form={form} setForm={setForm} locale={locale} />
 
