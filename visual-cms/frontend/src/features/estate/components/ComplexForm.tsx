@@ -5,6 +5,7 @@ import { estateApi } from '../api'
 import { getT, setT, setLabel, isRu } from './tfield'
 import { TextField, TextArea, NumberField, SelectField, StringListField, StatsField, LabelMapField } from './fields'
 import { GallerySlidesField } from './GallerySlidesField'
+import { MediaField, MediaListField } from './mediaFields'
 import { ProjectMapSection } from './ProjectMapSection'
 import { SiteCardSection } from './SiteCardSection'
 
@@ -135,21 +136,22 @@ export const ComplexForm: React.FC<{ complex: ComplexDetail; locale: Locale }> =
       {/* Медиа — языконезависимо */}
       {isRu(locale) && (
         <div className="space-y-4 pt-4 border-t border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase">Медиа (URL)</h3>
+          <h3 className="text-sm font-semibold text-gray-500 uppercase">Медиа</h3>
           <div className="grid grid-cols-2 gap-4">
-            <TextField label="Логотип" value={form.logo} onChange={(v) => setForm((f) => ({ ...f, logo: v }))} />
+            <MediaField label="Логотип" value={form.logo} onChange={(v) => setForm((f) => ({ ...f, logo: v }))} />
             <TextField label="CSS-класс логотипа" value={form.logoClass} onChange={(v) => setForm((f) => ({ ...f, logoClass: v }))} />
-            <TextField label="About-медиа" value={form.media} onChange={(v) => setForm((f) => ({ ...f, media: v }))} />
-            <TextField
+            <MediaField label="About-медиа" value={form.media} onChange={(v) => setForm((f) => ({ ...f, media: v }))} />
+            <MediaField
               label="About-видео"
               hint="если «О проекте — слайды» пусто"
+              kind="video"
               value={form.aboutVideo}
               onChange={(v) => setForm((f) => ({ ...f, aboutVideo: v }))}
             />
             <TextField label="Ссылка на карту" value={form.mapUrl} onChange={(v) => setForm((f) => ({ ...f, mapUrl: v }))} />
-            <TextField label="Картинка карты" value={form.mapImage} onChange={(v) => setForm((f) => ({ ...f, mapImage: v }))} />
+            <MediaField label="Картинка карты" value={form.mapImage} onChange={(v) => setForm((f) => ({ ...f, mapImage: v }))} />
           </div>
-          <StringListField label="Hero-изображения" value={form.heroImages} onChange={(v) => setForm((f) => ({ ...f, heroImages: v }))} />
+          <MediaListField label="Hero-изображения" value={form.heroImages} onChange={(v) => setForm((f) => ({ ...f, heroImages: v }))} />
           {/* Слайдеры страницы проекта: по ссылке на строку, фото или видео
               (.mp4/.webm). Порядок строк — порядок слайдов; при одном элементе
               навигации нет. Под списком — кадрирование каждого слайда.

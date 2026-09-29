@@ -12,7 +12,7 @@ import {
   type SlideFit,
   type SlideSettings,
 } from '../gallerySlides'
-import { StringListField } from './fields'
+import { MediaListField, MediaThumb } from './mediaFields'
 
 /**
  * Галерея слайдов ЖК: ссылки по одной на строку (как раньше) и кадрирование
@@ -49,9 +49,12 @@ export const GallerySlidesField: React.FC<{
 
   return (
     <div>
-      <StringListField
+      {/* Свои превью с кадрированием — ниже, миниатюры списка не нужны. */}
+      <MediaListField
         label={label}
         hint={hint}
+        kind="any"
+        thumbnails={false}
         value={slides.map((s) => s.url)}
         onChange={(urls) => onChange(writeGallery(withUrls(slides, urls)))}
       />
@@ -90,7 +93,7 @@ const SlideFramingRow: React.FC<{
         className={cn('relative w-28 shrink-0 select-none', contain ? 'cursor-default opacity-60' : 'cursor-crosshair')}
         data-testid={`focus-${index}`}
       >
-        <SlideMedia src={src} video={isVideoUrl(slide.url)} className="block w-full h-auto rounded" />
+        <MediaThumb src={src} video={isVideoUrl(slide.url)} className="block w-full h-auto rounded" />
         {!contain && (
           <span
             className="absolute w-3 h-3 -ml-1.5 -mt-1.5 rounded-full border-2 border-white bg-primary-500 shadow pointer-events-none"
@@ -154,13 +157,13 @@ const FramePreview: React.FC<{ src: string; slide: SlideSettings; ratio: number 
       data-fit={slide.fit}
     >
       {contain && (
-        <SlideMedia
+        <MediaThumb
           src={src}
           video={video}
           className="absolute -inset-2 w-[calc(100%+1rem)] h-[calc(100%+1rem)] max-w-none object-cover blur-md brightness-90"
         />
       )}
-      <SlideMedia
+      <MediaThumb
         src={src}
         video={video}
         className="absolute inset-0 w-full h-full"
@@ -169,16 +172,3 @@ const FramePreview: React.FC<{ src: string; slide: SlideSettings; ratio: number 
     </div>
   )
 }
-
-/** Фото или первый кадр видео (без звука и без интерфейса плеера). */
-const SlideMedia: React.FC<{ src: string; video: boolean; className?: string; style?: React.CSSProperties }> = ({
-  src,
-  video,
-  className,
-  style,
-}) =>
-  video ? (
-    <video src={src} muted playsInline preload="metadata" className={className} style={style} />
-  ) : (
-    <img src={src} alt="" loading="lazy" draggable={false} className={className} style={style} />
-  )

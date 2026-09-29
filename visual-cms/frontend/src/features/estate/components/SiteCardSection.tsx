@@ -1,7 +1,8 @@
 import React from 'react'
 import type { ComplexDetail, Locale } from '../types'
 import { getT, isRu, setT } from './tfield'
-import { CheckboxField, SelectField, StringListField, TextField } from './fields'
+import { CheckboxField, SelectField, StringListField } from './fields'
+import { MediaField } from './mediaFields'
 
 /** Класс карточки для фильтра на главной — те же ключи, что у кнопок фильтра. */
 const FILTER_CLASSES = [
@@ -58,10 +59,10 @@ export const SiteCardSection: React.FC<{
           options={FILTER_CLASSES}
           onChange={(v) => setForm((f) => ({ ...f, filterClass: v }))}
         />
-        <TextField
+        <MediaField
           label="Картинка карточки"
           hint="пусто — About-медиа"
-          value={form.cardImage ?? ''}
+          value={form.cardImage}
           onChange={(v) => setForm((f) => ({ ...f, cardImage: v }))}
         />
       </div>

@@ -18,6 +18,8 @@ interface ImageUploadProps {
    * по-прежнему идёт через onChange.
    */
   onSelectAsset?: (asset: MediaAsset) => void
+  /** Подпись поля адреса для экранного диктора, когда видимая подпись снаружи. */
+  ariaLabel?: string
 }
 
 export const ImageUpload: React.FC<ImageUploadProps> = ({
@@ -27,6 +29,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   placeholder = 'https://example.com/image.jpg',
   kind = 'image',
   onSelectAsset,
+  ariaLabel,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUrlMode, setIsUrlMode] = useState(true)
@@ -161,6 +164,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
               setPreviewError(false)
             }}
             placeholder={placeholder}
+            aria-label={ariaLabel}
             className="w-full px-3 py-1.5 pr-8 border border-gray-300 rounded text-sm text-gray-900 bg-white"
           />
           {value && (
@@ -237,7 +241,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
         <div className="relative border border-gray-200 rounded overflow-hidden bg-gray-50">
           {kind === 'video' ? (
             <video
-              src={value}
+              src={resolveMediaUrl(value)}
               controls
               muted
               playsInline
@@ -247,7 +251,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
             />
           ) : (
             <img
-              src={value}
+              src={resolveMediaUrl(value)}
               alt="Preview"
               className="w-full max-h-32 object-contain"
               onError={() => setPreviewError(true)}

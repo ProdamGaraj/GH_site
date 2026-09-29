@@ -1,6 +1,16 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, within } from '@testing-library/react'
+
+vi.mock('@/features/media/MediaPicker', () => ({
+  MediaPicker: ({ open, kind, onSelect }: any) =>
+    open ? (
+      <button type="button" data-kind={kind} onClick={() => onSelect({ url: '/media/new.mp4' })}>
+        выбрать
+      </button>
+    ) : null,
+}))
+
 import { GallerySlidesField } from './GallerySlidesField'
 import type { GalleryItem } from '../gallerySlides'
 
@@ -70,5 +80,19 @@ describe('GallerySlidesField', () => {
   it('пустая галерея — без блока кадрирования', () => {
     setup([])
     expect(screen.queryByTestId('slide-framing')).toBeNull()
+  })
+
+  it('«Добавить из медиатеки»: фото и видео, новый слайд в конце, кадрирование старых цело', () => {
+    const onChange = setup([{ url: '/a.jpg', focus: { x: 10, y: 20 } }])
+    fireEvent.click(screen.getByRole('button', { name: /Добавить из медиатеки/ }))
+    const pick = screen.getByRole('button', { name: 'выбрать' })
+    expect(pick.getAttribute('data-kind')).toBe('any')
+    fireEvent.click(pick)
+    expect(onChange).toHaveBeenCalledWith([{ url: '/a.jpg', focus: { x: 10, y: 20 } }, '/media/new.mp4'])
+  })
+
+  it('миниатюр списка нет — превью кадрирования уже показывают слайды', () => {
+    setup(['/a.jpg'])
+    expect(screen.queryByTestId('media-thumbs')).toBeNull()
   })
 })

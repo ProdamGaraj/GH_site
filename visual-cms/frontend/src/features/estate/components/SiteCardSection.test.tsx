@@ -1,7 +1,18 @@
 // @vitest-environment jsdom
 import { useEffect, useState } from 'react'
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, cleanup, within } from '@testing-library/react'
+
+vi.mock('@/features/media/MediaPicker', () => ({
+  MediaPicker: ({ open, onSelect }: any) =>
+    open ? (
+      <button type="button" onClick={() => onSelect({ url: '/media/picked.jpg' })}>
+        выбрать
+      </button>
+    ) : null,
+}))
+vi.mock('@/features/media/useProjectVariantWidths', () => ({ useProjectVariantWidths: () => [] }))
+
 import { SiteCardSection } from './SiteCardSection'
 import type { ComplexDetail, Locale } from '../types'
 
@@ -52,9 +63,7 @@ describe('SiteCardSection — ru', () => {
 
   it('картинка и теги карточки', () => {
     const form = setup(complex())
-    // Подписи полей админки не связаны с input: первое текстовое поле — картинка, второе — теги.
-    const [image] = section().getAllByRole('textbox')
-    fireEvent.change(image, { target: { value: '/media/card.jpg' } })
+    fireEvent.change(section().getByLabelText('Картинка карточки'), { target: { value: '/media/card.jpg' } })
     expect(form.current.cardImage).toBe('/media/card.jpg')
     const tags = section().getByDisplayValue(/Рассрочка/)
     fireEvent.change(tags, { target: { value: 'Скидка\n\n Ипотека ' } })
@@ -79,5 +88,17 @@ describe('SiteCardSection — перевод (uz)', () => {
     expect((form.current.translations as any).uz.cardTags).toEqual(['Muddatli to‘lov', 'Ipoteka'])
     fireEvent.change(field, { target: { value: '' } })
     expect((form.current.translations as any).uz.cardTags).toBeUndefined()
+  })
+})
+
+describe('SiteCardSection — картинка из медиатеки', () => {
+  afterEach(() => cleanup())
+
+  it('выбор в медиатеке пишет адрес в cardImage, превью показывает его', () => {
+    const form = setup(complex())
+    fireEvent.click(section().getByRole('button', { name: /Выбрать из галереи/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'выбрать' }))
+    expect(form.current.cardImage).toBe('/media/picked.jpg')
+    expect(section().getByAltText('Preview').getAttribute('src')).toBe('/media/picked.jpg')
   })
 })

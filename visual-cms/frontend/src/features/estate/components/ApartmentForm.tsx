@@ -4,6 +4,7 @@ import type { Apartment, Locale } from '../types'
 import { estateApi } from '../api'
 import { getT, setT, isRu } from './tfield'
 import { TextField, NumberField, SelectField, StringListField } from './fields'
+import { MediaField } from './mediaFields'
 
 /** Форма квартиры (внутри дома). Сохраняет/удаляет саму себя. */
 export const ApartmentForm: React.FC<{
@@ -81,7 +82,7 @@ export const ApartmentForm: React.FC<{
             ]}
             onChange={(v) => setForm((f) => ({ ...f, status: v }))}
           />
-          <TextField label="План (URL)" value={form.planImage} onChange={(v) => setForm((f) => ({ ...f, planImage: v }))} />
+          <MediaField label="План" value={form.planImage} onChange={(v) => setForm((f) => ({ ...f, planImage: v }))} />
         </div>
       )}
 
