@@ -138,6 +138,23 @@ export function whyDisabled(
   return ''
 }
 
+/**
+ * Почему недоступна кнопка «Синхронизировать проект». Пустая строка —
+ * доступна. Кроме общих причин — у проекта должен быть ID дома в MacroCRM:
+ * синхронизация идёт по нему.
+ */
+export function whyProjectSyncDisabled(
+  state: MacroSyncState | null,
+  busy: boolean,
+  starting: boolean,
+  externalHouseId: number | null | undefined
+): string {
+  const common = whyDisabled(state, busy, starting)
+  if (common) return common
+  if (!externalHouseId) return 'У проекта нет ID дома в MacroCRM — задайте его в разделе «Основное» и сохраните ЖК'
+  return ''
+}
+
 /** Подпись кнопки: продолжение прерванного прогона называется своим именем. */
 export function startLabel(state: MacroSyncState | null, starting = false): string {
   if (state?.running || starting) return 'Синхронизация идёт…'

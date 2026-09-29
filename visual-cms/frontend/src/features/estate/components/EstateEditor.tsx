@@ -8,6 +8,7 @@ import { LocaleTabs } from './fields'
 import { ComplexForm } from './ComplexForm'
 import { HouseCard } from './HouseCard'
 import { PlanGroupingPanel } from './PlanGroupingPanel'
+import { ProjectSyncButton } from './ProjectSyncButton'
 import { SectionNav } from './SectionNav'
 
 /**
@@ -25,9 +26,14 @@ export const EstateEditor: React.FC = () => {
   const [version, setVersion] = useState(0)
   // Место в закреплённой полосе, куда форма ЖК кладёт свою кнопку сохранения.
   const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null)
+  // Растёт после синхронизации с CRM: раздел планировок пересчитывает превью
+  // по свежим данным, не теряя черновик.
+  const [syncToken, setSyncToken] = useState(0)
 
+  // Экран «Загрузка…» — только пока ЖК ещё не открыт. Повторная загрузка
+  // (после правки домов, после синхронизации) обновляет данные на месте:
+  // иначе страница размонтировалась бы вместе с несохранёнными правками.
   const load = useCallback(async () => {
-    setLoading(true)
     try {
       setComplex(await estateApi.getComplex(id))
       setError(null)
@@ -39,6 +45,7 @@ export const EstateEditor: React.FC = () => {
   }, [id])
 
   useEffect(() => {
+    setLoading(true)
     load()
   }, [load])
 
@@ -47,14 +54,18 @@ export const EstateEditor: React.FC = () => {
     setVersion((v) => v + 1)
   }
 
+  const onSynced = useCallback(() => {
+    load()
+    setSyncToken((t) => t + 1)
+  }, [load])
+
   const addHouse = async () => {
     await estateApi.createHouse(id, { name: 'Новый корпус', order: complex?.houses.length || 0 })
     reload()
   }
 
-  if (loading) return <div className="p-8 text-gray-500">Загрузка…</div>
-  if (error) return <div className="p-8 text-red-600">{error}</div>
-  if (!complex) return null
+  if (loading && !complex) return <div className="p-8 text-gray-500">Загрузка…</div>
+  if (!complex) return <div className="p-8 text-red-600">{error ?? 'ЖК не найден'}</div>
 
   return (
     <div className="min-h-full bg-gray-50">
@@ -67,8 +78,10 @@ export const EstateEditor: React.FC = () => {
             <h1 className="text-xl font-bold text-gray-900 truncate">{complex.name}</h1>
             <span className="text-sm text-gray-400 truncate">/{complex.slug}</span>
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center gap-4">
+            {error && <span className="text-sm text-red-600">{error}</span>}
             <LocaleTabs active={locale} onChange={setLocale} className="mb-0 border-b-0" />
+            <ProjectSyncButton externalHouseId={complex.externalHouseId} onFinished={onSynced} />
             <div ref={setActionsSlot} data-testid="estate-actions" />
           </div>
         </div>
@@ -92,6 +105,7 @@ export const EstateEditor: React.FC = () => {
               key={`plans-${complex.id}`}
               complexId={complex.id}
               initial={complex.planGrouping}
+              refreshToken={syncToken}
             />
           </div>
 

@@ -1,0 +1,42 @@
+import type { ComplexDetail } from './types'
+
+/** ЖК для тестов редактора: все поля формы, по умолчанию без домов. */
+export function testComplex(over: Partial<ComplexDetail> = {}): ComplexDetail {
+  return {
+    id: 'c1',
+    slug: 'ozmakon-business',
+    order: 0,
+    status: 'active',
+    showOnSite: true,
+    filterClass: 'business',
+    cardImage: '/media/card.jpg',
+    cardTags: ['Акция'],
+    externalHouseId: 5139395,
+    name: "O'zMakon Business",
+    className: 'Бизнес',
+    intro: '',
+    about: '',
+    aboutExtra: '',
+    locationText: '',
+    yardEyebrow: '',
+    yardTitle: '',
+    yardText: '',
+    yardFeatures: [],
+    stats: [],
+    logo: '/media/logo.png',
+    logoClass: '',
+    media: '',
+    aboutVideo: '',
+    mapUrl: '',
+    mapImage: '',
+    heroImages: ['/media/h1.jpg'],
+    gallery: [],
+    hallGallery: [],
+    yardGallery: [],
+    translations: {},
+    planGrouping: null,
+    windowViews: ['Во двор'],
+    houses: [],
+    ...over,
+  } as ComplexDetail
+}

@@ -11,45 +11,12 @@ vi.mock('@/features/media/useProjectVariantWidths', () => ({ useProjectVariantWi
 
 import { estateApi } from '../api'
 import { SECTION, sectionsFor } from '../sections'
-import type { ComplexDetail, Locale } from '../types'
+import type { Locale } from '../types'
+import { testComplex } from '../testComplex.fixture'
 import { ComplexForm } from './ComplexForm'
 
-const COMPLEX = {
-  id: 'c1',
-  slug: 'ozmakon-business',
-  order: 0,
-  status: 'active',
-  showOnSite: true,
-  filterClass: 'business',
-  cardImage: '/media/card.jpg',
-  cardTags: ['Акция'],
-  externalHouseId: 5139395,
-  name: "O'zMakon Business",
-  className: 'Бизнес',
-  intro: '',
-  about: '',
-  aboutExtra: '',
-  locationText: '',
-  yardEyebrow: '',
-  yardTitle: '',
-  yardText: '',
-  yardFeatures: [],
-  stats: [],
-  logo: '/media/logo.png',
-  logoClass: '',
-  media: '',
-  aboutVideo: '',
-  mapUrl: '',
-  mapImage: '',
-  heroImages: ['/media/h1.jpg'],
-  gallery: [],
-  hallGallery: [],
-  yardGallery: [],
-  translations: {},
-  planGrouping: { tolerance: 0.01 },
-  windowViews: ['Во двор'],
-  houses: [],
-} as unknown as ComplexDetail
+// planGrouping есть — проверяем, что форма его не отправляет.
+const COMPLEX = testComplex({ planGrouping: { areaTolerance: 0.01 } })
 
 function mount(locale: Locale, withSlot = true) {
   const slot = document.createElement('div')

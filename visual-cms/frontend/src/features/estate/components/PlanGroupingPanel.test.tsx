@@ -133,16 +133,40 @@ describe('PlanGroupingPanel — группа', () => {
     expect(preview.mock.calls.length).toBe(calls)
   })
 
-  it('«Подставить значения из CRM» снимает ручные данные группы, бейджи остаются', async () => {
+  it('«Вернуть данные из CRM» снимает ручные данные группы, бейджи остаются', async () => {
     const card = await mount({ overrides: { A: { priceMin: 1, entrances: [2], badges: { ru: ['Акция'] } } } })
     expect(within(card).getAllByText('локально').length).toBeGreaterThan(0)
     expect(within(card).getByText('Акция')).toBeTruthy()
-    fireEvent.click(within(card).getByRole('button', { name: /Подставить значения из CRM/ }))
+    const reset = within(card).getByRole('button', { name: /Вернуть данные из CRM/ }) as HTMLButtonElement
+    expect(reset.disabled).toBe(false)
+    fireEvent.click(reset)
     // Строго: в исходном запросе бейджи тоже были — ждём пересчёта после сброса.
     await waitFor(() => expect(lastPayload()!.overrides!.A).toEqual({ badges: { ru: ['Акция'] } }))
+    // Кнопка остаётся на месте, но делать ей больше нечего.
     await waitFor(() =>
-      expect(within(screen.getByTestId('plan-group')).queryByRole('button', { name: /Подставить значения из CRM/ })).toBeNull()
+      expect(
+        (within(screen.getByTestId('plan-group')).getByRole('button', { name: /Вернуть данные из CRM/ }) as HTMLButtonElement)
+          .disabled
+      ).toBe(true)
     )
+  })
+
+  it('«Вернуть данные из CRM» видна всегда; без ручных данных — неактивна с пояснением', async () => {
+    const card = await mount()
+    const reset = within(card).getByRole('button', { name: /Вернуть данные из CRM/ }) as HTMLButtonElement
+    expect(reset.disabled).toBe(true)
+    expect(reset.title).toBe('Все данные группы и так из CRM')
+  })
+
+  it('после синхронизации (refreshToken) превью пересчитывается, черновик цел', async () => {
+    const { rerender } = render(<PlanGroupingPanel complexId="c1" initial={null} refreshToken={0} />)
+    const card = await screen.findByTestId('plan-group')
+    fireEvent.click(within(card).getByRole('button', { name: /На сайте/ }))
+    await waitFor(() => expect(lastPayload()).toMatchObject({ hidden: ['A', 'B'] }))
+    const calls = preview.mock.calls.length
+    rerender(<PlanGroupingPanel complexId="c1" initial={null} refreshToken={1} />)
+    await waitFor(() => expect(preview.mock.calls.length).toBeGreaterThan(calls))
+    expect(lastPayload()).toMatchObject({ hidden: ['A', 'B'] })
   })
 
   it('бейджи RU/UZ/EN через запятую', async () => {

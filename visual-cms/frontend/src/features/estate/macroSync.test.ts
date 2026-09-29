@@ -17,6 +17,7 @@ import {
   shouldPoll,
   type MacroSyncRun,
   type MacroSyncState,
+  whyProjectSyncDisabled,
 } from './macroSync'
 
 function run(over: Partial<MacroSyncRun> = {}): MacroSyncRun {
@@ -43,6 +44,24 @@ function run(over: Partial<MacroSyncRun> = {}): MacroSyncRun {
 function state(over: Partial<MacroSyncState> = {}): MacroSyncState {
   return { configured: true, missing: [], running: false, resumable: null, runs: [], ...over }
 }
+
+describe('кнопка «Синхронизировать проект»', () => {
+  it('настроено, не идёт, есть ID дома — можно', () => {
+    expect(whyProjectSyncDisabled(state(), false, false, 5139395)).toBe('')
+  })
+
+  it('без ID дома в MacroCRM — нельзя, с подсказкой где его задать', () => {
+    expect(whyProjectSyncDisabled(state(), false, false, null)).toMatch(/нет ID дома в MacroCRM.*«Основное»/)
+    expect(whyProjectSyncDisabled(state(), false, false, 0)).not.toBe('')
+  })
+
+  it('общие причины важнее: идёт другой прогон, не настроено', () => {
+    expect(whyProjectSyncDisabled(state({ running: true }), false, false, 1)).toBe('Прогон уже идёт')
+    expect(whyProjectSyncDisabled(state({ configured: false, missing: ['MACRO_TOKEN'] }), false, false, 1)).toMatch(
+      /MACRO_TOKEN/
+    )
+  })
+})
 
 describe('доступность кнопки', () => {
   it('настроено и не идёт — можно запускать', () => {

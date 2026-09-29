@@ -7,6 +7,15 @@ import type { MacroSyncRun, MacroSyncState } from './macroSync'
  * Ходит в бэкенд CMS (/api/macro-sync), а не в estate-service: синк выполняется
  * там, где живут токен CRM, журнал прогонов и публикация страниц.
  */
+export interface StartOptions {
+  /** Продолжить прерванный прогон. */
+  resume?: boolean
+  /** Полная пересборка: опросить планировки всех квартир заново. */
+  full?: boolean
+  /** Только эти дома MacroCRM (кнопка проекта); пусто — все проекты. */
+  externalHouseIds?: number[]
+}
+
 export const macroSyncApi = {
   status: () => api.get<MacroSyncState>('/macro-sync/status'),
 
@@ -18,7 +27,7 @@ export const macroSyncApi = {
    * время значит поймать таймаут прокси, поэтому бэкенд отвечает 202, а ход
    * дела смотрится опросом статуса.
    */
-  start: (options: { resume?: boolean; full?: boolean } = {}) =>
+  start: (options: StartOptions = {}) =>
     api.post<{ started: boolean; resumedFrom: string | null }>('/macro-sync/run', {
       trigger: 'manual',
       resume: options.resume === true,
@@ -26,6 +35,7 @@ export const macroSyncApi = {
       // когда привязки потерялись: обычный прогон такие квартиры пропустит,
       // потому что отметка об опросе у них уже стоит.
       full: options.full === true,
+      ...(options.externalHouseIds?.length ? { externalHouseIds: options.externalHouseIds } : {}),
     }),
 
   run: (id: string) => api.get<MacroSyncRun>(`/macro-sync/runs/${id}`),

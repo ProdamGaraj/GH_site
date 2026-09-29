@@ -1,6 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useState } from 'react'
 import { RefreshCw, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react'
-import { macroSyncApi } from '../macroSyncApi'
 import {
   canStart,
   whyDisabled,
@@ -9,15 +8,10 @@ import {
   formatTime,
   formatDuration,
   summarize,
-  shouldPoll,
-  pollInterval,
-  isStarting,
-  showsRunning,
   STATUS_CLASS,
   STATUS_LABEL,
-  type MacroSyncState,
-  type PendingStart,
 } from '../macroSync'
+import { useMacroSync } from '../useMacroSync'
 
 /**
  * Панель синхронизации квартир и планировок с MacroCRM.
@@ -30,68 +24,19 @@ import {
  * отрисовка: компоненты в этом проекте тестами не покрываются.
  */
 export const MacroSyncPanel: React.FC<{ onFinished?: () => void }> = ({ onFinished }) => {
-  const [state, setState] = useState<MacroSyncState | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
-  // Нажали, но сервер прогон ещё не показывает — см. isStarting.
-  const [pending, setPending] = useState<PendingStart | null>(null)
-  // Чтобы заметить переход «шёл» → «закончился» и обновить список ЖК.
-  const wasRunning = useRef(false)
-
-  const load = useCallback(async () => {
-    try {
-      const next = await macroSyncApi.status()
-      setState(next)
-      // Достучались — прежняя ошибка больше не актуальна. Иначе красная строка
-      // висела бы поверх живых данных.
-      setError(null)
-      if (wasRunning.current && !next.running) onFinished?.()
-      wasRunning.current = next.running
-      // Сервер подтвердил прогон — дальше состояние ведёт он, а не нажатие.
-      setPending((prev) => (isStarting(prev, next, Date.now()) ? prev : null))
-    } catch (e: any) {
-      setError(e?.message || 'Не удалось получить состояние синхронизации')
-    }
-  }, [onFinished])
-
-  useEffect(() => {
-    load()
-  }, [load])
-
-  const starting = isStarting(pending, state, Date.now())
-  const running = showsRunning(state, starting)
-
-  // Опрашиваем, пока идёт прогон (нужны живые счётчики), пока состояние ни разу
-  // не загрузилось (бэкенд мог перезапускаться) и пока ждём подтверждения
-  // только что запущенного прогона.
-  useEffect(() => {
-    if (!shouldPoll(state, starting)) return
-    const timer = setInterval(load, pollInterval(state, starting))
-    return () => clearInterval(timer)
-  }, [state, starting, load])
+  // Состояние, опрос и запуск — общие с кнопкой проекта (useMacroSync).
+  const sync = useMacroSync(onFinished)
+  const { state, busy, error, starting, running } = sync
 
   const start = async (full = false) => {
     if (full && !confirm(
       'Опросить планировки всех квартир заново? Это займёт несколько минут ' +
       'и нужно только если привязки потерялись.'
     )) return
-
-    setBusy(true)
-    setError(null)
-    try {
-      // Полная пересборка и продолжение прерванного прогона — разные вещи:
-      // продолжать при full нечего, обход начинается сначала.
-      await macroSyncApi.start(full ? { full: true } : { resume: Boolean(state?.resumable) })
-      // Сервер ответил 202 и создаёт прогон в фоне. Показываем «идёт» сразу,
-      // не дожидаясь, пока он появится в журнале.
-      setPending({ at: Date.now(), previousRunId: state?.runs?.[0]?.id ?? null })
-      await load()
-    } catch (e: any) {
-      setError(e?.message || 'Не удалось запустить синхронизацию')
-    } finally {
-      setBusy(false)
-    }
+    // Полная пересборка и продолжение прерванного прогона — разные вещи:
+    // продолжать при full нечего, обход начинается сначала.
+    await sync.start(full ? { full: true } : { resume: Boolean(state?.resumable) })
   }
 
   const disabledReason = whyDisabled(state, busy, starting)

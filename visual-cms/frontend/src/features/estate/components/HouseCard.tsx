@@ -89,7 +89,8 @@ export const HouseCard: React.FC<{
           </div>
 
           <p className="text-sm text-gray-500" data-testid="house-apartments">
-            {apartmentSummary(form.apartments)}. Цены, этажи, подъезды и бейджи для сайта — у групп в разделе{' '}
+            {/* Из пропса, не из формы: после синхронизации сводка свежая без перемонтирования. */}
+            {apartmentSummary(house.apartments)}. Цены, этажи, подъезды и бейджи для сайта — у групп в разделе{' '}
             <a href={`#${SECTION.plans}`} className="text-primary-700 hover:underline">
               «Планировки на сайте»
             </a>

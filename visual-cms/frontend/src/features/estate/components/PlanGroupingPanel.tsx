@@ -53,7 +53,9 @@ const cardKey = (group: PlanGroupPreview) => group.plans.map((p) => p.planName).
 export const PlanGroupingPanel: React.FC<{
   complexId: string
   initial: PlanGroupingConfig | null | undefined
-}> = ({ complexId, initial }) => {
+  /** Меняется после синхронизации с CRM: пересчитать превью по свежим данным. */
+  refreshToken?: number
+}> = ({ complexId, initial, refreshToken = 0 }) => {
   const [saved, setSaved] = useState<PlanGroupingDraft>(() => toDraft(initial))
   const [draft, setDraft] = useState<PlanGroupingDraft>(() => toDraft(initial))
   const [toleranceText, setToleranceText] = useState(() => String(toDraft(initial).areaTolerance))
@@ -94,7 +96,7 @@ export const PlanGroupingPanel: React.FC<{
       controller.abort()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [complexId, draft])
+  }, [complexId, draft, refreshToken])
 
   // Состав карточек поменялся — старый выбор больше ничего не значит.
   useEffect(() => setSelected(new Set()), [preview])
@@ -422,11 +424,19 @@ const PlanCard: React.FC<{
           >
             <Pencil size={14} /> {editing ? 'Свернуть' : 'Изменить данные'}
           </button>
-          {hasCrmOverride(override) && (
-            <button onClick={onResetCrm} className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
-              <RotateCcw size={14} /> Подставить значения из CRM
-            </button>
-          )}
+          {/* Кнопка на месте всегда, чтобы её не искать; без ручных данных — неактивна. */}
+          <button
+            onClick={onResetCrm}
+            disabled={!hasCrmOverride(override)}
+            title={
+              hasCrmOverride(override)
+                ? 'Снять ручные цену, площадь, этажи и подъезды группы — вернуть данные CRM. Бейджи останутся.'
+                : 'Все данные группы и так из CRM'
+            }
+            className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 disabled:text-gray-300 disabled:cursor-not-allowed"
+          >
+            <RotateCcw size={14} /> Вернуть данные из CRM
+          </button>
         </div>
         {problem && <p className="text-sm text-red-600">{problem}</p>}
 
