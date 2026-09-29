@@ -1,7 +1,8 @@
 import React from 'react'
 import type { ComplexDetail, Locale } from '../types'
 import { getT, isRu, setT } from './tfield'
-import { CheckboxField, SelectField, StringListField } from './fields'
+import { SECTION } from '../sections'
+import { CheckboxField, FormSection, SelectField, StringListField } from './fields'
 import { MediaField } from './mediaFields'
 
 /** Класс карточки для фильтра на главной — те же ключи, что у кнопок фильтра. */
@@ -31,47 +32,48 @@ export const SiteCardSection: React.FC<{
   if (!isRu(locale)) {
     const translated = (getT(form, 'cardTags', locale) as string[] | undefined) ?? []
     return (
-      <section className="space-y-4 pt-4 border-t border-gray-100" data-testid="site-card">
-        <h3 className="text-sm font-semibold text-gray-500 uppercase">Карточка на главной — перевод</h3>
+      <FormSection id={SECTION.card} title="Карточка на главной — перевод" testId="site-card">
         <StringListField
           label="Теги карточки"
           hint={baseTags.length ? `по одному в строке; ru: ${baseTags.join(', ')}` : 'по одному в строке'}
           value={translated}
           onChange={(v) => setForm((f) => setT(f, 'cardTags', locale, v.length ? v : undefined))}
         />
-      </section>
+      </FormSection>
     )
   }
 
   return (
-    <section className="space-y-4 pt-4 border-t border-gray-100" data-testid="site-card">
-      <h3 className="text-sm font-semibold text-gray-500 uppercase">Сайт и карточка на главной</h3>
-      <CheckboxField
-        label="Показывать на сайте"
-        hint="карточка на главной и страница проекта"
-        checked={form.showOnSite ?? false}
-        onChange={(v) => setForm((f) => ({ ...f, showOnSite: v }))}
-      />
-      <div className="grid grid-cols-2 gap-4">
-        <SelectField
-          label="Класс для фильтра на главной"
-          value={form.filterClass || 'business'}
-          options={FILTER_CLASSES}
-          onChange={(v) => setForm((f) => ({ ...f, filterClass: v }))}
-        />
+    <FormSection id={SECTION.card} title="Сайт и карточка на главной" testId="site-card">
+      <div className="grid lg:grid-cols-2 2xl:grid-cols-3 gap-x-6 gap-y-5 items-start">
+        <div className="space-y-4">
+          <CheckboxField
+            label="Показывать на сайте"
+            hint="карточка на главной и страница проекта"
+            checked={form.showOnSite ?? false}
+            onChange={(v) => setForm((f) => ({ ...f, showOnSite: v }))}
+          />
+          <SelectField
+            label="Класс для фильтра на главной"
+            value={form.filterClass || 'business'}
+            options={FILTER_CLASSES}
+            onChange={(v) => setForm((f) => ({ ...f, filterClass: v }))}
+          />
+        </div>
         <MediaField
           label="Картинка карточки"
           hint="пусто — About-медиа"
           value={form.cardImage}
           onChange={(v) => setForm((f) => ({ ...f, cardImage: v }))}
         />
+        <StringListField
+          label="Теги карточки"
+          hint="по одному в строке; «Распродано» появится сам"
+          rows={4}
+          value={baseTags}
+          onChange={(v) => setForm((f) => ({ ...f, cardTags: v }))}
+        />
       </div>
-      <StringListField
-        label="Теги карточки"
-        hint="по одному в строке; «Распродано» у распроданного проекта появится сам"
-        value={baseTags}
-        onChange={(v) => setForm((f) => ({ ...f, cardTags: v }))}
-      />
-    </section>
+    </FormSection>
   )
 }

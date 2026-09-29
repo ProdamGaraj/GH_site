@@ -1,8 +1,9 @@
 import React, { useRef, useState, useCallback } from 'react'
 import { Upload, X, Image as ImageIcon, Link as LinkIcon, Loader2, FolderOpen } from 'lucide-react'
-import { mediaApi, resolveMediaUrl, type MediaAsset } from '@/shared/api/mediaApi'
+import { resolveMediaUrl, type MediaAsset } from '@/shared/api/mediaApi'
 import { MediaPicker } from '@/features/media/MediaPicker'
 import { useProjectVariantWidths } from '@/features/media/useProjectVariantWidths'
+import { acceptFor, uploadedUrlOf, useMediaUpload } from '@/features/media/useMediaUpload'
 
 interface ImageUploadProps {
   value: string
@@ -33,7 +34,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUrlMode, setIsUrlMode] = useState(true)
-  const [isUploading, setIsUploading] = useState(false)
+  const { upload, uploading: isUploading } = useMediaUpload(kind)
   const [previewError, setPreviewError] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -43,43 +44,15 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   const showImageOptions = kind === 'image' || kind === 'any'
 
   const handleFileSelect = useCallback(async (file: File) => {
-    const expectImage = kind === 'image'
-    const expectVideo = kind === 'video'
-    if (expectImage && !file.type.startsWith('image/')) {
-      alert('Пожалуйста, выберите изображение')
-      return
-    }
-    if (expectVideo && !file.type.startsWith('video/')) {
-      alert('Пожалуйста, выберите видео')
-      return
-    }
-
-    setIsUploading(true)
     setPreviewError(false)
-
-    // Опции оптимизации/адаптивов применимы только к изображениям; бэкенд игнорирует их для прочего.
-    const isImage = file.type.startsWith('image/')
-
-    try {
-      const asset = await mediaApi.upload({
-        file,
-        title: file.name.replace(/\.[^.]+$/, ''),
-        optimize: isImage && showImageOptions ? optimize : false,
-        variantWidths: isImage && showImageOptions && makeResponsive ? variantWidths : undefined,
-      })
-      // Если создана оптимизированная версия — подставляем её (легче, без потери качества).
-      if (onSelectAsset) {
-        onSelectAsset(asset)
-      } else {
-        onChange(resolveMediaUrl(asset.optimizedUrl || asset.url))
-      }
-    } catch (error: any) {
-      console.error('Upload error:', error)
-      alert(`Ошибка загрузки: ${error?.message || ''}`)
-    } finally {
-      setIsUploading(false)
+    const asset = await upload(file, { optimize, responsive: makeResponsive })
+    if (!asset) return
+    if (onSelectAsset) {
+      onSelectAsset(asset)
+    } else {
+      onChange(uploadedUrlOf(asset))
     }
-  }, [onChange, onSelectAsset, kind, showImageOptions, optimize, makeResponsive, variantWidths])
+  }, [upload, optimize, makeResponsive, onSelectAsset, onChange])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -194,7 +167,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           <input
             ref={fileInputRef}
             type="file"
-            accept={kind === 'image' ? 'image/*' : kind === 'video' ? 'video/*' : 'image/*,video/*'}
+            accept={acceptFor(kind)}
             onChange={handleInputChange}
             className="hidden"
           />

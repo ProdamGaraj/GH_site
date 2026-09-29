@@ -10,6 +10,8 @@ vi.mock('@/features/media/MediaPicker', () => ({
       </button>
     ) : null,
 }))
+// Загрузка файлов берёт ширины экранов из стора редактора — здесь стора нет.
+vi.mock('@/features/media/useProjectVariantWidths', () => ({ useProjectVariantWidths: () => [] }))
 
 import { GallerySlidesField } from './GallerySlidesField'
 import type { GalleryItem } from '../gallerySlides'
@@ -82,9 +84,9 @@ describe('GallerySlidesField', () => {
     expect(screen.queryByTestId('slide-framing')).toBeNull()
   })
 
-  it('«Добавить из медиатеки»: фото и видео, новый слайд в конце, кадрирование старых цело', () => {
+  it('медиатека: фото и видео, новый слайд в конце, кадрирование старых цело', () => {
     const onChange = setup([{ url: '/a.jpg', focus: { x: 10, y: 20 } }])
-    fireEvent.click(screen.getByRole('button', { name: /Добавить из медиатеки/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Медиатека/ }))
     const pick = screen.getByRole('button', { name: 'выбрать' })
     expect(pick.getAttribute('data-kind')).toBe('any')
     fireEvent.click(pick)

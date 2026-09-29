@@ -5,7 +5,8 @@ import type { ComplexDetail, GeoPoint, Locale, MapPlace, PlaceType } from '../ty
 import { estateApi } from '../api'
 import { movePlace, newPlace, removePlace, updatePlace } from '../projectMap'
 import { getT, isRu, setLabel, setT } from './tfield'
-import { CoordinatesField, Label, LabelMapField, TextField } from './fields'
+import { SECTION } from '../sections'
+import { CoordinatesField, FormSection, Label, LabelMapField, TextField } from './fields'
 
 const selectCls =
   'w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500'
@@ -42,8 +43,7 @@ export const ProjectMapSection: React.FC<{
     const names = (getT(form, 'placeNames', locale) as Record<string, string> | undefined) ?? {}
     const byId = new Map(places.map((p) => [p.id, p.name]))
     return (
-      <section className="space-y-4 pt-4 border-t border-gray-100" data-testid="project-map">
-        <h3 className="text-sm font-semibold text-gray-500 uppercase">Карта проекта — перевод</h3>
+      <FormSection id={SECTION.map} title="Карта проекта — перевод" testId="project-map">
         {form.salesOffice && (
           <TextField
             label="Адрес отдела продаж"
@@ -65,7 +65,7 @@ export const ProjectMapSection: React.FC<{
         ) : (
           <p className="text-sm text-gray-400">Мест рядом пока нет — переводить нечего.</p>
         )}
-      </section>
+      </FormSection>
     )
   }
 
@@ -76,28 +76,31 @@ export const ProjectMapSection: React.FC<{
     }))
 
   return (
-    <section className="space-y-4 pt-4 border-t border-gray-100" data-testid="project-map">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-500 uppercase flex items-center gap-2">
+    <FormSection
+      id={SECTION.map}
+      testId="project-map"
+      title={
+        <>
           <MapPin size={14} /> Карта проекта
-        </h3>
+        </>
+      }
+      actions={
         <Link to="/estate/place-types" className="text-sm text-primary-700 hover:underline">
           Типы мест
         </Link>
-      </div>
-
-      <CoordinatesField
-        label="Точка дома"
-        hint="центр карты; без неё карты на странице нет"
-        value={form.housePoint}
-        allowEmpty
-        onChange={(point) => setForm((f) => ({ ...f, housePoint: point }))}
-      />
-
-      <div className="grid grid-cols-2 gap-4">
+      }
+    >
+      <div className="grid lg:grid-cols-3 gap-4 items-start">
+        <CoordinatesField
+          label="Точка дома"
+          hint="без неё карты нет"
+          value={form.housePoint}
+          allowEmpty
+          onChange={(point) => setForm((f) => ({ ...f, housePoint: point }))}
+        />
         <CoordinatesField
           label="Отдел продаж"
-          hint="для кнопок «Такси» и «Маршрут»"
+          hint="для «Такси» и «Маршрута»"
           value={form.salesOffice}
           allowEmpty
           onChange={setOffice}
@@ -132,7 +135,7 @@ export const ProjectMapSection: React.FC<{
           <NewPlaceRow types={types} onAdd={(place) => setPlaces([...places, place])} />
         </div>
       </div>
-    </section>
+    </FormSection>
   )
 }
 

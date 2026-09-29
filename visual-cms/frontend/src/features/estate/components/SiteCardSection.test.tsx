@@ -94,11 +94,11 @@ describe('SiteCardSection — перевод (uz)', () => {
 describe('SiteCardSection — картинка из медиатеки', () => {
   afterEach(() => cleanup())
 
-  it('выбор в медиатеке пишет адрес в cardImage, превью показывает его', () => {
+  it('выбор в медиатеке пишет адрес в cardImage, миниатюра показывает его', () => {
     const form = setup(complex())
-    fireEvent.click(section().getByRole('button', { name: /Выбрать из галереи/ }))
+    fireEvent.click(section().getByRole('button', { name: /Медиатека/ }))
     fireEvent.click(screen.getByRole('button', { name: 'выбрать' }))
     expect(form.current.cardImage).toBe('/media/picked.jpg')
-    expect(section().getByAltText('Preview').getAttribute('src')).toBe('/media/picked.jpg')
+    expect(section().getByTestId('media-tile').querySelector('img')?.getAttribute('src')).toBe('/media/picked.jpg')
   })
 })

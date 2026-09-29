@@ -199,7 +199,8 @@ export const PlanGroupingPanel: React.FC<{
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className={`space-y-3 ${loading ? 'opacity-60' : ''}`}>
+      {/* Сеткой: карточка планировки узкая, по одной в строку на широком экране пустело. */}
+      <div className={`grid xl:grid-cols-2 2xl:grid-cols-3 gap-3 items-start ${loading ? 'opacity-60' : ''}`}>
         {preview?.groups.map((group) => {
           const key = cardKey(group)
           return (
@@ -216,7 +217,7 @@ export const PlanGroupingPanel: React.FC<{
           )
         })}
         {preview && preview.groups.length === 0 && (
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-gray-400 xl:col-span-2 2xl:col-span-3">
             Нет планировок с квартирами в продаже — нечего показывать.
           </p>
         )}

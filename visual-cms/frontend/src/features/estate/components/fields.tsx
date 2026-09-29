@@ -4,7 +4,7 @@ import type { GeoPoint, Locale, StatItem } from '../types'
 import { formatPoint, parseCoordinates } from '../projectMap'
 import { LOCALES, LOCALE_LABELS } from '../types'
 
-const inputCls =
+export const inputCls =
   'w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500'
 
 export const Label: React.FC<{ children: React.ReactNode; hint?: string }> = ({ children, hint }) => (
@@ -12,6 +12,27 @@ export const Label: React.FC<{ children: React.ReactNode; hint?: string }> = ({ 
     {children}
     {hint && <span className="ml-2 text-xs font-normal text-gray-400">{hint}</span>}
   </label>
+)
+
+/**
+ * Раздел редактора ЖК — отдельная карточка. id — якорь меню разделов
+ * (sections.ts); отступ сверху — чтобы заголовок не прятался под закреплённой
+ * полосой при переходе.
+ */
+export const FormSection: React.FC<{
+  id: string
+  title: React.ReactNode
+  actions?: React.ReactNode
+  testId?: string
+  children: React.ReactNode
+}> = ({ id, title, actions, testId, children }) => (
+  <section id={id} data-testid={testId} className="bg-white rounded-lg border border-gray-200 p-6 space-y-4 scroll-mt-24">
+    <div className="flex items-center justify-between gap-4">
+      <h2 className="text-sm font-semibold text-gray-500 uppercase flex items-center gap-2">{title}</h2>
+      {actions}
+    </div>
+    {children}
+  </section>
 )
 
 export const TextField: React.FC<{
@@ -194,8 +215,9 @@ export const StatsField: React.FC<{
 export const LocaleTabs: React.FC<{
   active: Locale
   onChange: (l: Locale) => void
-}> = ({ active, onChange }) => (
-  <div className="flex gap-1 border-b border-gray-200 mb-4">
+  className?: string
+}> = ({ active, onChange, className }) => (
+  <div className={cn('flex gap-1 border-b border-gray-200 mb-4', className)}>
     {LOCALES.map((l) => (
       <button
         key={l}
