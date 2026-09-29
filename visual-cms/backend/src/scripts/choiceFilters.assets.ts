@@ -14,7 +14,7 @@
 export const FILTERS_JS_HEAD = '/* Фильтры квартир (#choice)'
 
 /** Заголовок текущей версии — по нему миграция узнаёт, что уже применена. */
-export const FILTERS_JS_MARKER = `${FILTERS_JS_HEAD}, v5.`
+export const FILTERS_JS_MARKER = `${FILTERS_JS_HEAD}, v6.`
 
 /** Начало скрипта первой версии (до миграций) — для тестов обновления. */
 export const FILTERS_JS_V1_START = `${FILTERS_JS_HEAD}. Работают по data-атрибутам`
@@ -25,10 +25,11 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
    Выбранные чипсы одного поля объединяются по ИЛИ, разные поля — по И.
    Варианты сужаются под остальные условия: чипс, который при них ничего не
    покажет, выключается; выбранный остаётся кликабельным, чтобы его можно было
-   снять. Цена карточки — диапазон «от priceMin до priceMax»: карточка подходит,
-   если он пересекается с заданным.
-   На десктопе комнатность и цена стоят строкой, без панелей; на телефоне —
-   кнопки, панель открывается под своей кнопкой. */
+   снять. Площадь и этаж — диапазоны «от/до»: карточка группы планировок
+   подходит, если хоть одна её квартира попадает в заданный диапазон. Цены на
+   сайте нет (v6).
+   На десктопе комнатность, площадь и этаж стоят строкой, без панелей; на
+   телефоне — кнопки, панель открывается под своей кнопкой. */
 (function () {
   var section = document.getElementById('choice');
   if (!section) return;
@@ -44,16 +45,60 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
   var lang = (document.documentElement.getAttribute('lang') || 'ru').slice(0, 2).toLowerCase();
   var T = TEXTS[lang] || TEXTS.ru;
 
+  function num(value) {
+    if (value === null || value === undefined) return null;
+    var text = String(value).replace(/\\s/g, '').replace(',', '.');
+    if (text === '') return null;
+    var n = Number(text);
+    return isFinite(n) ? n : null;
+  }
+
+  /* Диапазоны «от/до». Поля ввода — data-filter="<имя>Min" / "<имя>Max".
+     Карточка группы планировок объединяет квартиры, поэтому у неё не одно
+     значение, а набор отрезков: площадь — один отрезок «от и до» группы,
+     этажи — по точке на каждый этаж, где есть квартира. Карточка подходит,
+     если хоть один её отрезок пересекается с заданным. Нулевая площадь —
+     это отсутствие данных, а не квартира в 0 м². */
+  var RANGES = {
+    area: function (card) {
+      var lo = num(card.getAttribute('data-area-min'));
+      var hi = num(card.getAttribute('data-area-max'));
+      if (!(lo > 0)) lo = hi;
+      if (!(hi > 0)) hi = lo;
+      return lo > 0 ? [[Math.min(lo, hi), Math.max(lo, hi)]] : [];
+    },
+    floor: function (card) {
+      return (card.getAttribute('data-floors') || '').split(/[,|]/).map(num)
+        .filter(function (f) { return f !== null; })
+        .map(function (f) { return [f, f]; });
+    }
+  };
+  var RANGE_NAMES = Object.keys(RANGES);
+  var allCards = Array.prototype.slice.call(grid.querySelectorAll('.apartment-card'));
+
+  /* Диапазон, по которому данных нет ни у одной карточки, не показываем:
+     фильтр по нему отсёк бы всё. */
+  var rangeHasData = {};
+  RANGE_NAMES.forEach(function (name) {
+    rangeHasData[name] = allCards.some(function (card) { return RANGES[name](card).length > 0; });
+    if (rangeHasData[name]) return;
+    toolbar.querySelectorAll('[data-filter="' + name + 'Min"]').forEach(function (input) {
+      var group = input.closest('.filter-group');
+      if (group) group.hidden = true;
+    });
+  });
+
   /* Строка фильтров для десктопа. Собирается из копий тех же чипсов и полей
-     цены, что и в панелях: состояние у них общее (выбор хранится по полю, поля
-     цены синхронизируются), так что строка и панели — одно и то же. Что
-     показать — строку или кнопки с панелями, — решает CSS по ширине экрана.
-     Поле без вариантов в строку не попадает. */
-  var INLINE_PANELS = ['rooms', 'price'];
+     диапазонов, что и в панелях: состояние у них общее (выбор хранится по
+     полю, поля диапазонов синхронизируются), так что строка и панели — одно
+     и то же. Что показать — строку или кнопки с панелями, — решает CSS по
+     ширине экрана. Поле без вариантов в строку не попадает. */
+  var INLINE_PANELS = ['rooms', 'area', 'floor'];
   var main = toolbar.querySelector('.filter-main');
   var inline = document.createElement('div');
   inline.className = 'filter-inline';
   INLINE_PANELS.forEach(function (name) {
+    if (RANGES[name] && !rangeHasData[name]) return;
     var panel = toolbar.querySelector('.filter-panel[data-panel="' + name + '"]');
     var control = panel && (panel.querySelector('.chip-row') || panel.querySelector('.range-box'));
     if (!control) return;
@@ -90,8 +135,10 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
 
   var triggers = toolbar.querySelectorAll('.filter-trigger[data-panel]');
   var panels = toolbar.querySelectorAll('.filter-panel');
-  var priceInputs = toolbar.querySelectorAll('[data-filter="priceMin"], [data-filter="priceMax"]');
   var applyButtons = toolbar.querySelectorAll('[data-filter-action="apply"]');
+  function rangeInputs(name) {
+    return toolbar.querySelectorAll('[data-filter="' + name + 'Min"], [data-filter="' + name + 'Max"]');
+  }
 
   /* Чипсы разворачиваются из данных проекта (срок сдачи, виды из окон), и у
      проекта их может не быть. Пустую группу прячем и в своей панели, и в
@@ -105,7 +152,8 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
   triggers.forEach(function (trigger) {
     var panel = toolbar.querySelector('.filter-panel[data-panel="' + trigger.getAttribute('data-panel') + '"]');
     if (!panel) return;
-    var usable = panel.querySelector('[data-filter][data-value]') || panel.querySelector('.range-box');
+    var usable = panel.querySelector('.filter-group:not([hidden]) [data-filter][data-value]') ||
+      panel.querySelector('.filter-group:not([hidden]) .range-box');
     if (!usable) trigger.style.display = 'none';
   });
 
@@ -198,49 +246,52 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
     apply();
   });
 
-  /* Поле цены тоже есть в двух панелях: ввод в одной копируется в другую,
-     иначе фильтр зависел бы от того, какое поле заполнено последним. */
-  priceInputs.forEach(function (input) {
-    input.setAttribute('data-placeholder', input.getAttribute('placeholder') || '');
-    input.addEventListener('input', function () {
-      var kind = input.getAttribute('data-filter');
-      toolbar.querySelectorAll('[data-filter="' + kind + '"]').forEach(function (other) {
-        if (other !== input) other.value = input.value;
+  /* Поле диапазона есть в нескольких местах (строка, своя панель, «Все
+     фильтры»): ввод в одном копируется в остальные, иначе фильтр зависел бы
+     от того, какое поле заполнено последним. */
+  RANGE_NAMES.forEach(function (name) {
+    rangeInputs(name).forEach(function (input) {
+      input.setAttribute('data-placeholder', input.getAttribute('placeholder') || '');
+      input.addEventListener('input', function () {
+        var kind = input.getAttribute('data-filter');
+        toolbar.querySelectorAll('[data-filter="' + kind + '"]').forEach(function (other) {
+          if (other !== input) other.value = input.value;
+        });
+        apply();
       });
-      apply();
     });
   });
 
-  function readPrice(kind) {
-    var input = toolbar.querySelector('[data-filter="' + kind + '"]');
-    if (!input || input.value === '') return null;
-    var n = Number(input.value);
-    return isFinite(n) ? n : null;
+  /* Заданный диапазон; перепутанные «от» и «до» меняются местами — пустая
+     выдача из-за порядка полей выглядела бы поломкой. */
+  function readRange(name) {
+    var lo = toolbar.querySelector('[data-filter="' + name + 'Min"]');
+    var hi = toolbar.querySelector('[data-filter="' + name + 'Max"]');
+    var min = lo ? num(lo.value) : null;
+    var max = hi ? num(hi.value) : null;
+    if (min !== null && max !== null && min > max) return { min: max, max: min };
+    return { min: min, max: max };
   }
 
-  function cardPrice(card) {
-    var min = Number(card.getAttribute('data-price')) || 0;
-    var max = Number(card.getAttribute('data-price-max')) || 0;
-    return { min: min, max: Math.max(min, max) };
+  function rangeSet(name) {
+    var want = readRange(name);
+    return want.min !== null || want.max !== null;
   }
 
-  function priceOk(card) {
-    var min = readPrice('priceMin');
-    var max = readPrice('priceMax');
-    if (min === null && max === null) return true;
-    var p = cardPrice(card);
-    /* Карточка без цены под ценовой фильтр не попадает: «0 UZS» — это
-       отсутствие цены, а не бесплатная квартира. */
-    if (!(p.min > 0)) return false;
-    if (max !== null && p.min > max) return false;
-    if (min !== null && p.max < min) return false;
-    return true;
+  function rangeOk(card, name) {
+    var want = readRange(name);
+    if (want.min === null && want.max === null) return true;
+    /* Карточка без данных под заданный диапазон не попадает: подтвердить,
+       что она в нём, нечем. */
+    return RANGES[name](card).some(function (span) {
+      return (want.max === null || span[0] <= want.max) && (want.min === null || span[1] >= want.min);
+    });
   }
 
   function valuesOf(card, field) {
     var raw = card.getAttribute('data-' + field);
-    /* Карточка типа планировки объединяет квартиры с разными видами из окон и
-       этажами, поэтому значение атрибута — множество через «|». */
+    /* Карточка группы планировок объединяет квартиры с разными видами из окон
+       и сроками, поэтому значение атрибута — множество через «|». */
     return raw ? raw.split('|') : [];
   }
 
@@ -256,11 +307,10 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
       var hit = set.some(function (v) { return values.indexOf(v) !== -1; });
       if (!hit) return false;
     }
-    return skip === 'price' || priceOk(card);
-  }
-
-  function groupDigits(n) {
-    return String(Math.round(n)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ' ');
+    for (var r = 0; r < RANGE_NAMES.length; r++) {
+      if (RANGE_NAMES[r] !== skip && !rangeOk(card, RANGE_NAMES[r])) return false;
+    }
+    return true;
   }
 
   function refreshFacets(cards) {
@@ -277,31 +327,34 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
       });
     });
 
-    /* Подсказка в полях цены — реальный диапазон при остальных условиях. */
-    var lo = Infinity;
-    var hi = 0;
-    cards.forEach(function (card) {
-      if (!matches(card, 'price')) return;
-      var p = cardPrice(card);
-      if (!(p.min > 0)) return;
-      if (p.min < lo) lo = p.min;
-      if (p.max > hi) hi = p.max;
-    });
-    priceInputs.forEach(function (input) {
-      var isMin = input.getAttribute('data-filter') === 'priceMin';
-      var hint = hi > 0
-        ? (isMin ? T.from : T.to).replace('{n}', groupDigits(isMin ? lo : hi))
-        : input.getAttribute('data-placeholder');
-      input.setAttribute('placeholder', hint);
+    /* Подсказка в полях диапазона — реальные границы при остальных условиях,
+       с запасом до целого: «от 34» у площади 34.87 не отсекает её. */
+    RANGE_NAMES.forEach(function (name) {
+      var lo = Infinity;
+      var hi = -Infinity;
+      cards.forEach(function (card) {
+        if (!matches(card, name)) return;
+        RANGES[name](card).forEach(function (span) {
+          if (span[0] < lo) lo = span[0];
+          if (span[1] > hi) hi = span[1];
+        });
+      });
+      rangeInputs(name).forEach(function (input) {
+        var isMin = input.getAttribute('data-filter') === name + 'Min';
+        var hint = hi >= lo
+          ? (isMin ? T.from : T.to).replace('{n}', String(isMin ? Math.floor(lo) : Math.ceil(hi)))
+          : input.getAttribute('data-placeholder');
+        input.setAttribute('placeholder', hint);
+      });
     });
   }
 
   function refreshTriggers() {
-    var priceSet = readPrice('priceMin') !== null || readPrice('priceMax') !== null;
-    var anySet = priceSet || fields.some(function (f) { return selected[f] && selected[f].length > 0; });
+    var anySet = RANGE_NAMES.some(rangeSet) ||
+      fields.some(function (f) { return selected[f] && selected[f].length > 0; });
     triggers.forEach(function (trigger) {
       var name = trigger.getAttribute('data-panel');
-      var on = name === 'all' ? anySet : name === 'price' ? priceSet : !!(selected[name] && selected[name].length);
+      var on = name === 'all' ? anySet : RANGES[name] ? rangeSet(name) : !!(selected[name] && selected[name].length);
       trigger.classList.toggle('has-value', on);
     });
   }
@@ -309,7 +362,9 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
   function reset() {
     selected = {};
     toolbar.querySelectorAll('[data-filter][data-value]').forEach(function (c) { c.classList.remove('active'); });
-    priceInputs.forEach(function (i) { i.value = ''; });
+    RANGE_NAMES.forEach(function (name) {
+      rangeInputs(name).forEach(function (i) { i.value = ''; });
+    });
     apply();
   }
   toolbar.querySelectorAll('[data-filter-action="reset"], .reset-filter').forEach(function (b) {
@@ -349,18 +404,23 @@ export const FILTERS_JS = `${FILTERS_JS_MARKER} Работают по data-ат�
 })();
 `
 
-/** Начало CSS-дополнения любой версии: с него хвост globalCss заменяется при обновлении. */
+/** Начало CSS-дополнения любой версии: с него секция заменяется при обновлении. */
 export const FILTERS_CSS_HEAD = '/* ==== choice-filters'
 
 /** Маркер текущей версии — по нему миграция узнаёт, что уже применена. */
-export const FILTERS_CSS_MARKER = `${FILTERS_CSS_HEAD} v6 ====`
+export const FILTERS_CSS_MARKER = `${FILTERS_CSS_HEAD} v7 ====`
+
+/** Панели диапазонов: площадь и этаж (v7; до неё — цена). */
+const RANGE_PANELS = ['area', 'floor']
+const CHIP_PANELS = ['rooms', 'deadline', 'windowViews']
+const panelSel = (names: string[]) => names.map((n) => `.filter-panel[data-panel="${n}"]`).join(',\n')
 
 export const FILTERS_CSS = `
 ${FILTERS_CSS_MARKER}
    Поверх исходного CSS блока (scripts/migrate-choice-filters.ts): панель
    фильтров поверх карточек и под своей кнопкой, веса под Inter, галочка
-   вместо символа «⌄», выключенные варианты. Секция должна оставаться
-   последней в globalCss: обновление заменяет её до конца. */
+   вместо символа «⌄», выключенные варианты. Фильтры площади и этажа вместо
+   цены (v7). Обновление заменяет секцию до заголовка следующей. */
 
 /* Секция обрезала панель, когда после фильтра карточек оставалось мало и
    «Все фильтры» оказывались выше самой секции. */
@@ -436,19 +496,22 @@ ${FILTERS_CSS_MARKER}
 
 /* Высоту и левый край панели ставит скрипт — прямо под её кнопкой. */
 .filter-panel,
-.filter-panel[data-panel="price"],
+${panelSel(RANGE_PANELS)},
 .filter-panel[data-panel="all"] {
   top: 0;
 }
 
 /* В панелях с чипсами пара кнопок — на 780 px это была пустая плашка. */
-.filter-panel[data-panel="rooms"],
-.filter-panel[data-panel="deadline"],
-.filter-panel[data-panel="windowViews"] {
+${panelSel(CHIP_PANELS)} {
   width: min(420px, calc(100vw - 42px));
 }
 
-/* «Все фильтры» в одну колонку: в две поля цены сжимались до «от 376 5…». */
+/* Два поля «от/до» — тоже не на 780 px. */
+${panelSel(RANGE_PANELS)} {
+  width: min(460px, calc(100vw - 42px));
+}
+
+/* «Все фильтры» в одну колонку: в две поля «от/до» сжимались. */
 .filter-panel[data-panel="all"] {
   left: 0;
   right: auto;
@@ -464,25 +527,20 @@ ${FILTERS_CSS_MARKER}
   margin-top: 22px;
 }
 
-/* На телефоне — во всю ширину тулбара. Селекторы панелей с чипсами
-   перечислены явно: иначе их width: 420px (выше) побеждал по специфичности
-   и панель вылезала за край экрана. */
+/* На телефоне — во всю ширину тулбара. Селекторы панелей перечислены явно:
+   иначе их width (выше) побеждал по специфичности и панель вылезала за край
+   экрана. */
 @media (max-width: 760px) {
   .filter-panel,
-  .filter-panel[data-panel="price"],
-  .filter-panel[data-panel="all"],
-  .filter-panel[data-panel="rooms"],
-  .filter-panel[data-panel="deadline"],
-  .filter-panel[data-panel="windowViews"] {
+  ${panelSel([...RANGE_PANELS, 'all', ...CHIP_PANELS])} {
     left: 0;
     right: 0;
     width: auto;
   }
 }
 
-/* На телефоне поля цены друг под другом: в два столбца подсказка
-   «от 376 511 429» обрезалась. «—» и «UZS» убираем, валюта уже есть в
-   заголовке группы. */
+/* На телефоне поля «от/до» друг под другом. «—» и «м²» убираем: единица
+   уже в заголовке группы. */
 @media (max-width: 560px) {
   .range-box {
     grid-template-columns: 1fr;
@@ -495,10 +553,10 @@ ${FILTERS_CSS_MARKER}
   }
 }
 
-/* ---- Десктоп: комнатность и цена строкой, без панелей ----
-   Строку собирает скрипт из копий чипсов и полей цены. На десктопе прячем
-   кнопки этих панелей и «Все фильтры» (всё основное уже на виду; срок сдачи и
-   вид из окна, если они есть у проекта, остаются своими кнопками). */
+/* ---- Десктоп: комнатность, площадь и этаж строкой, без панелей ----
+   Строку собирает скрипт из копий чипсов и полей диапазонов. На десктопе
+   прячем кнопки этих панелей и «Все фильтры» (всё основное уже на виду; срок
+   сдачи и вид из окна, если они есть у проекта, остаются своими кнопками). */
 .filter-inline,
 .filter-count {
   display: none;
@@ -527,12 +585,12 @@ ${FILTERS_CSS_MARKER}
   flex-wrap: nowrap;
 }
 
-/* В строке поля цены стоят сами по себе, без общей рамки вокруг: рамка
-   вокруг полей с рамками выглядела двойной. Ширина — под самую длинную
-   подсказку: узбекское «4 789 163 414 gacha» в 170 px обрезалось. */
+/* В строке поля стоят сами по себе, без общей рамки вокруг: рамка вокруг
+   полей с рамками выглядела двойной. Ширина — под самую длинную подсказку:
+   узбекское «234 gacha» в 104 px обрезалось. */
 .filter-inline .range-box {
   min-height: 0;
-  grid-template-columns: 190px auto 190px;
+  grid-template-columns: 120px auto 120px;
   gap: 8px;
   padding: 0;
   border: 0;
@@ -548,8 +606,8 @@ ${FILTERS_CSS_MARKER}
   background: #fff;
 }
 
-/* «UZS» уже в подписи группы. */
-.filter-inline .range-box > span:last-child {
+/* «м²» уже в подписи группы. */
+.filter-inline .range-unit {
   display: none;
 }
 
@@ -593,7 +651,8 @@ ${FILTERS_CSS_MARKER}
   }
 
   .filter-trigger[data-panel="rooms"],
-  .filter-trigger[data-panel="price"],
+  .filter-trigger[data-panel="area"],
+  .filter-trigger[data-panel="floor"],
   .filter-trigger[data-panel="all"] {
     display: none;
   }

@@ -1,5 +1,5 @@
 /**
- * Фильтры секции «Выбрать» (блок «Complex choice»), версия 4.
+ * Фильтры секции «Выбрать» (блок «Complex choice»), версия 5.
  *
  * Что было не так на странице проекта:
  * - панель фильтров рисовалась под карточками планировок, а на коротком
@@ -18,7 +18,9 @@
  *   планировок у карточки диапазон — «от 600 млн» отсекал карточку 376–700;
  * - «⌄» был символом в тексте кнопки и рисовался запасным шрифтом, криво;
  * - пустые группы («Срок сдачи» без сроков) висели в «Все фильтры»;
- * - «квартир нет» писалось по-русски и на узбекской версии.
+ * - «квартир нет» писалось по-русски и на узбекской версии;
+ * - v5: цены на сайте больше нет — фильтр цены заменён фильтрами площади и
+ *   этажа, из карточки убрана цена (`choiceRanges.ts`).
  *
  * Здесь только чистое преобразование структуры блока и строк переводов:
  * запись в базу — в `migrate-choice-filters.ts`.
@@ -26,16 +28,9 @@
  * Идемпотентность: каждая правка проверяет, не применена ли она уже, и
  * повторный вызов ничего не меняет.
  */
-import {
-  MigrationError,
-  MigrationResult,
-  StructureNode,
-  findAll,
-  findOne,
-  hasClass,
-  setAttr,
-  walk,
-} from './choiceToPlanTypes'
+import { MigrationError, MigrationResult, StructureNode, findAll, hasClass, walk } from './choiceToPlanTypes'
+import { replaceCssSection } from './complexMedia'
+import { RangesResult, migrateRanges } from './choiceRanges'
 import {
   FILTERS_CSS,
   FILTERS_CSS_HEAD,
@@ -44,10 +39,6 @@ import {
   FILTERS_JS_HEAD,
   FILTERS_JS_MARKER,
 } from './choiceFilters.assets'
-
-/** Верхняя граница цены карточки: после склейки планировок это диапазон. */
-const PRICE_MAX_ATTR = 'data-price-max'
-const PRICE_MAX_BINDING = '{{$.priceMax}}'
 
 /** «Комнатность ⌄» → «Комнатность». Галочку теперь рисует CSS. */
 const CHEVRON_RE = /\s*⌄\s*$/
@@ -77,20 +68,19 @@ export function migrateFiltersJs(js: string, changes: string[]): string {
   if (!tail.endsWith('})();')) {
     throw new MigrationError('Скрипт фильтров не последний в globalJs — после него есть другой код')
   }
-  changes.push('globalJs: скрипт фильтров v5 (десктоп — строкой, телефон — панель под кнопкой, сужение вариантов, цена диапазоном, счётчик, ru/uz/en)')
+  changes.push('globalJs: скрипт фильтров v6 (десктоп — строкой, телефон — панель под кнопкой, сужение вариантов, площадь и этаж «от/до», счётчик, ru/uz/en)')
   return js.slice(0, start) + FILTERS_JS
 }
 
 /**
- * Ставит текущую CSS-секцию фильтров. Прежняя версия секции (она всегда в
- * конце globalCss) заменяется до конца; если секции нет — дописывается.
+ * Ставит текущую CSS-секцию фильтров на место прежней версии; если секции
+ * нет — дописывает. Секции, дописанные после неё другими миграциями
+ * («Распродано»), остаются на месте.
  */
 export function migrateFiltersCss(css: string, changes: string[]): string {
   if (css.includes(FILTERS_CSS_MARKER)) return css
-  const start = css.indexOf(FILTERS_CSS_HEAD)
-  const base = start === -1 ? css : css.slice(0, start)
-  changes.push('globalCss: строка фильтров на десктопе, панель под кнопкой на телефоне, без переключателя вида')
-  return base.trimEnd() + '\n' + FILTERS_CSS
+  changes.push('globalCss: строка фильтров на десктопе (комнатность, площадь, этаж), панель под кнопкой на телефоне')
+  return replaceCssSection(css.includes(FILTERS_CSS_HEAD) ? css : css.trimEnd(), FILTERS_CSS_HEAD, FILTERS_CSS)
 }
 
 /**
@@ -124,19 +114,17 @@ export function removeViewToggle(structure: StructureNode, changes: string[]): v
   })
 }
 
-export function migrateChoiceFilters(input: StructureNode): MigrationResult {
+export interface ChoiceFiltersResult extends MigrationResult {
+  /** Замена цены на площадь и этаж: по ней считаются переводы новых узлов. */
+  ranges: RangesResult
+}
+
+export function migrateChoiceFilters(input: StructureNode): ChoiceFiltersResult {
   const structure: StructureNode = JSON.parse(JSON.stringify(input))
   const changes: string[] = []
 
-  const card = findOne(
-    structure,
-    (n) => hasClass(n, 'apartment-card') && n.attributes?.['data-price'] !== undefined,
-    '.apartment-card с data-price'
-  )
-  if (card.attributes?.[PRICE_MAX_ATTR] === undefined) {
-    setAttr(card, PRICE_MAX_ATTR, PRICE_MAX_BINDING)
-    changes.push(`карточка: ${PRICE_MAX_ATTR}="${PRICE_MAX_BINDING}"`)
-  }
+  const ranges = migrateRanges(structure)
+  changes.push(...ranges.changes)
 
   removeChoiceBanner(structure, changes)
   removeViewToggle(structure, changes)
@@ -158,8 +146,8 @@ export function migrateChoiceFilters(input: StructureNode): MigrationResult {
   metadata.globalJs = migrateFiltersJs(js, changes)
   metadata.globalCss = migrateFiltersCss(typeof metadata.globalCss === 'string' ? metadata.globalCss : '', changes)
 
-  if (changes.length === 0) return { structure: input, changes, alreadyMigrated: true }
-  return { structure, changes, alreadyMigrated: false }
+  if (changes.length === 0) return { structure: input, changes, alreadyMigrated: true, ranges }
+  return { structure, changes, alreadyMigrated: false, ranges }
 }
 
 /** Строка перевода, как её отдаёт таблица translations. */

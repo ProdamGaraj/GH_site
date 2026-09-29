@@ -40,10 +40,6 @@ function hasApartments(bodyHtml: string): boolean {
  * переводов их не видит: в `page.structure` этих узлов нет, и на узбекской
  * версии страницы они оставались русскими. Отсюда таблица подписей вместо
  * литералов в разметке.
- *
- * `floorWord` — слово, по которому в мете карточки ищется этаж. Оно тоже
- * языкозависимо: estate-service отдаёт «8/9 этаж» на ru и «8/9 qavat» на uz,
- * и регулярка с русским словом на узбекской странице не находила ничего.
  */
 export interface OverlayLabels {
   close: string
@@ -54,47 +50,43 @@ export interface OverlayLabels {
   nextImage: string
   plan: string
   project: string
-  price: string
+  /** Класс проекта («Комфорт+») — вместо цены: цен на сайте нет. */
+  projectClass: string
   floor: string
   deadline: string
   cta: string
-  priceOnRequest: string
   floorUnknown: string
   deadlineUnknown: string
   planDescription: string
-  floorWord: string
 }
 
 const OVERLAY_LABELS: Record<string, OverlayLabels> = {
   ru: {
     close: 'Закрыть', viewImage: 'Просмотр изображения', prevView: 'Предыдущий ракурс', nextView: 'Следующий ракурс',
     prevImage: 'Предыдущее изображение', nextImage: 'Следующее изображение',
-    plan: 'Планировка', project: 'Проект', price: 'Стоимость', floor: 'Этаж',
+    plan: 'Планировка', project: 'Проект', projectClass: 'Класс', floor: 'Этаж',
     deadline: 'Срок сдачи', cta: 'Получить консультацию',
-    priceOnRequest: 'Цена по запросу', floorUnknown: 'Этаж уточняется',
+    floorUnknown: 'Этаж уточняется',
     deadlineUnknown: 'Срок уточняется',
     planDescription: ' — планировка с продуманными жилыми зонами и доступом к инфраструктуре проекта.',
-    floorWord: 'этаж',
   },
   uz: {
     close: 'Yopish', viewImage: 'Rasmni ko‘rish', prevView: 'Oldingi rakurs', nextView: 'Keyingi rakurs',
     prevImage: 'Oldingi rasm', nextImage: 'Keyingi rasm',
-    plan: 'Reja', project: 'Loyiha', price: 'Narx', floor: 'Qavat',
+    plan: 'Reja', project: 'Loyiha', projectClass: 'Sinf', floor: 'Qavat',
     deadline: 'Topshirish muddati', cta: 'Maslahat olish',
-    priceOnRequest: 'Narx so‘rov bo‘yicha', floorUnknown: 'Qavat aniqlanmoqda',
+    floorUnknown: 'Qavat aniqlanmoqda',
     deadlineUnknown: 'Muddat aniqlanmoqda',
     planDescription: ' — puxta o‘ylangan yashash zonalari va loyiha infratuzilmasiga kirish imkoniga ega reja.',
-    floorWord: 'qavat',
   },
   en: {
     close: 'Close', viewImage: 'Image preview', prevView: 'Previous view', nextView: 'Next view',
     prevImage: 'Previous image', nextImage: 'Next image',
-    plan: 'Floor plan', project: 'Project', price: 'Price', floor: 'Floor',
+    plan: 'Floor plan', project: 'Project', projectClass: 'Class', floor: 'Floor',
     deadline: 'Completion', cta: 'Get a consultation',
-    priceOnRequest: 'Price on request', floorUnknown: 'Floor to be confirmed',
+    floorUnknown: 'Floor to be confirmed',
     deadlineUnknown: 'Date to be confirmed',
     planDescription: ' — a layout with well-planned living areas and access to the project infrastructure.',
-    floorWord: 'floor',
   },
 }
 
@@ -123,12 +115,12 @@ const PLAN_MODAL_MARKUP = (L: OverlayLabels) => `
         <button class="side-arrow right" type="button" id="planModalNext" aria-label="${L.nextView}">&#8250;</button>
       </div>
       <div class="plan-modal-info">
-        <span class="section-eyebrow">${L.plan}</span>
+        <span class="section-eyebrow" id="planModalEyebrow">${L.plan}</span>
         <h3 id="planModalTitle"></h3>
         <p id="planModalText"></p>
         <div class="plan-modal-facts">
           <span><b id="planModalProject"></b>${L.project}</span>
-          <span><b id="planModalPrice"></b>${L.price}</span>
+          <span id="planModalClassFact"><b id="planModalClass"></b>${L.projectClass}</span>
           <span><b id="planModalFloor"></b>${L.floor}</span>
           <span><b id="planModalDeadline"></b>${L.deadline}</span>
         </div>
@@ -187,20 +179,12 @@ const RUNTIME_JS = (L: OverlayLabels) => `<script>
     var node = document.getElementById(id);
     if (node) node.textContent = value || '';
   }
-  // Цена карточки — первый непустой узел .apartment-price: в вёрстке дизайна
-  // это текст перед старой ценой, в карточке CMS — вложенный <span>, а первым
-  // узлом стоит перенос строки. Брать childNodes[0] значило показывать пустоту.
-  function priceOf(card) {
-    var box = card.querySelector('.apartment-price');
-    if (!box) return '';
-    for (var i = 0; i < box.childNodes.length; i++) {
-      var text = (box.childNodes[i].textContent || '').trim();
-      if (text) return text;
-    }
-    return '';
+  function textIn(card, selector) {
+    var node = card.querySelector(selector);
+    return node ? node.textContent.replace(/\\s+/g, ' ').trim() : '';
   }
-  // Распроданный проект: вместо цены — «Распродано» на языке страницы. Подпись
-  // приходит из данных проекта атрибутом секции; пусто — проект продаётся.
+  // Распроданный проект: «Распродано» на языке страницы — в надзаголовке окна.
+  // Подпись приходит из данных проекта атрибутом секции; пусто — продаётся.
   function soldLabelOf(card) {
     var section = card.closest('[data-sold-label]');
     return section ? (section.getAttribute('data-sold-label') || '').trim() : '';
@@ -209,23 +193,24 @@ const RUNTIME_JS = (L: OverlayLabels) => `<script>
     if (!modal || !card) return;
     closeLightbox();
     // Содержимое берём из самой карточки: она уже отрисована на деплое,
-    // второго источника данных для модалки заводить не нужно.
-    var title = card.querySelector('h3');
-    var price = priceOf(card);
-    var meta = card.querySelector('.apartment-meta');
-    var project = card.querySelector('[data-card-project]');
-    var titleText = title ? title.textContent.trim() : '';
-    var metaText = meta ? meta.textContent.replace(/\\s+/g, ' ').trim() : '';
-    var parts = metaText.split('|');
-    // Слово «этаж» языкозависимо: на uz мета приходит как «8/9 qavat».
-    var floorRe = new RegExp('\\d+\\/\\d+\\s*' + ${JSON.stringify(L.floorWord)});
-    var floor = metaText.match(floorRe);
+    // второго источника данных для модалки заводить не нужно. Каждое поле —
+    // из своего помеченного узла или атрибута карточки, а не разбором текста:
+    // текст карточки меняется вместе с вёрсткой.
+    var titleText = textIn(card, 'h3');
+    var projectClass = textIn(card, '[data-apartment-class]');
+    var sold = soldLabelOf(card);
 
+    setText('planModalEyebrow', sold ? ${JSON.stringify(L.plan)} + ' · ' + sold : ${JSON.stringify(L.plan)});
     setText('planModalTitle', titleText || ${JSON.stringify(L.plan)});
-    setText('planModalPrice', soldLabelOf(card) || price || ${JSON.stringify(L.priceOnRequest)});
-    setText('planModalProject', project ? project.textContent.trim() : '');
-    setText('planModalFloor', floor ? floor[0] : ${JSON.stringify(L.floorUnknown)});
-    setText('planModalDeadline', parts.length > 1 ? parts[parts.length - 1].trim() : ${JSON.stringify(L.deadlineUnknown)});
+    setText('planModalProject', textIn(card, '[data-card-project]'));
+    setText('planModalClass', projectClass);
+    // Класса у проекта может не быть — пустой пункт выглядел бы поломкой.
+    // display, а не hidden: правило вида .plan-modal-facts span { display: … }
+    // перебило бы скрытие из браузерной таблицы стилей.
+    var classFact = document.getElementById('planModalClassFact');
+    if (classFact) classFact.style.display = projectClass ? '' : 'none';
+    setText('planModalFloor', textIn(card, '[data-card-floors]') || ${JSON.stringify(L.floorUnknown)});
+    setText('planModalDeadline', (card.getAttribute('data-deadline') || '').trim() || ${JSON.stringify(L.deadlineUnknown)});
     setText('planModalText', titleText
       ? titleText + ${JSON.stringify(L.planDescription)}
       : '');

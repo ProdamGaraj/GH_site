@@ -71,7 +71,8 @@ describe('содержимое', () => {
     for (const id of [
       'galleryLightboxPrev', 'galleryLightboxNext', 'galleryLightboxImage', 'galleryLightboxCounter',
       'planModalPrev', 'planModalNext', 'planModalTitle', 'planModalText',
-      'planModalProject', 'planModalPrice', 'planModalFloor', 'planModalDeadline',
+      'planModalProject', 'planModalClass', 'planModalClassFact', 'planModalFloor', 'planModalDeadline',
+      'planModalEyebrow',
     ]) {
       expect(out).toContain('id="' + id + '"')
     }

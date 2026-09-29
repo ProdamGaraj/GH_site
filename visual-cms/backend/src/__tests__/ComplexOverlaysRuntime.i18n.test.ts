@@ -4,7 +4,7 @@
  * Оверлеи (лайтбокс галереи и модалка планировки) инжектирует генератор, а не
  * блок структуры. Система переводов их не видит: в `page.structure` этих узлов
  * нет, поэтому на узбекской версии страницы они оставались русскими —
- * «Планировка», «Стоимость», «Получить консультацию» посреди узбекского текста.
+ * «Планировка», «Класс», «Получить консультацию» посреди узбекского текста.
  */
 import { generateComplexOverlays, overlayLabels } from '../services/ComplexOverlaysRuntime'
 
@@ -33,10 +33,11 @@ describe('overlayLabels', () => {
     }
   })
 
-  it('слово этажа своё у каждого языка — по нему мета карточки парсится', () => {
-    // estate-service отдаёт «8/9 этаж» на ru и «8/9 qavat» на uz.
-    expect(overlayLabels('ru').floorWord).toBe('этаж')
-    expect(overlayLabels('uz').floorWord).toBe('qavat')
+  it('вместо стоимости — класс проекта: цен на сайте нет', () => {
+    expect(overlayLabels('ru').projectClass).toBe('Класс')
+    expect(overlayLabels('uz').projectClass).toBe('Sinf')
+    expect(overlayLabels('en').projectClass).toBe('Class')
+    expect(overlayLabels('ru')).not.toHaveProperty('price')
   })
 })
 
@@ -49,15 +50,17 @@ describe('generateComplexOverlays', () => {
     const out = generateComplexOverlays(BODY, 'uz')
     expect(out).toContain('Reja')
     expect(out).toContain('Maslahat olish')
-    expect(out).toContain('Narx')
+    expect(out).toContain('Sinf')
     expect(out).not.toContain('Планировка')
     expect(out).not.toContain('Получить консультацию')
-    expect(out).not.toContain('Стоимость')
+    expect(out).not.toContain('</b>Класс<')
+    expect(out).toContain('</b>Sinf<')
   })
 
-  it('регулярка этажа собирается под язык, а не зашита по-русски', () => {
-    expect(generateComplexOverlays(BODY, 'uz')).toContain('"qavat"')
-    expect(generateComplexOverlays(BODY, 'ru')).toContain('"этаж"')
+  it('цены в окне нет ни на одном языке', () => {
+    expect(generateComplexOverlays(BODY, 'ru')).not.toContain('Стоимость')
+    expect(generateComplexOverlays(BODY, 'uz')).not.toContain('Narx')
+    expect(generateComplexOverlays(BODY, 'en')).not.toContain('Price')
   })
 
   it('без языка остаётся русский — поведение существующих страниц не меняется', () => {

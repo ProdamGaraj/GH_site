@@ -55,6 +55,13 @@ function block(): StructureNode {
             id: 'card',
             tagName: 'article',
             attributes: { class: 'apartment-card', 'data-price': '{{$.priceMin}}', 'data-rooms': '{{$.rooms}}' },
+            children: [
+              {
+                id: 'meta',
+                attributes: { class: 'apartment-meta' },
+                children: [{ id: 'floors', tagName: 'span', content: '{{$.floorsLabel}}' }],
+              },
+            ],
           },
         ],
       },
@@ -88,13 +95,19 @@ describe('migrateChoiceFilters', () => {
   const result = migrateChoiceFilters(block())
   const out = result.structure
 
-  it('карточка получает верхнюю границу цены', () => {
-    expect(find(out, 'card').attributes!['data-price-max']).toBe('{{$.priceMax}}')
+  it('карточка без цены, с данными площади и этажей (подробно — choiceRanges.test.ts)', () => {
+    expect(find(out, 'card').attributes).not.toHaveProperty('data-price')
+    expect(find(out, 'card').attributes).toMatchObject({ 'data-area-min': '{{$.areaMin}}', 'data-floors': '{{$.floorsAttr}}' })
+  })
+
+  it('кнопка цены заменена кнопками площади и этажа', () => {
+    expect(() => find(out, 'price')).toThrow()
+    expect(find(out, 'price--area').content).toBe('Площадь')
+    expect(find(out, 'price--floor').content).toBe('Этаж')
   })
 
   it('у кнопок фильтра символ ⌄ убран, чужие узлы не тронуты', () => {
     expect(find(out, 'rooms').content).toBe('Комнатность')
-    expect(find(out, 'price').content).toBe('Цена')
     expect(find(out, 'all').content).toBe('Все фильтры')
     expect(find(out, 'other').content).toBe('Прочее ⌄')
   })
@@ -132,9 +145,15 @@ describe('migrateChoiceFilters', () => {
     expect(JSON.stringify(again.structure)).toBe(JSON.stringify(out))
   })
 
-  it('без карточки с data-price — ошибка, а не тихий пропуск', () => {
+  it('без карточки — ошибка, а не тихий пропуск', () => {
     const broken = block()
-    delete find(broken, 'card').attributes!['data-price']
+    find(broken, 'grid').children = []
+    expect(() => migrateChoiceFilters(broken)).toThrow(MigrationError)
+  })
+
+  it('без строки этажей в карточке — ошибка: окну планировки нечего читать', () => {
+    const broken = block()
+    find(broken, 'meta').children = []
     expect(() => migrateChoiceFilters(broken)).toThrow(MigrationError)
   })
 
@@ -225,6 +244,15 @@ describe('обновление с v2 (уже применённой на сте�
     expect(changes).toHaveLength(1)
   })
 
+  it('секция, дописанная после фильтров другой миграцией, остаётся на месте', () => {
+    const SOLD = '\n\n/* ==== choice-sold-out v1 ==== */\n.x { display: none; }\n'
+    const css = migrateFiltersCss(V2_CSS + SOLD, [])
+    expect(css.endsWith(SOLD)).toBe(true)
+    expect(css).not.toContain('старая секция')
+    expect(css).toContain(FILTERS_CSS_MARKER)
+    expect(migrateFiltersCss(css, [])).toBe(css)
+  })
+
   it('CSS-секция v2 заменяется, а не дописывается вторая', () => {
     const changes: string[] = []
     const css = migrateFiltersCss(V2_CSS, changes)
@@ -262,8 +290,8 @@ describe('chevronTranslationFixes', () => {
     ])
   })
 
-  it('после миграции блока кнопки находятся так же', () => {
+  it('после миграции блока кнопка цены уже заменена — её перевод удаляет план переводов, а не чистка', () => {
     const migrated = migrateChoiceFilters(block()).structure
-    expect(chevronTranslationFixes(migrated, rows).map((f) => f.id)).toEqual(['1', '2'])
+    expect(chevronTranslationFixes(migrated, rows).map((f) => f.id)).toEqual(['1'])
   })
 })

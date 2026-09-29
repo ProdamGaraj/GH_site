@@ -12,8 +12,10 @@ import { FILTERS_JS } from '../scripts/choiceFilters.assets'
 
 interface Card {
   rooms: string
-  price: number
-  priceMax?: number
+  /** Площадь группы «от/до»; одно число — группа одной площади. */
+  area?: [number, number] | number
+  /** Этажи, где есть квартиры группы: «2,3,12». */
+  floors?: number[]
   deadline?: string
   views?: string
 }
@@ -24,11 +26,17 @@ function chips(field: string, values: string[]): string {
     .join('')
 }
 
+/** Группа «от/до», как её кладёт миграция (choiceRanges.ts). */
+function rangeGroup(name: string, title: string, unit: string | null): string {
+  return `<div class="filter-group filter-group--range" id="g-${name}"><h3>${title}</h3><div class="range-box">
+      <input type="number" data-filter="${name}Min" placeholder="от" /><span>—</span>
+      <input type="number" data-filter="${name}Max" placeholder="до" />${unit ? `<span class="range-unit">${unit}</span>` : ''}</div></div>`
+}
+
 function page(cards: Card[], lang = 'ru', deadlines: string[] = []): Document {
   const rooms = [...new Set(cards.map((c) => c.rooms))]
-  const priceBox = `<div class="filter-group"><h3>Цена, UZS</h3><div class="range-box">
-      <input type="number" data-filter="priceMin" placeholder="от" /><span>—</span>
-      <input type="number" data-filter="priceMax" placeholder="до" /><span>UZS</span></div></div>`
+  const area = () => rangeGroup('area', 'Площадь, м²', 'м²')
+  const floor = () => rangeGroup('floor', 'Этаж', null)
   const actions = `<div class="panel-actions">
       <button type="button" data-filter-action="reset">Сбросить</button>
       <button type="button" data-filter-action="apply">Показать</button></div>`
@@ -39,7 +47,8 @@ function page(cards: Card[], lang = 'ru', deadlines: string[] = []): Document {
       <div class="filter-main">
         <button type="button" class="filter-trigger" data-panel="rooms">Комнатность</button>
         <button type="button" class="filter-trigger" data-panel="deadline">Срок сдачи</button>
-        <button type="button" class="filter-trigger" data-panel="price">Цена</button>
+        <button type="button" class="filter-trigger" data-panel="area">Площадь</button>
+        <button type="button" class="filter-trigger" data-panel="floor">Этаж</button>
         <button type="button" class="filter-trigger" data-panel="all">Все фильтры</button>
         <button type="button" class="reset-filter">Сбросить</button>
       </div>
@@ -49,31 +58,35 @@ function page(cards: Card[], lang = 'ru', deadlines: string[] = []): Document {
       <div class="filter-panel" data-panel="deadline">
         <div class="filter-group" id="g-deadline"><div class="chip-row">${chips('deadline', deadlines)}</div></div>${actions}
       </div>
-      <div class="filter-panel" data-panel="price">${priceBox}${actions}</div>
+      <div class="filter-panel" data-panel="area">${area()}${actions}</div>
+      <div class="filter-panel" data-panel="floor">${floor()}${actions}</div>
       <div class="filter-panel" data-panel="all">
         <div class="filter-group" id="g-all-rooms"><div class="chip-row">${chips('rooms', rooms)}</div></div>
+        ${area().replace('id="g-area"', 'id="g-all-area"')}
+        ${floor().replace('id="g-floor"', 'id="g-all-floor"')}
         <div class="filter-group" id="g-all-deadline"><div class="chip-row">${chips('deadline', deadlines)}</div></div>
-        ${priceBox}${actions}
+        ${actions}
       </div>
     </div>
     <div class="apartments-grid">${cards
-      .map(
-        (c, i) =>
-          `<article class="apartment-card" id="c${i}" data-rooms="${c.rooms}" data-price="${c.price}"` +
-          (c.priceMax !== undefined ? ` data-price-max="${c.priceMax}"` : '') +
+      .map((c, i) => {
+        const [lo, hi] = c.area === undefined ? ['', ''] : Array.isArray(c.area) ? c.area : [c.area, c.area]
+        return (
+          `<article class="apartment-card" id="c${i}" data-rooms="${c.rooms}"` +
+          ` data-area-min="${lo}" data-area-max="${hi}" data-floors="${(c.floors ?? []).join(',')}"` +
           ` data-deadline="${c.deadline ?? ''}" data-windowViews="${c.views ?? ''}"></article>`
-      )
+        )
+      })
       .join('')}</div>
   </section>`
   new Function(FILTERS_JS)()
   return document
 }
 
-const M = 1_000_000
 const CATALOG: Card[] = [
-  { rooms: '1', price: 376 * M, priceMax: 400 * M },
-  { rooms: '1', price: 545 * M, priceMax: 626 * M },
-  { rooms: '2', price: 578 * M, priceMax: 700 * M },
+  { rooms: '1', area: 34.87, floors: [2, 3, 4] },
+  { rooms: '1', area: [41.2, 44.9], floors: [5, 12] },
+  { rooms: '2', area: [55.64, 70.1], floors: [3, 16] },
 ]
 
 function visible(dom: Document): string[] {
@@ -83,15 +96,17 @@ function visible(dom: Document): string[] {
 }
 
 function chip(dom: Document, field: string, value: string, index = 0): HTMLButtonElement {
-  return dom.querySelectorAll(`[data-filter="${field}"][data-value="${value}"]`)[
-    index
-  ] as HTMLButtonElement
+  return dom.querySelectorAll(`[data-filter="${field}"][data-value="${value}"]`)[index] as HTMLButtonElement
 }
 
-function typePrice(dom: Document, kind: 'priceMin' | 'priceMax', value: string, index = 0): void {
+function type(dom: Document, kind: string, value: string, index = 0): void {
   const input = dom.querySelectorAll(`[data-filter="${kind}"]`)[index] as HTMLInputElement
   input.value = value
   input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
+function placeholder(dom: Document, kind: string, index = 0): string | null {
+  return dom.querySelectorAll(`[data-filter="${kind}"]`)[index].getAttribute('placeholder')
 }
 
 function applyLabel(dom: Document): string {
@@ -100,6 +115,10 @@ function applyLabel(dom: Document): string {
 
 function emptyMessage(dom: Document): HTMLElement {
   return dom.querySelector('.apartments-empty') as HTMLElement
+}
+
+function trigger(dom: Document, name: string): HTMLButtonElement {
+  return dom.querySelector(`.filter-trigger[data-panel="${name}"]`) as HTMLButtonElement
 }
 
 describe('фильтры: исходное состояние', () => {
@@ -111,34 +130,112 @@ describe('фильтры: исходное состояние', () => {
   })
 
   it('пустая группа спрятана и в своей панели, и в «Все фильтры»', () => {
-    const doc = dom
-    expect((doc.getElementById('g-deadline') as HTMLElement).hidden).toBe(true)
-    expect((doc.getElementById('g-all-deadline') as HTMLElement).hidden).toBe(true)
-    expect((doc.getElementById('g-rooms') as HTMLElement).hidden).toBe(false)
+    expect((dom.getElementById('g-deadline') as HTMLElement).hidden).toBe(true)
+    expect((dom.getElementById('g-all-deadline') as HTMLElement).hidden).toBe(true)
+    expect((dom.getElementById('g-rooms') as HTMLElement).hidden).toBe(false)
   })
 
   it('кнопка пустой панели спрятана', () => {
-    const trigger = dom.querySelector('[data-panel="deadline"].filter-trigger') as HTMLElement
-    expect(trigger.style.display).toBe('none')
+    expect(trigger(dom, 'deadline').style.display).toBe('none')
+    expect(trigger(dom, 'area').style.display).toBe('')
   })
 
-  it('подсказки цены — реальный диапазон каталога', () => {
-    const [min] = dom.querySelectorAll('[data-filter="priceMin"]')
-    const [max] = dom.querySelectorAll('[data-filter="priceMax"]')
-    expect(min.getAttribute('placeholder')).toBe('от 376 000 000')
-    expect(max.getAttribute('placeholder')).toBe('до 700 000 000')
+  it('подсказки — реальные границы каталога, с запасом до целого', () => {
+    expect(placeholder(dom, 'areaMin')).toBe('от 34')
+    expect(placeholder(dom, 'areaMax')).toBe('до 71')
+    expect(placeholder(dom, 'floorMin')).toBe('от 2')
+    expect(placeholder(dom, 'floorMax')).toBe('до 16')
   })
 
   it('пустого сообщения нет', () => {
     expect(emptyMessage(dom).hidden).toBe(true)
   })
+
+  it('цены нет: ни полей, ни чтения data-price', () => {
+    expect(dom.querySelector('[data-filter^="price"]')).toBeNull()
+    expect(FILTERS_JS).not.toMatch(/data-price|priceMin/)
+  })
+})
+
+describe('фильтры: площадь — диапазон группы', () => {
+  it('«от 44» оставляет группу 41.2–44.9: в ней есть квартиры больше', () => {
+    const dom = page(CATALOG)
+    type(dom, 'areaMin', '44')
+    expect(visible(dom)).toEqual(['c1', 'c2'])
+  })
+
+  it('«до 40» — только маленькая', () => {
+    const dom = page(CATALOG)
+    type(dom, 'areaMax', '40')
+    expect(visible(dom)).toEqual(['c0'])
+  })
+
+  it('диапазон между группами — пусто, видно сообщение', () => {
+    const dom = page(CATALOG)
+    type(dom, 'areaMin', '46')
+    type(dom, 'areaMax', '50')
+    expect(visible(dom)).toEqual([])
+    expect(emptyMessage(dom).hidden).toBe(false)
+  })
+
+  it('перепутанные «от» и «до» меняются местами', () => {
+    const dom = page(CATALOG)
+    type(dom, 'areaMin', '50')
+    type(dom, 'areaMax', '40')
+    expect(visible(dom)).toEqual(['c1'])
+  })
+
+  it('карточка без площади под фильтр площади не попадает', () => {
+    const dom = page([{ rooms: '1', area: 50 }, { rooms: '1' }])
+    type(dom, 'areaMax', '100')
+    expect(visible(dom)).toEqual(['c0'])
+  })
+})
+
+describe('фильтры: этаж — хоть одна квартира группы на этаже из диапазона', () => {
+  it('этажи 5–8: группа с 5 и 12 подходит, со 2–4 и с 3, 16 — нет', () => {
+    const dom = page(CATALOG)
+    type(dom, 'floorMin', '5')
+    type(dom, 'floorMax', '8')
+    expect(visible(dom)).toEqual(['c1'])
+  })
+
+  it('пропуск этажей учитывается: у группы 3 и 16 нет квартир на 6–15', () => {
+    const dom = page(CATALOG)
+    type(dom, 'floorMin', '6')
+    type(dom, 'floorMax', '11')
+    expect(visible(dom)).toEqual([])
+  })
+
+  it('только «от 13» — группа с 16-м этажом', () => {
+    const dom = page(CATALOG)
+    type(dom, 'floorMin', '13')
+    expect(visible(dom)).toEqual(['c2'])
+  })
+
+  it('этаж и площадь вместе — по И', () => {
+    const dom = page(CATALOG)
+    type(dom, 'floorMin', '12')
+    type(dom, 'areaMax', '50')
+    expect(visible(dom)).toEqual(['c1'])
+  })
+})
+
+describe('фильтры: диапазон без данных', () => {
+  it('ни у одной карточки нет этажей — фильтра этажа нет нигде', () => {
+    const dom = page([{ rooms: '1', area: 40 }, { rooms: '2', area: 60 }])
+    expect((dom.getElementById('g-floor') as HTMLElement).hidden).toBe(true)
+    expect((dom.getElementById('g-all-floor') as HTMLElement).hidden).toBe(true)
+    expect(trigger(dom, 'floor').style.display).toBe('none')
+    expect(dom.querySelector('.filter-inline [data-panel="floor"]')).toBeNull()
+    expect(dom.querySelector('.filter-inline [data-panel="area"]')).not.toBeNull()
+  })
 })
 
 describe('фильтры: варианты сужаются под остальные условия', () => {
-  it('цена до 400 млн — «2» выключен в обеих панелях, «1» доступен', () => {
+  it('площадь до 40 — «2» выключен в обеих панелях, «1» доступен', () => {
     const dom = page(CATALOG)
-    typePrice(dom, 'priceMax', String(400 * M))
-    expect(visible(dom)).toEqual(['c0'])
+    type(dom, 'areaMax', '40')
     expect(chip(dom, 'rooms', '2', 0).disabled).toBe(true)
     expect(chip(dom, 'rooms', '2', 1).disabled).toBe(true)
     expect(chip(dom, 'rooms', '1').disabled).toBe(false)
@@ -147,34 +244,33 @@ describe('фильтры: варианты сужаются под осталь�
 
   it('выключенный чипс не выбирается кликом', () => {
     const dom = page(CATALOG)
-    typePrice(dom, 'priceMax', String(400 * M))
+    type(dom, 'areaMax', '40')
     chip(dom, 'rooms', '2').click()
     expect(chip(dom, 'rooms', '2').classList.contains('active')).toBe(false)
     expect(visible(dom)).toEqual(['c0'])
   })
 
-  it('выбранный чипс остаётся доступным, даже если цена его исключила', () => {
+  it('выбранный чипс остаётся доступным, даже если площадь его исключила', () => {
     const dom = page(CATALOG)
     chip(dom, 'rooms', '2').click()
-    typePrice(dom, 'priceMax', String(400 * M))
+    type(dom, 'areaMax', '40')
     expect(visible(dom)).toEqual([])
     expect(chip(dom, 'rooms', '2').disabled).toBe(false)
     chip(dom, 'rooms', '2').click()
     expect(visible(dom)).toEqual(['c0'])
   })
 
-  it('варианты своего поля не выключаются выбором в нём же', () => {
-    const dom = page(CATALOG)
-    chip(dom, 'rooms', '1').click()
-    expect(visible(dom)).toEqual(['c0', 'c1'])
-    expect(chip(dom, 'rooms', '2').disabled).toBe(false)
-  })
-
-  it('комнатность сужает подсказку цены', () => {
+  it('комнатность сужает подсказки площади и этажа', () => {
     const dom = page(CATALOG)
     chip(dom, 'rooms', '2').click()
-    const [min] = dom.querySelectorAll('[data-filter="priceMin"]')
-    expect(min.getAttribute('placeholder')).toBe('от 578 000 000')
+    expect(placeholder(dom, 'areaMin')).toBe('от 55')
+    expect(placeholder(dom, 'floorMin')).toBe('от 3')
+  })
+
+  it('подсказка площади не сужается своим же полем', () => {
+    const dom = page(CATALOG)
+    type(dom, 'areaMin', '60')
+    expect(placeholder(dom, 'areaMin')).toBe('от 34')
   })
 
   it('чипс одного поля синхронен в своей панели и в «Все фильтры»', () => {
@@ -182,40 +278,12 @@ describe('фильтры: варианты сужаются под осталь�
     chip(dom, 'rooms', '1', 1).click()
     expect(chip(dom, 'rooms', '1', 0).classList.contains('active')).toBe(true)
   })
-})
 
-describe('фильтры: цена — диапазон карточки', () => {
-  it('«от 600 млн» оставляет карточку 545–626: в ней есть квартиры дороже', () => {
+  it('ввод в одной панели копируется в другие', () => {
     const dom = page(CATALOG)
-    typePrice(dom, 'priceMin', String(600 * M))
-    expect(visible(dom)).toEqual(['c1', 'c2'])
-  })
-
-  it('диапазон целиком вне заданного — карточка скрыта', () => {
-    const dom = page(CATALOG)
-    typePrice(dom, 'priceMin', String(410 * M))
-    typePrice(dom, 'priceMax', String(540 * M))
-    expect(visible(dom)).toEqual([])
-    expect(emptyMessage(dom).hidden).toBe(false)
-  })
-
-  it('без data-price-max карточка сравнивается по одной цене', () => {
-    const dom = page([{ rooms: '1', price: 500 * M }])
-    typePrice(dom, 'priceMin', String(501 * M))
-    expect(visible(dom)).toEqual([])
-  })
-
-  it('карточка без цены под ценовой фильтр не попадает', () => {
-    const dom = page([{ rooms: '1', price: 0 }, { rooms: '1', price: 300 * M }])
-    typePrice(dom, 'priceMax', String(400 * M))
-    expect(visible(dom)).toEqual(['c1'])
-  })
-
-  it('ввод в одной панели копируется в другую', () => {
-    const dom = page(CATALOG)
-    typePrice(dom, 'priceMax', String(400 * M), 1)
-    const inputs = dom.querySelectorAll('[data-filter="priceMax"]')
-    expect((inputs[0] as HTMLInputElement).value).toBe(String(400 * M))
+    type(dom, 'floorMax', '8', 1)
+    const inputs = [...dom.querySelectorAll('[data-filter="floorMax"]')] as HTMLInputElement[]
+    expect(inputs.every((i) => i.value === '8')).toBe(true)
   })
 })
 
@@ -223,8 +291,8 @@ describe('фильтры: множества и сброс', () => {
   it('значение-множество через «|» совпадает по любому элементу', () => {
     const dom = page(
       [
-        { rooms: '1', price: M, deadline: '2026|2027' },
-        { rooms: '1', price: M, deadline: '2028' },
+        { rooms: '1', deadline: '2026|2027' },
+        { rooms: '1', deadline: '2028' },
       ],
       'ru',
       ['2026', '2027', '2028']
@@ -233,31 +301,31 @@ describe('фильтры: множества и сброс', () => {
     expect(visible(dom)).toEqual(['c0'])
   })
 
-  it('сброс возвращает всё и снимает отметки', () => {
+  it('сброс возвращает всё и очищает поля «от/до»', () => {
     const dom = page(CATALOG)
     chip(dom, 'rooms', '2').click()
-    typePrice(dom, 'priceMin', String(600 * M))
+    type(dom, 'areaMin', '60')
+    type(dom, 'floorMax', '3')
     ;(dom.querySelector('.reset-filter') as HTMLButtonElement).click()
     expect(visible(dom)).toEqual(['c0', 'c1', 'c2'])
     expect(chip(dom, 'rooms', '2').classList.contains('active')).toBe(false)
-    const input = dom.querySelector('[data-filter="priceMin"]') as HTMLInputElement
-    expect(input.value).toBe('')
+    const inputs = [...dom.querySelectorAll('[data-filter^="area"], [data-filter^="floor"]')] as HTMLInputElement[]
+    expect(inputs.every((i) => i.value === '')).toBe(true)
   })
 
-  it('кнопка панели отмечена, пока в её поле что-то выбрано', () => {
+  it('кнопка панели отмечена, пока в её поле что-то задано', () => {
     const dom = page(CATALOG)
-    const doc = dom
     chip(dom, 'rooms', '1').click()
-    expect(doc.querySelector('.filter-trigger[data-panel="rooms"]')!.classList.contains('has-value')).toBe(true)
-    expect(doc.querySelector('.filter-trigger[data-panel="all"]')!.classList.contains('has-value')).toBe(true)
-    expect(doc.querySelector('.filter-trigger[data-panel="price"]')!.classList.contains('has-value')).toBe(false)
+    expect(trigger(dom, 'rooms').classList.contains('has-value')).toBe(true)
+    expect(trigger(dom, 'all').classList.contains('has-value')).toBe(true)
+    expect(trigger(dom, 'area').classList.contains('has-value')).toBe(false)
+    type(dom, 'areaMin', '40')
+    expect(trigger(dom, 'area').classList.contains('has-value')).toBe(true)
+    expect(trigger(dom, 'floor').classList.contains('has-value')).toBe(false)
   })
 })
 
 describe('фильтры: панели', () => {
-  function trigger(dom: Document, name: string): HTMLButtonElement {
-    return dom.querySelector(`.filter-trigger[data-panel="${name}"]`) as HTMLButtonElement
-  }
   function panel(dom: Document, name: string): HTMLElement {
     return dom.querySelector(`.filter-panel[data-panel="${name}"]`) as HTMLElement
   }
@@ -329,11 +397,11 @@ describe('фильтры: панели', () => {
   it('повторный клик по кнопке панели закрывает её, другая кнопка — переключает', () => {
     const dom = page(CATALOG)
     trigger(dom, 'rooms').click()
-    trigger(dom, 'price').click()
+    trigger(dom, 'floor').click()
     expect(panel(dom, 'rooms').classList.contains('is-open')).toBe(false)
-    expect(panel(dom, 'price').classList.contains('is-open')).toBe(true)
-    trigger(dom, 'price').click()
-    expect(panel(dom, 'price').classList.contains('is-open')).toBe(false)
+    expect(panel(dom, 'floor').classList.contains('is-open')).toBe(true)
+    trigger(dom, 'floor').click()
+    expect(panel(dom, 'floor').classList.contains('is-open')).toBe(false)
   })
 
   it('«Показать» закрывает панель, выбор сохраняется', () => {
@@ -347,17 +415,19 @@ describe('фильтры: панели', () => {
 })
 
 describe('фильтры: язык страницы', () => {
-  it('uz: пустое сообщение и подсказки цены по-узбекски', () => {
+  it('uz: пустое сообщение и подсказки по-узбекски', () => {
     const dom = page(CATALOG, 'uz')
-    typePrice(dom, 'priceMax', '1')
+    expect(placeholder(dom, 'floorMin')).toBe('2 dan')
+    expect(placeholder(dom, 'floorMax')).toBe('16 gacha')
+    type(dom, 'areaMax', '1')
     expect(emptyMessage(dom).textContent).toContain("rejalar yo'q")
-    const [min] = dom.querySelectorAll('[data-filter="priceMin"]')
-    expect(min.getAttribute('placeholder')).toBe('376 000 000 dan')
+    // Под условием ничего нет — подсказка этажа возвращается к исходной.
+    expect(placeholder(dom, 'floorMin')).toBe('от')
   })
 
   it('неизвестный язык — русский', () => {
     const dom = page(CATALOG, 'de')
-    typePrice(dom, 'priceMax', '1')
+    type(dom, 'areaMax', '1')
     expect(emptyMessage(dom).textContent).toContain('планировок нет')
   })
 })
@@ -373,15 +443,21 @@ describe('фильтры: строка на десктопе', () => {
     return inline(dom).querySelector(`[data-filter="${kind}"]`) as HTMLInputElement
   }
 
-  it('собирается в начале .filter-main: комнатность и цена с подписями из заголовков панелей', () => {
+  it('собирается в начале .filter-main: комнатность, площадь и этаж с подписями из заголовков панелей', () => {
     const dom = page(CATALOG)
     const groups = [...inline(dom).querySelectorAll('.filter-inline-group')]
-    expect(groups.map((g) => g.getAttribute('data-panel'))).toEqual(['rooms', 'price'])
+    expect(groups.map((g) => g.getAttribute('data-panel'))).toEqual(['rooms', 'area', 'floor'])
     expect(groups.map((g) => g.querySelector('.filter-inline-label')!.textContent)).toEqual([
       'Комнатность',
-      'Цена, UZS',
+      'Площадь, м²',
+      'Этаж',
     ])
     expect(dom.querySelector('.filter-main')!.firstElementChild).toBe(inline(dom))
+  })
+
+  it('единица площади в строке помечена — CSS прячет её: «м²» уже в подписи', () => {
+    const dom = page(CATALOG)
+    expect(inline(dom).querySelector('[data-panel="area"] .range-unit')!.textContent).toBe('м²')
   })
 
   it('чипс в строке фильтрует и синхронен с чипсами в панелях', () => {
@@ -393,20 +469,20 @@ describe('фильтры: строка на десктопе', () => {
     expect(all.every((c) => c.classList.contains('active'))).toBe(true)
   })
 
-  it('цена в строке фильтрует и копируется в поля панелей', () => {
+  it('этаж в строке фильтрует и копируется в поля панелей', () => {
     const dom = page(CATALOG)
-    const input = inlineInput(dom, 'priceMax')
-    input.value = String(400 * M)
+    const input = inlineInput(dom, 'floorMin')
+    input.value = '13'
     input.dispatchEvent(new Event('input', { bubbles: true }))
-    expect(visible(dom)).toEqual(['c0'])
-    const others = [...dom.querySelectorAll('.filter-panel [data-filter="priceMax"]')] as HTMLInputElement[]
-    expect(others.every((i) => i.value === String(400 * M))).toBe(true)
-    expect(inlineChip(dom, '2').disabled).toBe(true)
+    expect(visible(dom)).toEqual(['c2'])
+    const others = [...dom.querySelectorAll('.filter-panel [data-filter="floorMin"]')] as HTMLInputElement[]
+    expect(others.every((i) => i.value === '13')).toBe(true)
+    expect(inlineChip(dom, '1').disabled).toBe(true)
   })
 
-  it('подсказки цены обновляются и в строке', () => {
+  it('подсказки обновляются и в строке', () => {
     const dom = page(CATALOG)
-    expect(inlineInput(dom, 'priceMin').getAttribute('placeholder')).toBe('от 376 000 000')
+    expect(inlineInput(dom, 'areaMin').getAttribute('placeholder')).toBe('от 34')
   })
 
   it('счётчик и «Сбросить» — одна пара в конце строки, счётчик показывает число карточек', () => {
@@ -428,7 +504,7 @@ describe('фильтры: строка на десктопе', () => {
   it('сброс очищает и строку', () => {
     const dom = page(CATALOG)
     inlineChip(dom, '1').click()
-    const input = inlineInput(dom, 'priceMin')
+    const input = inlineInput(dom, 'areaMin')
     input.value = '1'
     input.dispatchEvent(new Event('input', { bubbles: true }))
     ;(dom.querySelector('.reset-filter') as HTMLButtonElement).click()
@@ -439,7 +515,7 @@ describe('фильтры: строка на десктопе', () => {
 
   it('клик по чипсу в строке закрывает открытую панель — она больше не нужна', () => {
     const dom = page(CATALOG)
-    ;(dom.querySelector('.filter-trigger[data-panel="all"]') as HTMLButtonElement).click()
+    trigger(dom, 'all').click()
     inlineChip(dom, '1').click()
     expect(dom.querySelector('.filter-panel[data-panel="all"]')!.classList.contains('is-open')).toBe(false)
   })

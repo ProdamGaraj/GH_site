@@ -122,11 +122,30 @@ function slideOf(track: StructureNode, label: string): StructureNode {
   return slide
 }
 
-/** Заменяет CSS-секцию блока (она всегда в конце) на актуальную версию. */
+/** Начало любой дописанной миграциями CSS-секции: «/* ==== имя vN ====». */
+const CSS_SECTION_START = '\n/* ==== '
+
+/**
+ * Ставит CSS-секцию на место её прежней версии, не трогая соседние.
+ *
+ * Секция тянется от своего заголовка до заголовка следующей секции (или до
+ * конца стилей). Раньше она считалась последней и вырезалась до конца — а
+ * вместе с ней и секции, которые другие миграции дописали после неё (у блока
+ * «Выбрать» за фильтрами идёт «Распродано»). Секции ещё нет — дописывается.
+ */
+export function replaceCssSection(css: string, head: string, section: string): string {
+  const start = css.indexOf(head)
+  if (start === -1) return css + '\n' + section
+  const next = css.indexOf(CSS_SECTION_START, start + head.length)
+  const before = css.slice(0, start).trimEnd()
+  return next === -1 ? before + '\n' + section : before + '\n' + section.trimEnd() + '\n' + css.slice(next)
+}
+
+/** Заменяет CSS-секцию блока на актуальную версию (см. replaceCssSection). */
 export function upsertCssSection(metadata: Record<string, unknown>, head: string, marker: string, section: string): boolean {
   const css = typeof metadata.globalCss === 'string' ? metadata.globalCss : ''
   if (css.includes(marker)) return false
-  metadata.globalCss = stripSection(css, head) + '\n' + section
+  metadata.globalCss = replaceCssSection(css, head, section)
   return true
 }
 
