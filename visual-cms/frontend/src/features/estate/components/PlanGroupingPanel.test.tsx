@@ -10,7 +10,7 @@ import { estateApi } from '../api'
 import type { PlanGroupingConfig, PlanGroupingPreview } from '../types'
 import { PlanGroupingPanel } from './PlanGroupingPanel'
 
-const CRM = { priceMin: 480_000_000, priceMax: 700_000_000, areaMin: 55, areaMax: 55.2, floors: [2, 3, 5], entrances: [1, 3] }
+const CRM = { areaMin: 55, areaMax: 55.2, floors: [2, 3, 5], entrances: [1, 3] }
 
 /**
  * Сервер в миниатюре: одна группа A+B, правка и скрытие — из присланного
@@ -71,13 +71,14 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('PlanGroupingPanel — группа', () => {
-  it('цена от–до, этажи, подъезды, в продаже — из CRM, без пометок «локально»', async () => {
+  it('площадь, этажи, подъезды, в продаже — из CRM, без пометок «локально»; цены нет', async () => {
     const card = await mount()
-    expect(within(card).getByText('480 000 000 – 700 000 000 UZS')).toBeTruthy()
+    expect(within(card).getByText('55.00–55.20 м²')).toBeTruthy()
     expect(within(card).getByText('2–3, 5')).toBeTruthy()
     expect(within(card).getByText('1, 3')).toBeTruthy()
     expect(within(card).getByText('12')).toBeTruthy()
     expect(within(card).queryByText('локально')).toBeNull()
+    expect(card.textContent).not.toMatch(/Цена|UZS/)
   })
 
   it('глаз скрывает группу целиком и возвращает; сохраняется в настройку', async () => {
@@ -94,19 +95,25 @@ describe('PlanGroupingPanel — группа', () => {
     await waitFor(() => expect(lastPayload()).toBeNull())
   })
 
-  it('ручная цена: пометка «локально», рядом значение CRM, в превью — правка по якорю', async () => {
+  it('ручная площадь: пометка «локально», рядом значение CRM, в превью — правка по якорю', async () => {
     const card = await mount()
     fireEvent.click(within(card).getByRole('button', { name: /Изменить данные/ }))
     const editor = screen.getByTestId('group-editor')
-    const field = within(editor).getByLabelText('Цена от, UZS') as HTMLInputElement
-    expect(field.placeholder).toBe('480 000 000')
-    fireEvent.change(field, { target: { value: '450 000 000' } })
+    const field = within(editor).getByLabelText('Площадь от, м²') as HTMLInputElement
+    expect(field.placeholder).toBe('55')
+    fireEvent.change(field, { target: { value: '54,5' } })
 
-    await waitFor(() => expect(lastPayload()).toMatchObject({ overrides: { A: { priceMin: 450_000_000 } } }))
-    expect(within(editor).getByText('CRM: 480 000 000')).toBeTruthy()
+    await waitFor(() => expect(lastPayload()).toMatchObject({ overrides: { A: { areaMin: 54.5 } } }))
+    expect(within(editor).getByText('CRM: 55')).toBeTruthy()
     await waitFor(() =>
-      expect(within(screen.getByTestId('plan-group')).getByText('450 000 000 – 700 000 000 UZS')).toBeTruthy()
+      expect(within(screen.getByTestId('plan-group')).getByText('54.50–55.20 м²')).toBeTruthy()
     )
+  })
+
+  it('в редакторе группы полей цены нет', async () => {
+    const card = await mount()
+    fireEvent.click(within(card).getByRole('button', { name: /Изменить данные/ }))
+    expect(screen.getByTestId('group-editor').textContent).not.toMatch(/Цена|UZS/)
   })
 
   it('недописанное значение не уходит в черновик, поле подсвечено', async () => {
@@ -124,9 +131,9 @@ describe('PlanGroupingPanel — группа', () => {
     const card = await mount()
     fireEvent.click(within(card).getByRole('button', { name: /Изменить данные/ }))
     const editor = screen.getByTestId('group-editor')
-    fireEvent.change(within(editor).getByLabelText('Цена до, UZS'), { target: { value: '100' } })
-    fireEvent.change(within(editor).getByLabelText('Цена от, UZS'), { target: { value: '200' } })
-    expect(await screen.findByText('Цена «от» больше цены «до»')).toBeTruthy()
+    fireEvent.change(within(editor).getByLabelText('Площадь до, м²'), { target: { value: '40' } })
+    fireEvent.change(within(editor).getByLabelText('Площадь от, м²'), { target: { value: '50' } })
+    expect(await screen.findByText('Площадь «от» больше площади «до»')).toBeTruthy()
     expect((screen.getByRole('button', { name: /^Сохранить$/ }) as HTMLButtonElement).disabled).toBe(true)
     const calls = preview.mock.calls.length
     await new Promise((r) => setTimeout(r, 400))
@@ -134,7 +141,7 @@ describe('PlanGroupingPanel — группа', () => {
   })
 
   it('«Вернуть данные из CRM» снимает ручные данные группы, бейджи остаются', async () => {
-    const card = await mount({ overrides: { A: { priceMin: 1, entrances: [2], badges: { ru: ['Акция'] } } } })
+    const card = await mount({ overrides: { A: { areaMin: 54, entrances: [2], badges: { ru: ['Акция'] } } } })
     expect(within(card).getAllByText('локально').length).toBeGreaterThan(0)
     expect(within(card).getByText('Акция')).toBeTruthy()
     const reset = within(card).getByRole('button', { name: /Вернуть данные из CRM/ }) as HTMLButtonElement

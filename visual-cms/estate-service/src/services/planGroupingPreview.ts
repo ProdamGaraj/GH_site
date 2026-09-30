@@ -43,8 +43,6 @@ export interface PlanPreview {
 
 /** Данные карточки, которые можно поправить вручную. */
 export interface PlanGroupValues {
-  priceMin: number
-  priceMax: number
   areaMin: number
   areaMax: number
   floors: number[]
@@ -60,8 +58,6 @@ export interface PlanGroupPreview {
   /** Итоговые значения карточки — с ручной правкой, как на сайте. */
   areaMin: number
   areaMax: number
-  priceMin: number
-  priceMax: number
   floors: number[]
   entrances: number[]
   apartmentsCount: number
@@ -150,8 +146,6 @@ function unknownNames(rows: PlanTypeRow[], config: Required<PlanGroupingConfig>)
 
 function values(row: PlanTypeRow): PlanGroupValues {
   return {
-    priceMin: num(row.priceMin),
-    priceMax: num(row.priceMax),
     areaMin: num(row.areaMin),
     areaMax: num(row.areaMax),
     floors: Array.isArray(row.floors) ? row.floors : [],

@@ -14,14 +14,12 @@ import {
   dropNames,
   forgetOverride,
   formatAreaRange,
-  formatMoney,
   formatNumberList,
   hasCrmOverride,
   mergeCards,
   overrideProblems,
   parseArea,
   parseBadges,
-  parseMoney,
   parseNumberList,
   resetToCrm,
   restorePlan,
@@ -381,8 +379,8 @@ const PlanCard: React.FC<{
         </div>
 
         <dl className={cn('flex flex-wrap gap-x-4 gap-y-1 text-sm', group.hidden ? 'text-gray-400' : 'text-gray-600')}>
-          <Fact label="Цена" local={local('priceMin') || local('priceMax')}>
-            {group.priceMin > 0 ? `${formatMoney(group.priceMin)} – ${formatMoney(group.priceMax)} UZS` : '—'}
+          <Fact label="Площадь" local={local('areaMin') || local('areaMax')}>
+            {formatAreaRange(group.areaMin, group.areaMax)}
           </Fact>
           <Fact label="Этажи" local={local('floors')}>
             {formatNumberList(group.floors)}
@@ -391,7 +389,6 @@ const PlanCard: React.FC<{
             {formatNumberList(group.entrances)}
           </Fact>
           <Fact label="В продаже">{group.apartmentsCount}</Fact>
-          {(local('areaMin') || local('areaMax')) && <Fact label="Площадь" local>{formatAreaRange(group.areaMin, group.areaMax)}</Fact>}
         </dl>
 
         {badges.length > 0 && (
@@ -430,7 +427,7 @@ const PlanCard: React.FC<{
             disabled={!hasCrmOverride(override)}
             title={
               hasCrmOverride(override)
-                ? 'Снять ручные цену, площадь, этажи и подъезды группы — вернуть данные CRM. Бейджи останутся.'
+                ? 'Снять ручные площадь, этажи и подъезды группы — вернуть данные CRM. Бейджи останутся.'
                 : 'Все данные группы и так из CRM'
             }
             className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 disabled:text-gray-300 disabled:cursor-not-allowed"
@@ -480,26 +477,9 @@ const GroupEditor: React.FC<{
   onBadges: (locale: BadgeLocale, list: string[]) => void
 }> = ({ group, override, onField, onBadges }) => {
   const crm = group.crm
-  const money = (n: number) => (n > 0 ? formatMoney(n) : '')
   return (
     <div className="rounded-md border border-gray-200 bg-gray-50 p-3 space-y-3" data-testid="group-editor">
       <div className="grid grid-cols-2 gap-3">
-        <OverrideInput
-          label="Цена от, UZS"
-          crmText={money(crm.priceMin)}
-          value={override?.priceMin}
-          format={formatMoney}
-          parse={parseMoney}
-          onCommit={(v) => onField('priceMin', v)}
-        />
-        <OverrideInput
-          label="Цена до, UZS"
-          crmText={money(crm.priceMax)}
-          value={override?.priceMax}
-          format={formatMoney}
-          parse={parseMoney}
-          onCommit={(v) => onField('priceMax', v)}
-        />
         <OverrideInput
           label="Площадь от, м²"
           crmText={String(crm.areaMin)}

@@ -1,7 +1,5 @@
 import {
   formatArea,
-  groupThousands,
-  formatPrice,
   apartmentTitle,
   apartmentMeta,
   toNumber,
@@ -31,21 +29,6 @@ describe('formatArea', () => {
   })
 })
 
-describe('groupThousands / formatPrice', () => {
-  it('groups digits by spaces', () => {
-    expect(groupThousands(1354320000)).toBe('1 354 320 000')
-    expect(groupThousands(936748269)).toBe('936 748 269')
-  })
-  it('formats price with UZS suffix', () => {
-    expect(formatPrice('1354320000')).toBe('1 354 320 000 UZS')
-  })
-  it('returns empty for zero/absent price', () => {
-    expect(formatPrice(0)).toBe('')
-    expect(formatPrice(null)).toBe('')
-    expect(formatPrice(undefined)).toBe('')
-  })
-})
-
 describe('apartmentTitle', () => {
   it('ru format', () => {
     expect(apartmentTitle(4, '114.00', 'ru')).toBe('4-комн. 114 м²')
@@ -66,8 +49,6 @@ describe('apartmentMeta', () => {
     order: 0,
     rooms: 4,
     areaM2: '114.00',
-    price: '1354320000',
-    oldPrice: '1539000000',
     entrance: 2,
     apartmentClass: 'Бизнес',
     badges: ['Акция'],

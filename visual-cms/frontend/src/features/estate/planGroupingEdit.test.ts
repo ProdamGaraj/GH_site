@@ -22,11 +22,9 @@ import {
   forgetOverride,
   hasCrmOverride,
   overrideProblems,
-  parseMoney,
   parseArea,
   parseNumberList,
   parseBadges,
-  formatMoney,
   formatNumberList,
 } from './planGroupingEdit'
 
@@ -231,10 +229,10 @@ describe('скрытие групп', () => {
 
 describe('ручные данные групп', () => {
   it('поле ставится и снимается (undefined — вернуть CRM); пустая правка удаляется', () => {
-    let draft = setOverrideField(emptyDraft(), 'A', 'priceMin', 450)
+    let draft = setOverrideField(emptyDraft(), 'A', 'areaMin', 54.5)
     draft = setOverrideField(draft, 'A', 'floors', [16, 2, 2])
-    expect(draft.overrides).toEqual({ A: { priceMin: 450, floors: [2, 16] } })
-    draft = setOverrideField(draft, 'A', 'priceMin', undefined)
+    expect(draft.overrides).toEqual({ A: { areaMin: 54.5, floors: [2, 16] } })
+    draft = setOverrideField(draft, 'A', 'areaMin', undefined)
     draft = setOverrideField(draft, 'A', 'floors', undefined)
     expect(draft.overrides).toEqual({})
   })
@@ -248,7 +246,7 @@ describe('ручные данные групп', () => {
   })
 
   it('«Подставить значения из CRM» снимает поля CRM, бейджи оставляет', () => {
-    let draft = setOverrideField(emptyDraft(), 'A', 'priceMin', 1)
+    let draft = setOverrideField(emptyDraft(), 'A', 'areaMin', 1)
     draft = setOverrideField(draft, 'A', 'entrances', [1, 3])
     draft = setBadges(draft, 'A', 'ru', ['Акция'])
     expect(hasCrmOverride(draft.overrides.A)).toBe(true)
@@ -256,53 +254,52 @@ describe('ручные данные групп', () => {
     expect(draft.overrides).toEqual({ A: { badges: { ru: ['Акция'] } } })
     expect(hasCrmOverride(draft.overrides.A)).toBe(false)
     // Без бейджей правка исчезает целиком.
-    expect(resetToCrm(setOverrideField(emptyDraft(), 'B', 'priceMax', 5), 'B').overrides).toEqual({})
+    expect(resetToCrm(setOverrideField(emptyDraft(), 'B', 'areaMax', 5), 'B').overrides).toEqual({})
   })
 
   it('«забыть» — правка целиком', () => {
-    const draft = setBadges(setOverrideField(emptyDraft(), 'B', 'priceMin', 1), 'B', 'ru', ['x'])
+    const draft = setBadges(setOverrideField(emptyDraft(), 'B', 'areaMin', 1), 'B', 'ru', ['x'])
     expect(forgetOverride(draft, 'B').overrides).toEqual({})
   })
 
   it('правка идёт за планировкой: объединение её не стирает, пропажа имени — стирает', () => {
-    const draft = setOverrideField(emptyDraft(), 'A', 'priceMin', 1)
-    expect(mergeCards(draft, [['A'], ['B']]).overrides).toEqual({ A: { priceMin: 1 } })
+    const draft = setOverrideField(emptyDraft(), 'A', 'areaMin', 1)
+    expect(mergeCards(draft, [['A'], ['B']]).overrides).toEqual({ A: { areaMin: 1 } })
     expect(dropNames(draft, ['A']).overrides).toEqual({})
   })
 
   it('черновики с правками сравниваются по сути, не по порядку ключей', () => {
-    const a = setOverrideField(setOverrideField(emptyDraft(), 'B', 'priceMin', 1), 'A', 'priceMin', 2)
-    const b = setOverrideField(setOverrideField(emptyDraft(), 'A', 'priceMin', 2), 'B', 'priceMin', 1)
+    const a = setOverrideField(setOverrideField(emptyDraft(), 'B', 'areaMin', 1), 'A', 'areaMin', 2)
+    const b = setOverrideField(setOverrideField(emptyDraft(), 'A', 'areaMin', 2), 'B', 'areaMin', 1)
     expect(sameConfig(a, b)).toBe(true)
     expect(toPayload(a)).toEqual(toPayload(b))
   })
 
   it('только скрытие или только правка — не «настройка по умолчанию»', () => {
     expect(toPayload(setGroupHidden(emptyDraft(), ['a'], true))).not.toBeNull()
-    expect(toPayload(setOverrideField(emptyDraft(), 'A', 'priceMin', 1))).not.toBeNull()
+    expect(toPayload(setOverrideField(emptyDraft(), 'A', 'areaMin', 1))).not.toBeNull()
   })
 
   it('«от» больше «до» — ошибка группы, как на сервере', () => {
-    let draft = setOverrideField(emptyDraft(), 'A', 'priceMin', 10)
-    draft = setOverrideField(draft, 'A', 'priceMax', 5)
-    draft = setOverrideField(draft, 'B', 'areaMin', 60)
+    let draft = setOverrideField(emptyDraft(), 'B', 'areaMin', 60)
     draft = setOverrideField(draft, 'B', 'areaMax', 55)
-    draft = setOverrideField(draft, 'C', 'priceMin', 10)
-    expect(overrideProblems(draft)).toEqual({
-      A: 'Цена «от» больше цены «до»',
-      B: 'Площадь «от» больше площади «до»',
+    draft = setOverrideField(draft, 'C', 'areaMin', 10)
+    expect(overrideProblems(draft)).toEqual({ B: 'Площадь «от» больше площади «до»' })
+  })
+
+  it('цена из правки старой версии в черновик не попадает — на сайте цен нет', () => {
+    const draft = toDraft({
+      overrides: {
+        A: { priceMin: 450, priceMax: 700, entrances: [1] } as any,
+        B: { priceMin: 1 } as any,
+      },
     })
+    expect(draft.overrides).toEqual({ A: { entrances: [1] } })
+    expect(JSON.stringify(toPayload(draft))).not.toMatch(/price/)
   })
 })
 
 describe('ввод значений', () => {
-  it('деньги: пробелы допустимы, пусто — CRM, мусор — ошибка', () => {
-    expect(parseMoney('450 000 000')).toEqual({ ok: true, value: 450000000 })
-    expect(parseMoney('  ')).toEqual({ ok: true, value: undefined })
-    expect(parseMoney('45,5')).toEqual({ ok: false })
-    expect(parseMoney('-1')).toEqual({ ok: false })
-  })
-
   it('площадь: запятая, сотые', () => {
     expect(parseArea('55,3')).toEqual({ ok: true, value: 55.3 })
     expect(parseArea('40.25')).toEqual({ ok: true, value: 40.25 })
@@ -327,8 +324,7 @@ describe('ввод значений', () => {
     expect(parseBadges('')).toEqual([])
   })
 
-  it('вывод: деньги с пробелами, списки — диапазонами', () => {
-    expect(formatMoney(450000000)).toBe('450 000 000')
+  it('вывод: списки — диапазонами', () => {
     expect(formatNumberList([7, 2, 3, 4, 5])).toBe('2–5, 7')
     expect(formatNumberList([1, 3])).toBe('1, 3')
     expect(formatNumberList([])).toBe('—')
@@ -338,6 +334,5 @@ describe('ввод значений', () => {
     for (const list of [[2, 3, 4, 16], [-1, 1, 2], [5]]) {
       expect(parseNumberList(formatNumberList(list))).toEqual({ ok: true, value: list })
     }
-    expect(parseMoney(formatMoney(1354320000))).toEqual({ ok: true, value: 1354320000 })
   })
 })

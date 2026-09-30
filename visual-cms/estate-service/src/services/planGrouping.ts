@@ -66,11 +66,11 @@ export interface PlanGroupBadges {
 
 /**
  * Ручные данные карточки планировки. Поле есть — оно главнее CRM, нет —
- * значение из CRM. Бейджей в CRM нет: они всегда ручные.
+ * значение из CRM. Бейджей в CRM нет: они всегда ручные. Цены нет: на сайте
+ * цены не показываются (2026-09-29); цена, записанная старой версией,
+ * отбрасывается при чтении (normalizeOverrides).
  */
 export interface PlanGroupOverride {
-  priceMin?: number
-  priceMax?: number
   areaMin?: number
   areaMax?: number
   floors?: number[]
@@ -79,7 +79,7 @@ export interface PlanGroupOverride {
 }
 
 /** Поля, которые «Подставить значения из CRM» возвращает к данным CRM. */
-export const CRM_OVERRIDE_FIELDS = ['priceMin', 'priceMax', 'areaMin', 'areaMax', 'floors', 'entrances'] as const
+export const CRM_OVERRIDE_FIELDS = ['areaMin', 'areaMax', 'floors', 'entrances'] as const
 
 /** Значения по умолчанию: ничего не склеиваем сверх точных совпадений. */
 export const DEFAULT_GROUPING: Required<PlanGroupingConfig> = {
@@ -129,7 +129,7 @@ function normalizeOverrides(raw: unknown): Record<string, PlanGroupOverride> {
     if (!name || !value || typeof value !== 'object') continue
     const v = value as Record<string, unknown>
     const o: PlanGroupOverride = {}
-    for (const key of ['priceMin', 'priceMax', 'areaMin', 'areaMax'] as const) {
+    for (const key of ['areaMin', 'areaMax'] as const) {
       const n = finiteOrUndefined(v[key])
       if (n !== undefined) o[key] = n
     }
@@ -253,15 +253,10 @@ export function mergeGroup(rows: PlanTypeRow[]): PlanTypeRow {
   const [first] = ordered
   if (ordered.length === 1) return first
 
-  const minPrices = ordered.map((r) => num(r.priceMin)).filter((p) => p > 0)
-  const maxPrices = ordered.map((r) => num(r.priceMax)).filter((p) => p > 0)
-
   return {
     ...first,
     areaMin: Math.min(...ordered.map((r) => num(r.areaMin))),
     areaMax: Math.max(...ordered.map((r) => num(r.areaMax))),
-    priceMin: minPrices.length ? Math.min(...minPrices) : 0,
-    priceMax: maxPrices.length ? Math.max(...maxPrices) : 0,
     apartmentsCount: ordered.reduce((sum, r) => sum + (r.apartmentsCount || 0), 0),
     floors: uniqueSortedNumbers(ordered.flatMap((r) => (Array.isArray(r.floors) ? r.floors : []))),
     entrances: uniqueSortedNumbers(
@@ -369,8 +364,6 @@ export function applyOverride(merged: PlanTypeRow, override: PlanGroupOverride |
   if (!override) return merged
   return {
     ...merged,
-    priceMin: override.priceMin ?? merged.priceMin,
-    priceMax: override.priceMax ?? merged.priceMax,
     areaMin: override.areaMin ?? merged.areaMin,
     areaMax: override.areaMax ?? merged.areaMax,
     floors: override.floors ?? merged.floors,

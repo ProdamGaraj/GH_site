@@ -53,11 +53,12 @@ const houses: HouseRow[] = [
 
 // Глобальный order задаёт порядок в плоском гриде «Выбрать» (a1,a2,a3),
 // при этом a2 живёт в другом доме (h2) — грид идёт вперемешку по домам.
-const apartments: ApartmentRow[] = [
+// Строки базы: цена из CRM в них есть — в ответ для сайта она не попадает.
+const apartments = [
   { id: 'a3', houseId: 'h1', order: 2, rooms: 3, areaM2: '65.41', price: '871240268', oldPrice: null, entrance: 3, apartmentClass: 'Бизнес', badges: ['Рассрочка'], floor: '4/16', number: '139', deadline: '1 кв. 2028', offerLabel: 'Последняя планировка', status: 'available', planImage: '' },
   { id: 'a1', houseId: 'h1', order: 0, rooms: 4, areaM2: '114.00', price: '1354320000', oldPrice: '1539000000', entrance: 2, apartmentClass: 'Бизнес', badges: ['Акция'], floor: '8/9', number: '102', deadline: '1 кв. 2028', offerLabel: 'Акция', status: 'available', planImage: '' },
   { id: 'a2', houseId: 'h2', order: 1, rooms: 3, areaM2: '78.81', price: '936748269', oldPrice: '1064486670', entrance: 3, apartmentClass: 'Бизнес', badges: ['Ипотека'], floor: '2/16', number: '116', deadline: '1 кв. 2028', offerLabel: '', status: 'available', planImage: '' },
-]
+] as unknown as ApartmentRow[]
 
 describe('buildComplexDetail — structure (ru)', () => {
   const dto = buildComplexDetail(complex, houses, apartments, [], 'ru')
@@ -82,21 +83,17 @@ describe('buildComplexDetail — structure (ru)', () => {
     expect(dto.houses[1].apartments.map((a) => a.id)).toEqual(['a2'])
   })
 
-  it('derives apartment title/price/meta', () => {
+  it('derives apartment title/meta', () => {
     const a1 = dto.houses[0].apartments[0]
     expect(a1.title).toBe('4-комн. 114 м²')
-    expect(a1.priceFormatted).toBe('1 354 320 000 UZS')
-    expect(a1.oldPriceFormatted).toBe('1 539 000 000 UZS')
     expect(a1.meta).toBe('№ 102 | 8/9 этаж | 2 подъезд | 1 кв. 2028')
-    expect(a1.price).toBe(1354320000)
     expect(a1.areaM2).toBe(114)
   })
 
-  it('handles null oldPrice', () => {
-    const a3 = dto.houses[0].apartments[1] // a3 lives in h1 at order 2
-    expect(a3.id).toBe('a3')
-    expect(a3.oldPrice).toBeNull()
-    expect(a3.oldPriceFormatted).toBe('')
+  it('цен нет ни у квартир, ни у групп: на сайте цены не показываются', () => {
+    const json = JSON.stringify(dto)
+    expect(json).not.toMatch(/"(old)?[pP]rice/)
+    expect(json).not.toMatch(/1354320000|1 354 320 000|UZS/)
   })
 
   it('provides flattened apartments across houses in house/apartment order', () => {
@@ -151,11 +148,11 @@ describe('buildComplexListItem', () => {
 describe('buildComplexDetail — только продающиеся квартиры на витрине', () => {
   // Проданная и забронированная в том же доме, что и a1/a3: если фильтр
   // отвалится, они попадут и в дом, и в плоский грид, и в чипсы фильтра.
-  const sold: ApartmentRow = {
+  const sold = {
     id: 'aSold', houseId: 'h1', order: 3, rooms: 2, areaM2: '42.26', price: '680799327',
     oldPrice: null, entrance: 1, apartmentClass: 'Эконом', badges: [], floor: '2/16',
     number: '16', deadline: '2 кв. 2029', offerLabel: '', status: 'sold', planImage: '',
-  }
+  } as ApartmentRow
   const reserved: ApartmentRow = { ...sold, id: 'aReserved', order: 4, number: '17', status: 'reserved' }
   const hidden: ApartmentRow = { ...sold, id: 'aHidden', order: 5, number: '18', status: 'hidden' }
   const withGone = [...apartments, sold, reserved, hidden]

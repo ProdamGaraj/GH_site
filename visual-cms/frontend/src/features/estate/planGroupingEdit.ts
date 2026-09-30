@@ -51,7 +51,9 @@ export function toDraft(config: PlanGroupingConfig | null | undefined): PlanGrou
   return draft
 }
 
-const OVERRIDE_NUMBERS = ['priceMin', 'priceMax', 'areaMin', 'areaMax'] as const
+// Цены нет: на сайте цены не показываются (2026-09-29). Цена из правки,
+// записанной старой версией, отбрасывается при чтении (cleanOverride).
+const OVERRIDE_NUMBERS = ['areaMin', 'areaMax'] as const
 const OVERRIDE_LISTS = ['floors', 'entrances'] as const
 export const BADGE_LOCALES = ['ru', 'uz', 'en'] as const
 export type BadgeLocale = (typeof BADGE_LOCALES)[number]
@@ -221,8 +223,8 @@ export function setBadges(draft: PlanGroupingDraft, key: string, locale: BadgeLo
 }
 
 /**
- * «Подставить значения из CRM»: у группы снимаются ручные цена, площадь,
- * этажи и подъезды. Бейджей в CRM нет — они остаются.
+ * «Подставить значения из CRM»: у группы снимаются ручные площадь, этажи и
+ * подъезды. Бейджей в CRM нет — они остаются.
  */
 export function resetToCrm(draft: PlanGroupingDraft, key: string): PlanGroupingDraft {
   return withOverride(draft, key, (o) => ({ badges: o.badges }))
@@ -239,16 +241,14 @@ export function hasCrmOverride(override: PlanGroupOverride | null | undefined): 
 }
 
 /**
- * Что не так с ручными данными группы: «от» больше «до» у цены или площади.
- * Те же правила, что у сервера (он такую настройку не примет), — сохранение
- * и пересчёт ждут исправления. Ключ — якорь правки.
+ * Что не так с ручными данными группы: «от» больше «до» у площади. Те же
+ * правила, что у сервера (он такую настройку не примет), — сохранение и
+ * пересчёт ждут исправления. Ключ — якорь правки.
  */
 export function overrideProblems(draft: PlanGroupingDraft): Record<string, string> {
   const out: Record<string, string> = {}
   for (const [key, o] of Object.entries(draft.overrides)) {
-    if (o.priceMin !== undefined && o.priceMax !== undefined && o.priceMin > o.priceMax) {
-      out[key] = 'Цена «от» больше цены «до»'
-    } else if (o.areaMin !== undefined && o.areaMax !== undefined && o.areaMin > o.areaMax) {
+    if (o.areaMin !== undefined && o.areaMax !== undefined && o.areaMin > o.areaMax) {
       out[key] = 'Площадь «от» больше площади «до»'
     }
   }
@@ -259,14 +259,6 @@ export function overrideProblems(draft: PlanGroupingDraft): Record<string, strin
 
 /** Результат разбора поля: значение, «пусто» (вернуть CRM) или ошибка. */
 export type Parsed<T> = { ok: true; value: T | undefined } | { ok: false }
-
-/** «450 000 000» → 450000000; пусто — CRM. */
-export function parseMoney(text: string): Parsed<number> {
-  const t = text.replace(/[\s\u00a0]/g, '')
-  if (!t) return { ok: true, value: undefined }
-  if (!/^\d{1,13}$/.test(t)) return { ok: false }
-  return { ok: true, value: Number(t) }
-}
 
 /** «55,3» → 55.3 (сотые); пусто — CRM. */
 export function parseArea(text: string): Parsed<number> {
@@ -306,11 +298,6 @@ export function parseNumberList(text: string): Parsed<number[]> {
 /** «Акция, Последняя планировка» → список без пустых и повторов. */
 export function parseBadges(text: string): string[] {
   return uniqueNames(text.split(','))
-}
-
-/** 450000000 → «450 000 000». */
-export function formatMoney(value: number): string {
-  return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 }
 
 /** [2,3,4,5,7] → «2–5, 7»; пусто — прочерк. */

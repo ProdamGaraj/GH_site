@@ -173,8 +173,6 @@ export interface ApartmentRow {
   order: number
   rooms: number
   areaM2: string | number
-  price: string | number
-  oldPrice?: string | number | null
   entrance?: number | null
   apartmentClass: string
   badges: string[]
@@ -230,14 +228,16 @@ export function applyOverlay<T extends Record<string, any>>(
   return out
 }
 
-// --- Языковые производные (title / meta / price) ---
+// --- Языковые производные (title / meta) ---
+// Цен на сайте нет (решение 2026-09-29): цена из CRM хранится в базе, но в
+// ответ для сайта не попадает — шаблону нечего вывести даже по ошибке.
 const WORDS: Record<
   Locale,
-  { floor: string; entrance: string; numberPrefix: string; floors: string; from: string; entrances: string }
+  { floor: string; entrance: string; numberPrefix: string; floors: string; entrances: string }
 > = {
-  ru: { floor: 'этаж', entrance: 'подъезд', numberPrefix: '№', floors: 'этажи', from: 'от', entrances: 'подъезды' },
-  uz: { floor: 'qavat', entrance: 'kirish', numberPrefix: '№', floors: 'qavatlar', from: 'dan', entrances: 'kirishlar' },
-  en: { floor: 'floor', entrance: 'entrance', numberPrefix: 'No.', floors: 'floors', from: 'from', entrances: 'entrances' },
+  ru: { floor: 'этаж', entrance: 'подъезд', numberPrefix: '№', floors: 'этажи', entrances: 'подъезды' },
+  uz: { floor: 'qavat', entrance: 'kirish', numberPrefix: '№', floors: 'qavatlar', entrances: 'kirishlar' },
+  en: { floor: 'floor', entrance: 'entrance', numberPrefix: 'No.', floors: 'floors', entrances: 'entrances' },
 }
 
 /** Слово «квартира» с числом: 1 квартира, 3 квартиры, 12 квартир. */
@@ -263,20 +263,6 @@ export function toNumber(v: string | number | null | undefined): number {
 /** Площадь без лишних нулей: 114.00 -> "114", 78.81 -> "78.81". */
 export function formatArea(v: string | number): string {
   return String(toNumber(v))
-}
-
-/** Группировка разрядов пробелами: 1354320000 -> "1 354 320 000". */
-export function groupThousands(n: number): string {
-  return Math.round(n)
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
-}
-
-/** "1 354 320 000 UZS" (пусто/0 → ''). */
-export function formatPrice(v: string | number | null | undefined): string {
-  const n = toNumber(v)
-  if (n <= 0) return ''
-  return `${groupThousands(n)} UZS`
 }
 
 /**
@@ -397,13 +383,6 @@ export function formatAreaRange(min: string | number, max: string | number, loca
   return a === b ? `${a} ${unit}` : `${a} – ${b} ${unit}`
 }
 
-/** «от 1 153 779 562 UZS». Пустая строка, если цены нет — плашку рисовать не из чего. */
-export function formatPriceFrom(value: string | number | null | undefined, locale: Locale): string {
-  const formatted = formatPrice(value)
-  if (!formatted) return ''
-  return locale === 'uz' ? `${formatted} dan` : `${WORDS[locale].from} ${formatted}`
-}
-
 /** «12 квартир» / «1 квартира». */
 export function formatApartmentsCount(count: number, locale: Locale): string {
   if (count <= 0) return ''
@@ -453,10 +432,6 @@ export interface ApartmentDTO {
   rooms: number
   areaM2: number
   title: string
-  price: number
-  oldPrice: number | null
-  priceFormatted: string
-  oldPriceFormatted: string
   apartmentClass: string
   badges: string[]
   planImage: string
@@ -570,8 +545,6 @@ export interface PlanTypeRow {
   isStudio: boolean
   areaMin: string | number
   areaMax: string | number
-  priceMin: string | number
-  priceMax: string | number
   apartmentsCount: number
   floors: number[]
   entrances: number[]
@@ -596,7 +569,6 @@ export interface PlanTypeDTO {
   /** «2-комн. 55.64 – 56.12 м²» — заголовок карточки. */
   title: string
   areaLabel: string
-  priceLabel: string
   countLabel: string
   floorsLabel: string
   /** «подъезд 1» / «подъезды 1, 3» — различает зеркальные варианты. */
@@ -632,8 +604,6 @@ export interface PlanTypeDTO {
   apartmentsCount: number
   areaMin: number
   areaMax: number
-  priceMin: number
-  priceMax: number
   /** Границы этажей — чтобы этаж фильтровался диапазоном, а не двумя десятками чипсов. */
   floorMin: number | null
   floorMax: number | null
@@ -727,17 +697,11 @@ export function buildApartmentDTO(
   index: Map<string, string>
 ): ApartmentDTO {
   const a = applyOverlay(apartment, 'apartment', apartment.id, locale, APARTMENT_TR_FIELDS, index)
-  const price = toNumber(a.price)
-  const oldPrice = a.oldPrice === null || a.oldPrice === undefined ? null : toNumber(a.oldPrice)
   return {
     id: a.id,
     rooms: a.rooms,
     areaM2: toNumber(a.areaM2),
     title: apartmentTitle(a.rooms, a.areaM2, locale),
-    price,
-    oldPrice,
-    priceFormatted: formatPrice(price),
-    oldPriceFormatted: oldPrice ? formatPrice(oldPrice) : '',
     apartmentClass: a.apartmentClass,
     badges: Array.isArray(a.badges) ? a.badges : [],
     planImage: a.planImage,
@@ -813,7 +777,6 @@ export function buildPlanTypeDTO(
 
     title: planTypeTitle(p.rooms, areaMin, areaMax, locale),
     areaLabel: formatAreaRange(areaMin, areaMax, locale),
-    priceLabel: soldOut ? '' : formatPriceFrom(p.priceMin, locale),
     countLabel: soldOut ? '' : formatApartmentsCount(p.apartmentsCount, locale),
     floorsLabel: formatFloorsRange(floors, locale),
     entranceLabel: formatEntrances(entrances, locale),
@@ -828,8 +791,6 @@ export function buildPlanTypeDTO(
     apartmentsCount: p.apartmentsCount,
     areaMin,
     areaMax,
-    priceMin: soldOut ? 0 : toNumber(p.priceMin),
-    priceMax: soldOut ? 0 : toNumber(p.priceMax),
     floorMin: floors.length ? Math.min(...floors) : null,
     floorMax: floors.length ? Math.max(...floors) : null,
 

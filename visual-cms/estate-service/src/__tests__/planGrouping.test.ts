@@ -29,8 +29,6 @@ function plan(over: Partial<PlanTypeRow> = {}): PlanTypeRow {
     isStudio: false,
     areaMin: 40,
     areaMax: 40,
-    priceMin: 100,
-    priceMax: 100,
     apartmentsCount: 1,
     floors: [2],
     entrances: [1],
@@ -209,13 +207,13 @@ describe('слияние группы', () => {
   const rows = [
     plan({
       planName: 'a', order: 1, id: 'id-a', areaMin: 39.79, areaMax: 40.03,
-      priceMin: 500, priceMax: 700, apartmentsCount: 4,
+      apartmentsCount: 4,
       floors: [3, 4], entrances: [5], windowViews: ['двор'],
       images: [{ title: 'm', url: '/a.webp', thumbUrl: '' }],
     }),
     plan({
       planName: 'b', order: 0, id: 'id-b', areaMin: 39.8, areaMax: 39.8,
-      priceMin: 400, priceMax: 600, apartmentsCount: 2,
+      apartmentsCount: 2,
       floors: [4, 5], entrances: [1], windowViews: ['бульвар', 'двор'],
       images: [{ title: 'm', url: '/b.webp', thumbUrl: '' }, { title: 'm', url: '/a.webp', thumbUrl: '' }],
       panoUrl: 'https://tour',
@@ -228,11 +226,9 @@ describe('слияние группы', () => {
     expect(merged.planName).toBe('b')
   })
 
-  it('площадь и цена показываются полным диапазоном', () => {
+  it('площадь показывается полным диапазоном', () => {
     expect(merged.areaMin).toBe(39.79)
     expect(merged.areaMax).toBe(40.03)
-    expect(merged.priceMin).toBe(400)
-    expect(merged.priceMax).toBe(700)
   })
 
   it('квартиры суммируются — покупатель видит реальное предложение', () => {
@@ -256,13 +252,6 @@ describe('слияние группы', () => {
   it('группа из одного элемента возвращается как есть', () => {
     const single = plan({ planName: 'solo' })
     expect(mergeGroup([single])).toBe(single)
-  })
-
-  it('нулевые цены не занижают диапазон до нуля', () => {
-    const withZero = [plan({ planName: 'a', priceMin: 0, priceMax: 0 }), plan({ planName: 'b', priceMin: 900, priceMax: 950 })]
-    const m = mergeGroup(withZero)
-    expect(m.priceMin).toBe(900)
-    expect(m.priceMax).toBe(950)
   })
 })
 

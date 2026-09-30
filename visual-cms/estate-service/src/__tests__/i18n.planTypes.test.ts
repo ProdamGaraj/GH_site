@@ -10,7 +10,6 @@ import {
   buildPlanTypeDTO,
   buildComplexDetail,
   formatAreaRange,
-  formatPriceFrom,
   formatApartmentsCount,
   formatFloorsRange,
   formatEntrances,
@@ -24,8 +23,9 @@ import {
 
 const EMPTY = new Map<string, string>()
 
+/** Строка plan_types, как её отдаёт база: цена из CRM в ней есть. */
 function planType(over: Partial<PlanTypeRow> = {}): PlanTypeRow {
-  return {
+  const row = {
     id: 'plan-1',
     houseId: 'h1',
     signature: 'К2-54.65-6|abc123',
@@ -48,6 +48,7 @@ function planType(over: Partial<PlanTypeRow> = {}): PlanTypeRow {
     order: 0,
     ...over,
   }
+  return row
 }
 
 const baseComplex: ComplexRow = {
@@ -99,15 +100,6 @@ describe('форматирование диапазонов', () => {
     expect(formatAreaRange('40', '40', 'en')).toBe('40 m²')
   })
 
-  it('цена подписывается как «от»', () => {
-    expect(formatPriceFrom(1153779562, 'ru')).toBe('от 1 153 779 562 UZS')
-  })
-
-  it('нулевая цена не даёт плашку «от 0»', () => {
-    expect(formatPriceFrom(0, 'ru')).toBe('')
-    expect(formatPriceFrom(null, 'ru')).toBe('')
-  })
-
   it('число квартир склоняется', () => {
     expect(formatApartmentsCount(1, 'ru')).toBe('1 квартира')
     expect(formatApartmentsCount(3, 'ru')).toBe('3 квартиры')
@@ -138,7 +130,6 @@ describe('карточка типа', () => {
     const dto = buildPlanTypeDTO(planType(), 'ru', EMPTY)
     expect(dto.title).toBe('2-комн. от 55.64 м²')
     expect(dto.areaLabel).toBe('55.64 – 56.12 м²')
-    expect(dto.priceLabel).toBe('от 1 153 779 562 UZS')
     expect(dto.countLabel).toBe('12 квартир')
     expect(dto.floorsLabel).toBe('этажи 3–16')
   })
@@ -189,8 +180,12 @@ describe('карточка типа', () => {
     const dto = buildPlanTypeDTO(planType(), 'ru', EMPTY)
     expect(dto.areaMin).toBe(55.64)
     expect(dto.areaMax).toBe(56.12)
-    expect(dto.priceMin).toBe(1153779562)
-    expect(typeof dto.priceMax).toBe('number')
+  })
+
+  it('цены в карточке нет, хотя в строке базы она есть: на сайте цены не показываются', () => {
+    const dto = buildPlanTypeDTO(planType(), 'ru', EMPTY) as unknown as Record<string, unknown>
+    for (const key of ['priceLabel', 'priceMin', 'priceMax']) expect(dto).not.toHaveProperty(key)
+    expect(JSON.stringify(dto)).not.toMatch(/1153779562|1 153 779 562|UZS/)
   })
 
   it('пустые массивы из базы не роняют сборку', () => {

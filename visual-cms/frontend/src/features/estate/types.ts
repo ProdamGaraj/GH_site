@@ -33,8 +33,6 @@ export interface Apartment {
   order: number
   rooms: number
   areaM2: number | string
-  price: number | string
-  oldPrice: number | string | null
   entrance: number | null
   apartmentClass: string
   badges: string[]
@@ -184,10 +182,11 @@ export interface PlanGroupBadges {
   en?: string[]
 }
 
-/** Ручные данные группы: поле есть — главнее CRM, нет — значение CRM. */
+/**
+ * Ручные данные группы: поле есть — главнее CRM, нет — значение CRM. Цены
+ * нет: на сайте цены не показываются.
+ */
 export interface PlanGroupOverride {
-  priceMin?: number
-  priceMax?: number
   areaMin?: number
   areaMax?: number
   floors?: number[]
@@ -197,8 +196,6 @@ export interface PlanGroupOverride {
 
 /** Данные карточки, которые можно поправить вручную. */
 export interface PlanGroupValues {
-  priceMin: number
-  priceMax: number
   areaMin: number
   areaMax: number
   floors: number[]

@@ -31,8 +31,8 @@ const baseComplex: ComplexRow = {
 }
 
 const baseApartment: ApartmentRow = {
-  id: 'a1', houseId: 'h1', order: 0, rooms: 2, areaM2: '60', price: '100',
-  oldPrice: null, entrance: 1, apartmentClass: 'Бизнес', badges: ['Акция'],
+  id: 'a1', houseId: 'h1', order: 0, rooms: 2, areaM2: '60',
+  entrance: 1, apartmentClass: 'Бизнес', badges: ['Акция'],
   floor: '3/9', number: '12', deadline: '1 кв. 2028',
   offerLabel: '', status: 'available', planImage: '',
 }

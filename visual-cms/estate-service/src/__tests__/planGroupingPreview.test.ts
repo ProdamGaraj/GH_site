@@ -22,8 +22,6 @@ function plan(over: Partial<PlanTypeRow> = {}): PlanTypeRow {
     isStudio: false,
     areaMin: 40,
     areaMax: 40,
-    priceMin: 100,
-    priceMax: 100,
     apartmentsCount: 1,
     floors: [2],
     entrances: [1],

@@ -27,12 +27,11 @@ const planBadgesSchema = z.array(z.string().trim().min(1).max(40)).max(10)
 
 /**
  * Ручные данные группы планировок поверх CRM (services/planGrouping.ts).
- * Этажи — целые, подвал бывает минусовым; подъезды — целые с нуля.
+ * Этажи — целые, подвал бывает минусовым; подъезды — целые с нуля. Цены нет:
+ * на сайте цены не показываются; цена от старой админки молча отбрасывается.
  */
 const planGroupOverrideSchema = z
   .object({
-    priceMin: z.number().min(0).max(1e13).optional(),
-    priceMax: z.number().min(0).max(1e13).optional(),
     areaMin: z.number().min(0).max(10000).optional(),
     areaMax: z.number().min(0).max(10000).optional(),
     floors: z.array(z.number().int().min(-10).max(300)).max(310).optional(),
@@ -40,9 +39,6 @@ const planGroupOverrideSchema = z
     badges: z
       .object({ ru: planBadgesSchema.optional(), uz: planBadgesSchema.optional(), en: planBadgesSchema.optional() })
       .optional(),
-  })
-  .refine((o) => o.priceMin === undefined || o.priceMax === undefined || o.priceMin <= o.priceMax, {
-    message: 'Цена «от» больше цены «до»',
   })
   .refine((o) => o.areaMin === undefined || o.areaMax === undefined || o.areaMin <= o.areaMax, {
     message: 'Площадь «от» больше площади «до»',

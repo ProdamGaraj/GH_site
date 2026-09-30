@@ -67,8 +67,6 @@ const planType = (id: string, over: Partial<PlanTypeRow> = {}): PlanTypeRow => (
   isStudio: false,
   areaMin: '55',
   areaMax: '56',
-  priceMin: '1000000000',
-  priceMax: '1200000000',
   apartmentsCount: 3,
   floors: [3, 5],
   entrances: [1],
@@ -142,11 +140,11 @@ describe('карточка каталога на главной', () => {
 describe('страница распроданного проекта', () => {
   const types = [planType('A', { apartmentsCount: 0 }), planType('B', { apartmentsCount: 0, order: 1 })]
 
-  it('показываются все планировки — без цены и «N квартир»', () => {
+  it('показываются все планировки — без «N квартир»', () => {
     const dto = buildComplexDetail(complex({ status: 'sold_out' }), [], [], [], 'ru', types)
     expect(dto.planTypes.map((p) => p.planName)).toEqual(['A', 'B'])
     for (const p of dto.planTypes) {
-      expect(p).toMatchObject({ priceLabel: '', countLabel: '', priceMin: 0, priceMax: 0 })
+      expect(p).toMatchObject({ countLabel: '' })
       expect(p.cover).toEqual([{ image: `/media/${p.planName}.jpg` }])
     }
     expect(dto.planSections).toHaveLength(1)
@@ -158,11 +156,10 @@ describe('страница распроданного проекта', () => {
     expect(dto.saleStateClass).toBe('is-sold-out')
   })
 
-  it('активный проект — как раньше: типы без квартир скрыты, цены на месте', () => {
+  it('активный проект — как раньше: типы без квартир скрыты, «N квартир» на месте', () => {
     const dto = buildComplexDetail(complex(), [], [], [], 'ru', [planType('A', { apartmentsCount: 0 }), planType('C')])
     expect(dto.planTypes.map((p) => p.planName)).toEqual(['C'])
-    expect(dto.planTypes[0].priceLabel).not.toBe('')
-    expect(dto.planTypes[0].priceMin).toBe(1000000000)
+    expect(dto.planTypes[0].countLabel).toBe('3 квартиры')
     expect(dto.soldOut).toEqual([])
     expect(dto.saleStateClass).toBe('')
   })
