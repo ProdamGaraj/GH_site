@@ -25,8 +25,8 @@ describe('PreviewController.baseCss', () => {
     expect(res.type).toHaveBeenCalledWith('text/css')
     expect(res.set).toHaveBeenCalledWith('Cache-Control', expect.stringContaining('max-age'))
     const sent = res.send.mock.calls[0][0] as string
-    expect(sent).toContain('.canvas-viewport input[type="text"]')
-    expect(sent).toContain('.canvas-viewport *')
+    expect(sent).toContain(':where(.canvas-viewport) input[type="text"]')
+    expect(sent).toContain(':where(.canvas-viewport) *')
     expect(sent).toContain('@keyframes spin')
   })
 
@@ -36,7 +36,7 @@ describe('PreviewController.baseCss', () => {
     await previewController.baseCss(req, res, jest.fn())
 
     const sent = res.send.mock.calls[0][0] as string
-    expect(sent).toContain('.canvas-viewport input')
+    expect(sent).toContain(':where(.canvas-viewport) input')
     expect(sent).not.toContain('display:none')
   })
 })

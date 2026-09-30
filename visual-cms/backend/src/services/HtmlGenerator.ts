@@ -129,8 +129,9 @@ export class HtmlGenerator {
     // --- Общие стили/скрипты по уровням (сайт → страница → блок) ---
     // Страница — на корне дерева; блок — на вложенных узлах (дедуп по контенту).
     const blockAssets = this.collectBlockAssets(structure)
-    // CSS-чанки встраиваются внутрь основного <style> после reset, до dynamic,
-    // чтобы element-specific dynamic/responsive перебивали общий авторский CSS.
+    // CSS-чанки встраиваются внутрь основного <style> после базы (reset + стили
+    // форм по умолчанию), до dynamic: авторский CSS главнее базы, а
+    // element-specific dynamic/responsive — главнее авторского.
     const authoredCss = [
       this.cssChunk(options.siteCss, 'Site CSS'),
       this.cssChunk(structure.metadata?.globalCss, 'Page CSS'),
@@ -192,16 +193,13 @@ export class HtmlGenerator {
       font-style: normal;
     }
     
-${styleGenerator.getResetCss()}
+${styleGenerator.getBaseCss()}
 ${authoredCss}
     /* Keyframes for animations */
     ${keyframes}
-    
+
     /* Dynamic styles (hover, animations, etc.) */
     ${dynamicCSS}
-    
-    /* Form and output binding styles */
-    ${styleGenerator.generateFormStyles()}
 ${specificHideCSS}${responsiveCSS}${responsiveMediaCSS}
   </style>
 ${siteCustomHead ? '  ' + siteCustomHead.split('\n').join('\n  ') + '\n' : ''}${customHeadHtml ? '  ' + customHeadHtml.split('\n').join('\n  ') + '\n' : ''}</head>

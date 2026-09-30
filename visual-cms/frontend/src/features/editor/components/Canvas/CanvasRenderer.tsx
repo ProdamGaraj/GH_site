@@ -10,6 +10,7 @@ import { BlockNodeWithViewport } from '../../utils/variationUtils'
 import { DataBindingIndicator, useBlockDataPreview } from '@/features/dataBindings'
 import { RepeaterRenderer } from './RepeaterRenderer'
 import { StaticCarouselTrack } from './StaticCarouselTrack'
+import { canvasTagProps } from '../../utils/canvasTagProps'
 
 // Text elements that support inline editing
 const TEXT_ELEMENTS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'a', 'button', 'label', 'li']
@@ -281,48 +282,8 @@ const CanvasRendererComponent: React.FC<CanvasRendererProps> = ({
     } : {}),
   }
 
-  // Add attributes for specific elements
-  if (node.tagName === 'input') {
-    elementProps.type = node.attributes?.type || 'text'
-    elementProps.placeholder = node.attributes?.placeholder || ''
-    elementProps.value = node.content || ''
-    elementProps.readOnly = true
-  }
-
-  if (node.tagName === 'textarea') {
-    elementProps.placeholder = node.attributes?.placeholder || ''
-    elementProps.value = node.content || ''
-    elementProps.readOnly = true
-  }
-
-  if (node.tagName === 'img') {
-    elementProps.src = node.attributes?.src || 'https://via.placeholder.com/150'
-    elementProps.alt = node.attributes?.alt || ''
-  }
-
-  if (node.tagName === 'video') {
-    // Без проброса атрибутов <video> на канвасе был пустым боксом.
-    // Автоплей в редакторе не включаем; muted всегда — канвас не должен звучать.
-    if (node.attributes?.src) elementProps.src = node.attributes.src
-    if (node.attributes?.poster) elementProps.poster = node.attributes.poster
-    elementProps.controls = node.attributes?.controls !== undefined && node.attributes.controls !== 'false'
-    elementProps.loop = node.attributes?.loop !== undefined && node.attributes.loop !== 'false'
-    elementProps.muted = true
-    elementProps.playsInline = true
-    elementProps.autoPlay = false
-    elementProps.preload = 'metadata'
-  }
-
-  // Handle select elements
-  if (node.tagName === 'select') {
-    elementProps.value = node.attributes?.value || ''
-    elementProps.onChange = () => {} // Read-only in editor
-  }
-
-  // Handle option elements - must have value prop
-  if (node.tagName === 'option') {
-    elementProps.value = node.attributes?.value || node.content || ''
-  }
+  // Атрибуты по тегу: поля, картинки, видео, формы (utils/canvasTagProps.ts).
+  Object.assign(elementProps, canvasTagProps(node))
 
   // Void elements don't have children
   if (isVoidElement) {

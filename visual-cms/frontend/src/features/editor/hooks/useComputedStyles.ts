@@ -60,14 +60,10 @@ export const useComputedStyles = (node: BlockNode): React.CSSProperties => {
       })
     }
 
-    // Для контейнеров без явного display - устанавливаем block для правильного вертикального потока
-    const containerTags = ['div', 'section', 'article', 'header', 'footer', 'main', 'aside', 'form']
-    const isContainerTag = containerTags.includes(node.tagName?.toLowerCase() || '')
-    
-    if (!baseStyles.display && isContainerTag && node.elementType === 'container') {
-      // По умолчанию контейнеры - блочные с вертикальным потоком
-      baseStyles.display = 'block'
-    }
+    // Контейнеру без своего display инлайн-display НЕ ставим: div/section/form
+    // и так блочные, а display из CSS страницы/блока (.lead-form { display:
+    // grid }) инлайн перебил бы — на сайте инлайна нет, и канвас расходился с
+    // деплоем (форма заявки в канвасе была блоком, кнопка — по ширине текста).
 
     // If layoutMode is set, apply appropriate display
     if (node.layoutMode && !baseStyles.display) {
@@ -88,5 +84,5 @@ export const useComputedStyles = (node: BlockNode): React.CSSProperties => {
     }
 
     return baseStyles as React.CSSProperties
-  }, [node.styles, node.layoutMode, node.tagName, node.elementType, viewport, breakpoints, browserOffset])
+  }, [node.styles, node.layoutMode, viewport, breakpoints, browserOffset])
 }

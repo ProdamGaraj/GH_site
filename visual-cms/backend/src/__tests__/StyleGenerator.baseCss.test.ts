@@ -5,8 +5,9 @@
  *  - getResetCss/getBaseCss — статичная база (reset + форм-стили);
  *  - scopeCss — префиксация селекторов под контейнер канваса, спец-случаи
  *    (html/body/:root → scope), сохранность @keyframes/@font-face, списки;
- *  - деплой-инвариант: HtmlGenerator по-прежнему инлайнит ровно getResetCss()
- *    и generateFormStyles() (извлечение не изменило вывод прода).
+ *  - деплой: HtmlGenerator инлайнит ровно getBaseCss() — ДО авторского CSS,
+ *    чтобы стиль блока был главнее стилей форм по умолчанию;
+ *  - канвас: база под `:where(scope)` — без добавочной специфичности.
  */
 import { styleGenerator, scopeCss } from '../services/StyleGenerator'
 import { htmlGenerator } from '../services/HtmlGenerator'
@@ -95,22 +96,43 @@ describe('StyleGenerator — канонический base-CSS', () => {
   describe('getBaseCssScoped', () => {
     it('форм-поля скоупятся, @keyframes spin сохраняется', () => {
       const scoped = styleGenerator.getBaseCssScoped('.canvas-viewport')
-      expect(scoped).toContain('.canvas-viewport input[type="text"]')
-      expect(scoped).toContain('.canvas-viewport select')
-      expect(scoped).toContain('.canvas-viewport *') // reset
+      expect(scoped).toContain(':where(.canvas-viewport) input[type="text"]')
+      expect(scoped).toContain(':where(.canvas-viewport) select')
+      expect(scoped).toContain(':where(.canvas-viewport) *') // reset
       expect(scoped).toContain('@keyframes spin') // не тронут
-      expect(scoped).not.toContain('.canvas-viewport @keyframes')
+      expect(scoped).not.toContain(':where(.canvas-viewport) @keyframes')
+    })
+
+    it('скоуп не добавляет специфичности: база в канвасе соревнуется с автором как на сайте', () => {
+      const scoped = styleGenerator.getBaseCssScoped('.canvas-viewport')
+      // Голый префикс (.canvas-viewport input[type="text"]) давал базе класс
+      // сверху и перебивал .lead-form input блока — на сайте они равны.
+      expect(scoped).not.toMatch(/(^|[\s,])\.canvas-viewport [a-z*:[]/m)
+      expect(scoped).toContain(':where(.canvas-viewport) button[type="submit"]')
+      // html/body/:root → сам корень канваса, тоже без специфичности.
+      expect(scoped).toMatch(/:where\(\.canvas-viewport\) \{/)
     })
   })
 
-  describe('деплой-инвариант (извлечение не изменило прод-вывод)', () => {
-    it('HtmlGenerator инлайнит ровно getResetCss() и generateFormStyles()', () => {
-      const html = htmlGenerator.generatePage(rootNode(), {
+  describe('деплой: база — стили по умолчанию, автор главнее', () => {
+    const page = (globalCss: string): string =>
+      htmlGenerator.generatePage({ ...rootNode(), metadata: { globalCss } } as BlockNode, {
         metadata: { title: 'T', description: 'D', keywords: [] },
         slug: 'index',
       })
-      expect(html).toContain(styleGenerator.getResetCss())
-      expect(html).toContain(styleGenerator.generateFormStyles())
+
+    it('HtmlGenerator инлайнит ровно getBaseCss() один раз', () => {
+      const html = page('')
+      expect(html).toContain(styleGenerator.getBaseCss())
+      expect(html.split('/* Кнопки */')).toHaveLength(2)
+    })
+
+    it('стили форм — до CSS страницы и блоков: .lead-form button (золотой) главнее button[type="submit"] (синий)', () => {
+      const html = page('.lead-form button { background: gold; }')
+      const base = html.indexOf('button[type="submit"]')
+      const authored = html.indexOf('.lead-form button { background: gold; }')
+      expect(base).toBeGreaterThan(-1)
+      expect(authored).toBeGreaterThan(base)
     })
   })
 })
