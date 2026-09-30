@@ -92,8 +92,9 @@ export function extractTranslatableFields(node: any): TranslationEntry[] {
     entries.push({ nodeId, field: 'content', value: node.content })
   }
 
-  // Translatable attributes
-  const translatableAttrs = ['alt', 'placeholder', 'title', 'aria-label']
+  // Translatable attributes. data-title — подпись, которую скрипт блока
+  // показывает по действию (заголовок над видео в каталоге на главной).
+  const translatableAttrs = ['alt', 'placeholder', 'title', 'aria-label', 'data-title']
   if (node.attributes) {
     for (const attr of translatableAttrs) {
       if (node.attributes[attr] && typeof node.attributes[attr] === 'string') {
@@ -194,7 +195,7 @@ export function applyNodeTranslations(node: any, map: TranslationMap): any {
 
     // Атрибуты (в т.ч. медиа: src/poster/href/data-slide-video)
     if (node.attributes) {
-      const attrFields = ['src', 'alt', 'href', 'placeholder', 'title', 'poster', 'aria-label', 'data-slide-video']
+      const attrFields = ['src', 'alt', 'href', 'placeholder', 'title', 'poster', 'aria-label', 'data-slide-video', 'data-title']
       for (const field of attrFields) {
         if (nodeTranslations[field]) {
           node.attributes[field] = nodeTranslations[field]

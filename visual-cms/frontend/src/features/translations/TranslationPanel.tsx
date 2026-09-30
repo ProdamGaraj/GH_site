@@ -92,6 +92,7 @@ const FIELD_ICON: Record<string, React.ReactNode> = {
   title: <Type size={12} />,
   poster: <Image size={12} />,
   'aria-label': <FileText size={12} />,
+  'data-title': <Type size={12} />,
   'bg:image': <Image size={12} />,
   'data-slide-video': <Film size={12} />,
   'meta:title': <FileText size={12} />,
@@ -108,6 +109,8 @@ const FIELD_LABEL: Record<string, string> = {
   title: 'Title',
   poster: 'Poster',
   'aria-label': 'Aria Label',
+  // Подпись, которую скрипт блока показывает по действию (заголовок каталога).
+  'data-title': 'Подпись по действию',
   'bg:image': 'Фон (картинка)',
   'data-slide-video': 'Видео слайда',
   'meta:title': 'Meta Title',

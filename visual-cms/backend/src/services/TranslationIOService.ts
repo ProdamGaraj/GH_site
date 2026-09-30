@@ -68,6 +68,7 @@ function fieldLabel(field: string): string {
     title: 'Title',
     poster: 'Poster',
     'aria-label': 'Aria Label',
+    'data-title': 'Подпись по действию',
     'bg:image': 'Фон (картинка)',
     'data-slide-video': 'Видео слайда',
     'meta:title': 'Meta Title',
