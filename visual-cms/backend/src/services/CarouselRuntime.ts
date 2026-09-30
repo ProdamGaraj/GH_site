@@ -48,6 +48,16 @@
  *                                       Где свайп работает сейчас, на корне стоит
  *                                       data-carousel-swipe-active="true".
  *
+ *   [data-header-theme="dark|light"]  — на слайде: фон под шапкой сайта (ставит редактор
+ *                                       или CMS при публикации по яркости верха фото).
+ *                                       У видео-слайда без метки runtime раз в секунду
+ *                                       оценивает кадр (8×4) и пишет data-header-theme-live,
+ *                                       пока карусель у верха экрана и вкладка видна.
+ *
+ * При смене слайда и темы кадра на корне всплывает событие carousel:change
+ * (detail: index, slide, reason 'slide' | 'theme') — по нему шапка сайта
+ * перекрашивается без опроса.
+ *
  * Число слайдов runtime пишет на корень: data-carousel-count="N" — за него
  * может цепляться CSS вёрстки (например, спрятать пустую галерею). Кнопки
  * prev/next, точки и счётчик при N < 2 скрываются: листать нечего, а мёртвая
@@ -446,6 +456,96 @@ ${BREAKPOINT_RUNTIME_JS}
       }
     }
 
+    // --- Тема шапки над каруселью ---
+    // Шапка сайта (скрипт блока «Navigation») красит текст по фону под собой.
+    // Над каруселью этот фон — активный слайд: его метку data-header-theme
+    // ставит редактор вручную или CMS при публикации (по яркости верха фото).
+    // Кадр видео CMS разобрать нечем — его оценивает runtime и пишет
+    // data-header-theme-live. О смене слайда и темы кадра карусель сообщает
+    // событием carousel:change (всплывает до document).
+    var THEME_SAMPLE_MS = 1000;
+    /** Гистерезис: между порогами тема не меняется — шапка не мигает на полутонах. */
+    var THEME_DARK_BELOW = 130;
+    var THEME_LIGHT_ABOVE = 150;
+    var THEME_SPLIT = 140;
+    /** Карусель под шапкой, только если её верх выше этой линии экрана. */
+    var THEME_ZONE_PX = 240;
+    var themeCanvas = null, themeCtx = null, themeTimer = null, themePending = null, themeBroken = false;
+
+    function announce(reason) {
+      var detail = { index: state.index, slide: state.slides[state.index] || null, reason: reason };
+      var ev;
+      try {
+        ev = new CustomEvent('carousel:change', { bubbles: true, detail: detail });
+      } catch (e) {
+        ev = document.createEvent('CustomEvent');
+        ev.initCustomEvent('carousel:change', true, false, detail);
+      }
+      root.dispatchEvent(ev);
+    }
+
+    function stopVideoTheme() {
+      if (themeTimer) { clearInterval(themeTimer); themeTimer = null; }
+      themePending = null;
+    }
+
+    /** Яркость (YIQ, 0..255) верхней четверти кадра по центральным 70% ширины — то, над чем шапка. */
+    function frameBrightness(v) {
+      var w = v.videoWidth, h = v.videoHeight;
+      if (!w || !h) return null;
+      try {
+        if (!themeCanvas) {
+          themeCanvas = document.createElement('canvas');
+          themeCanvas.width = 8; themeCanvas.height = 4;
+          themeCtx = themeCanvas.getContext('2d', { willReadFrequently: true });
+        }
+        if (!themeCtx) { themeBroken = true; stopVideoTheme(); return null; }
+        themeCtx.drawImage(v, w * 0.15, 0, w * 0.7, h * 0.25, 0, 0, 8, 4);
+        var d = themeCtx.getImageData(0, 0, 8, 4).data;
+        var sum = 0;
+        for (var i = 0; i < d.length; i += 4) sum += (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000;
+        return sum / (d.length / 4);
+      } catch (e) {
+        // Видео с чужого сервера без CORS «портит» canvas — следить за ним нельзя.
+        themeBroken = true;
+        stopVideoTheme();
+        return null;
+      }
+    }
+
+    function sampleVideoTheme() {
+      var slide = state.slides[state.index];
+      if (!slide || slide.hasAttribute('data-header-theme') || document.hidden) return;
+      var v = slide.querySelector('video[data-carousel-video="true"]');
+      if (!v || v.paused || v.readyState < 2) return;
+      var box = root.getBoundingClientRect();
+      if (box.top > THEME_ZONE_PX || box.bottom <= 0) return;
+      var b = frameBrightness(v);
+      if (b === null) return;
+      var current = slide.getAttribute('data-header-theme-live');
+      var next = b < THEME_DARK_BELOW ? 'dark'
+        : b > THEME_LIGHT_ABOVE ? 'light'
+        : (current || (b < THEME_SPLIT ? 'dark' : 'light'));
+      if (next === current) { themePending = null; return; }
+      // Первая оценка кадра — сразу; смена — после двух одинаковых оценок подряд.
+      if (current && themePending !== next) { themePending = next; return; }
+      themePending = null;
+      slide.setAttribute('data-header-theme-live', next);
+      announce('theme');
+    }
+
+    /** Следить за кадрами — только у видео-слайда без своей метки. Раз в секунду, дёшево. */
+    function syncVideoTheme() {
+      stopVideoTheme();
+      var slide = state.slides[state.index];
+      if (themeBroken || !slide || slide.hasAttribute('data-header-theme') || !slide.getAttribute('data-slide-video')) return;
+      themeTimer = setInterval(sampleVideoTheme, THEME_SAMPLE_MS);
+      var v = slide.querySelector('video[data-carousel-video="true"]');
+      if (!v) return;
+      if (v.readyState >= 2) setTimeout(sampleVideoTheme, 0);
+      else v.addEventListener('loadeddata', sampleVideoTheme, { once: true });
+    }
+
     /** cell — клетка трека, куда ехать; по умолчанию — клетка активного слайда. */
     function update(cell) {
       var n = state.slides.length;
@@ -487,6 +587,9 @@ ${BREAKPOINT_RUNTIME_JS}
         if (vi === state.index) playSlideVideo(state.slides[vi]);
         else pauseSlideVideo(state.slides[vi]);
       }
+      // Шапка над каруселью перекрашивается по активному слайду.
+      announce('slide');
+      syncVideoTheme();
     }
 
     function goTo(i, userInteraction) {

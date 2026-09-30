@@ -9,6 +9,7 @@ import { ValidationError } from '../middleware'
 import { logger } from './Logger'
 import { detectKind, extFromMime, validateSize, isInlineSafe, buildContentDisposition } from './mediaMime'
 import { buildVariantPlan } from './mediaVariants'
+import { topBandBrightness } from './headerTheme'
 
 /** Качество webp для оптимизированной версии и адаптивных вариантов (визуально без потерь). */
 const OPTIMIZED_WEBP_QUALITY = 82
@@ -80,7 +81,11 @@ export class MediaService {
     let variants: MediaVariant[] | null = null
     let width: number | null = null
     let height: number | null = null
+    let topBrightness: number | null = null
     if (kind === 'image' && file.mimetype !== 'image/svg+xml') {
+      // Тема шапки над слайдом с этим фото (services/headerTheme.ts): один раз здесь,
+      // чтобы публикация и браузер не разбирали картинку.
+      topBrightness = await topBandBrightness(file.buffer)
       try {
         const meta = await sharp(file.buffer, { failOn: 'none' }).metadata()
         // Учитываем EXIF-ориентацию: при повороте 90/270 ширина и высота меняются местами.
@@ -176,6 +181,7 @@ export class MediaService {
       sizeBytes: file.size,
       width,
       height,
+      topBrightness,
       title: title ?? file.originalname.replace(/\.[^.]+$/, ''),
       alt: alt ?? null,
       tags: tags && tags.length > 0 ? tags : undefined,

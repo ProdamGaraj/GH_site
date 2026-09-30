@@ -47,6 +47,33 @@ export function getSlideDisplayName(node: BlockNode, index: number): string {
   return `${tag} ${index + 1}`
 }
 
+/**
+ * Фон под шапкой сайта над этим слайдом — от него зависит цвет текста шапки
+ * (скрипт блока «Navigation»). «Авто»: фото CMS оценит при публикации по
+ * яркости верха картинки, видео — браузер по кадрам. Ручной выбор главнее.
+ */
+export const HEADER_THEME_ATTR = 'data-header-theme'
+export type SlideHeaderTheme = 'auto' | 'dark' | 'light'
+
+export const SLIDE_HEADER_THEMES: ReadonlyArray<{ value: SlideHeaderTheme; label: string }> = [
+  { value: 'auto', label: 'Авто' },
+  { value: 'dark', label: 'Тёмный (белая шапка)' },
+  { value: 'light', label: 'Светлый (тёмная шапка)' },
+]
+
+export function getSlideHeaderTheme(node: BlockNode): SlideHeaderTheme {
+  const value = node.attributes?.[HEADER_THEME_ATTR]
+  return value === 'dark' || value === 'light' ? value : 'auto'
+}
+
+/** Атрибуты слайда с выбранной темой; «Авто» — без атрибута. Не мутирует вход. */
+export function withSlideHeaderTheme(attributes: Record<string, string> | undefined, theme: SlideHeaderTheme): Record<string, string> {
+  const next = { ...(attributes || {}) }
+  if (theme === 'auto') delete next[HEADER_THEME_ATTR]
+  else next[HEADER_THEME_ATTR] = theme
+  return next
+}
+
 /** true, если слайд — лёгкий placeholder, привязанный к library-блоку. */
 export function isLinkedSlide(node: BlockNode): boolean {
   return typeof node.metadata?.linkedBlockId === 'string' && node.metadata.linkedBlockId.length > 0

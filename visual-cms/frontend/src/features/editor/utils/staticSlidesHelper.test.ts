@@ -6,6 +6,10 @@ import {
   getSlideDisplayName,
   isLinkedSlide,
   SLIDE_ATTR,
+  HEADER_THEME_ATTR,
+  SLIDE_HEADER_THEMES,
+  getSlideHeaderTheme,
+  withSlideHeaderTheme,
 } from './staticSlidesHelper'
 
 const mk = (overrides: Partial<BlockNode> & { id: string }): BlockNode => {
@@ -104,5 +108,26 @@ describe('isLinkedSlide', () => {
 
   it('false без metadata', () => {
     expect(isLinkedSlide(mk({ id: 'n' }))).toBe(false)
+  })
+})
+
+describe('тема шапки над слайдом', () => {
+  it('нет метки или мусор — «Авто»', () => {
+    expect(getSlideHeaderTheme(mk({ id: 'n' }))).toBe('auto')
+    expect(getSlideHeaderTheme(mk({ id: 'n', attributes: { [HEADER_THEME_ATTR]: 'purple' } }))).toBe('auto')
+    expect(getSlideHeaderTheme(mk({ id: 'n', attributes: { [HEADER_THEME_ATTR]: 'dark' } }))).toBe('dark')
+  })
+
+  it('ручной выбор пишется атрибутом, «Авто» его снимает; остальные атрибуты целы, вход не меняется', () => {
+    const attrs = { [SLIDE_ATTR]: 'true', 'data-slide-video': '/v.mp4' }
+    const dark = withSlideHeaderTheme(attrs, 'dark')
+    expect(dark).toEqual({ ...attrs, [HEADER_THEME_ATTR]: 'dark' })
+    expect(attrs).not.toHaveProperty(HEADER_THEME_ATTR)
+    expect(withSlideHeaderTheme(dark, 'auto')).toEqual(attrs)
+    expect(withSlideHeaderTheme(undefined, 'light')).toEqual({ [HEADER_THEME_ATTR]: 'light' })
+  })
+
+  it('варианты в меню — авто, тёмный, светлый', () => {
+    expect(SLIDE_HEADER_THEMES.map((t) => t.value)).toEqual(['auto', 'dark', 'light'])
   })
 })

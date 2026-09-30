@@ -102,6 +102,15 @@ export class MediaAsset {
   @Column({ type: 'integer', nullable: true })
   durationSec?: number | null
 
+  /**
+   * Яркость (YIQ, 0..255) верхней полосы картинки — того, над чем висит шапка
+   * сайта. Считается при загрузке (services/headerTheme.ts); по ней слайд с
+   * этим фото получает тему шапки при публикации. null — не картинка или не
+   * посчитано (старые файлы — scripts/backfill-media-top-brightness.ts).
+   */
+  @Column({ type: 'smallint', nullable: true })
+  topBrightness?: number | null
+
   /** Произвольное название (для UI). По умолчанию = fileName без расширения. */
   @Column({ type: 'varchar', length: 255, nullable: true })
   title?: string | null

@@ -23,7 +23,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Link2, Trash2, Copy, Plus, MousePointerClick, Film, Upload, Languages } from 'lucide-react'
+import { GripVertical, Link2, Trash2, Copy, Plus, MousePointerClick, Film, Upload, Languages, SunMoon } from 'lucide-react'
 import { Button } from '@/shared/components/Button'
 import { MediaPicker } from '@/features/media/MediaPicker'
 import { MediaLanguageSection } from '@/features/media/MediaLanguageSection'
@@ -37,10 +37,14 @@ import {
 } from '@/features/editor/utils/carouselHelpers'
 import { buildMediaSlideNode } from '@/features/editor/utils/slideMediaHelper'
 import {
+  SLIDE_HEADER_THEMES,
   getSlideChildren,
   getSlideDisplayName,
+  getSlideHeaderTheme,
   isLinkedSlide,
   withSlideAttribute,
+  withSlideHeaderTheme,
+  type SlideHeaderTheme,
 } from '@/features/editor/utils/staticSlidesHelper'
 
 interface StaticSlidesPanelProps {
@@ -142,6 +146,12 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track, pag
     dispatch(updateNode({ id: slide.id, updates: { attributes: attrs } }))
   }
 
+  // Фон под шапкой сайта над слайдом: «Авто» — без атрибута (фото оценит CMS
+  // при публикации, видео — браузер по кадрам), иначе data-header-theme.
+  const handleSetHeaderTheme = (slide: BlockNode, theme: SlideHeaderTheme) => {
+    dispatch(updateNode({ id: slide.id, updates: { attributes: withSlideHeaderTheme(slide.attributes, theme) } }))
+  }
+
   // Применяет «Вписывание» ко ВСЕМ слайдам: background-size (для фото/постера) +
   // data-slide-fit (object-fit видео в рантайме). cover = обрезать, contain = с полосами.
   const handleSetFit = (fit: string) => {
@@ -208,6 +218,7 @@ export const StaticSlidesPanel: React.FC<StaticSlidesPanelProps> = ({ track, pag
                 onDelete={() => handleDelete(slide)}
                 onDuplicate={() => handleDuplicate(slide, i)}
                 onSetVideo={(url) => handleSetVideo(slide, url)}
+                onSetHeaderTheme={(theme) => handleSetHeaderTheme(slide, theme)}
               />
             ))}
           </div>
@@ -270,6 +281,7 @@ interface SlideRowProps {
   onDelete: () => void
   onDuplicate: () => void
   onSetVideo: (url: string) => void
+  onSetHeaderTheme: (theme: SlideHeaderTheme) => void
 }
 
 const SlideRow: React.FC<SlideRowProps> = ({
@@ -282,6 +294,7 @@ const SlideRow: React.FC<SlideRowProps> = ({
   onDelete,
   onDuplicate,
   onSetVideo,
+  onSetHeaderTheme,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: slide.id,
@@ -297,6 +310,8 @@ const SlideRow: React.FC<SlideRowProps> = ({
   const hasVideo = !!videoUrl
   const [showVideo, setShowVideo] = useState(hasVideo)
   const [showLang, setShowLang] = useState(false)
+  const headerTheme = getSlideHeaderTheme(slide)
+  const [showTheme, setShowTheme] = useState(false)
   const [videoDraft, setVideoDraft] = useState(videoUrl)
 
   // Синхронизируем черновик при внешней смене значения (дубликат/переключение).
@@ -353,6 +368,15 @@ const SlideRow: React.FC<SlideRowProps> = ({
         <Button
           variant="ghost"
           size="sm"
+          onClick={() => setShowTheme((v) => !v)}
+          title="Фон под шапкой сайта — от него зависит цвет её текста"
+          data-testid="slide-header-theme-toggle"
+        >
+          <SunMoon size={13} className={headerTheme !== 'auto' ? 'text-amber-600' : 'text-gray-400'} />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setShowLang((v) => !v)}
           title="Медиа слайда по языкам и экранам"
         >
@@ -394,6 +418,25 @@ const SlideRow: React.FC<SlideRowProps> = ({
               <Trash2 size={12} className="text-red-500" />
             </button>
           )}
+        </div>
+      )}
+
+      {showTheme && (
+        <div className="px-2 pb-2 flex items-center gap-2">
+          <span className="text-xs text-gray-600 shrink-0">Фон под шапкой</span>
+          <select
+            value={headerTheme}
+            onChange={(e) => onSetHeaderTheme(e.target.value as SlideHeaderTheme)}
+            className="flex-1 min-w-0 px-2 py-1 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+            title="Авто: фото оценит CMS при публикации, видео — браузер по кадрам"
+            data-testid="slide-header-theme"
+          >
+            {SLIDE_HEADER_THEMES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 

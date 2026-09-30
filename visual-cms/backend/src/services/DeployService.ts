@@ -29,6 +29,9 @@ import { applyCollectionTransforms } from '../utils/collectionTransforms'
 import { localizeInternalLinks, localizeNavigation, langPrefix } from './linkLocalization'
 import { generateLanguageEntryStub } from './languageEntry'
 import { findPublishedSibling, leftoverFiles, planSiteSync, publishedFiles, removePublishedFiles } from './pagePublication'
+import { In } from 'typeorm'
+import { MediaAsset } from '../models/MediaAsset'
+import { applyAutoHeaderThemes, slideAssetIds } from './headerTheme'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
@@ -293,7 +296,7 @@ export class DeployService {
       const defaultLang = activeLanguages.find(l => l.isDefault)
 
       // Данные при публикации — до языковых префиксов: ссылки из данных тоже их получат.
-      const pageStructure = await this.applyPublishData(page, updatedStructure, defaultLang?.code)
+      const pageStructure = await this.prepareForPublish(page, updatedStructure, defaultLang?.code)
       let availableLangsForSwitcher: { code: string; name: string; flag: string; isDefault: boolean; direction: string }[] | undefined
       if (translationLocales.length > 0) {
         availableLangsForSwitcher = activeLanguages
@@ -488,7 +491,7 @@ export class DeployService {
     // Превью с теми же данными, что получит публикация. Источник не ответил —
     // превью всё равно открывается, просто без этих данных (деплой бы упал).
     try {
-      structure = await this.applyPublishData(page, structure, lang || defaultLang?.code)
+      structure = await this.prepareForPublish(page, structure, lang || defaultLang?.code)
     } catch (err: any) {
       logger.warn('Preview: publish data unavailable', { pageId: page.id, error: err.message })
       structure = this.substituteItemData(structure, {})
@@ -592,7 +595,7 @@ export class DeployService {
           }
           
           const isHome = this.isHomePage(page, page.site)
-          const pageStructure = await this.applyPublishData(page, updatedStructure, defLang?.code)
+          const pageStructure = await this.prepareForPublish(page, updatedStructure, defLang?.code)
 
           // Ссылки языка по умолчанию тоже получают префикс: он теперь есть у
       // каждого языка, а корень занят распознавателем.
@@ -734,7 +737,7 @@ export class DeployService {
           }
 
           const isHome = this.isHomePage(page, site)
-          const pageStructure = await this.applyPublishData(page, updatedStructure, defLang?.code)
+          const pageStructure = await this.prepareForPublish(page, updatedStructure, defLang?.code)
 
           // Ссылки языка по умолчанию тоже получают префикс: он теперь есть у
       // каждого языка, а корень занят распознавателем.
@@ -2471,6 +2474,35 @@ export class DeployService {
    * Источник не ответил — страница не публикуется (ошибка деплоя, на сайте
    * остаётся прежний файл): пустой каталог на главной хуже вчерашнего.
    */
+  /**
+   * Структура страницы к публикации: данные при публикации (applyPublishData)
+   * и тема шапки над фото-слайдами каруселей (services/headerTheme.ts). Один
+   * вход для всех путей деплоя и превью — чтобы они не расходились.
+   */
+  private async prepareForPublish(page: Page, structure: any, lang?: string): Promise<any> {
+    const withData = await this.applyPublishData(page, structure, lang)
+    return this.applyHeaderThemes(withData)
+  }
+
+  /**
+   * Фото-слайдам без ручной метки — data-header-theme по яркости верха их
+   * картинки (MediaAsset.topBrightness, считается при загрузке). Шапка сайта
+   * по ней перекрашивается над слайдером без анализа картинок в браузере.
+   */
+  private async applyHeaderThemes(structure: any): Promise<any> {
+    const ids = slideAssetIds(structure ?? {})
+    if (ids.length === 0) return structure
+    const assets = await AppDataSource.getRepository(MediaAsset).find({
+      where: { id: In(ids) },
+      select: { id: true, topBrightness: true },
+    })
+    const brightness = new Map<string, number>()
+    for (const asset of assets) {
+      if (typeof asset.topBrightness === 'number') brightness.set(asset.id, asset.topBrightness)
+    }
+    return applyAutoHeaderThemes(structure, brightness)
+  }
+
   private async applyPublishData(page: Page, structure: any, lang?: string): Promise<any> {
     const defs = page.publishData ?? []
     if (defs.length === 0) return structure
@@ -2853,7 +2885,7 @@ export class DeployService {
             )
 
           // Данные при публикации — на языке этой версии страницы.
-          const withData = await this.applyPublishData(page, translatedStructure, lang.code)
+          const withData = await this.prepareForPublish(page, translatedStructure, lang.code)
 
           // Внутренние ссылки уводят на язык страницы: без этого клик по меню
           // на /uz/ возвращал посетителя на русскую версию.

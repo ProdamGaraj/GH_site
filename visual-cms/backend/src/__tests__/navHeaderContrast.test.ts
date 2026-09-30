@@ -8,7 +8,17 @@
  */
 import navigationBlock from './fixtures/navigationBlock.json'
 import { StructureNode } from '../scripts/choiceToPlanTypes'
-import { PROBE_AFTER, PROBE_BEFORE, migrateNavHeaderContrast, patchContrastJs } from '../scripts/navHeaderContrast'
+import {
+  CAROUSEL_THEME_FN,
+  LISTENER_AFTER,
+  LISTENER_ANCHOR,
+  PROBE_AFTER,
+  PROBE_BEFORE,
+  SKIP_AFTER,
+  SKIP_BEFORE,
+  migrateNavHeaderContrast,
+  patchContrastJs,
+} from '../scripts/navHeaderContrast'
 
 const BLOCK = navigationBlock as unknown as StructureNode
 const LIVE_JS = BLOCK.metadata!.globalJs as string
@@ -67,10 +77,78 @@ describe('после правки: проба за шапкой', () => {
     expect(textColor(mount(fixed, 0))).toBe('белый')
   })
 
-  it('заменена только строка пробы, остальной скрипт цел', () => {
+  it('заменены только проба и опрос слайда, остальной скрипт цел', () => {
     expect(fixed).not.toContain(PROBE_BEFORE)
     expect(fixed).toContain(PROBE_AFTER)
-    expect(fixed.replace(PROBE_AFTER, PROBE_BEFORE)).toBe(LIVE_JS)
+    const reverted = fixed
+      .replace(PROBE_AFTER, PROBE_BEFORE)
+      .replace(CAROUSEL_THEME_FN, '')
+      .replace(SKIP_AFTER, SKIP_BEFORE)
+      .replace(LISTENER_AFTER, LISTENER_ANCHOR)
+    expect(reverted).toBe(LIVE_JS)
+  })
+
+  it('уже поправленный скрипт второй раз не правится', () => {
+    expect(patchContrastJs(fixed)).toBe(fixed)
+  })
+})
+
+describe('после правки: шапка над слайдером', () => {
+  const fixed = patchContrastJs(LIVE_JS)
+
+  /**
+   * Слайдер с самого верха страницы, шапка над ним. Под точками пробы —
+   * слайд `underPoint` (при листании лентой это ещё прошлый кадр), активный —
+   * с классом is-active.
+   */
+  function mountSlider(themes: Array<string | null>, active: number, underPoint: number, live: Array<string | null> = []): HTMLElement {
+    const slides = themes
+      .map((theme, i) => {
+        const attrs = [theme ? `data-header-theme="${theme}"` : '', live[i] ? `data-header-theme-live="${live[i]}"` : '']
+        return `<div class="slide${i === active ? ' is-active' : ''}" data-carousel-slide="true" id="s${i}" ${attrs.join(' ')}
+                     style="background-image: url('/media/s${i}.jpg')"></div>`
+      })
+      .join('')
+    document.body.innerHTML = `
+      <div data-carousel="true" id="hero"><div data-carousel-track="true">${slides}</div></div>
+      <nav class="gnav"></nav>`
+    const nav = document.querySelector('.gnav') as HTMLElement
+    nav.getBoundingClientRect = () => ({ ...HEADER, right: HEADER.left + HEADER.width, x: HEADER.left, y: HEADER.top }) as DOMRect
+    const hero = document.getElementById('hero')!
+    ;(document as any).elementsFromPoint = () => [nav, document.getElementById(`s${underPoint}`)!, hero.firstElementChild!, hero]
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 })
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1920 })
+    new Function(fixed)()
+    ;(window as any).syncLogoContrast()
+    return nav
+  }
+
+  it('тема — у активного слайда, даже если под шапкой ещё прошлый кадр', () => {
+    expect(textColor(mountSlider(['light', 'dark'], 1, 0))).toBe('белый')
+    expect(textColor(mountSlider(['light', 'dark'], 0, 1))).toBe('тёмный')
+  })
+
+  it('у видео-слайда без метки — тема кадра от карусели (data-header-theme-live)', () => {
+    expect(textColor(mountSlider([null, null], 0, 0, ['light']))).toBe('тёмный')
+  })
+
+  it('ручная метка главнее темы кадра', () => {
+    expect(textColor(mountSlider(['dark'], 0, 0, ['light']))).toBe('белый')
+  })
+
+  it('без меток — как раньше: фото не определить, светлый текст', () => {
+    expect(textColor(mountSlider([null, null], 0, 0))).toBe('белый')
+  })
+
+  it('смена слайда (carousel:change) перекрашивает шапку без прокрутки', async () => {
+    jest.useRealTimers()
+    const nav = mountSlider(['light', 'dark'], 0, 0)
+    expect(textColor(nav)).toBe('тёмный')
+    document.getElementById('s0')!.classList.remove('is-active')
+    document.getElementById('s1')!.classList.add('is-active')
+    document.getElementById('hero')!.dispatchEvent(new CustomEvent('carousel:change', { bubbles: true }))
+    await new Promise((resolve) => setTimeout(resolve, 60))
+    expect(textColor(nav)).toBe('белый')
   })
 })
 
@@ -83,6 +161,13 @@ describe('migrateNavHeaderContrast', () => {
     expect(once.structure.metadata!.globalJs).toBe(patchContrastJs(LIVE_JS))
     expect(JSON.stringify(BLOCK)).toBe(snapshot)
     expect(migrateNavHeaderContrast(once.structure)).toMatchObject({ alreadyMigrated: true, patched: [] })
+  })
+
+  it('на стенде, где проба уже поправлена, довносится только тема слайдера', () => {
+    const probeOnly: StructureNode = { ...BLOCK, metadata: { ...BLOCK.metadata, globalJs: LIVE_JS.replace(PROBE_BEFORE, PROBE_AFTER) } }
+    const out = migrateNavHeaderContrast(probeOnly)
+    expect(out.alreadyMigrated).toBe(false)
+    expect(out.structure.metadata!.globalJs).toBe(patchContrastJs(LIVE_JS))
   })
 
   it('кэш-копия блока в странице (вложенный узел) правится так же', () => {
