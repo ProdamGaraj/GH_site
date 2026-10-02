@@ -103,6 +103,12 @@ describe('buildComplexDetail — поля секций', () => {
     const dto = buildComplexDetail({ ...baseComplex, mapImage: '/media/map.jpg' }, [], [], [], 'ru')
     expect(dto.mapImages).toEqual([{ image: '/media/map.jpg' }])
   })
+  it('панорама 360°: есть ссылка — один элемент (кнопка в «Локации»), нет — пусто', () => {
+    expect(buildComplexDetail({ ...baseComplex, panoramaUrl: '' }, [], [], [], 'ru').panorama).toEqual([])
+    expect(buildComplexDetail({ ...baseComplex, panoramaUrl: '  ' }, [], [], [], 'ru').panorama).toEqual([])
+    const dto = buildComplexDetail({ ...baseComplex, panoramaUrl: 'https://tour.example.com/x' }, [], [], [], 'uz')
+    expect(dto.panorama).toEqual([{ url: 'https://tour.example.com/x' }])
+  })
 })
 
 describe('buildApartmentDTO — условные плашка и планировка', () => {

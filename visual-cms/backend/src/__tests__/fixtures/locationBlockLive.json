@@ -1,0 +1,547 @@
+{
+ "id": "1783408497258_9zasafbc1",
+ "styles": {
+  "properties": {
+   "display": "grid"
+  }
+ },
+ "tagName": "section",
+ "children": [
+  {
+   "id": "node-1783405511132-bwe22tzvv",
+   "styles": {
+    "properties": {}
+   },
+   "tagName": "div",
+   "children": [
+    {
+     "id": "node-1783405511132-kxgakrjj1",
+     "styles": {
+      "properties": {}
+     },
+     "content": "{{item.locationTitle}}",
+     "tagName": "h2",
+     "children": [],
+     "metadata": {},
+     "attributes": {},
+     "elementType": "text"
+    },
+    {
+     "id": "1790915613212-096ere2iw",
+     "styles": {
+      "properties": {
+       "color": "#000000",
+       "border": "2px solid #94a3b8",
+       "height": "auto",
+       "display": "flex",
+       "padding": "20px",
+       "alignItems": "flex-end",
+       "borderWidth": "0px",
+       "flexDirection": "row",
+       "justifyContent": "space-between",
+       "backgroundColor": "transparent"
+      }
+     },
+     "tagName": "div",
+     "children": [
+      {
+       "id": "node-1783405511132-i2kdjr8pu",
+       "styles": {
+        "properties": {}
+       },
+       "content": "{{item.locationText}}",
+       "tagName": "p",
+       "children": [],
+       "metadata": {},
+       "attributes": {
+        "id": "projectLocationText"
+       },
+       "elementType": "text"
+      },
+      {
+       "id": "node-1783405511132-x2x8gk3eq",
+       "styles": {
+        "properties": {
+         "paddingTop": "4px",
+         "borderColor": "#66666b",
+         "borderWidth": "1px",
+         "paddingLeft": "8px",
+         "borderRadius": "100px",
+         "paddingRight": "8px",
+         "paddingBottom": "4px"
+        }
+       },
+       "content": "Панорама 360°",
+       "tagName": "a",
+       "children": [],
+       "metadata": {},
+       "attributes": {
+        "id": "panoramaLink",
+        "href": "#location",
+        "hidden": ""
+       },
+       "elementType": "text"
+      }
+     ],
+     "metadata": {
+      "name": "Div"
+     },
+     "attributes": {},
+     "elementType": "container"
+    }
+   ],
+   "metadata": {},
+   "attributes": {
+    "class": "section-copy"
+   },
+   "elementType": "container"
+  },
+  {
+   "id": "node-1783405511132-92pii0rt2",
+   "styles": {
+    "properties": {}
+   },
+   "tagName": "div",
+   "children": [
+    {
+     "id": "tplnode-8bidx5aeu",
+     "styles": {
+      "properties": {}
+     },
+     "_repeat": {
+      "source": "item.mapImages"
+     },
+     "content": "",
+     "tagName": "div",
+     "children": [
+      {
+       "id": "tplnode-cywfbkbfe",
+       "styles": {
+        "properties": {
+         "top": "0",
+         "left": "0",
+         "width": "100%",
+         "height": "100%",
+         "position": "absolute",
+         "backgroundSize": "cover",
+         "backgroundImage": "url(\"{{$.image}}\")",
+         "backgroundRepeat": "no-repeat",
+         "backgroundPosition": "center"
+        }
+       },
+       "content": "",
+       "tagName": "div",
+       "children": [],
+       "metadata": {
+        "name": "Map image"
+       },
+       "attributes": {
+        "class": "location-map-image",
+        "aria-hidden": "true"
+       },
+       "elementType": "container"
+      }
+     ],
+     "metadata": {
+      "name": "Map image (repeat)"
+     },
+     "attributes": {},
+     "elementType": "container"
+    },
+    {
+     "id": "project-map-repeat",
+     "styles": {
+      "properties": {}
+     },
+     "_repeat": {
+      "source": "item.mapHouse"
+     },
+     "tagName": "div",
+     "children": [
+      {
+       "id": "project-map",
+       "styles": {
+        "properties": {}
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "project-map-canvas",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "div",
+         "children": [],
+         "metadata": {
+          "name": "Холст карты"
+         },
+         "attributes": {
+          "class": "project-map-canvas",
+          "data-map-canvas": ""
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "project-map-legend",
+         "styles": {
+          "properties": {}
+         },
+         "_repeat": {
+          "source": "item.mapLegend"
+         },
+         "tagName": "div",
+         "children": [
+          {
+           "id": "project-map-filter",
+           "styles": {
+            "properties": {
+             "--map-color": "{{$.color}}"
+            }
+           },
+           "tagName": "button",
+           "children": [
+            {
+             "id": "project-map-filter-icon",
+             "styles": {
+              "properties": {}
+             },
+             "content": "{{$.icon}}",
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {
+              "class": "project-map-filter-icon",
+              "aria-hidden": "true",
+              "data-map-icon": ""
+             },
+             "elementType": "html-code"
+            },
+            {
+             "id": "project-map-filter-name",
+             "styles": {
+              "properties": {}
+             },
+             "content": "{{$.name}}",
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {
+              "class": "project-map-filter-name"
+             },
+             "elementType": "text"
+            },
+            {
+             "id": "project-map-filter-count",
+             "styles": {
+              "properties": {}
+             },
+             "content": "{{$.count}}",
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {
+              "class": "project-map-filter-count"
+             },
+             "elementType": "text"
+            }
+           ],
+           "metadata": {
+            "name": "Тип места"
+           },
+           "attributes": {
+            "type": "button",
+            "class": "project-map-filter",
+            "data-map-filter": "{{$.type}}"
+           },
+           "elementType": "container"
+          }
+         ],
+         "metadata": {
+          "name": "Легенда (повтор по mapLegend)"
+         },
+         "attributes": {
+          "role": "group",
+          "class": "project-map-legend",
+          "aria-label": "Что рядом",
+          "data-map-legend": ""
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "project-map-points",
+         "styles": {
+          "properties": {}
+         },
+         "_repeat": {
+          "source": "item.mapPoints"
+         },
+         "tagName": "ul",
+         "children": [
+          {
+           "id": "project-map-point",
+           "styles": {
+            "properties": {}
+           },
+           "tagName": "li",
+           "children": [
+            {
+             "id": "project-map-point-name",
+             "styles": {
+              "properties": {}
+             },
+             "content": "{{$.name}}",
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {
+              "class": "project-map-point-name",
+              "data-map-point-name": ""
+             },
+             "elementType": "text"
+            },
+            {
+             "id": "project-map-point-distance",
+             "styles": {
+              "properties": {}
+             },
+             "content": "{{$.distance}}",
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {
+              "class": "project-map-point-distance"
+             },
+             "elementType": "text"
+            }
+           ],
+           "metadata": {},
+           "attributes": {
+            "class": "project-map-point",
+            "data-id": "{{$.id}}",
+            "data-lat": "{{$.lat}}",
+            "data-lng": "{{$.lng}}",
+            "data-kind": "{{$.kind}}",
+            "data-type": "{{$.type}}",
+            "data-color": "{{$.color}}",
+            "data-distance": "{{$.distance}}",
+            "data-map-point": ""
+           },
+           "elementType": "container"
+          }
+         ],
+         "metadata": {
+          "name": "Точки (повтор по mapPoints): для диктора и если карта не загрузилась"
+         },
+         "attributes": {
+          "class": "project-map-points",
+          "data-map-points": ""
+         },
+         "elementType": "container"
+        }
+       ],
+       "metadata": {
+        "name": "Карта проекта"
+       },
+       "attributes": {
+        "class": "project-map",
+        "data-map": ""
+       },
+       "elementType": "container"
+      }
+     ],
+     "metadata": {
+      "name": "Карта проекта (повтор по mapHouse: без точки дома карты нет)"
+     },
+     "attributes": {},
+     "elementType": "container"
+    }
+   ],
+   "metadata": {},
+   "attributes": {
+    "id": "locationVisual",
+    "class": "location-visual",
+    "aria-label": "Карта расположения"
+   },
+   "elementType": "container"
+  },
+  {
+   "id": "node-1783405511132-edhif0r1v",
+   "styles": {
+    "properties": {
+     "width": "100%"
+    }
+   },
+   "tagName": "div",
+   "children": [
+    {
+     "id": "location-trip",
+     "styles": {
+      "properties": {
+       "width": "100%"
+      }
+     },
+     "_repeat": {
+      "source": "item.mapOffices"
+     },
+     "tagName": "div",
+     "children": [
+      {
+       "id": "location-trip-links",
+       "styles": {
+        "properties": {
+         "width": "100%",
+         "display": "flex",
+         "alignItems": "flex-start",
+         "flexDirection": "row",
+         "justifyContent": "space-between"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "1790915974882-uiv2n2y7v",
+         "styles": {
+          "properties": {
+           "gap": "0",
+           "color": "#000000",
+           "width": "100%",
+           "display": "flex",
+           "minWidth": "70%",
+           "flexDirection": "row-reverse",
+           "justifyContent": "space-between",
+           "backgroundColor": "transparent"
+          }
+         },
+         "tagName": "div",
+         "children": [
+          {
+           "id": "location-trip-google",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Маршрут в Google Maps",
+           "tagName": "a",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "rel": "noopener",
+            "href": "https://www.google.com/maps/dir/?api=1&destination={{$.lat}},{{$.lng}}",
+            "target": "_blank"
+           },
+           "elementType": "text"
+          },
+          {
+           "id": "location-trip-yandex",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Маршрут в Яндекс Картах",
+           "tagName": "a",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "rel": "noopener",
+            "href": "https://yandex.uz/maps/?rtext=~{{$.lat}},{{$.lng}}&rtt=auto",
+            "target": "_blank"
+           },
+           "elementType": "text"
+          },
+          {
+           "id": "location-trip-taxi",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Вызвать такси в отдел продаж",
+           "tagName": "a",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "rel": "noopener",
+            "href": "https://3.redirect.appmetrica.yandex.com/route?end-lat={{$.lat}}&end-lon={{$.lng}}&ref=gh.uz&appmetrica_tracking_id=1178268795219780156",
+            "class": "location-trip-taxi",
+            "target": "_blank"
+           },
+           "elementType": "text"
+          }
+         ],
+         "metadata": {
+          "name": "Div"
+         },
+         "attributes": {},
+         "elementType": "container"
+        },
+        {
+         "id": "location-office",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "p",
+         "children": [
+          {
+           "id": "location-office-name",
+           "styles": {
+            "properties": {}
+           },
+           "content": "{{$.name}}",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "class": "location-office-name"
+           },
+           "elementType": "text"
+          },
+          {
+           "id": "location-office-address",
+           "styles": {
+            "properties": {}
+           },
+           "content": "{{$.address}}",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "class": "location-office-address"
+           },
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "location-office"
+         },
+         "elementType": "container"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "location-trip-links"
+       },
+       "elementType": "container"
+      }
+     ],
+     "metadata": {
+      "name": "Поездка в отдел продаж (повтор по mapOffices)"
+     },
+     "attributes": {
+      "class": "location-trip"
+     },
+     "elementType": "container"
+    }
+   ],
+   "metadata": {},
+   "attributes": {
+    "class": "location-actions"
+   },
+   "elementType": "container"
+  }
+ ],
+ "metadata": {
+  "globalCss": ".map-label {position: absolute;\n  display: inline-flex;\n  align-items: center;\n  gap: 8px;\n  min-height: 34px;\n  padding: 0 12px;\n  border-radius: 999px;\n  background: rgba(255, 255, 255, .9);\n  color: #15181d;\n  font-size: 12px;\n  font-weight: 900;\n  box-shadow: 0 10px 28px rgba(0, 0, 0, .18);}\n\n.location-actions {display: flex;\n  justify-content: flex-end;\n  gap: 10px;\n  margin-top: 18px;}\n\n/* ============================================================\n   БЛОК: LOCATION — расположение проекта (карта, метки, ссылки).\n   Зависимости: page.css (.detail-section, .section-copy;\n   отступ .location-section.detail-section-pad задан там же).\n   Карту и ссылки подставляет page.js.\n   ============================================================ */\n\n.location-visual {\n  position: relative;\n  min-height: clamp(360px, 56vw, 690px);\n  border-radius: 28px;\n  background:\n    linear-gradient(180deg, rgba(13, 15, 18, .08), rgba(13, 15, 18, .38)),\n    url(\"https://images.unsplash.com/photo-1534471812555-5b0bb08f034c?auto=format&fit=crop&w=1800&q=84\") center / cover no-repeat;\n  overflow: hidden;\n}\n\nbody[data-project=\"ozmakon-business\"] .location-visual {\n  min-height: clamp(340px, 46vw, 620px);\n  border: 1px solid rgba(21, 24, 29, .08);\n  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .24);\n}\n\n.map-label.accent {\n  background: #15181d;\n  color: #fff;\n}\n\n.location-actions a {\n  min-height: 48px;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  padding: 0 18px;\n  border: 1px solid rgba(21, 24, 29, .12);\n  border-radius: 13px;\n  background: #fff;\n  color: #15181d;\n  font-weight: 900;\n}\n\n@media (max-width: 980px) {\n  .location-actions {\n    justify-content: flex-start;\n    flex-wrap: wrap;\n  }\n}\n\n@media (max-width: 560px) {\n  .location-grid {\n    grid-template-columns: 1fr;\n  }\n\n  .location-visual {\n    min-height: 360px;\n    border-radius: 22px;\n  }\n\n  .location-actions a {\n    width: 100%;\n    justify-content: center;\n  }\n}\n/* ==== project-map v2 ==== */\n/* Карта проекта вместо фото-заглушки с метками в процентах.\n   Рантайм — backend/src/services/runtime/map-runtime.js, данные — estate:\n   mapHouse (есть ли карта), mapPoints, mapLegend, mapOffices. Правила ниже\n   перекрывают старые правила блока выше. */\n\n.location-visual {\n  background: #ece7dc;\n}\n\n/* У проекта нет ни точки дома, ни картинки карты — пустую рамку не показываем. */\n.location-visual:not(:has(.location-map-image, [data-map])) {\n  display: none;\n}\n\n.project-map {\n  position: absolute;\n  inset: 0;\n}\n\n/* Специфичнее .maplibregl-map из CSS MapLibre: та ставит position: relative,\n   и холст без своей высоты схлопнулся бы. */\n.project-map .project-map-canvas {\n  position: absolute;\n  inset: 0;\n}\n\n.project-map[data-map-state=\"failed\"] .project-map-canvas {\n  display: none;\n}\n\n/* --- Легенда: фильтр по типам мест --- */\n\n.project-map-legend {\n  position: absolute;\n  z-index: 2;\n  top: 16px;\n  left: 16px;\n  right: 64px;\n  display: flex;\n  flex-wrap: wrap;\n  gap: 8px;\n  /* Сквозь промежутки между кнопками карту можно тащить. */\n  pointer-events: none;\n}\n\n.project-map-legend:empty {\n  display: none;\n}\n\n.project-map-filter {\n  pointer-events: auto;\n  display: inline-flex;\n  align-items: center;\n  gap: 8px;\n  min-height: 36px;\n  padding: 0 12px 0 5px;\n  border: 0;\n  border-radius: 999px;\n  background: rgba(255, 255, 255, .94);\n  color: #15181d;\n  font: inherit;\n  font-size: 13px;\n  font-weight: 700;\n  line-height: 1;\n  box-shadow: 0 6px 18px rgba(13, 15, 18, .14);\n  cursor: pointer;\n  transition: opacity .2s ease, box-shadow .2s ease;\n}\n\n.project-map-filter[aria-pressed=\"false\"] {\n  opacity: .5;\n  box-shadow: none;\n}\n\n.project-map-filter-icon,\n.project-map-pin-icon {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n}\n\n.project-map-filter-icon {\n  width: 26px;\n  height: 26px;\n  border-radius: 50%;\n  background: var(--map-color, #15181d);\n  color: #fff;\n}\n\n.project-map-filter-icon svg {\n  width: 15px;\n  height: 15px;\n}\n\n.project-map-filter-count {\n  color: rgba(21, 24, 29, .45);\n}\n\n/* --- Метки. Внешний элемент метки двигает MapLibre, оформление — внутри. --- */\n\n/* Слои: места, над ними дом, выше всех — отдел продаж (он главнее);\n   открытая подсказка места — поверх всего (z-index 4 ставит рантайм). */\n.project-map-marker--house {\n  z-index: 2;\n}\n\n.project-map-marker--office {\n  z-index: 3;\n}\n\n.project-map-marker--house .project-map-pin,\n.project-map-marker--office .project-map-pin {\n  position: relative;\n  /* flex, а не inline-flex: у строчного элемента под ним остаётся зазор\n     под выносные элементы шрифта, и остриё не доставало бы до точки. */\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  min-height: 34px;\n  /* Высота хвостика: метка стоит якорем bottom, остриё — ровно на точке. */\n  margin-bottom: 7px;\n  padding: 0 14px;\n  border-radius: 999px;\n  font-size: 13px;\n  font-weight: 800;\n  white-space: nowrap;\n  box-shadow: 0 10px 28px rgba(13, 15, 18, .22);\n}\n\n.project-map-marker--house .project-map-pin::after,\n.project-map-marker--office .project-map-pin::after {\n  content: \"\";\n  position: absolute;\n  top: 100%;\n  left: 50%;\n  border: 7px solid transparent;\n  border-bottom: 0;\n  transform: translateX(-50%);\n}\n\n.project-map-marker--house .project-map-pin {\n  background: #15181d;\n  color: #fff;\n}\n\n.project-map-marker--house .project-map-pin::before {\n  content: \"\";\n  width: 8px;\n  height: 8px;\n  border-radius: 50%;\n  background: #fdb82a;\n}\n\n.project-map-marker--house .project-map-pin::after {\n  border-top-color: #15181d;\n}\n\n.project-map-marker--office .project-map-pin {\n  background: #fdb82a;\n  color: #15181d;\n}\n\n.project-map-marker--office .project-map-pin::after {\n  border-top-color: #fdb82a;\n}\n\n/* Подпись под точкой (рантайм: южная из двух точек, дома и отдела продаж,\n   чтобы близкие подписи не накрывали друг друга). Якорь — top. */\n.project-map-marker--below .project-map-pin {\n  margin-top: 7px;\n  margin-bottom: 0;\n}\n\n.project-map-marker--below .project-map-pin::after {\n  top: auto;\n  bottom: 100%;\n  border: 7px solid transparent;\n  border-top: 0;\n}\n\n.project-map-marker--house.project-map-marker--below .project-map-pin::after {\n  border-bottom-color: #15181d;\n}\n\n.project-map-marker--office.project-map-marker--below .project-map-pin::after {\n  border-bottom-color: #fdb82a;\n}\n\n.project-map-marker--place .project-map-pin {\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  width: 30px;\n  height: 30px;\n  padding: 0;\n  border: 2px solid #fff;\n  border-radius: 50%;\n  background: var(--map-color, #15181d);\n  color: #fff;\n  box-shadow: 0 4px 12px rgba(13, 15, 18, .28);\n  cursor: pointer;\n  transition: transform .15s ease;\n}\n\n.project-map-pin-icon svg {\n  display: block;\n  width: 16px;\n  height: 16px;\n}\n\n.project-map-marker--place:hover {\n  z-index: 4;\n}\n\n.project-map-marker--place:hover .project-map-pin,\n.project-map-marker--place.is-open .project-map-pin,\n.project-map-marker--place .project-map-pin:focus-visible {\n  transform: scale(1.15);\n}\n\n.project-map-tip {\n  position: absolute;\n  bottom: calc(100% + 8px);\n  left: 50%;\n  display: grid;\n  gap: 3px;\n  padding: 8px 12px;\n  border-radius: 12px;\n  background: #fff;\n  color: #15181d;\n  font-size: 13px;\n  font-weight: 700;\n  line-height: 1.2;\n  white-space: nowrap;\n  box-shadow: 0 10px 28px rgba(13, 15, 18, .18);\n  opacity: 0;\n  visibility: hidden;\n  pointer-events: none;\n  transform: translate(-50%, 4px);\n  transition: opacity .15s ease, transform .15s ease, visibility .15s;\n}\n\n.project-map-tip-distance {\n  color: rgba(21, 24, 29, .55);\n  font-size: 12px;\n  font-weight: 600;\n}\n\n.project-map-marker--place:hover .project-map-tip,\n.project-map-marker--place.is-open .project-map-tip,\n.project-map-pin:focus-visible + .project-map-tip {\n  opacity: 1;\n  visibility: visible;\n  transform: translate(-50%, 0);\n}\n\n/* --- Список точек: для экранного диктора, а если карта не загрузилась — на виду. --- */\n\n.project-map-points {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  margin: 0;\n  padding: 0;\n  overflow: hidden;\n  clip-path: inset(50%);\n  white-space: nowrap;\n  list-style: none;\n}\n\n.project-map[data-map-state=\"failed\"] .project-map-points {\n  z-index: 1;\n  top: 68px;\n  left: 16px;\n  width: min(360px, calc(100% - 32px));\n  height: auto;\n  max-height: calc(100% - 84px);\n  display: grid;\n  align-content: start;\n  gap: 8px;\n  padding: 14px 16px;\n  overflow: auto;\n  clip-path: none;\n  white-space: normal;\n  border-radius: 18px;\n  background: rgba(255, 255, 255, .95);\n  box-shadow: 0 10px 28px rgba(13, 15, 18, .14);\n}\n\n.project-map-point {\n  display: flex;\n  justify-content: space-between;\n  gap: 12px;\n  font-size: 14px;\n  line-height: 1.3;\n}\n\n/* display: flex выше перебил бы атрибут hidden, которым легенда прячет строки. */\n.project-map-point[hidden] {\n  display: none;\n}\n\n.project-map-point[data-kind=\"house\"] {\n  font-weight: 800;\n}\n\n.project-map-point-distance {\n  color: rgba(21, 24, 29, .55);\n  white-space: nowrap;\n}\n\n.project-map-point-distance:empty {\n  display: none;\n}\n\n/* --- Поездка в отдел продаж --- */\n\n.location-actions {\n  flex-wrap: wrap;\n}\n\n/* display: inline-flex у ссылок блока перебивал атрибут hidden: скрытая\n   «Панорама 360°» (ведёт на эту же секцию) была видна. */\n.location-actions a[hidden] {\n  display: none;\n}\n\n.location-trip,\n.location-trip-links {\n  display: contents;\n}\n\n.location-office {\n  flex: 1 1 100%;\n  margin: 0;\n  color: rgba(21, 24, 29, .62);\n  font-size: 14px;\n  text-align: right;\n}\n\n.location-office-address:not(:empty)::before {\n  content: \" · \";\n}\n\n.location-actions a.location-trip-taxi {\n  border-color: #15181d;\n  background: #15181d;\n  color: #fff;\n}\n\n@media (max-width: 980px) {\n  .location-office {\n    text-align: left;\n  }\n}\n\n@media (max-width: 767px) {\n  /* Одна строка с прокруткой; край гаснет — видно, что дальше есть ещё. */\n  .project-map-legend {\n    right: 56px;\n    flex-wrap: nowrap;\n    overflow-x: auto;\n    pointer-events: auto;\n    scrollbar-width: none;\n    -webkit-mask-image: linear-gradient(to right, #000 85%, transparent);\n    mask-image: linear-gradient(to right, #000 85%, transparent);\n  }\n\n  .project-map-legend::-webkit-scrollbar {\n    display: none;\n  }\n\n  /* Тень прокрутка обрезала бы прямоугольником — на телефоне вместо неё рамка. */\n  .project-map-filter {\n    flex: 0 0 auto;\n    border: 1px solid rgba(21, 24, 29, .1);\n    box-shadow: none;\n  }\n}\n"
+ },
+ "attributes": {
+  "id": "location",
+  "class": "detail-section detail-section-pad location-section"
+ },
+ "elementType": "container"
+}

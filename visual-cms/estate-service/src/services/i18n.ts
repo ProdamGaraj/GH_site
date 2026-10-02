@@ -480,6 +480,11 @@ export interface ComplexDetailDTO extends ProjectMapDTO {
   mapUrl: string
   mapImage: string
   panoramaUrl: string
+  /**
+   * Панорама 360° как массив 0..1: кнопка «Панорама 360°» в «Локации» есть,
+   * только если ссылка задана (условий в движке шаблонов нет).
+   */
+  panorama: Array<{ url: string }>
   /** mapImage как массив 0..1 — оверлей поверх CSS-карты только при наличии. */
   mapImages: Array<{ image: string }>
   logo: string
@@ -927,6 +932,7 @@ export function buildComplexDetail(
     mapUrl: c.mapUrl,
     mapImage: c.mapImage,
     panoramaUrl: c.panoramaUrl,
+    panorama: optionalOne('url', c.panoramaUrl),
     mapImages: optionalOne('image', c.mapImage),
     logo: c.logo,
     logoClass: c.logoClass,

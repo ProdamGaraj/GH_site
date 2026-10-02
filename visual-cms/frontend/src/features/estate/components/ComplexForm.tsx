@@ -178,6 +178,13 @@ export const ComplexForm: React.FC<{
             <MediaField label="Картинка карты" value={form.mapImage} onChange={setField('mapImage')} />
             <TextField label="CSS-класс логотипа" value={form.logoClass} onChange={setField('logoClass')} />
             <TextField label="Ссылка на карту" value={form.mapUrl} onChange={setField('mapUrl')} />
+            <TextField
+              label="Панорама 360° — ссылка"
+              hint="пусто — кнопки на сайте нет"
+              placeholder="https://…"
+              value={form.panoramaUrl ?? ''}
+              onChange={(v) => setForm((f) => ({ ...f, panoramaUrl: v.trim() }))}
+            />
           </div>
           <MediaListField label="Hero-изображения" value={form.heroImages} onChange={setField('heroImages')} />
           {/* Слайдеры страницы проекта: по ссылке на строку, фото или видео
