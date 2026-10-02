@@ -34,6 +34,26 @@ describe('StyleGenerator — канонический base-CSS', () => {
       expect(reset).toMatch(/input, textarea \{/)
     })
 
+    it('рамки сброшены как Tailwind preflight в канвасе: толщина 0, линия solid', () => {
+      // Без типа линии рамка с толщиной и цветом видна в редакторе (preflight),
+      // но не на сайте (initial: none) — кнопка «Панорама 360°».
+      const universal = styleGenerator.getResetCss().match(/\*, \*::before, \*::after \{([^}]*)\}/)
+      expect(universal).not.toBeNull()
+      expect(universal![1]).toContain('border-width: 0;')
+      expect(universal![1]).toContain('border-style: solid;')
+      expect(universal![1]).toContain('border-color: #e5e7eb;')
+    })
+
+    it('форм-стили идут после сброса рамок — у полей рамка остаётся', () => {
+      const base = styleGenerator.getBaseCss()
+      expect(base.indexOf('border-style: solid;')).toBeLessThan(base.indexOf('border: 1px solid #d1d5db'))
+    })
+
+    it('в канвасе сброс рамок без добавочной специфичности', () => {
+      const scoped = styleGenerator.getBaseCssScoped('.canvas-viewport')
+      expect(scoped).toMatch(/:where\(\.canvas-viewport\) \*[^{]*\{[^}]*border-style: solid;/)
+    })
+
     it('getBaseCss = reset + форм-стили', () => {
       const base = styleGenerator.getBaseCss()
       expect(base).toContain('box-sizing: border-box') // reset

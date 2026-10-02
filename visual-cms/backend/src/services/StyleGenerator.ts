@@ -620,6 +620,11 @@ label {
    *    доезжали в оба, а рукопашная копия reset в index.css больше не дрейфила.
    * @font-face СЮДА НЕ входит: в канвасе Muller уже загружен (frontend/index.css),
    * а на деплое @font-face эмитится отдельно (свой origin /fonts/*.woff2).
+   *
+   * Рамки — как Tailwind preflight, который в канвасе действует на всё (UI
+   * редактора на Tailwind): толщина 0, линия solid, цвет #e5e7eb. Без этого
+   * элемент с толщиной и цветом рамки, но без типа линии, в редакторе был
+   * с рамкой, а на сайте без (кнопка «Панорама 360°» в «Локации»).
    */
   getResetCss(): string {
     return [
@@ -628,6 +633,9 @@ label {
       '      box-sizing: border-box;',
       '      margin: 0;',
       '      padding: 0;',
+      '      border-width: 0;',
+      '      border-style: solid;',
+      '      border-color: #e5e7eb;',
       '    }',
       '    ',
       '    html {',

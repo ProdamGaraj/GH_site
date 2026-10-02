@@ -11,6 +11,11 @@
  * - href — ссылка проекта, открывается в новой вкладке (сервисы панорам часто
  *   запрещают встраивание на чужой сайт).
  *
+ * Вид кнопки (v2): у рамки были толщина и цвет, но не тип линии — рамку рисовал
+ * только сброс Tailwind в редакторе, на сайте кнопка выглядела текстом. И
+ * длинный текст локации сжимал её в две строки. Теперь тип линии задан явно,
+ * кнопка в одну строку и не сжимается.
+ *
  * Узел ссылки сохраняет id — его перевод («360° panorama») продолжает работать.
  * Чистое преобразование; запись — `migrate-complex-panorama.ts`. Идемпотентно.
  */
@@ -18,6 +23,11 @@ import { MigrationError, MigrationResult, StructureNode, findAll, findOne, makeN
 
 export const PANORAMA_LINK_ID = 'panoramaLink'
 export const PANORAMA_SOURCE = 'item.panorama'
+export const PANORAMA_LINK_STYLES: Readonly<Record<string, string>> = {
+  borderStyle: 'solid',
+  whiteSpace: 'nowrap',
+  flexShrink: '0',
+}
 
 const isLink = (n: StructureNode) => n.attributes?.id === PANORAMA_LINK_ID
 
@@ -51,6 +61,12 @@ export function migrateComplexPanorama(input: StructureNode): MigrationResult {
     const { hidden: _hidden, ...rest } = attrs
     link.attributes = { ...rest, ...wanted }
     changes.push('ссылка: href — панорама проекта, новая вкладка, без hidden')
+  }
+
+  const props = link.styles?.properties ?? {}
+  if (Object.entries(PANORAMA_LINK_STYLES).some(([key, value]) => props[key] !== value)) {
+    link.styles = { ...link.styles, properties: { ...props, ...PANORAMA_LINK_STYLES } }
+    changes.push('кнопка: рамка сплошной линией, в одну строку, не сжимается текстом')
   }
 
   if (changes.length === 0) return { structure: input, changes, alreadyMigrated: true }

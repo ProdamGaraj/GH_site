@@ -22,7 +22,9 @@ jest.mock('../services/TranslationService', () => ({
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { DeployService } = require('../services/DeployService')
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { migrateComplexPanorama, PANORAMA_LINK_ID } = require('../scripts/complexPanorama')
+const { migrateComplexPanorama, PANORAMA_LINK_ID, PANORAMA_LINK_STYLES } = require('../scripts/complexPanorama')
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { htmlGenerator } = require('../services/HtmlGenerator')
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { findAll, incompleteNodes } = require('../scripts/choiceToPlanTypes')
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -55,6 +57,23 @@ describe('блок «Локация» (живой снимок)', () => {
     expect(after.content).toBe('Панорама 360°')
   })
 
+  it('кнопка: рамка сплошной линией, одна строка, не сжимается; прежний вид сохранён', () => {
+    const [before] = links(LIVE)
+    expect(before.styles.properties).not.toHaveProperty('borderStyle') // причина бага
+    const [after] = links(result.structure)
+    expect(after.styles.properties).toEqual({ ...before.styles.properties, ...PANORAMA_LINK_STYLES })
+    expect(after.styles.properties).toMatchObject({ borderColor: '#66666b', borderWidth: '1px', borderRadius: '100px' })
+  })
+
+  it('блок после первой версии миграции (как на стенде) получает только вид кнопки', () => {
+    const v1 = JSON.parse(JSON.stringify(result.structure))
+    const [link] = links(v1)
+    for (const key of Object.keys(PANORAMA_LINK_STYLES)) delete link.styles.properties[key]
+    const again = migrateComplexPanorama(v1)
+    expect(again.changes).toEqual(['кнопка: рамка сплошной линией, в одну строку, не сжимается текстом'])
+    expect(again.structure).toEqual(result.structure)
+  })
+
   it('повторный запуск ничего не меняет, исходник не мутируется', () => {
     const snapshot = JSON.stringify(LIVE)
     migrateComplexPanorama(LIVE)
@@ -69,6 +88,20 @@ describe('страница проекта после подстановки да
     const found = links(page)
     expect(found).toHaveLength(1)
     expect(found[0].attributes.href).toBe('https://tour.example.com/dostlik')
+  })
+
+  it('в HTML у кнопки сплошная рамка, одна строка и запрет сжатия', () => {
+    const page = svc.substituteItemData(result.structure, { panorama: [{ url: 'https://tour.example.com/dostlik' }] })
+    const html: string = htmlGenerator.generatePage(page, {
+      metadata: { title: 'Harizma', description: '', keywords: [] },
+      slug: 'complex/harizma',
+    })
+    // Стили узла — инлайн в style ссылки.
+    const tag = html.match(/<a\b[^>]*id="panoramaLink"[^>]*>/)?.[0]
+    expect(tag).toBeDefined()
+    expect(tag).toMatch(/border-style:\s*solid/)
+    expect(tag).toMatch(/white-space:\s*nowrap/)
+    expect(tag).toMatch(/flex-shrink:\s*0/)
   })
 
   it('панорамы нет — кнопки нет вовсе', () => {

@@ -110,7 +110,7 @@ function breakpointIds(root: StructureNode): string[] {
 }
 
 /** Ставит переопределение стилей узла на брейкпоинте у его родителя. true — если изменилось. */
-function setOverride(parent: StructureNode, nodeId: string, bpId: string, styles: Record<string, string>): boolean {
+export function setOverride(parent: StructureNode, nodeId: string, bpId: string, styles: Record<string, string>): boolean {
   const variations = (parent.variations ??= {}) as Record<string, { inheritedOverrides?: Record<string, { styles?: Record<string, unknown> }> }>
   const variation = (variations[bpId] ??= {})
   const overrides = (variation.inheritedOverrides ??= {})
