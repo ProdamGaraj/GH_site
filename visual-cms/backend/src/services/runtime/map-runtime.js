@@ -40,14 +40,22 @@
   var MAX_ZOOM = 18
   /** Ближе показ всех точек не подъезжает: иначе два соседних дома — это весь экран. */
   var FIT_MAX_ZOOM = 16
+  /**
+   * Дальше не отъезжает: масштаб района. Далёкая точка (отдел продаж в
+   * нескольких километрах) на узкой карте телефона уходит за край — к ней
+   * можно отдалить карту или нажать «Маршрут», — а дом и места рядом не
+   * мельчают до масштаба города.
+   */
+  var FIT_MIN_ZOOM = 13
   var SINGLE_POINT_ZOOM = 15
   /**
-   * Поля вокруг точек при показе всех сразу. Подписи дома и отдела продаж
+   * Поля вокруг точек при подгонке масштаба. Подписи дома и отдела продаж
    * шириной до ~200 px стоят над точкой или под ней (splitLabels): сверху —
    * легенда и высота подписи, снизу — подпись, по бокам — её половина, иначе
-   * на телефоне подпись обрезает край карты.
+   * на телефоне подпись обрезает край карты. Дом стоит в центре, рамка вокруг
+   * него симметрична, поэтому и поля симметричны: по большему из краёв оси.
    */
-  var FIT_PADDING = { top: 110, right: 100, bottom: 70, left: 100 }
+  var FIT_PADDING = { top: 110, right: 100, bottom: 110, left: 100 }
   /** Насколько за рамку тайлов можно увести карту, градусы (~5 км). */
   var PAN_MARGIN = 0.05
 
@@ -170,6 +178,44 @@
       [w, s],
       [e, n],
     ]
+  }
+
+  /** Точка проекта — дом; карта открывается с ним в центре. */
+  function centerPoint(points) {
+    return points.filter(function (p) { return p.kind === 'house' })[0] || points[0]
+  }
+
+  /**
+   * Рамка с центром в точке center, вмещающая все точки: самая дальняя по
+   * каждой оси отражается через центр. Подогнанный под неё масштаб показывает
+   * всё, что вокруг дома, а дом остаётся посередине. null — все точки на месте
+   * центра, подгонять нечего.
+   */
+  function boundsAround(center, points) {
+    var dLng = 0
+    var dLat = 0
+    points.forEach(function (p) {
+      dLng = Math.max(dLng, Math.abs(p.lng - center.lng))
+      dLat = Math.max(dLat, Math.abs(p.lat - center.lat))
+    })
+    if (dLng === 0 && dLat === 0) return null
+    return [
+      [center.lng - dLng, center.lat - dLat],
+      [center.lng + dLng, center.lat + dLat],
+    ]
+  }
+
+  /**
+   * Масштаб под рамку вокруг дома в пределах FIT_MIN_ZOOM…FIT_MAX_ZOOM, центр —
+   * дом. MapLibre считает масштаб по размеру карты, поэтому подгонка — после
+   * её создания. Не влезает даже поле (крошечная карта) — масштаб района.
+   */
+  function centerOnProject(map, center, points) {
+    var box = boundsAround(center, points)
+    if (!box) return
+    var camera = map.cameraForBounds(box, { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM })
+    var zoom = camera ? Math.max(FIT_MIN_ZOOM, Math.min(FIT_MAX_ZOOM, camera.zoom)) : FIT_MIN_ZOOM
+    map.jumpTo({ center: [center.lng, center.lat], zoom: zoom })
   }
 
   /**
@@ -392,16 +438,14 @@
         attributionControl: { compact: true },
         locale: pageText(),
       }
-      if (view.points.length === 1) {
-        options.center = [view.points[0].lng, view.points[0].lat]
-        options.zoom = SINGLE_POINT_ZOOM
-      } else {
-        options.bounds = boundsOf(view.points)
-        options.fitBoundsOptions = { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM }
-      }
+      // На любой странице и любом экране карта открывается с домом в центре.
+      var center = centerPoint(view.points)
+      options.center = [center.lng, center.lat]
+      options.zoom = SINGLE_POINT_ZOOM
 
       var map = new maplibregl.Map(options)
       view.map = map
+      centerOnProject(map, center, view.points)
       map.touchZoomRotate.disableRotation()
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
 

@@ -11,6 +11,7 @@
  *
  * Что проверяется:
  *   - карта отрисовалась, в консоли нет ошибок, все файлы /map/ пришли;
+ *   - карта открылась с домом в центре — на компьютере и на телефоне;
  *   - меток столько же, сколько точек, и они не плывут при масштабировании;
  *   - легенда прячет и возвращает места своего типа;
  *   - нажатие на место открывает подсказку;
@@ -26,6 +27,8 @@ const { chromium } = require('playwright-core')
 
 /** Метка дальше этого от своей точки — «плывёт». */
 const MAX_DRIFT_PX = 1.5
+/** Дом дальше этого от центра карты — карта открылась не на проекте. */
+const MAX_CENTER_OFFSET_PX = 1
 
 function option(name) {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`))
@@ -87,6 +90,23 @@ function markerDrift(page) {
   })
 }
 
+/** Смещение дома от центра карты, px, и масштаб, с которым карта открылась. */
+function houseOffset(page) {
+  return page.evaluate(() => {
+    const view = document.querySelector('[data-map]').ghMap
+    const house = view.points.find((p) => p.kind === 'house') || view.points[0]
+    const box = view.map.getContainer()
+    const q = view.map.project([house.lng, house.lat])
+    const offset = Math.hypot(q.x - box.clientWidth / 2, q.y - box.clientHeight / 2)
+    return { offset: Math.round(offset * 10) / 10, zoom: Math.round(view.map.getZoom() * 100) / 100 }
+  })
+}
+
+async function checkCentered(page, prefix) {
+  const { offset, zoom } = await houseOffset(page)
+  check(`${prefix}дом в центре карты`, offset <= MAX_CENTER_OFFSET_PX, `смещение ${offset} px, масштаб ${zoom}`)
+}
+
 async function zoomBy(page, delta) {
   await page.evaluate((d) => {
     const map = document.querySelector('[data-map]').ghMap.map
@@ -108,6 +128,7 @@ async function checkDesktop(browser) {
   check('карта отрисовалась', (await mapState(page)) === 'ready', await mapState(page))
   await page.waitForTimeout(1500) // тайлы и шрифты догружаются после первой отрисовки
   check('без ошибок скриптов и 404 в /map/', errors.length === 0, errors.slice(0, 3).join(' | '))
+  await checkCentered(page, '')
 
   const counts = await page.evaluate(() => {
     const view = document.querySelector('[data-map]').ghMap
@@ -188,6 +209,7 @@ async function checkMobile(browser) {
   })
   await openMap(page)
   check('телефон: карта отрисовалась', (await mapState(page)) === 'ready')
+  await checkCentered(page, 'телефон: ')
   const taxi = page.locator('a.location-trip-taxi').first()
   if ((await taxi.count()) > 0) {
     const href = (await taxi.getAttribute('href')) || ''

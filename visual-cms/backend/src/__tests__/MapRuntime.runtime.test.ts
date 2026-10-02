@@ -53,6 +53,8 @@ interface Fake {
   maps: FakeMap[]
   protocols: string[]
   failOnCreate: boolean
+  /** Масштаб, который «MapLibre» подбирает под рамку; undefined — рамка не влезает. */
+  cameraZoom: number | undefined
 }
 
 let fake: Fake
@@ -78,6 +80,8 @@ class FakeMap {
   controls: Array<[any, string]> = []
   removed = false
   touchZoomRotate = { disableRotation: jest.fn() }
+  fits: Array<[number[][], any]> = []
+  jumps: any[] = []
   constructor(options: any) {
     if (fake.failOnCreate) throw new Error('Failed to initialize WebGL')
     this.options = options
@@ -100,6 +104,14 @@ class FakeMap {
   remove(): void {
     this.removed = true
   }
+  cameraForBounds(bounds: number[][], options: any): { zoom: number } | undefined {
+    this.fits.push([bounds, options])
+    return fake.cameraZoom === undefined ? undefined : { zoom: fake.cameraZoom }
+  }
+  jumpTo(options: any): this {
+    this.jumps.push(options)
+    return this
+  }
   marker(id: string): HTMLElement {
     const found = this.markers.find((m) => m.options.element.getAttribute('data-map-marker') === id)
     if (!found) throw new Error(`нет метки ${id}`)
@@ -108,7 +120,7 @@ class FakeMap {
 }
 
 function installLibrary(): void {
-  fake = { maps: [], protocols: [], failOnCreate: false }
+  fake = { maps: [], protocols: [], failOnCreate: false, cameraZoom: 14.2 }
   ;(window as any).maplibregl = {
     Map: FakeMap,
     Marker: FakeMarker,
@@ -263,22 +275,80 @@ describe('карта', () => {
     expect(fake.maps[0].controls[0][0].options).toEqual({ showCompass: false })
   })
 
-  it('все точки в кадре; двигать можно в пределах тайлов с запасом', async () => {
+  it('дом в центре; масштаб — под рамку вокруг дома, вмещающую все точки', async () => {
+    mockFetch()
+    page([HOUSE, OFFICE, SCHOOL, PARK])
+    run()
+    await flush()
+    const map = fake.maps[0]
+    expect(map.options).toMatchObject({ center: [69.28, 41.3], zoom: 15 })
+    expect(map.options.bounds).toBeUndefined()
+
+    // Дальняя по каждой оси точка отражена через дом: по долготе — офис
+    // (+0.01), по широте — парк (+0.002).
+    expect(map.fits).toHaveLength(1)
+    const [[sw, ne], fitOptions] = map.fits[0]
+    expect(sw[0]).toBeCloseTo(69.27)
+    expect(sw[1]).toBeCloseTo(41.298)
+    expect(ne[0]).toBeCloseTo(69.29)
+    expect(ne[1]).toBeCloseTo(41.302)
+    expect(fitOptions).toEqual({ padding: { top: 110, right: 100, bottom: 110, left: 100 }, maxZoom: 16 })
+    expect(map.jumps).toEqual([{ center: [69.28, 41.3], zoom: 14.2 }])
+  })
+
+  it('поля подгонки симметричны: иначе дом съехал бы с центра', async () => {
+    mockFetch()
+    page([HOUSE, OFFICE])
+    run()
+    await flush()
+    const { padding } = fake.maps[0].fits[0][1]
+    expect(padding.top).toBe(padding.bottom)
+    expect(padding.left).toBe(padding.right)
+  })
+
+  it('дом в центре, даже если в разметке он не первый', async () => {
+    mockFetch()
+    page([SCHOOL, OFFICE, HOUSE])
+    run()
+    await flush()
+    const map = fake.maps[0]
+    expect(map.options.center).toEqual([69.28, 41.3])
+    expect(map.jumps[0].center).toEqual([69.28, 41.3])
+  })
+
+  it.each([
+    ['далёкий отдел продаж — не мельче района', 11.4, 13],
+    ['рамка не влезает в крошечную карту — масштаб района', undefined, 13],
+    ['соседние точки — не ближе 16', 17.5, 16],
+  ])('масштаб: %s', async (_name, cameraZoom, zoom) => {
+    mockFetch()
+    fake.cameraZoom = cameraZoom
+    page([HOUSE, { ...OFFICE, lng: 69.4 }])
+    run()
+    await flush()
+    expect(fake.maps[0].jumps).toEqual([{ center: [69.28, 41.3], zoom }])
+  })
+
+  it('все точки на месте дома — как одна точка: масштаб 15, без подгонки', async () => {
+    mockFetch()
+    page([HOUSE, { ...OFFICE, lat: HOUSE.lat, lng: HOUSE.lng }])
+    run()
+    await flush()
+    expect(fake.maps[0].options).toMatchObject({ center: [69.28, 41.3], zoom: 15 })
+    expect(fake.maps[0].fits).toHaveLength(0)
+    expect(fake.maps[0].jumps).toHaveLength(0)
+  })
+
+  it('двигать можно в пределах тайлов с запасом', async () => {
     mockFetch()
     page([HOUSE, OFFICE, SCHOOL, PARK])
     run()
     await flush()
     const { options } = fake.maps[0]
-    expect(options.bounds).toEqual([
-      [69.28, 41.299],
-      [69.29, 41.302],
-    ])
-    expect(options.fitBoundsOptions).toEqual({ padding: { top: 110, right: 100, bottom: 70, left: 100 }, maxZoom: 16 })
     expect(options.maxBounds[0][0]).toBeCloseTo(69.0)
     expect(options.maxBounds[0][1]).toBeCloseTo(41.1)
     expect(options.maxBounds[1][0]).toBeCloseTo(69.6)
     expect(options.maxBounds[1][1]).toBeCloseTo(41.55)
-    expect(options.center).toBeUndefined()
   })
 
   it('точка за рамкой тайлов расширяет пределы, иначе её не показать', async () => {
@@ -296,6 +366,7 @@ describe('карта', () => {
     await flush()
     expect(fake.maps[0].options).toMatchObject({ center: [69.28, 41.3], zoom: 15 })
     expect(fake.maps[0].options.bounds).toBeUndefined()
+    expect(fake.maps[0].fits).toHaveLength(0)
   })
 
   it('готова после первой отрисовки', async () => {
