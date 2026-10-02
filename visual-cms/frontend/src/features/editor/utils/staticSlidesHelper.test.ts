@@ -10,6 +10,8 @@ import {
   SLIDE_HEADER_THEMES,
   getSlideHeaderTheme,
   withSlideHeaderTheme,
+  LANG_HEADER_THEMES,
+  toLangHeaderTheme,
 } from './staticSlidesHelper'
 
 const mk = (overrides: Partial<BlockNode> & { id: string }): BlockNode => {
@@ -129,5 +131,18 @@ describe('тема шапки над слайдом', () => {
 
   it('варианты в меню — авто, тёмный, светлый', () => {
     expect(SLIDE_HEADER_THEMES.map((t) => t.value)).toEqual(['auto', 'dark', 'light'])
+  })
+})
+
+describe('тема шапки на языковой версии слайда', () => {
+  it('пусто — как в основном языке; auto — по фото языка; мусор — как в основном', () => {
+    expect(toLangHeaderTheme(undefined)).toBe('')
+    expect(toLangHeaderTheme('auto')).toBe('auto')
+    expect(toLangHeaderTheme('dark')).toBe('dark')
+    expect(toLangHeaderTheme('purple')).toBe('')
+  })
+
+  it('варианты: как в основном, авто по фото языка, тёмный, светлый', () => {
+    expect(LANG_HEADER_THEMES.map((t) => t.value)).toEqual(['', 'auto', 'dark', 'light'])
   })
 })

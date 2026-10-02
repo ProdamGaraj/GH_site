@@ -66,6 +66,24 @@ export function getSlideHeaderTheme(node: BlockNode): SlideHeaderTheme {
   return value === 'dark' || value === 'light' ? value : 'auto'
 }
 
+/**
+ * Тема на языковой версии слайда — строка перевода data-header-theme.
+ * Пусто — как в основном языке (строки нет); «auto» — по фото этого языка,
+ * даже если в основном языке тема задана руками.
+ */
+export type LangHeaderTheme = '' | 'auto' | 'dark' | 'light'
+
+export const LANG_HEADER_THEMES: ReadonlyArray<{ value: LangHeaderTheme; label: string }> = [
+  { value: '', label: 'Как в основном языке' },
+  { value: 'auto', label: 'Авто — по фото этого языка' },
+  { value: 'dark', label: 'Тёмный (белая шапка)' },
+  { value: 'light', label: 'Светлый (тёмная шапка)' },
+]
+
+export function toLangHeaderTheme(value: string | undefined): LangHeaderTheme {
+  return value === 'auto' || value === 'dark' || value === 'light' ? value : ''
+}
+
 /** Атрибуты слайда с выбранной темой; «Авто» — без атрибута. Не мутирует вход. */
 export function withSlideHeaderTheme(attributes: Record<string, string> | undefined, theme: SlideHeaderTheme): Record<string, string> {
   const next = { ...(attributes || {}) }

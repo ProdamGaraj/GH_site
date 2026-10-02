@@ -195,7 +195,9 @@ export function applyNodeTranslations(node: any, map: TranslationMap): any {
 
     // Атрибуты (в т.ч. медиа: src/poster/href/data-slide-video)
     if (node.attributes) {
-      const attrFields = ['src', 'alt', 'href', 'placeholder', 'title', 'poster', 'aria-label', 'data-slide-video', 'data-title']
+      // data-header-theme — фон под шапкой над слайдом на этом языке (dark | light |
+      // auto): задаётся в «Медиа слайда по языкам», в тексты на перевод не выдаётся.
+      const attrFields = ['src', 'alt', 'href', 'placeholder', 'title', 'poster', 'aria-label', 'data-slide-video', 'data-title', 'data-header-theme']
       for (const field of attrFields) {
         if (nodeTranslations[field]) {
           node.attributes[field] = nodeTranslations[field]

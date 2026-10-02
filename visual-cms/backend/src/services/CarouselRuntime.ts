@@ -513,9 +513,15 @@ ${BREAKPOINT_RUNTIME_JS}
       }
     }
 
+    /** Ручная тема слайда — только dark | light (auto и прочее — решают кадры). */
+    function hasManualTheme(slide) {
+      var t = slide.getAttribute('data-header-theme');
+      return t === 'dark' || t === 'light';
+    }
+
     function sampleVideoTheme() {
       var slide = state.slides[state.index];
-      if (!slide || slide.hasAttribute('data-header-theme') || document.hidden) return;
+      if (!slide || hasManualTheme(slide) || document.hidden) return;
       var v = slide.querySelector('video[data-carousel-video="true"]');
       if (!v || v.paused || v.readyState < 2) return;
       var box = root.getBoundingClientRect();
@@ -538,7 +544,7 @@ ${BREAKPOINT_RUNTIME_JS}
     function syncVideoTheme() {
       stopVideoTheme();
       var slide = state.slides[state.index];
-      if (themeBroken || !slide || slide.hasAttribute('data-header-theme') || !slide.getAttribute('data-slide-video')) return;
+      if (themeBroken || !slide || hasManualTheme(slide) || !slide.getAttribute('data-slide-video')) return;
       themeTimer = setInterval(sampleVideoTheme, THEME_SAMPLE_MS);
       var v = slide.querySelector('video[data-carousel-video="true"]');
       if (!v) return;

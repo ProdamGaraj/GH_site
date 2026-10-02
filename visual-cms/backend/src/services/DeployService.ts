@@ -29,9 +29,9 @@ import { applyCollectionTransforms } from '../utils/collectionTransforms'
 import { localizeInternalLinks, localizeNavigation, langPrefix } from './linkLocalization'
 import { generateLanguageEntryStub } from './languageEntry'
 import { findPublishedSibling, leftoverFiles, planSiteSync, publishedFiles, removePublishedFiles } from './pagePublication'
-import { In } from 'typeorm'
+import { In, Like } from 'typeorm'
 import { MediaAsset } from '../models/MediaAsset'
-import { applyAutoHeaderThemes, slideAssetIds } from './headerTheme'
+import { applyAutoHeaderThemes, slideMediaRefs } from './headerTheme'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
@@ -2485,20 +2485,29 @@ export class DeployService {
   }
 
   /**
-   * Фото-слайдам без ручной метки — data-header-theme по яркости верха их
-   * картинки (MediaAsset.topBrightness, считается при загрузке). Шапка сайта
-   * по ней перекрашивается над слайдером без анализа картинок в браузере.
+   * Фото-слайдам без ручной темы — data-header-theme по яркости верха их
+   * картинки (MediaAsset.topBrightness, считается при загрузке). Картинка —
+   * та, что реально стоит фоном слайда на этой языковой версии (uuid файла в
+   * адресе фона), а без фона в стилях — metadata.mediaAssetId. Шапка сайта по
+   * метке перекрашивается над слайдером без анализа картинок в браузере.
    */
   private async applyHeaderThemes(structure: any): Promise<any> {
-    const ids = slideAssetIds(structure ?? {})
-    if (ids.length === 0) return structure
-    const assets = await AppDataSource.getRepository(MediaAsset).find({
-      where: { id: In(ids) },
-      select: { id: true, topBrightness: true },
-    })
+    const refs = slideMediaRefs(structure ?? {})
+    const files = refs.filter((r) => r.startsWith('file:')).map((r) => r.slice(5))
+    const ids = refs.filter((r) => r.startsWith('asset:')).map((r) => r.slice(6))
+    const repo = AppDataSource.getRepository(MediaAsset)
+    const select = { id: true, storageKey: true, topBrightness: true }
     const brightness = new Map<string, number>()
-    for (const asset of assets) {
-      if (typeof asset.topBrightness === 'number') brightness.set(asset.id, asset.topBrightness)
+    // У оригинала и всех производных (.opt.webp, .w800.webp) один uuid хранилища.
+    const byFile = files.length
+      ? await repo.find({ where: files.map((uuid) => ({ storageKey: Like(`${uuid}.%`) })), select })
+      : []
+    for (const asset of byFile) {
+      if (typeof asset.topBrightness === 'number') brightness.set(`file:${asset.storageKey.split('.')[0]}`, asset.topBrightness)
+    }
+    const byId = ids.length ? await repo.find({ where: { id: In(ids) }, select }) : []
+    for (const asset of byId) {
+      if (typeof asset.topBrightness === 'number') brightness.set(`asset:${asset.id}`, asset.topBrightness)
     }
     return applyAutoHeaderThemes(structure, brightness)
   }

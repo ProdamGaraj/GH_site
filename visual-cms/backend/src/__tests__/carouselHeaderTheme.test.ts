@@ -133,6 +133,15 @@ describe('кадр видео → data-header-theme-live', () => {
     expect(live('s1')).toBeNull()
   })
 
+  it('«auto» — не ручная метка: кадры оцениваются', () => {
+    mount(`<div id="s0" data-carousel-slide="true"></div>
+           <div id="s1" data-carousel-slide="true" data-slide-video="/media/v.mp4" data-header-theme="auto"></div>`)
+    next()
+    playing('s1')
+    jest.advanceTimersByTime(1000)
+    expect(live('s1')).toBe('dark')
+  })
+
   it('карусель не у верха экрана (под шапкой её нет) — не оцениваются', () => {
     mount(PHOTO_THEN_VIDEO, 900)
     next()

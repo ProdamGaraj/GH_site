@@ -62,19 +62,54 @@ export async function topBandBrightness(image: Buffer): Promise<number | null> {
 interface SlideNode {
   attributes?: Record<string, string>
   metadata?: Record<string, unknown> | object
+  styles?: { properties?: Record<string, unknown> } | object
   children?: SlideNode[]
   variations?: unknown
 }
 
+export const HEADER_THEME_ATTR = 'data-header-theme'
+/**
+ * «Авто» явно — у языковой версии слайда (строка перевода data-header-theme):
+ * «по фото этого языка», даже если в основном языке тема задана руками.
+ */
+export const AUTO_THEME = 'auto'
+
 const isSlide = (node: SlideNode) => node.attributes?.['data-carousel-slide'] === 'true'
-const assetIdOf = (node: SlideNode) => {
-  const id = (node.metadata as Record<string, unknown> | undefined)?.mediaAssetId
-  return typeof id === 'string' && id ? id : null
+const isVideoSlide = (node: SlideNode) => !!node.attributes?.['data-slide-video']
+
+/** Ручная тема слайда: только dark | light; auto и мусор — не ручная. */
+function manualTheme(node: SlideNode): HeaderTheme | null {
+  const value = node.attributes?.[HEADER_THEME_ATTR]
+  return value === 'dark' || value === 'light' ? value : null
 }
 
-/** Фото-слайды без своей метки — кому нужна тема из медиатеки. */
+const MEDIA_ID_RE = /\/media\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+
+/**
+ * Ссылка на файл медиатеки, который реально стоит фоном слайда:
+ *   file:<uuid>  — из адреса фона (/media/<uuid>.png, .opt.webp, .w800.webp —
+ *                  у всех производных один uuid хранилища);
+ *   asset:<id>   — фона в стилях нет: исходный файл слайда (metadata.mediaAssetId).
+ * Фон — главный источник: на языковой версии там уже фото этого языка
+ * (перевод bg:image подставлен до публикации), а mediaAssetId мог устареть,
+ * если картинку слайда меняли в стилях. Фон не из медиатеки — темы нет.
+ */
+function mediaRefOf(node: SlideNode): string | null {
+  const props = ((node.styles as { properties?: Record<string, unknown> } | undefined)?.properties ?? {}) as Record<string, unknown>
+  const background = [props.backgroundImage, props.background].find((v) => typeof v === 'string' && v.includes('url(')) as
+    | string
+    | undefined
+  if (background) {
+    const file = MEDIA_ID_RE.exec(background)?.[1]
+    return file ? `file:${file.toLowerCase()}` : null
+  }
+  const id = (node.metadata as Record<string, unknown> | undefined)?.mediaAssetId
+  return typeof id === 'string' && id ? `asset:${id}` : null
+}
+
+/** Фото-слайд без ручной темы — кому нужна тема из медиатеки. */
 function needsAutoTheme(node: SlideNode): boolean {
-  return isSlide(node) && !node.attributes?.['data-header-theme'] && !node.attributes?.['data-slide-video'] && !!assetIdOf(node)
+  return isSlide(node) && !isVideoSlide(node) && !manualTheme(node) && !!mediaRefOf(node)
 }
 
 /** Все узлы, включая экранные вставки (variations.specificChildren). */
@@ -87,28 +122,38 @@ function walkNodes(node: SlideNode, visit: (n: SlideNode) => void): void {
   }
 }
 
-/** id медиафайлов фото-слайдов без ручной метки. */
-export function slideAssetIds(structure: SlideNode): string[] {
-  const ids = new Set<string>()
+/** Ссылки (file:<uuid> | asset:<id>) на файлы фото-слайдов без ручной темы. */
+export function slideMediaRefs(structure: SlideNode): string[] {
+  const refs = new Set<string>()
   walkNodes(structure, (node) => {
-    if (needsAutoTheme(node)) ids.add(assetIdOf(node)!)
+    if (needsAutoTheme(node)) refs.add(mediaRefOf(node)!)
   })
-  return [...ids]
+  return [...refs]
 }
 
 /**
- * Ставит data-header-theme фото-слайдам без ручной метки по яркости их
- * картинки. Структура копируется; нет яркости — слайд остаётся без метки
- * (шапка решит как раньше).
+ * Ставит data-header-theme фото-слайдам без ручной темы по яркости их
+ * картинки. «auto» (явное у языковой версии) снимается: дальше решает фото,
+ * а у видео-слайда — кадры (runtime карусели). Структура копируется; нет
+ * яркости — слайд остаётся без метки (шапка решит как раньше).
  */
-export function applyAutoHeaderThemes<T extends SlideNode>(structure: T, brightnessByAssetId: Map<string, number>): T {
-  if (brightnessByAssetId.size === 0) return structure
+export function applyAutoHeaderThemes<T extends SlideNode>(structure: T, brightnessByRef: Map<string, number>): T {
+  let hasAuto = false
+  walkNodes(structure, (node) => {
+    if (isSlide(node) && node.attributes?.[HEADER_THEME_ATTR] === AUTO_THEME) hasAuto = true
+  })
+  if (brightnessByRef.size === 0 && !hasAuto) return structure
   const copy: T = JSON.parse(JSON.stringify(structure))
   walkNodes(copy, (node) => {
+    if (!isSlide(node)) return
+    if (node.attributes?.[HEADER_THEME_ATTR] === AUTO_THEME) {
+      const { [HEADER_THEME_ATTR]: _auto, ...rest } = node.attributes
+      node.attributes = rest
+    }
     if (!needsAutoTheme(node)) return
-    const brightness = brightnessByAssetId.get(assetIdOf(node)!)
+    const brightness = brightnessByRef.get(mediaRefOf(node)!)
     if (brightness === undefined) return
-    node.attributes = { ...(node.attributes ?? {}), 'data-header-theme': themeFromBrightness(brightness) }
+    node.attributes = { ...(node.attributes ?? {}), [HEADER_THEME_ATTR]: themeFromBrightness(brightness) }
   })
   return copy
 }

@@ -9,7 +9,14 @@ import {
 import { usePageTranslations } from '@/features/translations/usePageTranslations'
 import { ResponsiveMediaMatrix } from './ResponsiveMediaMatrix'
 import { MediaPicker } from './MediaPicker'
-import { Film, X, Image as ImageIcon } from 'lucide-react'
+import { Film, X, Image as ImageIcon, SunMoon } from 'lucide-react'
+import {
+  HEADER_THEME_ATTR,
+  LANG_HEADER_THEMES,
+  SLIDE_ATTR,
+  toLangHeaderTheme,
+  type LangHeaderTheme,
+} from '@/features/editor/utils/staticSlidesHelper'
 import type { BlockNode } from '@/shared/types'
 
 interface MediaLanguageSectionProps {
@@ -24,7 +31,8 @@ interface MediaLanguageSectionProps {
  *
  * Содержит: селектор активного языка, матрицу «экран × язык»
  * (ResponsiveMediaMatrix) и, для слайдов с видео-фоном, строку языкового
- * варианта data-slide-video. В редакторе блока (переводы page-scoped)
+ * варианта data-slide-video, для слайдов карусели — фон под шапкой на этом
+ * языке (data-header-theme). В редакторе блока (переводы page-scoped)
  * показывает только базовую колонку.
  */
 export const MediaLanguageSection: React.FC<MediaLanguageSectionProps> = ({ node, pageId }) => {
@@ -60,6 +68,20 @@ export const MediaLanguageSection: React.FC<MediaLanguageSectionProps> = ({ node
       dispatch(saveTranslation({ pageId, locale: effectiveLocale, nodeId: node.id, field: 'data-slide-video', value }))
     } else {
       dispatch(deleteTranslation({ pageId, locale: effectiveLocale, nodeId: node.id, field: 'data-slide-video' }))
+    }
+  }
+
+  // Фон под шапкой на этом языке: своё фото языка — своя тема. Пусто — как в
+  // основном языке (строки нет), «auto» — по фото этого языка.
+  const isSlide = node.attributes?.[SLIDE_ATTR] === 'true'
+  const headerThemeLoc = effectiveLocale ? toLangHeaderTheme(translationMap[node.id]?.[HEADER_THEME_ATTR]) : ''
+  const setHeaderThemeTranslation = (value: LangHeaderTheme) => {
+    if (!effectiveLocale || !pageId) return
+    if (value) {
+      dispatch(updateTranslationLocally({ nodeId: node.id, field: HEADER_THEME_ATTR, value }))
+      dispatch(saveTranslation({ pageId, locale: effectiveLocale, nodeId: node.id, field: HEADER_THEME_ATTR, value }))
+    } else {
+      dispatch(deleteTranslation({ pageId, locale: effectiveLocale, nodeId: node.id, field: HEADER_THEME_ATTR }))
     }
   }
 
@@ -136,6 +158,33 @@ export const MediaLanguageSection: React.FC<MediaLanguageSectionProps> = ({ node
           ) : (
             <p className="text-[10px] text-gray-400">
               {localeEnabled ? 'Выберите язык выше, чтобы задать вариант видео.' : 'Языковые варианты доступны в редакторе страницы.'}
+            </p>
+          )}
+        </div>
+      )}
+
+      {isSlide && (
+        <div className="px-2 pb-2 pt-1 border-t border-gray-100" data-testid="slide-header-theme-lang">
+          <div className="flex items-center gap-1.5 mb-1">
+            <SunMoon size={11} className="text-amber-500" />
+            <span className="text-[10px] font-semibold text-gray-600 uppercase">Фон под шапкой · язык</span>
+          </div>
+          {effectiveLocale ? (
+            <select
+              value={headerThemeLoc}
+              onChange={(e) => setHeaderThemeTranslation(e.target.value as LangHeaderTheme)}
+              className="w-full px-2 py-1 text-[11px] border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+              title="От фона зависит цвет текста шапки сайта над этим слайдом"
+            >
+              {LANG_HEADER_THEMES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-[10px] text-gray-400">
+              {localeEnabled ? 'Выберите язык выше, чтобы задать фон под шапкой для него.' : 'Языковые варианты доступны в редакторе страницы.'}
             </p>
           )}
         </div>

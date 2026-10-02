@@ -423,12 +423,14 @@ const SlideRow: React.FC<SlideRowProps> = ({
 
       {showTheme && (
         <div className="px-2 pb-2 flex items-center gap-2">
-          <span className="text-xs text-gray-600 shrink-0">Фон под шапкой</span>
+          <span className="text-xs text-gray-600 shrink-0" title="Для отдельного языка — в «Медиа слайда по языкам»">
+            Фон под шапкой
+          </span>
           <select
             value={headerTheme}
             onChange={(e) => onSetHeaderTheme(e.target.value as SlideHeaderTheme)}
             className="flex-1 min-w-0 px-2 py-1 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary-500"
-            title="Авто: фото оценит CMS при публикации, видео — браузер по кадрам"
+            title="Для всех языков. Авто: фото оценит CMS при публикации, видео — браузер по кадрам"
             data-testid="slide-header-theme"
           >
             {SLIDE_HEADER_THEMES.map((t) => (

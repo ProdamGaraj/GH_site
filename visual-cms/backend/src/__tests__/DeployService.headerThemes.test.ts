@@ -1,7 +1,8 @@
 /**
  * Публикация: фото-слайды каруселей получают тему шапки по яркости верха
- * картинки (MediaAsset.topBrightness). Один вход для всех путей деплоя и
- * превью — prepareForPublish (данные страницы + темы слайдов).
+ * картинки (MediaAsset.topBrightness). Файл — по uuid хранилища из адреса
+ * фона (у оригинала и производных он общий), без фона — по mediaAssetId. Один
+ * вход для всех путей деплоя и превью — prepareForPublish.
  *
  * Приватные методы — через `as any` (как в DeployService.*.test.ts).
  */
@@ -48,6 +49,17 @@ const { MediaAsset } = require('../models/MediaAsset')
 const svc: any = new DeployService()
 const mediaRepo = () => AppDataSource.getRepository(MediaAsset)
 
+const DARK = '11111111-1111-4111-8111-111111111111'
+const LIGHT = '22222222-2222-4222-8222-222222222222'
+
+const photo = (id: string, file: string) => ({
+  id,
+  attributes: { 'data-carousel-slide': 'true' },
+  metadata: { mediaAssetId: 'stale-record' },
+  styles: { properties: { backgroundImage: `url("/media/${file}.opt.webp")` } },
+  children: [],
+})
+
 const slider = () => ({
   id: 'root',
   children: [
@@ -55,8 +67,9 @@ const slider = () => ({
       id: 'track',
       attributes: { 'data-carousel-track': 'true' },
       children: [
-        { id: 'dark-photo', attributes: { 'data-carousel-slide': 'true' }, metadata: { mediaAssetId: 'm-dark' }, children: [] },
-        { id: 'light-photo', attributes: { 'data-carousel-slide': 'true' }, metadata: { mediaAssetId: 'm-light' }, children: [] },
+        photo('dark-photo', DARK),
+        photo('light-photo', LIGHT),
+        { id: 'no-bg', attributes: { 'data-carousel-slide': 'true' }, metadata: { mediaAssetId: 'm-plain' }, children: [] },
         {
           id: 'video',
           attributes: { 'data-carousel-slide': 'true', 'data-slide-video': '/media/v.mp4' },
@@ -74,22 +87,25 @@ const themes = (structure: any) =>
 beforeEach(() => mediaRepo().find.mockReset())
 
 describe('DeployService.prepareForPublish — тема шапки над фото-слайдами', () => {
-  it('фото-слайды — по яркости из медиатеки, видео — без метки (его кадры оценит браузер)', async () => {
-    mediaRepo().find.mockResolvedValue([
-      { id: 'm-dark', topBrightness: 35 },
-      { id: 'm-light', topBrightness: 210 },
-    ])
+  it('фото — по файлу из адреса фона; без фона — по записи; видео — без метки', async () => {
+    mediaRepo().find
+      .mockResolvedValueOnce([
+        { id: 'a1', storageKey: `${DARK}.png`, topBrightness: 35 },
+        { id: 'a2', storageKey: `${LIGHT}.jpg`, topBrightness: 210 },
+      ])
+      .mockResolvedValueOnce([{ id: 'm-plain', storageKey: 'x.png', topBrightness: 40 }])
     const out = await svc.prepareForPublish({ id: 'p1' }, slider(), 'ru')
-    expect(themes(out)).toEqual(['dark', 'light', null])
-    // Спрашиваем только фото-слайды, одним запросом.
-    expect(mediaRepo().find).toHaveBeenCalledTimes(1)
-    expect(mediaRepo().find.mock.calls[0][0].where.id._value.sort()).toEqual(['m-dark', 'm-light'])
+    expect(themes(out)).toEqual(['dark', 'light', 'dark', null])
+    // Файлы — по uuid хранилища (любой производный), запись — по id.
+    const [byFile, byId] = mediaRepo().find.mock.calls.map((c: any[]) => c[0].where)
+    expect(byFile.map((w: any) => w.storageKey._value)).toEqual([`${DARK}.%`, `${LIGHT}.%`])
+    expect(byId.id._value).toEqual(['m-plain'])
   })
 
   it('у файла нет яркости (не прогнан бэкфилл) — слайд без метки', async () => {
-    mediaRepo().find.mockResolvedValue([{ id: 'm-dark', topBrightness: null }])
+    mediaRepo().find.mockResolvedValue([{ id: 'a1', storageKey: `${DARK}.png`, topBrightness: null }])
     const out = await svc.prepareForPublish({ id: 'p1' }, slider(), 'ru')
-    expect(themes(out)).toEqual([null, null, null])
+    expect(themes(out)).toEqual([null, null, null, null])
   })
 
   it('страница без каруселей — без запроса в базу', async () => {
