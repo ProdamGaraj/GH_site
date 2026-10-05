@@ -1,4 +1,4 @@
-import { apiFetch, ApiError } from '@/shared/api/http'
+import { apiFetch, readJson } from '@/shared/api/http'
 import { api } from '@/shared/api'
 import type {
   ComplexDetail,
@@ -15,19 +15,7 @@ import type {
  */
 const BASE = '/estate-api/api/admin'
 
-async function json<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    let details: unknown
-    try {
-      details = await res.json()
-    } catch {
-      /* ignore */
-    }
-    const msg = (details as any)?.error || `HTTP ${res.status}`
-    throw new ApiError(msg, res.status, { details })
-  }
-  return res.json() as Promise<T>
-}
+const json = readJson
 
 export const estateApi = {
   // --- Карта проекта: типы мест (общие для всех ЖК) и набор иконок ---

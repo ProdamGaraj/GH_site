@@ -14,7 +14,7 @@ vi.mock('@/features/media/MediaPicker', () => ({
 vi.mock('@/features/media/useProjectVariantWidths', () => ({ useProjectVariantWidths: () => [] }))
 
 import { GallerySlidesField } from './GallerySlidesField'
-import type { GalleryItem } from '../gallerySlides'
+import type { GalleryItem } from './gallerySlides'
 
 function setup(value: GalleryItem[]) {
   const onChange = vi.fn()

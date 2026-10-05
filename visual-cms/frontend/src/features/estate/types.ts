@@ -2,9 +2,9 @@
 
 import type { GalleryItem } from './gallerySlides'
 
-export type Locale = 'ru' | 'uz' | 'en'
-export const LOCALES: Locale[] = ['ru', 'uz', 'en']
-export const LOCALE_LABELS: Record<Locale, string> = { ru: 'RU', uz: 'UZ', en: 'EN' }
+import type { Locale } from '@/shared/forms/locales'
+export type { Locale } from '@/shared/forms/locales'
+export { LOCALES, LOCALE_LABELS } from '@/shared/forms/locales'
 
 export interface StatItem {
   value: string

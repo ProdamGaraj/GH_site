@@ -35,6 +35,25 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Тело JSON-ответа сервиса (estate-service, news-service через прокси) или
+ * ApiError: текст — поле `error` ответа, `details` — весь ответ (например,
+ * перечень недостающего перевода у news-service).
+ */
+export async function readJson<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    let details: unknown
+    try {
+      details = await res.json()
+    } catch {
+      /* тело не JSON — достаточно статуса */
+    }
+    const msg = (details as { error?: string } | undefined)?.error || `HTTP ${res.status}`
+    throw new ApiError(msg, res.status, { details })
+  }
+  return res.json() as Promise<T>
+}
+
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 export function readCookie(name: string): string | undefined {

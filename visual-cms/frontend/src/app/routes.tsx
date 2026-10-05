@@ -21,6 +21,9 @@ import { MediaLibraryPage } from '@/pages/MediaLibraryPage'
 import { EstatePage } from '@/pages/EstatePage'
 import { EstateEditorPage } from '@/pages/EstateEditorPage'
 import { EstatePlaceTypesPage } from '@/pages/EstatePlaceTypesPage'
+import { NewsPage } from '@/pages/NewsPage'
+import { NewsEditorPage } from '@/pages/NewsEditorPage'
+import { NewsDictionariesPage } from '@/pages/NewsDictionariesPage'
 import { Login } from '@/pages/Login'
 import { RequireAuth } from '@/widgets/auth/RequireAuth'
 
@@ -90,6 +93,18 @@ export const router = createBrowserRouter([
       {
         path: 'estate/:id',
         element: <EstateEditorPage />,
+      },
+      {
+        path: 'news',
+        element: <NewsPage />,
+      },
+      {
+        path: 'news/dictionaries',
+        element: <NewsDictionariesPage />,
+      },
+      {
+        path: 'news/:id',
+        element: <NewsEditorPage />,
       },
       {
         path: 'collections/:id',
