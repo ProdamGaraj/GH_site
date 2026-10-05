@@ -29,9 +29,12 @@ import { applyCollectionTransforms } from '../utils/collectionTransforms'
 import { localizeInternalLinks, localizeNavigation, langPrefix } from './linkLocalization'
 import { generateLanguageEntryStub } from './languageEntry'
 import { findPublishedSibling, leftoverFiles, planSiteSync, publishedFiles, removePublishedFiles } from './pagePublication'
-import { In, Like } from 'typeorm'
+import { In } from 'typeorm'
 import { MediaAsset } from '../models/MediaAsset'
 import { applyAutoHeaderThemes, slideMediaRefs } from './headerTheme'
+import { findAssetsByStorageUuids, storageUuidOf } from './mediaAssetLookup'
+import { pruneCollectionItems, writeCollectionManifest } from './collectionOutput'
+import { isDeployReportTarget, reportCollectionDeploy } from './deployReport'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
@@ -126,6 +129,11 @@ export interface PageInputBinding {
   method?: string
   path?: string
   mode?: string
+}
+
+/** Пометки деплоя, которые не делают его неуспешным: кэш вместо API, отчёт интеграции. */
+function isNonFatalDeployNote(note: string): boolean {
+  return note.includes('using cached data') || note.startsWith('Отчёт о деплое')
 }
 
 export class DeployService {
@@ -885,7 +893,11 @@ export class DeployService {
       items = applyCollectionTransforms(items, collection.transforms)
 
       if (items.length === 0) {
-        return { success: true, message: 'Коллекция пуста — нет элементов для генерации', deployedPages: [], errors: [] }
+        // Пусто (например, сняли с публикации последнюю новость) — страницы
+        // прошлой генерации убираем, иначе они остались бы на сайте.
+        const cleared = await this.clearCollectionOutput(collection)
+        const warnings = await this.reportCollectionDeploy(collection, cleared)
+        return { success: true, message: 'Коллекция пуста — нет элементов для генерации', deployedPages: [], errors: warnings }
       }
 
       // 3. Построить Maps для overrides — по apiItemId и по apiItemSlug (fallback)
@@ -926,16 +938,19 @@ export class DeployService {
       // Подготовить data config шаблона (один раз)
       const templateDataConfig = await this.preparePageDataConfig(templatePage.id, templateStructure)
 
-      // Resolve deploy directory — очищаем перед генерацией, чтобы не оставались stale-файлы
+      // Resolve deploy directory — перед генерацией убираем страницы прошлой
+      // генерации (по манифесту, см. collectionOutput.ts), чтобы не оставались
+      // stale-файлы. Чужие страницы в той же папке (список /news) остаются.
       const siteDir = this.resolveSiteDir(collection.site)
       // Элементы языка по умолчанию тоже лежат под префиксом: в корневом
       // <basePath>/<slug> кладётся распознаватель языка.
       const basePathClean = collection.basePath.replace(/^\/|\/$/g, '')
       const collectionDir = path.join(siteDir, defaultLangCode || '', basePathClean)
-      if (collectionDir !== siteDir && fs.existsSync(collectionDir)) {
-        fs.rmSync(collectionDir, { recursive: true, force: true })
-      }
+      const rootCollectionDir = path.join(siteDir, basePathClean)
+      if (collectionDir !== siteDir) pruneCollectionItems(collectionDir)
+      if (rootCollectionDir !== collectionDir && rootCollectionDir !== siteDir) pruneCollectionItems(rootCollectionDir)
       this.ensureDirectoryExists(collectionDir)
+      const defaultSlugs: string[] = []
 
       // Resolve navigation for the site
       const allSitePages = await this.pageRepository.find({ where: { siteId: collection.siteId } })
@@ -1010,6 +1025,7 @@ export class DeployService {
           this.ensureDirectoryExists(path.dirname(filePath))
           fs.writeFileSync(filePath, html, 'utf-8')
           deployedPages.push(`${collection.basePath.replace(/^\/|\/$/g, '')}/${itemSlug}`)
+          defaultSlugs.push(itemSlug)
 
           // Распознаватель языка в корневом адресе элемента.
           this.writeLanguageEntry({
@@ -1027,17 +1043,22 @@ export class DeployService {
         }
       }
 
+      if (collectionDir !== siteDir) writeCollectionManifest(collectionDir, defaultSlugs)
+      if (rootCollectionDir !== collectionDir && rootCollectionDir !== siteDir) writeCollectionManifest(rootCollectionDir, defaultSlugs)
+
       // 7. Мультиязычные версии страниц коллекции (если у шаблона есть переводы).
       // Для коллекций без переводов шаблона — no-op (поведение по умолчанию неизменно).
-      await this.deployCollectionTranslations({
+      const deployedByLang = await this.deployCollectionTranslations({
         collection, templatePage, templateStructure, templateDataConfig,
         overridesByItemId, overridesBySlug, resolvedNav,
         mainExtractedValues, statsByItemId, siteDir, defaultItems: items,
         deployedPages, errors,
       })
+      if (defaultLangCode) deployedByLang.set(defaultLangCode, defaultSlugs)
+      errors.push(...(await this.reportCollectionDeploy(collection, deployedByLang)))
 
       return {
-        success: errors.filter(e => !e.includes('using cached data')).length === 0,
+        success: errors.filter(e => !isNonFatalDeployNote(e)).length === 0,
         message: `Коллекция "${collection.name}": опубликовано ${deployedPages.length} страниц`,
         deployedPages,
         errors,
@@ -1210,12 +1231,14 @@ export class DeployService {
     defaultItems: any[]
     deployedPages: string[]
     errors: string[]
-  }): Promise<void> {
+  }): Promise<Map<string, string[]>> {
     const { collection, templatePage } = p
+    /** Язык → адреса элементов, выкаченные на нём (для отчёта о деплое). */
+    const deployedByLang = new Map<string, string[]>()
 
     const languages = await languageService.getActive()
     const translationLocales = await translationService.getPageLocales(templatePage.id)
-    if (translationLocales.length === 0) return
+    if (translationLocales.length === 0) return deployedByLang
 
     const availableLanguages = languages
       .filter(l => l.isActive && (l.isDefault || translationLocales.includes(l.code)))
@@ -1262,11 +1285,11 @@ export class DeployService {
 
         const basePathClean = collection.basePath.replace(/^\/|\/$/g, '')
         const langCollectionDir = path.join(p.siteDir, lang.code, basePathClean)
-        if (langCollectionDir !== p.siteDir && fs.existsSync(langCollectionDir)) {
-          fs.rmSync(langCollectionDir, { recursive: true, force: true })
-        }
+        if (langCollectionDir !== p.siteDir) pruneCollectionItems(langCollectionDir)
         this.ensureDirectoryExists(langCollectionDir)
 
+        const langSlugs: string[] = []
+        deployedByLang.set(lang.code, langSlugs)
         const usedSlugs = new Set<string>()
         for (const item of langItems) {
           const { itemId, itemTitle, baseSlug } = this.computeItemBase(collection, item)
@@ -1298,15 +1321,47 @@ export class DeployService {
             this.ensureDirectoryExists(path.dirname(filePath))
             fs.writeFileSync(filePath, html, 'utf-8')
             p.deployedPages.push(`${lang.code}/${basePathClean}/${itemSlug}`)
+            langSlugs.push(itemSlug)
             logger.info(`Collection "${collection.name}": deployed [${lang.code}] ${itemSlug}`)
           } catch (itemErr: any) {
             p.errors.push(`Collection "${collection.name}" [${lang.code}] "${itemTitle}": ${itemErr.message}`)
           }
         }
+        if (langCollectionDir !== p.siteDir) writeCollectionManifest(langCollectionDir, langSlugs)
       } catch (langErr: any) {
         p.errors.push(`Collection "${collection.name}" [${lang.code}]: ${langErr.message}`)
       }
     }
+    return deployedByLang
+  }
+
+  /**
+   * Коллекция пуста: страницы прошлой генерации убираются на всех активных
+   * языках (и распознаватели языка в корне). Возвращает пустые наборы по
+   * языкам — для отчёта о деплое.
+   */
+  private async clearCollectionOutput(collection: Collection): Promise<Map<string, string[]>> {
+    const siteDir = this.resolveSiteDir(collection.site)
+    const basePathClean = collection.basePath.replace(/^\/|\/$/g, '')
+    const cleared = new Map<string, string[]>()
+    const dirs = new Set<string>([path.join(siteDir, basePathClean)])
+    for (const lang of await languageService.getActive()) {
+      if (!lang.isActive) continue
+      dirs.add(path.join(siteDir, lang.code, basePathClean))
+      cleared.set(lang.code, [])
+    }
+    for (const dir of dirs) {
+      if (dir === siteDir || !fs.existsSync(dir)) continue
+      pruneCollectionItems(dir)
+      writeCollectionManifest(dir, [])
+    }
+    return cleared
+  }
+
+  /** Отчёт интеграции о выкаченных элементах (если коллекция его ждёт). */
+  private async reportCollectionDeploy(collection: Collection, deployedByLang: Map<string, string[]>): Promise<string[]> {
+    if (!isDeployReportTarget(collection.reportDeployTo)) return []
+    return reportCollectionDeploy(collection.reportDeployTo, deployedByLang)
   }
 
   /**
@@ -2495,16 +2550,12 @@ export class DeployService {
     const refs = slideMediaRefs(structure ?? {})
     const files = refs.filter((r) => r.startsWith('file:')).map((r) => r.slice(5))
     const ids = refs.filter((r) => r.startsWith('asset:')).map((r) => r.slice(6))
-    const repo = AppDataSource.getRepository(MediaAsset)
     const select = { id: true, storageKey: true, topBrightness: true }
     const brightness = new Map<string, number>()
-    // У оригинала и всех производных (.opt.webp, .w800.webp) один uuid хранилища.
-    const byFile = files.length
-      ? await repo.find({ where: files.map((uuid) => ({ storageKey: Like(`${uuid}.%`) })), select })
-      : []
-    for (const asset of byFile) {
-      if (typeof asset.topBrightness === 'number') brightness.set(`file:${asset.storageKey.split('.')[0]}`, asset.topBrightness)
+    for (const asset of await findAssetsByStorageUuids(files, select)) {
+      if (typeof asset.topBrightness === 'number') brightness.set(`file:${storageUuidOf(asset.storageKey)}`, asset.topBrightness)
     }
+    const repo = AppDataSource.getRepository(MediaAsset)
     const byId = ids.length ? await repo.find({ where: { id: In(ids) }, select }) : []
     for (const asset of byId) {
       if (typeof asset.topBrightness === 'number') brightness.set(`asset:${asset.id}`, asset.topBrightness)

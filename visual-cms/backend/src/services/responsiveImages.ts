@@ -1,13 +1,22 @@
 /**
- * Внедрение `srcset`/`sizes` в готовый HTML (pure, без БД).
+ * Лёгкие картинки в готовом HTML (pure, без БД).
  *
- * На деплое сайт должен отдавать разные изображения под разные экраны.
- * В разметке `<img>` хранит один `src` вида `<prefix>/media/<uuid>.<ext>`,
- * где `<uuid>` — это id ассета (storageKey = `<uuid>.<ext>`). По uuid находим
- * заранее сгенерированные варианты и дописываем `srcset` + `sizes`.
+ * В медиатеке у растрового файла есть оптимизированная полноразмерная версия
+ * (`<uuid>.opt.webp`, если она меньше оригинала) и адаптивные варианты по
+ * ширинам (`<uuid>.w768.webp`). В разметке же стоит адрес оригинала
+ * `<prefix>/media/<uuid>.<ext>` — его вставил редактор или данные. Здесь:
+ *  - `<img>`: `src` → оптимизированная версия, плюс `srcset` из вариантов и
+ *    полноразмерной версии и `sizes` по ширине файла (см. sizesFor);
+ *  - CSS `url(...)` (встроенные стили, `<style>`, переменные `--image`):
+ *    оригинал PNG/JPEG → оптимизированная версия.
  *
- * Чистая функция: на вход — html и карта вариантов по id, на выход — новый html.
- * Никаких обращений к БД/окружению — всё для юнит-тестов.
+ * `<uuid>` — uuid ХРАНИЛИЩА, не id записи MediaAsset (см. mediaAssetLookup.ts).
+ * GIF и SVG не трогаем: webp-версия GIF — только первый кадр анимации, у SVG
+ * производных нет. Ссылки (`href`), meta и data-атрибуты не трогаем: там
+ * может быть нужен именно оригинал.
+ *
+ * Чистые функции: на вход — html и карта версий по uuid, на выход — новый html.
+ * Идемпотентно.
  */
 
 export interface ResponsiveVariant {
@@ -15,66 +24,129 @@ export interface ResponsiveVariant {
   storageKey: string
 }
 
-export interface InjectOptions {
-  /** Значение `sizes`, если его нет у тега. По умолчанию "100vw". */
-  defaultSizes?: string
+/** Версии одного файла медиатеки. */
+export interface MediaRendition {
+  /** Оригинал: `<uuid>.<ext>`. */
+  storageKey: string
+  /** Полноразмерная webp-версия, если она меньше оригинала. */
+  optimizedKey: string | null
+  /** Ширина оригинала, px; null — неизвестна. */
+  width: number | null
+  variants: ResponsiveVariant[]
 }
 
-/** UUID в пути `/media/<uuid>.<ext>`. */
-const MEDIA_ID_RE = /\/media\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\./
+const UUID = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+
+/** Файл медиатеки в пути: `/media/<uuid>.<остаток имени>`. */
+const MEDIA_FILE_RE = new RegExp(`/media/(${UUID})\\.([^"'()&\\s]+)$`)
+
+/** Оригинал растровой картинки, который стоит заменить оптимизированной версией. */
+const SWAPPABLE_EXT = /^(png|jpe?g)$/i
+
+/** У этих файлов адаптивных вариантов нет или они ломают картинку. */
+const NO_VARIANTS_EXT = /^(gif|svg)$/i
+
+interface MediaRef {
+  uuid: string
+  /** Часть пути до имени файла, включая `/media/`. */
+  prefix: string
+  /** Имя файла после `<uuid>.`: `png`, `opt.webp`, `w768.webp`. */
+  rest: string
+}
+
+function parseMediaUrl(url: string): MediaRef | null {
+  const m = url.match(MEDIA_FILE_RE)
+  if (!m) return null
+  return { uuid: m[1].toLowerCase(), prefix: url.slice(0, url.length - m[0].length) + '/media/', rest: m[2] }
+}
+
+/** Адрес оптимизированной версии вместо оригинала PNG/JPEG; null — менять нечего. */
+function optimizedUrl(ref: MediaRef, rendition: MediaRendition | undefined): string | null {
+  if (!rendition?.optimizedKey || !SWAPPABLE_EXT.test(ref.rest)) return null
+  return ref.prefix + rendition.optimizedKey
+}
 
 /**
- * @param html      исходный HTML страницы
- * @param variantsById карта id ассета -> его варианты (могут быть пустыми)
+ * `sizes` для картинки шириной `width`. С `srcset` по ширинам браузер берёт
+ * собственный размер картинки из `sizes`, а не из файла: при `100vw` логотип
+ * или значок без заданной в CSS ширины растянулся бы на весь экран. Поэтому
+ * `sizes` — не шире самого файла: min(100vw, width), как у картинки без srcset
+ * под `max-width: 100%` из базовых стилей.
  */
-export function injectResponsiveImages(
-  html: string,
-  variantsById: Map<string, ResponsiveVariant[]>,
-  opts: InjectOptions = {},
-): string {
-  if (!html || variantsById.size === 0) return html
-  const defaultSizes = opts.defaultSizes ?? '100vw'
+export function sizesFor(width: number): string {
+  return `(max-width: ${width}px) 100vw, ${width}px`
+}
 
-  return html.replace(/<img\b[^>]*?\/?>/gi, (tag) => {
-    // Уважаем уже выставленный srcset (ручной или из другого источника).
-    if (/\ssrcset\s*=/i.test(tag)) return tag
+function enrichImgTag(tag: string, renditions: Map<string, MediaRendition>): string {
+  // Уважаем уже выставленный srcset (ручной или из другого источника).
+  if (/\ssrcset\s*=/i.test(tag)) return tag
 
-    const srcMatch = tag.match(/\ssrc\s*=\s*"([^"]*)"/i)
-    if (!srcMatch) return tag
-    const src = srcMatch[1]
+  const srcMatch = tag.match(/\ssrc\s*=\s*"([^"]*)"/i)
+  if (!srcMatch) return tag
+  const src = srcMatch[1]
+  const ref = parseMediaUrl(src)
+  if (!ref || NO_VARIANTS_EXT.test(ref.rest.split('.').pop() ?? '')) return tag
+  const rendition = renditions.get(ref.uuid)
+  if (!rendition) return tag
 
-    const idMatch = src.match(MEDIA_ID_RE)
-    if (!idMatch) return tag
-    const id = idMatch[1].toLowerCase()
+  const lighter = optimizedUrl(ref, rendition)
+  const finalSrc = lighter ?? src
+  let out = lighter ? tag.replace(srcMatch[0], srcMatch[0].replace(src, lighter)) : tag
 
-    const variants = variantsById.get(id)
-    if (!variants || variants.length === 0) return tag
+  // Без ширины файла не посчитать `sizes` — только лёгкий src, без srcset.
+  if (rendition.variants.length === 0 || !rendition.width) return out
 
-    // Префикс пути до имени файла берём из самого src — устойчиво к origin/base.
-    const prefix = src.slice(0, src.lastIndexOf('/') + 1)
-    const sorted = [...variants].sort((a, b) => b.width - a.width)
-    const srcset = sorted
-      .map((v) => `${prefix}${v.storageKey} ${v.width}w`)
-      .join(', ')
+  // Полноразмерная версия — тоже кандидат: иначе широкий экран получил бы
+  // самый большой вариант, даже если он уже экрана.
+  const sorted = [...rendition.variants].sort((a, b) => b.width - a.width)
+  const candidates = sorted.map((v) => `${ref.prefix}${v.storageKey} ${v.width}w`)
+  const finalRest = finalSrc.slice(finalSrc.lastIndexOf('/') + 1)
+  const isFullSize = finalRest === rendition.optimizedKey || finalRest === rendition.storageKey
+  if (isFullSize && rendition.width > sorted[0].width) {
+    candidates.unshift(`${finalSrc} ${rendition.width}w`)
+  }
 
-    const hasSizes = /\ssizes\s*=/i.test(tag)
-    const additions = ` srcset="${srcset}"` + (hasSizes ? '' : ` sizes="${defaultSizes}"`)
+  const hasSizes = /\ssizes\s*=/i.test(out)
+  const additions = ` srcset="${candidates.join(', ')}"` + (hasSizes ? '' : ` sizes="${sizesFor(rendition.width)}"`)
+  // Вставляем перед закрытием тега (поддержка и `/>`, и `>`).
+  if (out.endsWith('/>')) return out.slice(0, -2).trimEnd() + additions + ' />'
+  if (out.endsWith('>')) return out.slice(0, -1) + additions + '>'
+  return out
+}
 
-    // Вставляем перед закрытием тега (поддержка и `/>`, и `>`).
-    if (tag.endsWith('/>')) return tag.slice(0, -2) + additions + ' />'
-    if (tag.endsWith('>')) return tag.slice(0, -1) + additions + '>'
-    return tag
+/** `<img>`: оптимизированный `src`, `srcset` и `sizes`. */
+export function injectResponsiveImages(html: string, renditions: Map<string, MediaRendition>): string {
+  if (!html || renditions.size === 0) return html
+  return html.replace(/<img\b[^>]*?\/?>/gi, (tag) => enrichImgTag(tag, renditions))
+}
+
+/**
+ * CSS `url(...)` с оригиналом PNG/JPEG → оптимизированная версия. Кавычки —
+ * любые: `"`, `'`, без кавычек и `&quot;`/`&#39;` (так генератор пишет
+ * кавычки во встроенных стилях).
+ */
+export function swapCssMediaUrls(html: string, renditions: Map<string, MediaRendition>): string {
+  if (!html || renditions.size === 0) return html
+  return html.replace(/(url\(\s*)(&quot;|&#39;|"|')?([^"'()&\s]+)/gi, (whole, open: string, quote: string | undefined, url: string) => {
+    const ref = parseMediaUrl(url)
+    const lighter = ref ? optimizedUrl(ref, renditions.get(ref.uuid)) : null
+    return lighter ? `${open}${quote ?? ''}${lighter}` : whole
   })
 }
 
-/** Извлекает все уникальные id ассетов, на которые ссылается html через /media/<uuid>. */
-export function extractMediaIds(html: string): string[] {
+/** Всё сразу: `<img>` и CSS. */
+export function optimizeMediaInHtml(html: string, renditions: Map<string, MediaRendition>): string {
+  return swapCssMediaUrls(injectResponsiveImages(html, renditions), renditions)
+}
+
+/** Уникальные uuid хранилища, на которые ссылается html через `/media/<uuid>.`. */
+export function extractMediaUuids(html: string): string[] {
   if (!html) return []
-  const re = /\/media\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\./g
-  const ids = new Set<string>()
+  const re = new RegExp(`/media/(${UUID})\\.`, 'g')
+  const uuids = new Set<string>()
   let m: RegExpExecArray | null
   while ((m = re.exec(html)) !== null) {
-    ids.add(m[1].toLowerCase())
+    uuids.add(m[1].toLowerCase())
   }
-  return Array.from(ids)
+  return Array.from(uuids)
 }

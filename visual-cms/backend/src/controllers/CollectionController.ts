@@ -1,5 +1,4 @@
 import { Request, Response } from 'express'
-import * as fs from 'fs'
 import * as path from 'path'
 import { AppDataSource } from '../config/database'
 import { Collection } from '../models/Collection'
@@ -14,8 +13,26 @@ import { FetchConfig, AuthConfig } from '../services/SecureDataSourceService'
 import { CredentialsManager } from '../services/CredentialsManager'
 import { deployService } from '../services/DeployService'
 import { applyCollectionTransforms } from '../utils/collectionTransforms'
+import { pruneCollectionItems } from '../services/collectionOutput'
+import { languageService } from '../services/LanguageService'
+import type { DeployReportTarget } from '../services/deployReport'
 
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
+
+/** Раскладка коллекции под сервис-источник (provisionServiceCollection). */
+interface ProvisionPreset {
+  /** Поле тела запроса с адресом сервиса. */
+  baseUrlField: string
+  /** Путь списка полных данных элементов; {{lang}} — язык деплоя. */
+  path: string
+  titleField: string
+  reportDeployTo: DeployReportTarget | null
+}
+
+const PROVISION_PRESETS: Record<'estate' | 'news', ProvisionPreset> = {
+  estate: { baseUrlField: 'estateBaseUrl', path: '/api/complexes?full=1&lang={{lang}}', titleField: 'name', reportDeployTo: null },
+  news: { baseUrlField: 'newsBaseUrl', path: '/api/news?full=1&lang={{lang}}', titleField: 'title', reportDeployTo: 'news-service' },
+}
 
 export class CollectionController {
   private getRepository() {
@@ -107,7 +124,7 @@ export class CollectionController {
     // При смене basePath — удалить старые сгенерированные файлы
     if (data.basePath && data.basePath !== collection.basePath) {
       await this.checkBasePathConflict(collection.siteId, data.basePath)
-      this.cleanCollectionDir(collection.site ?? null, collection.basePath)
+      await this.cleanCollectionDir(collection.site ?? null, collection.basePath)
     }
 
     if (data.templatePageId && data.templatePageId !== collection.templatePageId) {
@@ -144,20 +161,20 @@ export class CollectionController {
     res.json({ message: 'Collection deleted' })
   })
 
-  // ─── Провижн связки estate-service → Collection ──────────────
+  // ─── Провижн связки сервис-источник → Collection ─────────────
 
   /**
-   * POST /api/collections/provision-estate
-   * Идемпотентно создаёт/обновляет:
-   *  1. DataSource(rest-api) → estate-service `/api/complexes?full=1&lang={{lang}}`
-   *     ({{lang}} подставляет DeployService при мультиязычном деплое);
-   *  2. Collection на выбранные сайт + страницу-шаблон с фиксированной раскладкой
-   *     полей estate (arrayPath=items, slugField=slug, titleField=name, apiIdField=slug).
+   * Идемпотентно создаёт/обновляет связку сервиса-источника с коллекцией:
+   *  1. DataSource(rest-api) → `<baseUrl><preset.path>` ({{lang}} подставляет
+   *     DeployService при мультиязычном деплое);
+   *  2. Collection на выбранные сайт + страницу-шаблон с раскладкой полей
+   *     сервиса (arrayPath=items, slugField=slug, apiIdField=slug).
    * Повторный вызов не плодит дубли — матч DataSource по имени, Collection по
    * (siteId, dataSourceId, basePath).
    */
-  provisionEstate = asyncHandler(async (req: Request, res: Response) => {
-    const { siteId, templatePageId, basePath, estateBaseUrl, name, dataSourceName } = req.body
+  private async provisionServiceCollection(req: Request, res: Response, preset: ProvisionPreset): Promise<void> {
+    const { siteId, templatePageId, basePath, name, dataSourceName } = req.body
+    const baseUrl = String(req.body[preset.baseUrlField])
 
     const [site, templatePage] = await Promise.all([
       AppDataSource.getRepository(Site).findOne({ where: { id: siteId } }),
@@ -167,7 +184,7 @@ export class CollectionController {
     if (!templatePage) throw new ValidationError('Template page not found')
 
     const dsRepo = this.getDataSourceRepository()
-    const url = `${String(estateBaseUrl).replace(/\/+$/, '')}/api/complexes?full=1&lang={{lang}}`
+    const url = `${baseUrl.replace(/\/+$/, '')}${preset.path}`
 
     // 1. DataSource — find-or-create по имени, URL держим в актуальном состоянии
     let dataSource = await dsRepo.findOne({ where: { name: dataSourceName } })
@@ -190,35 +207,24 @@ export class CollectionController {
     }
 
     // 2. Collection — find-or-create по (siteId, dataSourceId, basePath)
+    const layout = {
+      arrayPath: 'items',
+      slugField: 'slug',
+      titleField: preset.titleField,
+      apiIdField: 'slug',
+      reportDeployTo: preset.reportDeployTo,
+    }
     const repo = this.getRepository()
     let collection = await repo.findOne({ where: { siteId, dataSourceId: dataSource.id, basePath } })
     let collectionCreated = false
     if (!collection) {
       await this.checkBasePathConflict(siteId, basePath)
-      collection = repo.create({
-        siteId,
-        name,
-        dataSourceId: dataSource.id,
-        arrayPath: 'items',
-        templatePageId,
-        basePath,
-        slugField: 'slug',
-        titleField: 'name',
-        apiIdField: 'slug',
-        isActive: true,
-      })
+      collection = repo.create({ siteId, name, dataSourceId: dataSource.id, templatePageId, basePath, isActive: true, ...layout })
       await repo.save(collection)
       collectionCreated = true
     } else {
-      // Идемпотентно синхронизируем шаблон/имя/раскладку полей estate
-      Object.assign(collection, {
-        name,
-        templatePageId,
-        arrayPath: 'items',
-        slugField: 'slug',
-        titleField: 'name',
-        apiIdField: 'slug',
-      })
+      // Идемпотентно синхронизируем шаблон/имя/раскладку полей сервиса
+      Object.assign(collection, { name, templatePageId, ...layout })
       await repo.save(collection)
     }
 
@@ -233,6 +239,20 @@ export class CollectionController {
       collectionId: collection.id,
       created: { dataSource: dataSourceCreated, collection: collectionCreated },
     })
+  }
+
+  /** POST /api/collections/provision-estate — страницы проектов из estate-service. */
+  provisionEstate = asyncHandler(async (req: Request, res: Response) => {
+    await this.provisionServiceCollection(req, res, PROVISION_PRESETS.estate)
+  })
+
+  /**
+   * POST /api/collections/provision-news — страницы новостей из news-service.
+   * После деплоя коллекция сообщает сервису, что выкачено (reportDeployTo):
+   * его публичная лента отдаёт только выкаченные новости.
+   */
+  provisionNews = asyncHandler(async (req: Request, res: Response) => {
+    await this.provisionServiceCollection(req, res, PROVISION_PRESETS.news)
   })
 
   // ─── Элементы коллекции (из API) ─────────────────────────────
@@ -462,32 +482,36 @@ export class CollectionController {
   /**
    * Удаляет директорию сгенерированных файлов коллекции
    */
-  private cleanCollectionDir(site: Site | null, basePath: string): void {
+  private async cleanCollectionDir(site: Site | null, basePath: string): Promise<void> {
     const siteDir = site?.slug
       ? path.join(PUBLIC_DIR, 'sites', site.slug)
       : PUBLIC_DIR
-    const collectionDir = path.join(siteDir, basePath.replace(/^\//, ''))
+    const base = basePath.replace(/^\/|\/$/g, '')
+    if (!base) return // защита от удаления корня сайта
 
-    // Защита от удаления корневой директории сайта
-    if (collectionDir === siteDir || collectionDir === PUBLIC_DIR) {
-      return
-    }
-
-    if (fs.existsSync(collectionDir)) {
-      fs.rmSync(collectionDir, { recursive: true, force: true })
+    // Корневые распознаватели языка и папки языков: /<base>, /<lang>/<base>.
+    // Убираем только папки элементов коллекции — страница списка на basePath
+    // остаётся (см. services/collectionOutput.ts).
+    const languages = await languageService.getActive()
+    const dirs = [path.join(siteDir, base), ...languages.map((l) => path.join(siteDir, l.code, base))]
+    for (const dir of dirs) {
+      if (dir !== siteDir && dir !== PUBLIC_DIR) pruneCollectionItems(dir)
     }
   }
 
   /**
-   * Проверяет конфликт basePath с существующими страницами (Проблема 3)
+   * Проверяет конфликт basePath с существующими страницами (Проблема 3).
+   *
+   * Конфликт — страница ВНУТРИ папки коллекции (`news/архив`): её адрес может
+   * совпасть с адресом элемента. Страница на самом basePath (`news` — список
+   * новостей) не конфликтует: деплой коллекции убирает только свои папки
+   * элементов (services/collectionOutput.ts), index.html списка остаётся.
    */
   private async checkBasePathConflict(siteId: string, basePath: string): Promise<void> {
     const pathWithoutLeadingSlash = basePath.replace(/^\//, '')
     const pages = await this.getPageRepository().find({ where: { siteId } })
-    
-    const conflicting = pages.find(p => {
-      return p.slug === pathWithoutLeadingSlash || p.slug.startsWith(pathWithoutLeadingSlash + '/')
-    })
+
+    const conflicting = pages.find(p => p.slug.startsWith(pathWithoutLeadingSlash + '/'))
 
     if (conflicting) {
       throw new ConflictError(

@@ -16,6 +16,8 @@ services:
       # Токен записи estate-service — инжектится vite-прокси /estate-api
       # (server-side, не попадает в браузер). Должен совпадать с estate-service.
       - ESTATE_WRITE_TOKEN=dev-estate-write-token-change-me
+      # То же для news-service (vite-прокси /news-api).
+      - NEWS_WRITE_TOKEN=dev-news-write-token-change-me
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -49,8 +51,8 @@ services:
       # SSRF allowlist: доверенные внутренние хосты, которые резолвятся в
       # приватные IP и иначе блокируются ssrfGuard (см. B4 в KNOWN_ISSUES).
       # Точное совпадение hostname, lowercase, через запятую.
-      # estate-service — внутренний модуль ЖК, DataSource ходит к нему server-fetch.
-      - SSRF_ALLOWED_HOSTS=api.macrocrm.gh.uz,estate-service
+      # estate-service и news-service — внутренние модули, DataSource ходит к ним server-fetch.
+      - SSRF_ALLOWED_HOSTS=api.macrocrm.gh.uz,estate-service,news-service
       # --- Синхронизация с MacroCRM ---
       # Без MACRO_TOKEN и ESTATE_WRITE_TOKEN кнопка синхронизации отдаёт 503.
       # Токен CRM выдаёт Macro; держать только в окружении. MACRO_APP_ID нужен
@@ -61,6 +63,10 @@ services:
       # Тот же токен записи, что у estate-service.
       - ESTATE_SERVICE_URL=http://estate-service:5100
       - ESTATE_WRITE_TOKEN=dev-estate-write-token-change-me
+      # news-service: после деплоя коллекции новостей CMS сообщает ему, что
+      # выкачено (services/deployReport.ts). Токен — тот же, что у сервиса.
+      - NEWS_SERVICE_URL=http://news-service:5200
+      - NEWS_WRITE_TOKEN=dev-news-write-token-change-me
       # Коллекции, которые пересобрать после успешного прогона (через запятую).
       # Без них база обновится, а страницы останутся прежними до публикации.
       - MACRO_SYNC_COLLECTIONS=${MACRO_SYNC_COLLECTIONS:-}
@@ -94,6 +100,27 @@ services:
       - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
     volumes:
       - ./estate-service:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+    command: npm run dev
+
+  # Модуль новостей: отдельный сервис + отдельная БД `news` (создаётся
+  # автоматически на старте). CMS берёт из него карточки и страницы новостей
+  # (DataSource + коллекция), браузер — порции ленты через nginx /news-api/public/.
+  news-service:
+    build: ./news-service
+    ports:
+      - "5200:5200"
+    environment:
+      - NODE_ENV=development
+      - PORT=5200
+      - DATABASE_URL=postgresql://cms_user:cms_password@postgres:5432/news
+      # Токен для write-эндпоинтов (админка CMS, отчёт CMS о деплое). На проде переопределить.
+      - NEWS_WRITE_TOKEN=dev-news-write-token-change-me
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+    volumes:
+      - ./news-service:/app
       - /app/node_modules
     depends_on:
       - postgres

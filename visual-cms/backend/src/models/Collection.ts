@@ -81,6 +81,11 @@ export class Collection {
   @Column({ type: 'varchar', length: 50, default: 'api' })
   itemsOrder!: CollectionItemsOrder
 
+  // Кому сообщить после деплоя, какие элементы выкачены на каждом языке:
+  // ключ известной интеграции (services/deployReport.ts), не адрес. null — никому.
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  reportDeployTo?: string | null
+
   // --- Серверные трансформации элементов из API ---
   // include/exclude (по условию), sort, limit, unique, prepend, append.
   // Применяются DataTransformService при чтении (getItems) и деплое. Кеш

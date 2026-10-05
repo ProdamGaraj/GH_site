@@ -132,18 +132,31 @@ export const updateCollectionSchema = z.object({
 // POST /api/collections/provision-estate
 // Идемпотентный провижн связки estate-service → Collection: создаёт/находит
 // DataSource(rest-api) на estate-service и Collection на выбранный шаблон+сайт.
-export const provisionEstateSchema = z.object({
-  siteId: z.string().uuid('Invalid site ID'),
-  templatePageId: z.string().uuid('Invalid template page ID'),
-  basePath: z.string()
+const provisionBasePath = (fallback: string) =>
+  z.string()
     .min(1)
     .max(255)
     .regex(/^\/[a-z0-9\-\/]*$/, 'Base path must start with / and contain only lowercase, numbers, hyphens')
     .optional()
-    .default('/complex'),
+    .default(fallback)
+
+export const provisionEstateSchema = z.object({
+  siteId: z.string().uuid('Invalid site ID'),
+  templatePageId: z.string().uuid('Invalid template page ID'),
+  basePath: provisionBasePath('/complex'),
   estateBaseUrl: z.string().url('Invalid estate base URL').optional().default('http://estate-service:5100'),
   name: z.string().min(1).max(255).optional().default('Проекты (ЖК)'),
   dataSourceName: z.string().min(1).max(255).optional().default('Estate — Комплексы'),
+})
+
+// Провижн связки news-service → Collection: страницы новостей /<язык>/news/<slug>/.
+export const provisionNewsSchema = z.object({
+  siteId: z.string().uuid('Invalid site ID'),
+  templatePageId: z.string().uuid('Invalid template page ID'),
+  basePath: provisionBasePath('/news'),
+  newsBaseUrl: z.string().url('Invalid news base URL').optional().default('http://news-service:5200'),
+  name: z.string().min(1).max(255).optional().default('Новости'),
+  dataSourceName: z.string().min(1).max(255).optional().default('News — Новости'),
 })
 
 // POST /api/collections/:id/overrides

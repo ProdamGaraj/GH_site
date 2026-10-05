@@ -27,6 +27,7 @@ export default defineConfig(({ mode }) => {
   // чтобы не светить его в клиенте. Значение из окружения контейнера frontend.
   const estateToken =
     process.env.ESTATE_WRITE_TOKEN || env.ESTATE_WRITE_TOKEN || 'dev-estate-write-token-change-me'
+  const newsToken = process.env.NEWS_WRITE_TOKEN || env.NEWS_WRITE_TOKEN || 'dev-news-write-token-change-me'
 
   return {
     // The CMS is served under this path prefix by nginx on the shared domain
@@ -67,6 +68,14 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (p) => p.replace(/^\/estate-api/, ''),
           headers: { 'X-Estate-Token': estateToken },
+        },
+        // Модуль новостей (news-service): так же, токен X-News-Token добавляет
+        // прокси (на проде — nginx location /news-api/ + auth_request к CMS).
+        '/news-api': {
+          target: 'http://news-service:5200',
+          changeOrigin: true,
+          rewrite: (p) => p.replace(/^\/news-api/, ''),
+          headers: { 'X-News-Token': newsToken },
         },
       },
     },

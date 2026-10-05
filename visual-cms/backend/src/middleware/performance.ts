@@ -31,14 +31,16 @@ interface RequestTimingInfo {
 const requestTimings: Map<string, RequestTimingInfo[]> = new Map()
 const MAX_TIMING_KEYS = 500
 
-// Periodic cleanup: remove oldest entries when map exceeds limit
+// Periodic cleanup: remove oldest entries when map exceeds limit.
+// unref: таймер не держит процесс — сервер живёт за счёт HTTP, а тесты,
+// импортирующие middleware, иначе не завершались.
 setInterval(() => {
   if (requestTimings.size > MAX_TIMING_KEYS) {
     const keys = Array.from(requestTimings.keys())
     const toRemove = keys.slice(0, keys.length - MAX_TIMING_KEYS)
     toRemove.forEach(k => requestTimings.delete(k))
   }
-}, 300000)  // every 5 minutes
+}, 300000).unref()  // every 5 minutes
 
 /**
  * Middleware для измерения времени выполнения запросов

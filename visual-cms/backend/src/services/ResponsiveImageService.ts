@@ -1,45 +1,42 @@
-import { In } from 'typeorm'
-import { AppDataSource } from '../config/database'
-import { MediaAsset } from '../models/MediaAsset'
 import { logger } from './Logger'
-import {
-  injectResponsiveImages,
-  extractMediaIds,
-  type ResponsiveVariant,
-} from './responsiveImages'
+import { findAssetsByStorageUuids, storageUuidOf } from './mediaAssetLookup'
+import { extractMediaUuids, optimizeMediaInHtml, type MediaRendition } from './responsiveImages'
 
 /**
- * Обогащает готовый HTML страницы адаптивными `srcset`/`sizes`.
+ * Облегчает картинки готового HTML страницы (см. responsiveImages.ts):
+ * `<img>` получает оптимизированный `src`, `srcset` и `sizes`, CSS-фоны —
+ * оптимизированную версию вместо оригинала PNG/JPEG.
  *
- * Для каждого `<img src=".../media/<uuid>...">` находит варианты ассета (по uuid)
- * и дописывает srcset, чтобы на сайте под разные экраны грузились разные размеры.
+ * Файлы ищутся по uuid хранилища из адреса `/media/<uuid>.<ext>` — он не
+ * совпадает с id записи MediaAsset. Раньше искали по id, ничего не находили,
+ * и сайт грузил оригиналы (слайды по 6 МБ вместо 0,3 МБ webp).
  *
- * Один батч-запрос на страницу (id IN (...)) — без N+1.
+ * Один батч-запрос на страницу — без N+1.
  * Best-effort: при ошибке возвращает исходный html (деплой не падает).
  */
 export class ResponsiveImageService {
   async enrich(html: string): Promise<string> {
     try {
-      const ids = extractMediaIds(html)
-      if (ids.length === 0) return html
+      const uuids = extractMediaUuids(html)
+      if (uuids.length === 0) return html
 
-      const assets = await AppDataSource.getRepository(MediaAsset).find({
-        where: { id: In(ids) },
-        select: ['id', 'variants'],
+      const assets = await findAssetsByStorageUuids(uuids, {
+        optimizedStorageKey: true,
+        width: true,
+        variants: true,
       })
-
-      const map = new Map<string, ResponsiveVariant[]>()
+      const renditions = new Map<string, MediaRendition>()
       for (const a of assets) {
-        if (a.variants && a.variants.length > 0) {
-          map.set(
-            a.id.toLowerCase(),
-            a.variants.map((v) => ({ width: v.width, storageKey: v.storageKey })),
-          )
-        }
+        renditions.set(storageUuidOf(a.storageKey), {
+          storageKey: a.storageKey,
+          optimizedKey: a.optimizedStorageKey ?? null,
+          width: a.width ?? null,
+          variants: (a.variants ?? []).map((v) => ({ width: v.width, storageKey: v.storageKey })),
+        })
       }
-      if (map.size === 0) return html
+      if (renditions.size === 0) return html
 
-      return injectResponsiveImages(html, map)
+      return optimizeMediaInHtml(html, renditions)
     } catch (err: any) {
       logger.warn('[ResponsiveImageService] enrich failed, returning original html', {
         error: err?.message,

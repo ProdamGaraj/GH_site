@@ -157,3 +157,73 @@ describe('CollectionController.provisionEstate', () => {
     expect(res.status).not.toHaveBeenCalled()
   })
 })
+
+/**
+ * Провижн связки news-service → Collection (POST /api/collections/provision-news):
+ * тот же общий путь, другая раскладка — заголовок по title и отчёт о деплое
+ * сервису (reportDeployTo), без которого публичная лента не узнает, что выкачено.
+ */
+describe('CollectionController.provisionNews', () => {
+  const next = jest.fn() as unknown as NextFunction
+  const newsBody = {
+    siteId: 'site-1',
+    templatePageId: 'page-news',
+    basePath: '/news',
+    newsBaseUrl: 'http://news-service:5200/',
+    name: 'Новости',
+    dataSourceName: 'News — Новости',
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockRepos.Site.findOne.mockResolvedValue({ id: 'site-1' })
+    mockRepos.Page.findOne.mockResolvedValue({ id: 'page-news', isTemplate: false })
+    mockRepos.Collection.create.mockImplementation((d: any) => ({ id: 'col-news', ...d }))
+    mockRepos.DataSource.create.mockImplementation((d: any) => ({ id: 'ds-news', ...d }))
+    mockRepos.DataSource.findOne.mockResolvedValue(null)
+    mockRepos.Collection.findOne.mockResolvedValue(null)
+  })
+
+  it('создаёт источник /api/news и коллекцию с отчётом о деплое news-service', async () => {
+    // Страница списка /news уже есть — это не конфликт: деплой коллекции её не трогает.
+    mockRepos.Page.find.mockResolvedValue([{ name: 'News', slug: 'news' }])
+    const res = makeRes()
+
+    await ctrl.provisionNews({ body: { ...newsBody } } as Request, res, next)
+    await flush()
+
+    expect(next).not.toHaveBeenCalled()
+    expect(mockRepos.DataSource.create.mock.calls[0][0].config.url).toBe('http://news-service:5200/api/news?full=1&lang={{lang}}')
+    expect(mockRepos.Collection.create.mock.calls[0][0]).toMatchObject({
+      basePath: '/news',
+      arrayPath: 'items',
+      slugField: 'slug',
+      titleField: 'title',
+      apiIdField: 'slug',
+      reportDeployTo: 'news-service',
+    })
+    expect(res.status).toHaveBeenCalledWith(201)
+  })
+
+  it('страница ВНУТРИ папки коллекции — конфликт (её адрес мог бы совпасть с новостью)', async () => {
+    mockRepos.Page.find.mockResolvedValue([{ name: 'Архив', slug: 'news/archive' }])
+    const res = makeRes()
+    const localNext = jest.fn() as unknown as NextFunction
+
+    await ctrl.provisionNews({ body: { ...newsBody } } as Request, res, localNext)
+    await flush()
+
+    expect(localNext).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('news/archive') }))
+    expect(mockRepos.Collection.create).not.toHaveBeenCalled()
+  })
+
+  it('estate по-прежнему без отчёта о деплое', async () => {
+    mockRepos.Page.find.mockResolvedValue([])
+    const res = makeRes()
+
+    await ctrl.provisionEstate({ body: { ...baseBody } } as Request, res, next)
+    await flush()
+
+    expect(mockRepos.Collection.create.mock.calls[0][0]).toMatchObject({ titleField: 'name', reportDeployTo: null })
+  })
+})
