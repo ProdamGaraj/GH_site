@@ -24,7 +24,9 @@ vi.mock('@/shared/forms/GallerySlidesField', () => ({
     <input aria-label={label} value={(value ?? []).join(',')} onChange={(e) => onChange(e.target.value ? e.target.value.split(',') : [])} />
   ),
 }))
-vi.mock('../api', () => ({
+vi.mock('../api', async () => ({
+  // Настоящий клиент CMS-эндпоинта: он ходит через общий api, подменённый ниже.
+  newsCmsApi: (await vi.importActual<typeof import('../api')>('../api')).newsCmsApi,
   newsApi: {
     list: vi.fn(),
     get: vi.fn(),
@@ -399,5 +401,36 @@ describe('DictionariesPanel', () => {
     await waitFor(() =>
       expect(api.updateDictionary).toHaveBeenCalledWith('categories', 'promo', { nameRu: 'Акции', nameUz: 'Aksiyalar', nameEn: '', order: 0, hidden: false })
     )
+  })
+})
+
+// --- Страницы новостей (коллекция) ---
+
+vi.mock('@/shared/api', () => ({
+  siteApi: { getAll: vi.fn(async () => [{ id: 'site-1', name: 'Golden House' }]) },
+  pageApi: {
+    getAll: vi.fn(async () => [
+      { id: 'p-news', name: 'News', slug: 'news' },
+      { id: 'p-tpl', name: 'Новость (шаблон)', slug: 'news-template' },
+    ]),
+  },
+  api: { post: vi.fn(async () => ({ dataSourceId: 'ds', collectionId: 'col-1', created: { dataSource: true, collection: true } })) },
+}))
+
+describe('«Страницы новостей»', () => {
+  it('шаблон «Новость» выбран сам; создание — эндпоинт provision-news с /news', async () => {
+    const { api: cms } = await import('@/shared/api')
+    api.list.mockResolvedValue([])
+    render(
+      <MemoryRouter>
+        <NewsList />
+      </MemoryRouter>
+    )
+    fireEvent.click(await screen.findByRole('button', { name: /Страницы новостей/ }))
+    await waitFor(() => expect((screen.getByDisplayValue('Новость (шаблон) (/news-template)') as HTMLSelectElement)).toBeTruthy())
+    expect(screen.getByDisplayValue('/news')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Создать связку' }))
+    await screen.findByText('Коллекция создана')
+    expect(vi.mocked(cms.post)).toHaveBeenCalledWith('/collections/provision-news', { siteId: 'site-1', templatePageId: 'p-tpl', basePath: '/news' })
   })
 })

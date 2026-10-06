@@ -1,0 +1,1364 @@
+{
+ "id": "1782735638294_2o2imoxm3",
+ "styles": {
+  "properties": {
+   "gap": "clamp(16px, 2vw, 28px)",
+   "display": "grid",
+   "paddingLeft": "150px",
+   "paddingRight": "150px",
+   "paddingBottom": "80px",
+   "gridTemplateColumns": "repeat(3, minmax(0, 1fr))"
+  }
+ },
+ "tagName": "section",
+ "children": [
+  {
+   "id": "node-1782723357474-bcoaxtgkv",
+   "styles": {
+    "states": {
+     "hover": {
+      "boxShadow": "0 26px 60px rgba(21, 24, 29, .12)",
+      "transform": "translateY(-4px)",
+      "borderColor": "rgba(253, 184, 42, .36)"
+     }
+    },
+    "properties": {
+     "border": "1px solid rgba(21, 24, 29, .08)",
+     "display": "flex",
+     "overflow": "hidden",
+     "boxShadow": "0 18px 44px rgba(21, 24, 29, .07)",
+     "minHeight": "100%",
+     "background": "var(--white)",
+     "transition": "transform .24s ease, box-shadow .24s ease, border-color .24s ease",
+     "borderRadius": "24px"
+    }
+   },
+   "tagName": "article",
+   "children": [
+    {
+     "id": "node-1782723357474-kxb1zejmc",
+     "styles": {
+      "properties": {
+       "width": "100%",
+       "display": "flex",
+       "minHeight": "100%",
+       "flexDirection": "column"
+      }
+     },
+     "tagName": "div",
+     "children": [
+      {
+       "id": "node-1782723357474-43hg925ki",
+       "styles": {
+        "properties": {
+         "overflow": "hidden",
+         "position": "relative",
+         "background": "var(--paper)",
+         "aspectRatio": "1.72 / 1"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1782723357474-4j50be8qi",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "img",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "alt": "Акция Golden House с ваучером Makro",
+          "src": "/media/c281597d-4e78-4927-a81d-f2f863888a51.png"
+         },
+         "elementType": "image"
+        },
+        {
+         "id": "node-1782723357474-w7khc3mhm",
+         "styles": {
+          "properties": {
+           "top": "16px",
+           "left": "16px",
+           "color": "var(--white)",
+           "border": "1px solid rgba(255, 255, 255, .34)",
+           "display": "inline-flex",
+           "padding": "8px 14px",
+           "fontSize": "12px",
+           "position": "absolute",
+           "minHeight": "34px",
+           "alignItems": "center",
+           "background": "rgba(21, 24, 29, .38)",
+           "fontWeight": "900",
+           "borderRadius": "999px",
+           "backdropFilter": "blur(12px)",
+           "WebkitBackdropFilter": "blur(12px)"
+          }
+         },
+         "content": "Акции",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "news-badge"
+         },
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "news-media"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1782723357474-6nxrv1swi",
+       "styles": {
+        "properties": {
+         "flex": "1",
+         "display": "flex",
+         "padding": "clamp(20px, 2vw, 28px)",
+         "flexDirection": "column"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1782723357474-e9kag7hty",
+         "styles": {
+          "properties": {
+           "color": "rgba(21, 24, 29, .48)",
+           "fontSize": "13px",
+           "fontWeight": "800"
+          }
+         },
+         "content": "Действует сейчас",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "news-date"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-3wsrh3q9h",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Ваучер Makro на 2 миллиона сум в подарок",
+         "tagName": "h2",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-s0nw11n7m",
+         "styles": {
+          "properties": {}
+         },
+         "content": "При покупке недвижимости в Golden House покупатель получает ваучер Makro на 2 миллиона сум.",
+         "tagName": "p",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-27pr94sl1",
+         "styles": {
+          "properties": {
+           "gap": "8px",
+           "display": "flex",
+           "flexWrap": "wrap",
+           "marginTop": "auto",
+           "paddingTop": "22px"
+          }
+         },
+         "tagName": "div",
+         "children": [
+          {
+           "id": "node-1782723357474-7hpznhpqm",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Подарок",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          },
+          {
+           "id": "node-1782723357474-judjp77ki",
+           "styles": {
+            "properties": {}
+           },
+           "content": "ЖК Golden House",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "news-tags"
+         },
+         "layoutMode": "flex",
+         "elementType": "container"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "news-body"
+       },
+       "layoutMode": "flex",
+       "elementType": "container"
+      }
+     ],
+     "metadata": {},
+     "attributes": {
+      "class": "news-card-inner"
+     },
+     "layoutMode": "flex",
+     "elementType": "container"
+    }
+   ],
+   "metadata": {},
+   "attributes": {
+    "class": "news-card",
+    "data-news-type": "offer"
+   },
+   "layoutMode": "flex",
+   "elementType": "container"
+  },
+  {
+   "id": "node-1782723357474-pel1zl4ek",
+   "styles": {
+    "states": {
+     "hover": {
+      "boxShadow": "0 26px 60px rgba(21, 24, 29, .12)",
+      "transform": "translateY(-4px)",
+      "borderColor": "rgba(253, 184, 42, .36)"
+     }
+    },
+    "properties": {
+     "border": "1px solid rgba(21, 24, 29, .08)",
+     "display": "flex",
+     "overflow": "hidden",
+     "boxShadow": "0 18px 44px rgba(21, 24, 29, .07)",
+     "minHeight": "100%",
+     "background": "var(--white)",
+     "transition": "transform .24s ease, box-shadow .24s ease, border-color .24s ease",
+     "borderRadius": "24px"
+    }
+   },
+   "tagName": "article",
+   "children": [
+    {
+     "id": "node-1782723357474-bricy0ksn",
+     "styles": {
+      "properties": {
+       "width": "100%",
+       "display": "flex",
+       "minHeight": "100%",
+       "flexDirection": "column"
+      }
+     },
+     "tagName": "div",
+     "children": [
+      {
+       "id": "node-1782723357474-q53awdxds",
+       "styles": {
+        "properties": {
+         "overflow": "hidden",
+         "position": "relative",
+         "background": "var(--paper)",
+         "aspectRatio": "1.72 / 1"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1782723357474-ikku1rsch",
+         "styles": {
+          "properties": {
+           "objectPosition": "top center"
+          }
+         },
+         "tagName": "img",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "alt": "Департамент клиентского сервиса Golden House",
+          "src": "/media/7022a2b3-3e35-46bc-8b52-2f239011b7de.png",
+          "loading": "eager"
+         },
+         "elementType": "image"
+        },
+        {
+         "id": "node-1782723357474-7esa6094g",
+         "styles": {
+          "properties": {
+           "top": "16px",
+           "left": "16px",
+           "color": "var(--white)",
+           "border": "1px solid rgba(255, 255, 255, .34)",
+           "display": "inline-flex",
+           "padding": "8px 14px",
+           "fontSize": "12px",
+           "position": "absolute",
+           "minHeight": "34px",
+           "alignItems": "center",
+           "background": "rgba(21, 24, 29, .38)",
+           "fontWeight": "900",
+           "borderRadius": "999px",
+           "backdropFilter": "blur(12px)",
+           "WebkitBackdropFilter": "blur(12px)"
+          }
+         },
+         "content": "Новости",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "news-badge"
+         },
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "news-media"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1782723357474-68f6ld0ac",
+       "styles": {
+        "properties": {
+         "flex": "1",
+         "display": "flex",
+         "padding": "clamp(20px, 2vw, 28px)",
+         "flexDirection": "column"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1782723357474-lvaho8ofn",
+         "styles": {
+          "properties": {
+           "color": "rgba(21, 24, 29, .48)",
+           "fontSize": "13px",
+           "fontWeight": "800"
+          }
+         },
+         "content": "Клиентский сервис",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "news-date"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-9wn4rm26c",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Поддержка жителей после покупки",
+         "tagName": "h2",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-x7pq9ew4i",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Департамент клиентского сервиса помогает с передачей ключей, гарантийными обращениями и заявками жителей.",
+         "tagName": "p",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-ad2ctnzn2",
+         "styles": {
+          "properties": {
+           "gap": "8px",
+           "display": "flex",
+           "flexWrap": "wrap",
+           "marginTop": "auto",
+           "paddingTop": "22px"
+          }
+         },
+         "tagName": "div",
+         "children": [
+          {
+           "id": "node-1782723357474-9hzntndxx",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Сервис",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          },
+          {
+           "id": "node-1782723357474-unn0wesv5",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Гарантия",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "news-tags"
+         },
+         "layoutMode": "flex",
+         "elementType": "container"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "news-body"
+       },
+       "layoutMode": "flex",
+       "elementType": "container"
+      }
+     ],
+     "metadata": {},
+     "attributes": {
+      "class": "news-card-inner"
+     },
+     "layoutMode": "flex",
+     "elementType": "container"
+    }
+   ],
+   "metadata": {},
+   "attributes": {
+    "class": "news-card",
+    "data-news-type": "news"
+   },
+   "layoutMode": "flex",
+   "elementType": "container"
+  },
+  {
+   "id": "node-1782723357474-0qwwjwyv6",
+   "styles": {
+    "states": {
+     "hover": {
+      "boxShadow": "0 26px 60px rgba(21, 24, 29, .12)",
+      "transform": "translateY(-4px)",
+      "borderColor": "rgba(253, 184, 42, .36)"
+     }
+    },
+    "properties": {
+     "border": "1px solid rgba(21, 24, 29, .08)",
+     "display": "flex",
+     "overflow": "hidden",
+     "boxShadow": "0 18px 44px rgba(21, 24, 29, .07)",
+     "minHeight": "100%",
+     "background": "var(--white)",
+     "transition": "transform .24s ease, box-shadow .24s ease, border-color .24s ease",
+     "borderRadius": "24px"
+    }
+   },
+   "tagName": "article",
+   "children": [
+    {
+     "id": "node-1782723357474-ur32dm226",
+     "styles": {
+      "properties": {
+       "width": "100%",
+       "display": "flex",
+       "minHeight": "100%",
+       "flexDirection": "column"
+      }
+     },
+     "tagName": "div",
+     "children": [
+      {
+       "id": "node-1782723357474-1zrazhikr",
+       "styles": {
+        "properties": {
+         "overflow": "hidden",
+         "position": "relative",
+         "background": "var(--paper)",
+         "aspectRatio": "1.72 / 1"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1782723357474-ax72c11bi",
+         "styles": {
+          "properties": {
+           "objectPosition": "top center"
+          }
+         },
+         "tagName": "img",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "alt": "Специальные цены Golden House",
+          "src": "/media/7d2519d0-55e4-48e0-8081-6a0649e97bb7.jpg"
+         },
+         "elementType": "image"
+        },
+        {
+         "id": "node-1782723357474-vq2f1910m",
+         "styles": {
+          "properties": {
+           "top": "16px",
+           "left": "16px",
+           "color": "var(--white)",
+           "border": "1px solid rgba(255, 255, 255, .34)",
+           "display": "inline-flex",
+           "padding": "8px 14px",
+           "fontSize": "12px",
+           "position": "absolute",
+           "minHeight": "34px",
+           "alignItems": "center",
+           "background": "rgba(21, 24, 29, .38)",
+           "fontWeight": "900",
+           "borderRadius": "999px",
+           "backdropFilter": "blur(12px)",
+           "WebkitBackdropFilter": "blur(12px)"
+          }
+         },
+         "content": "Акции",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "news-badge"
+         },
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "news-media"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1782723357474-52nm5645b",
+       "styles": {
+        "properties": {
+         "flex": "1",
+         "display": "flex",
+         "padding": "clamp(20px, 2vw, 28px)",
+         "flexDirection": "column"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1782723357474-va8r6zom6",
+         "styles": {
+          "properties": {
+           "color": "rgba(21, 24, 29, .48)",
+           "fontSize": "13px",
+           "fontWeight": "800"
+          }
+         },
+         "content": "Спецпредложение",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "news-date"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-00unwoc83",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Квартиры по специальным условиям",
+         "tagName": "h2",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-z13et588c",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Подборка актуальных предложений по жилым комплексам с выгодными условиями покупки.",
+         "tagName": "p",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-fnugtikl6",
+         "styles": {
+          "properties": {
+           "gap": "8px",
+           "display": "flex",
+           "flexWrap": "wrap",
+           "marginTop": "auto",
+           "paddingTop": "22px"
+          }
+         },
+         "tagName": "div",
+         "children": [
+          {
+           "id": "node-1782723357474-7lg7nwkn4",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Скидка",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          },
+          {
+           "id": "node-1782723357474-jrme4w3j4",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Ипотека",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "news-tags"
+         },
+         "layoutMode": "flex",
+         "elementType": "container"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "news-body"
+       },
+       "layoutMode": "flex",
+       "elementType": "container"
+      }
+     ],
+     "metadata": {},
+     "attributes": {
+      "class": "news-card-inner"
+     },
+     "layoutMode": "flex",
+     "elementType": "container"
+    }
+   ],
+   "metadata": {},
+   "attributes": {
+    "class": "news-card",
+    "data-news-type": "offer"
+   },
+   "layoutMode": "flex",
+   "elementType": "container"
+  },
+  {
+   "id": "node-1782723357474-gk33txmn8",
+   "styles": {
+    "states": {
+     "hover": {
+      "boxShadow": "0 26px 60px rgba(21, 24, 29, .12)",
+      "transform": "translateY(-4px)",
+      "borderColor": "rgba(253, 184, 42, .36)"
+     }
+    },
+    "properties": {
+     "border": "1px solid rgba(21, 24, 29, .08)",
+     "display": "flex",
+     "overflow": "hidden",
+     "boxShadow": "0 18px 44px rgba(21, 24, 29, .07)",
+     "minHeight": "100%",
+     "background": "var(--white)",
+     "transition": "transform .24s ease, box-shadow .24s ease, border-color .24s ease",
+     "borderRadius": "24px"
+    }
+   },
+   "tagName": "article",
+   "children": [
+    {
+     "id": "node-1782723357474-e2heg3tqm",
+     "styles": {
+      "properties": {
+       "width": "100%",
+       "display": "flex",
+       "minHeight": "100%",
+       "flexDirection": "column"
+      }
+     },
+     "tagName": "div",
+     "children": [
+      {
+       "id": "node-1782723357474-1kimqamd9",
+       "styles": {
+        "properties": {
+         "overflow": "hidden",
+         "position": "relative",
+         "background": "var(--paper)",
+         "aspectRatio": "1.72 / 1"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1782723357474-8kqzhp3e0",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "img",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "alt": "O'zMakon Business",
+          "src": "/media/594d3b5f-d7dd-4be5-a3b6-b59c960ffcda.jpg"
+         },
+         "elementType": "image"
+        },
+        {
+         "id": "node-1782723357474-mtxb59zo3",
+         "styles": {
+          "properties": {
+           "top": "16px",
+           "left": "16px",
+           "color": "var(--white)",
+           "border": "1px solid rgba(255, 255, 255, .34)",
+           "display": "inline-flex",
+           "padding": "8px 14px",
+           "fontSize": "12px",
+           "position": "absolute",
+           "minHeight": "34px",
+           "alignItems": "center",
+           "background": "rgba(21, 24, 29, .38)",
+           "fontWeight": "900",
+           "borderRadius": "999px",
+           "backdropFilter": "blur(12px)",
+           "WebkitBackdropFilter": "blur(12px)"
+          }
+         },
+         "content": "Новости",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "news-badge"
+         },
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "news-media"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1782723357474-dw9mryrf7",
+       "styles": {
+        "properties": {
+         "flex": "1",
+         "display": "flex",
+         "padding": "clamp(20px, 2vw, 28px)",
+         "flexDirection": "column"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1782723357474-3sb3pjyi8",
+         "styles": {
+          "properties": {
+           "color": "rgba(21, 24, 29, .48)",
+           "fontSize": "13px",
+           "fontWeight": "800"
+          }
+         },
+         "content": "O'zMakon Business",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "news-date"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-0e11anq7n",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Новый этап строительства",
+         "tagName": "h2",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-g028xx2tv",
+         "styles": {
+          "properties": {}
+         },
+         "content": "В проекте продолжаются работы по корпусам, благоустройству и инженерной инфраструктуре.",
+         "tagName": "p",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-iyr2v7w6g",
+         "styles": {
+          "properties": {
+           "gap": "8px",
+           "display": "flex",
+           "flexWrap": "wrap",
+           "marginTop": "auto",
+           "paddingTop": "22px"
+          }
+         },
+         "tagName": "div",
+         "children": [
+          {
+           "id": "node-1782723357474-njzdi0h40",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Строительство",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          },
+          {
+           "id": "node-1782723357474-lbbhhgasi",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Бизнес-класс",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "news-tags"
+         },
+         "layoutMode": "flex",
+         "elementType": "container"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "news-body"
+       },
+       "layoutMode": "flex",
+       "elementType": "container"
+      }
+     ],
+     "metadata": {},
+     "attributes": {
+      "class": "news-card-inner"
+     },
+     "layoutMode": "flex",
+     "elementType": "container"
+    }
+   ],
+   "metadata": {},
+   "attributes": {
+    "class": "news-card",
+    "data-news-type": "news"
+   },
+   "layoutMode": "flex",
+   "elementType": "container"
+  },
+  {
+   "id": "node-1782723357474-1hkorvuiv",
+   "styles": {
+    "states": {
+     "hover": {
+      "boxShadow": "0 26px 60px rgba(21, 24, 29, .12)",
+      "transform": "translateY(-4px)",
+      "borderColor": "rgba(253, 184, 42, .36)"
+     }
+    },
+    "properties": {
+     "border": "1px solid rgba(21, 24, 29, .08)",
+     "display": "flex",
+     "overflow": "hidden",
+     "boxShadow": "0 18px 44px rgba(21, 24, 29, .07)",
+     "minHeight": "100%",
+     "background": "var(--white)",
+     "transition": "transform .24s ease, box-shadow .24s ease, border-color .24s ease",
+     "borderRadius": "24px"
+    }
+   },
+   "tagName": "article",
+   "children": [
+    {
+     "id": "node-1782723357474-iiyyskqbs",
+     "styles": {
+      "properties": {
+       "width": "100%",
+       "display": "flex",
+       "minHeight": "100%",
+       "flexDirection": "column"
+      }
+     },
+     "tagName": "div",
+     "children": [
+      {
+       "id": "node-1782723357474-v84ya34r0",
+       "styles": {
+        "properties": {
+         "overflow": "hidden",
+         "position": "relative",
+         "background": "var(--paper)",
+         "aspectRatio": "1.72 / 1"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1782723357474-hxg4em2ys",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "img",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "alt": "Рассрочка Golden House",
+          "src": "/media/a6cd7159-7810-4d66-ad95-b64b6b5831c4.jpg"
+         },
+         "elementType": "image"
+        },
+        {
+         "id": "node-1782723357474-vy43s9o1z",
+         "styles": {
+          "properties": {
+           "top": "16px",
+           "left": "16px",
+           "color": "var(--white)",
+           "border": "1px solid rgba(255, 255, 255, .34)",
+           "display": "inline-flex",
+           "padding": "8px 14px",
+           "fontSize": "12px",
+           "position": "absolute",
+           "minHeight": "34px",
+           "alignItems": "center",
+           "background": "rgba(21, 24, 29, .38)",
+           "fontWeight": "900",
+           "borderRadius": "999px",
+           "backdropFilter": "blur(12px)",
+           "WebkitBackdropFilter": "blur(12px)"
+          }
+         },
+         "content": "Акции",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "news-badge"
+         },
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "news-media"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1782723357474-5kcfdjpt2",
+       "styles": {
+        "properties": {
+         "flex": "1",
+         "display": "flex",
+         "padding": "clamp(20px, 2vw, 28px)",
+         "flexDirection": "column"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1782723357474-0szjrd6m3",
+         "styles": {
+          "properties": {
+           "color": "rgba(21, 24, 29, .48)",
+           "fontSize": "13px",
+           "fontWeight": "800"
+          }
+         },
+         "content": "Условия покупки",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "news-date"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-e7txapux6",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Рассрочка и ипотека",
+         "tagName": "h2",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-potrq5ep2",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Удобные платежные сценарии и партнерские программы для покупки квартиры в проектах Golden House.",
+         "tagName": "p",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-tkisjz279",
+         "styles": {
+          "properties": {
+           "gap": "8px",
+           "display": "flex",
+           "flexWrap": "wrap",
+           "marginTop": "auto",
+           "paddingTop": "22px"
+          }
+         },
+         "tagName": "div",
+         "children": [
+          {
+           "id": "node-1782723357474-1fir9ld9c",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Рассрочка",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          },
+          {
+           "id": "node-1782723357474-sp7erdmsg",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Банки",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "news-tags"
+         },
+         "layoutMode": "flex",
+         "elementType": "container"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "news-body"
+       },
+       "layoutMode": "flex",
+       "elementType": "container"
+      }
+     ],
+     "metadata": {},
+     "attributes": {
+      "class": "news-card-inner"
+     },
+     "layoutMode": "flex",
+     "elementType": "container"
+    }
+   ],
+   "metadata": {},
+   "attributes": {
+    "class": "news-card",
+    "data-news-type": "offer"
+   },
+   "layoutMode": "flex",
+   "elementType": "container"
+  },
+  {
+   "id": "node-1782723357474-18vhk38o5",
+   "styles": {
+    "states": {
+     "hover": {
+      "boxShadow": "0 26px 60px rgba(21, 24, 29, .12)",
+      "transform": "translateY(-4px)",
+      "borderColor": "rgba(253, 184, 42, .36)"
+     }
+    },
+    "properties": {
+     "border": "1px solid rgba(21, 24, 29, .08)",
+     "display": "flex",
+     "overflow": "hidden",
+     "boxShadow": "0 18px 44px rgba(21, 24, 29, .07)",
+     "minHeight": "100%",
+     "background": "var(--white)",
+     "transition": "transform .24s ease, box-shadow .24s ease, border-color .24s ease",
+     "borderRadius": "24px"
+    }
+   },
+   "tagName": "article",
+   "children": [
+    {
+     "id": "node-1782723357474-hzjyeregn",
+     "styles": {
+      "properties": {
+       "width": "100%",
+       "display": "flex",
+       "minHeight": "100%",
+       "flexDirection": "column"
+      }
+     },
+     "tagName": "div",
+     "children": [
+      {
+       "id": "node-1782723357474-ln39n8cj3",
+       "styles": {
+        "properties": {
+         "overflow": "hidden",
+         "position": "relative",
+         "background": "var(--paper)",
+         "aspectRatio": "1.72 / 1"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1782723357474-vxwg7rlp5",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "img",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "alt": "Infinity Golden House",
+          "src": "/media/a6a37e56-dc4e-449a-b6fb-8f0384f307fd.jpg"
+         },
+         "elementType": "image"
+        },
+        {
+         "id": "node-1782723357474-m0rxz5qov",
+         "styles": {
+          "properties": {
+           "top": "16px",
+           "left": "16px",
+           "color": "var(--white)",
+           "border": "1px solid rgba(255, 255, 255, .34)",
+           "display": "inline-flex",
+           "padding": "8px 14px",
+           "fontSize": "12px",
+           "position": "absolute",
+           "minHeight": "34px",
+           "alignItems": "center",
+           "background": "rgba(21, 24, 29, .38)",
+           "fontWeight": "900",
+           "borderRadius": "999px",
+           "backdropFilter": "blur(12px)",
+           "WebkitBackdropFilter": "blur(12px)"
+          }
+         },
+         "content": "Новости",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "news-badge"
+         },
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "news-media"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1782723357474-nbnb3xt95",
+       "styles": {
+        "properties": {
+         "flex": "1",
+         "display": "flex",
+         "padding": "clamp(20px, 2vw, 28px)",
+         "flexDirection": "column"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1782723357474-myvlr4hjm",
+         "styles": {
+          "properties": {
+           "color": "rgba(21, 24, 29, .48)",
+           "fontSize": "13px",
+           "fontWeight": "800"
+          }
+         },
+         "content": "Проекты",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "news-date"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-1kw2yhohe",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Обновления жилых комплексов",
+         "tagName": "h2",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-ye8d9nbc7",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Следите за новыми этапами, сервисными обновлениями и развитием городской среды Golden House.",
+         "tagName": "p",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1782723357474-f4a063joq",
+         "styles": {
+          "properties": {
+           "gap": "8px",
+           "display": "flex",
+           "flexWrap": "wrap",
+           "marginTop": "auto",
+           "paddingTop": "22px"
+          }
+         },
+         "tagName": "div",
+         "children": [
+          {
+           "id": "node-1782723357474-80avk1vym",
+           "styles": {
+            "properties": {}
+           },
+           "content": "ЖК",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          },
+          {
+           "id": "node-1782723357474-tky25fq2f",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Golden House",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "news-tags"
+         },
+         "layoutMode": "flex",
+         "elementType": "container"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "news-body"
+       },
+       "layoutMode": "flex",
+       "elementType": "container"
+      }
+     ],
+     "metadata": {},
+     "attributes": {
+      "class": "news-card-inner"
+     },
+     "layoutMode": "flex",
+     "elementType": "container"
+    }
+   ],
+   "metadata": {},
+   "attributes": {
+    "class": "news-card",
+    "data-news-type": "news"
+   },
+   "layoutMode": "flex",
+   "elementType": "container"
+  }
+ ],
+ "metadata": {
+  "name": "News feed",
+  "globalJs": "/* Блок: Лента новостей с фильтром — block-уровень globalJs.\n   Фильтрует карточки по типу (Все / Акции / Новости). Если на странице нет\n   фильтров — тихо выходит, поэтому блок безопасен где угодно. */\n(() => {\n  const init = () => {\n    const filters = document.querySelectorAll(\"[data-news-filter]\");\n    const cards = document.querySelectorAll(\"[data-news-type]\");\n    if (!filters.length) return;\n\n    const applyFilter = (filter) => {\n      filters.forEach((button) => {\n        button.classList.toggle(\"active\", button.dataset.newsFilter === filter);\n      });\n\n      cards.forEach((card) => {\n        card.classList.toggle(\"is-hidden\", filter !== \"all\" && card.dataset.newsType !== filter);\n      });\n    };\n\n    filters.forEach((button) => {\n      button.addEventListener(\"click\", () => applyFilter(button.dataset.newsFilter));\n    });\n\n    if (window.location.hash === \"#offers\") {\n      applyFilter(\"offer\");\n    }\n  };\n\n  if (document.readyState === \"loading\") {\n    document.addEventListener(\"DOMContentLoaded\", init);\n  } else {\n    init();\n  }\n})();",
+  "globalCss": "/* Блок: Лента новостей с фильтром — block-уровень globalCss. */\n\n.news-toolbar {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 10px;\n  margin-bottom: clamp(22px, 3vw, 36px);\n}\n\n.news-filter.active {\n  border-color: rgba(253, 184, 42, .9);\n  background: var(--gold);\n  color: var(--ink);\n  box-shadow: 0 14px 32px rgba(253, 184, 42, .28);\n}\n\n.news-card.is-hidden {\n  display: none;\n}\n\n.news-media img {\n  width: 100%;\n  height: 100%;\n  display: block;\n  object-fit: cover;\n  transition: transform .35s ease;\n}\n\n.news-card:hover .news-media img {\n  transform: scale(1.035);\n}\n\n.news-body h2 {\n  margin-top: 10px;\n  font-size: clamp(24px, 2vw, 34px);\n  line-height: 1.08;\n  letter-spacing: 0;\n}\n\n.news-body p {\n  margin-top: 14px;\n  color: var(--muted);\n  font-size: 16px;\n  line-height: 1.5;\n}\n\n.news-tags span {\n  padding: 8px 12px;\n  border: 1px solid rgba(253, 184, 42, .5);\n  border-radius: 999px;\n  background: rgba(255, 255, 255, .56);\n  color: rgba(21, 24, 29, .74);\n  font-size: 12px;\n  font-weight: 900;\n}\n\n@media (max-width: 1180px) {\n  .news-grid {\n    grid-template-columns: repeat(2, minmax(0, 1fr));\n  }\n}\n\n@media (max-width: 680px) {\n  .news-filter {\n    min-width: 0;\n    flex: 1 1 120px;\n  }\n\n  .news-grid {\n    grid-template-columns: 1fr;\n  }\n\n  .news-card {\n    border-radius: 22px;\n  }\n}"
+ },
+ "attributes": {
+  "class": "news-grid",
+  "aria-label": "Новости и акции Golden House"
+ },
+ "layoutMode": "grid",
+ "elementType": "container"
+}

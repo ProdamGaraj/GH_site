@@ -1,5 +1,6 @@
 import { apiFetch, readJson } from '@/shared/api/http'
 import { api } from '@/shared/api'
+import type { ProvisionResult } from '@/shared/components/ProvisionCollectionModal'
 import type {
   ComplexDetail,
   ComplexListItem,
@@ -93,11 +94,7 @@ export const estateApi = {
 
 }
 
-export interface ProvisionResult {
-  dataSourceId: string
-  collectionId: string
-  created: { dataSource: boolean; collection: boolean }
-}
+export type { ProvisionResult } from '@/shared/components/ProvisionCollectionModal'
 
 /**
  * Провижн связки estate → Collection. Это CMS-эндпоинт (не estate-service),

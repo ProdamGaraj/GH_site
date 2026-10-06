@@ -1,4 +1,6 @@
+import { api } from '@/shared/api'
 import { apiFetch, readJson } from '@/shared/api/http'
+import type { ProvisionBody, ProvisionResult } from '@/shared/components/ProvisionCollectionModal'
 import type { DictionaryEntry, DictionaryKind, NewsDetail, NewsDraft, NewsListItem } from './types'
 
 /**
@@ -35,4 +37,13 @@ export const newsApi = {
   /** Используемую запись сервер не удалит (409) — её прячут. */
   removeDictionary: (kind: DictionaryKind, key: string) =>
     apiFetch(`${BASE}/${kind}/${encodeURIComponent(key)}`, { method: 'DELETE' }).then((r) => (r.ok ? undefined : readJson<void>(r))),
+}
+
+/**
+ * Коллекция страниц новостей. Это эндпоинт CMS (не news-service), поэтому
+ * через общий api-клиент (/api). После деплоя коллекция сообщает сервису, что
+ * выкачено, — публичная лента отдаёт только это.
+ */
+export const newsCmsApi = {
+  provisionCollection: (body: ProvisionBody) => api.post<ProvisionResult>('/collections/provision-news', body),
 }

@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Newspaper, Plus, Tags } from 'lucide-react'
+import { Layers, Newspaper, Plus, Tags } from 'lucide-react'
+import { ProvisionCollectionModal } from '@/shared/components/ProvisionCollectionModal'
 import { inputCls } from '@/shared/forms/fields'
 import { cn } from '@/shared/utils'
-import { newsApi } from '../api'
+import { newsApi, newsCmsApi } from '../api'
 import type { ExtraLocale, LocaleState, NewsListItem, NewsStatus } from '../types'
 import { EXTRA_LOCALES } from '../types'
 import { missingText } from '../newsForm'
@@ -57,6 +58,7 @@ export const NewsList: React.FC = () => {
   const [query, setQuery] = useState('')
   const [title, setTitle] = useState('')
   const [creating, setCreating] = useState(false)
+  const [showProvision, setShowProvision] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -92,13 +94,35 @@ export const NewsList: React.FC = () => {
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <Newspaper size={24} /> Новости
         </h1>
-        <Link
-          to="/news/dictionaries"
-          className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-md text-sm hover:bg-gray-50"
-        >
-          <Tags size={16} /> Рубрики и теги
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowProvision(true)}
+            className="flex items-center gap-2 px-4 py-2 border border-primary-600 text-primary-700 rounded-md text-sm hover:bg-primary-50"
+          >
+            <Layers size={16} /> Страницы новостей
+          </button>
+          <Link
+            to="/news/dictionaries"
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-md text-sm hover:bg-gray-50"
+          >
+            <Tags size={16} /> Рубрики и теги
+          </Link>
+        </div>
       </div>
+
+      {showProvision && (
+        <ProvisionCollectionModal
+          onClose={() => setShowProvision(false)}
+          title="Страницы новостей"
+          description="Создаёт источник данных (news-service) и коллекцию: страница /<язык>/news/<адрес>/ на каждую опубликованную новость из шаблона «Новость». На uz/en — новости с отметкой языка и полным переводом."
+          templateLabel="Страница-шаблон («Новость (шаблон)»)"
+          defaultTemplateSlug="news-template"
+          defaultBasePath="/news"
+          doneHint="Осталось передеплоить коллекцию и страницу /news. После деплоя коллекции лента на /news начнёт подгружать новости."
+          provision={newsCmsApi.provisionCollection}
+        />
+      )}
 
       <form onSubmit={create} className="flex gap-2">
         <input
