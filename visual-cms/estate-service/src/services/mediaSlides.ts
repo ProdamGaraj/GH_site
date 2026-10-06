@@ -117,12 +117,20 @@ function plainSlide(url: string, image: string, video: string): MediaSlide {
 }
 
 /**
+ * Фото галереи для фона и постера: первое не-видео, иначе `fallback`.
+ * Видео в фон CSS не годится — url() на .mp4 даёт пустой блок.
+ */
+export function posterOf(value: unknown, fallback: string | null | undefined = ''): string {
+  return readGallery(value).find((item) => !isVideoUrl(item.url))?.url ?? (fallback ?? '').trim()
+}
+
+/**
  * Галерея → слайды. Постер видео — первое фото той же галереи (оно
  * по смыслу ближе всего), а если фото в ней нет — `fallbackPoster`.
  */
 export function toSlides(value: unknown, fallbackPoster = ''): MediaSlide[] {
   const items = readGallery(value)
-  const poster = items.find((item) => !isVideoUrl(item.url))?.url ?? fallbackPoster.trim()
+  const poster = posterOf(items, fallbackPoster)
   return items.map((item) => {
     const video = isVideoUrl(item.url)
     return {

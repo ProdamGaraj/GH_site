@@ -2,7 +2,7 @@
  * Слайды медиа-каруселей: фото и видео в одной галерее, кадрирование слайда.
  */
 import { galleryItemSchema } from '../schemas/estate.schema'
-import { aboutSlides, galleryUrls, isVideoUrl, readGallery, toSlides } from '../services/mediaSlides'
+import { aboutSlides, galleryUrls, isVideoUrl, posterOf, readGallery, toSlides } from '../services/mediaSlides'
 
 /** Слайд без настроек кадрирования. */
 const plain = (url: string, image: string, video: string) => ({ url, image, video, position: '50% 50%', fit: 'cover' })
@@ -18,6 +18,18 @@ describe('isVideoUrl', () => {
     for (const url of ['/a.webp', '/a.opt.webp', '/mp4/a.jpg', '/video.png']) {
       expect(isVideoUrl(url)).toBe(false)
     }
+  })
+})
+
+describe('posterOf', () => {
+  it('first photo, skipping videos and junk; objects count by url', () => {
+    expect(posterOf(['/v.mp4', '', { url: '/p.webp', fit: 'contain' }, '/q.webp'])).toBe('/p.webp')
+  })
+
+  it('no photo: fallback, trimmed; nothing at all: empty string', () => {
+    expect(posterOf(['/v.mp4'], ' /f.webp ')).toBe('/f.webp')
+    expect(posterOf(['/v.mp4'], null)).toBe('')
+    expect(posterOf(undefined)).toBe('')
   })
 })
 

@@ -1,2 +1,2 @@
 // Поле слайдов галереи — общее для админок ЖК и новостей: shared/forms/GallerySlidesField.tsx.
-export { GallerySlidesField } from '@/shared/forms/GallerySlidesField'
+export { GallerySlidesField, HERO_FRAMES } from '@/shared/forms/GallerySlidesField'

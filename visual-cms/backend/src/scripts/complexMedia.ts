@@ -454,3 +454,141 @@ export function migrateGalleryBlock(input: StructureNode, label: string, source:
   if (changes.length === 0) return { structure: input, changes, alreadyMigrated: true }
   return { structure, changes, alreadyMigrated: false }
 }
+
+// --- Hero страницы проекта ---
+
+/**
+ * Hero: был слайдер только из фото — список строк item.heroImages, кадр — CSS-
+ * переменная `--image` из `{{$}}`. Видео в такой список не встанет: url() на
+ * .mp4 даёт пустой слайд. Теперь слайды item.heroSlides, как у «О проекте»:
+ * фото или постер — фон, видео — data-slide-video (рантайм карусели), плюс
+ * кадрирование. Фон секции, трека и скрытого видео «О проекте» брал первую
+ * ссылку hero (`heroImages.0`) — если первым стоит видео, фон пропадал; теперь
+ * это item.heroPoster — первое фото hero, иначе картинка проекта.
+ */
+const HERO_SLIDES_FROM = 'item.heroImages'
+const HERO_SLIDES_SOURCE = 'item.heroSlides'
+const HERO_FIRST_IMAGE = '{{item.heroImages.0}}'
+const HERO_POSTER = '{{item.heroPoster}}'
+
+/** Привязки слайда hero: фон — из `--image` (так его рисует CSS блока). */
+const HERO_SLIDE_ATTRIBUTES = { 'data-slide-video': '{{$.video}}' }
+const HERO_SLIDE_PROPERTIES = { '--image': 'url("{{$.image}}")' }
+
+const HERO_CSS_HEAD = '/* ==== hero-media'
+export const HERO_CSS_MARKER = `${HERO_CSS_HEAD} v1 ====`
+/* Режим «целиком» — те же правила, что у карточек медиа, но в hero (секция
+   на весь экран, слайд рисуется из --image). Отдельным текстом: CSS блоков
+   общий на страницу, а блок не должен зависеть от соседа. */
+export const HERO_CSS = `
+${HERO_CSS_MARKER}
+   Hero из фото и видео (estate: item.heroSlides). Фокус — background-position
+   слайда, по нему же рантайм ставит object-position видео. «Целиком»
+   (data-slide-fit="contain") — кадр полностью на размытой копии себя. */
+.complex-hero-slide[data-slide-fit="contain"] {
+  overflow: hidden;
+}
+
+.complex-hero-slide[data-slide-fit="contain"]::before,
+.complex-hero-slide[data-slide-fit="contain"]::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+
+.complex-hero-slide[data-slide-fit="contain"]::before {
+  inset: -24px;
+  background: var(--slide-image) center / cover no-repeat;
+  filter: blur(20px) brightness(0.85);
+}
+
+.complex-hero-slide[data-slide-fit="contain"]::after {
+  inset: 0;
+  background: var(--slide-image) center / contain no-repeat;
+}
+
+.complex-hero-slide[data-slide-fit="contain"]:not([data-slide-video=""])::after {
+  content: none;
+}
+`
+
+/** Заменяет `{{item.heroImages.0}}` на постер во всех стилях и атрибутах дерева. */
+function replaceHeroFirstImage(root: StructureNode): number {
+  let count = 0
+  const swap = (record: Record<string, unknown> | undefined) => {
+    if (!record) return
+    for (const [key, value] of Object.entries(record)) {
+      if (typeof value === 'string' && value.includes(HERO_FIRST_IMAGE)) {
+        record[key] = value.split(HERO_FIRST_IMAGE).join(HERO_POSTER)
+        count++
+      }
+    }
+  }
+  const visit = (node: StructureNode) => {
+    swap(node.styles?.properties as Record<string, unknown> | undefined)
+    swap(node.attributes as Record<string, unknown> | undefined)
+    for (const child of node.children ?? []) visit(child)
+  }
+  visit(root)
+  return count
+}
+
+export function migrateHeroBlock(input: StructureNode): MigrationResult {
+  const structure: StructureNode = JSON.parse(JSON.stringify(input))
+  const changes: string[] = []
+
+  const track = findOne(
+    structure,
+    (n) => hasClass(n, 'complex-hero-slider') && n.attributes?.['data-carousel-track'] === 'true',
+    'Hero: трек .complex-hero-slider'
+  )
+  const slide = slideOf(track, 'Hero')
+  if (track._repeat?.source === HERO_SLIDES_FROM) {
+    track._repeat = { ...track._repeat, source: HERO_SLIDES_SOURCE }
+    changes.push(`Hero: слайды по ${HERO_SLIDES_SOURCE} — фото и видео`)
+  } else if (track._repeat?.source !== HERO_SLIDES_SOURCE) {
+    throw new MigrationError(`Hero: неожиданный источник слайдов ${String(track._repeat?.source)}`)
+  }
+
+  const attrs = slide.attributes ?? {}
+  const props = slide.styles?.properties ?? {}
+  const bound =
+    Object.entries(HERO_SLIDE_ATTRIBUTES).every(([k, v]) => attrs[k] === v) &&
+    Object.entries(HERO_SLIDE_PROPERTIES).every(([k, v]) => props[k] === v)
+  if (!bound) {
+    slide.attributes = { ...attrs, ...HERO_SLIDE_ATTRIBUTES }
+    slide.styles = { ...slide.styles, properties: { ...props, ...HERO_SLIDE_PROPERTIES } }
+    changes.push('Hero: слайд — фон из фото или постера, видео через data-slide-video')
+  }
+  if (frameSlideTemplate(slide)) {
+    changes.push('Hero: кадрирование слайда — фокус и «целиком» из данных ЖК')
+  }
+
+  const posters = replaceHeroFirstImage(structure)
+  if (posters > 0) changes.push(`Hero: фон по первому фото (item.heroPoster) — ${posters}`)
+
+  const metadata = (structure.metadata ??= {})
+  if (upsertCssSection(metadata, HERO_CSS_HEAD, HERO_CSS_MARKER, HERO_CSS)) {
+    changes.push('Hero: стили режима «целиком»')
+  }
+
+  if (changes.length === 0) return { structure: input, changes, alreadyMigrated: true }
+  return { structure, changes, alreadyMigrated: false }
+}
+
+/**
+ * Экземпляры блока hero на страницах: у связанного экземпляра свои стили
+ * корня (там тоже `--hero-image` по heroImages.0) — их ведёт страница, а не
+ * блок, поэтому правятся отдельно.
+ */
+export function migrateHeroInstances(input: StructureNode, heroBlockId: string): MigrationResult {
+  const structure: StructureNode = JSON.parse(JSON.stringify(input))
+  let count = 0
+  const visit = (node: StructureNode) => {
+    if (node.metadata?.linkedBlockId === heroBlockId) count += replaceHeroFirstImage(node)
+    else for (const child of node.children ?? []) visit(child)
+  }
+  visit(structure)
+  if (count === 0) return { structure: input, changes: [], alreadyMigrated: true }
+  return { structure, changes: [`экземпляр hero: фон по первому фото (item.heroPoster) — ${count}`], alreadyMigrated: false }
+}

@@ -141,7 +141,7 @@ const complexBase = {
   mapUrl: z.string().max(500).optional(),
   mapImage: z.string().max(500).optional(),
   panoramaUrl: z.string().max(500).optional(),
-  heroImages: z.array(z.string()).optional(),
+  heroImages: z.array(galleryItemSchema).optional(),
   gallery: z.array(galleryItemSchema).optional(),
   hallGallery: z.array(galleryItemSchema).optional(),
   yardGallery: z.array(galleryItemSchema).optional(),

@@ -155,8 +155,9 @@ export class Complex {
   @Column({ length: 500, default: '' })
   panoramaUrl!: string
 
+  /** Слайды hero: фото и видео, ссылка или {url, focus, fit} — как галереи ниже. */
   @Column({ type: 'jsonb', default: () => "'[]'" })
-  heroImages!: string[]
+  heroImages!: GalleryItem[]
 
   /** Галереи слайдов: ссылка или {url, focus, fit} — см. services/mediaSlides.ts. */
   @Column({ type: 'jsonb', default: () => "'[]'" })

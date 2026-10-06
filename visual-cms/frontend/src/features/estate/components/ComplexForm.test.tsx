@@ -66,13 +66,22 @@ describe('ComplexForm — разделы', () => {
     expect(renderedSections()[0]).toBe(SECTION.houses)
   })
 
-  it('медиаполя — компактные строки с миниатюрой, списки — с миниатюрами', () => {
+  it('медиаполя — компактные строки с миниатюрой, слайдеры — с кадрированием', () => {
     mount('ru')
     const media = document.getElementById(SECTION.media)!
     expect(within(media).getAllByTestId('media-tile')).toHaveLength(4)
-    expect(within(media).getByTestId('media-thumbs')).toBeTruthy()
+    // Hero (один слайд в фикстуре) — строка кадрирования, как у остальных слайдеров.
+    expect(within(media).getAllByTestId('slide-framing').length).toBeGreaterThan(0)
     // Картинка карточки — в своём разделе.
     expect(within(document.getElementById(SECTION.card)!).getAllByTestId('media-tile')).toHaveLength(1)
+  })
+
+  it('hero принимает и фото, и видео: загрузка не ограничена картинками', () => {
+    mount('ru')
+    const hero = screen.getByText('Hero — слайды').closest('[data-testid="media-list"]') as HTMLElement
+    expect(hero).toBeTruthy()
+    const input = within(hero).getByTestId('media-file-input') as HTMLInputElement
+    expect(input.accept).toBe('image/*,video/*')
   })
 })
 

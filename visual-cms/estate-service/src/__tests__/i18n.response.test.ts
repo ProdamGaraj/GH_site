@@ -143,6 +143,48 @@ describe('buildComplexListItem', () => {
     const item = buildComplexListItem({ ...complex, media: '' }, [], 'ru')
     expect(item.cardImage).toBe('h1.jpg')
   })
+
+  it('cardImage skips a hero video — url() on .mp4 renders nothing', () => {
+    const item = buildComplexListItem({ ...complex, media: '', heroImages: ['/v.mp4', { url: 'h2.jpg', fit: 'contain' }] }, [], 'ru')
+    expect(item.cardImage).toBe('h2.jpg')
+  })
+})
+
+describe('buildComplexDetail — hero slides (photo and video)', () => {
+  const withHero = (heroImages: unknown[], media = 'media.jpg') =>
+    buildComplexDetail({ ...complex, media, heroImages } as typeof complex, houses, apartments, [], 'ru')
+
+  it('photo-only hero keeps the old fields and gains slides', () => {
+    const dto = withHero(['h1.jpg', 'h2.jpg'])
+    expect(dto.heroImages).toEqual(['h1.jpg', 'h2.jpg'])
+    expect(dto.heroPoster).toBe('h1.jpg')
+    expect(dto.heroSlides.map((s) => [s.image, s.video])).toEqual([['h1.jpg', ''], ['h2.jpg', '']])
+  })
+
+  it('video first: slide plays it over the first photo, poster is that photo', () => {
+    const dto = withHero(['/v.mp4', 'h2.jpg'])
+    expect(dto.heroImages).toEqual(['/v.mp4', 'h2.jpg'])
+    expect(dto.heroPoster).toBe('h2.jpg')
+    expect(dto.heroSlides[0]).toMatchObject({ url: '/v.mp4', image: 'h2.jpg', video: '/v.mp4' })
+  })
+
+  it('video only: poster falls back to media', () => {
+    const dto = withHero(['/v.mp4'])
+    expect(dto.heroPoster).toBe('media.jpg')
+    expect(dto.heroSlides[0]).toMatchObject({ image: 'media.jpg', video: '/v.mp4' })
+  })
+
+  it('slide settings (focus/fit) reach the slide; urls stay plain strings', () => {
+    const dto = withHero([{ url: 'h1.jpg', focus: { x: 20, y: 80 }, fit: 'cover' }])
+    expect(dto.heroImages).toEqual(['h1.jpg'])
+    expect(dto.heroSlides[0]).toMatchObject({ position: '20% 80%', fit: 'cover' })
+  })
+
+  it('empty hero: no slides, poster from media', () => {
+    const dto = withHero([])
+    expect(dto.heroSlides).toEqual([])
+    expect(dto.heroPoster).toBe('media.jpg')
+  })
 })
 
 describe('buildComplexDetail — только продающиеся квартиры на витрине', () => {

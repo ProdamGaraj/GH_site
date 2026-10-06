@@ -13,7 +13,7 @@ vi.mock('@/features/media/MediaPicker', () => ({
 // Загрузка файлов берёт ширины экранов из стора редактора — здесь стора нет.
 vi.mock('@/features/media/useProjectVariantWidths', () => ({ useProjectVariantWidths: () => [] }))
 
-import { GallerySlidesField } from './GallerySlidesField'
+import { GallerySlidesField, HERO_FRAMES } from './GallerySlidesField'
 import type { GalleryItem } from './gallerySlides'
 
 function setup(value: GalleryItem[]) {
@@ -51,6 +51,13 @@ describe('GallerySlidesField', () => {
     const frames = within(screen.getByTestId('slide-0')).getAllByTestId('frame-preview')
     expect(frames).toHaveLength(2)
     for (const frame of frames) expect(frame.getAttribute('data-position')).toBe('30% 70%')
+  })
+
+  it('свои пропорции кадров (hero): превью по ним, а не по карточке слайдера', () => {
+    render(<GallerySlidesField label="Hero" value={['/a.jpg']} onChange={vi.fn()} frames={HERO_FRAMES} />)
+    const frames = within(screen.getByTestId('slide-0')).getAllByTestId('frame-preview')
+    expect(frames.map((f) => f.style.width)).toEqual(['128px', '35px'])
+    expect(screen.getByText('· ПК')).toBeTruthy()
   })
 
   it('«Целиком» пишет fit=contain; в этом режиме фокус не ставится и точки нет', () => {

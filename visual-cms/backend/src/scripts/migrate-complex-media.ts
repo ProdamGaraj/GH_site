@@ -1,5 +1,5 @@
 /**
- * Медиа на странице проекта: «О проекте», холлы, двор (см. complexMedia.ts).
+ * Медиа на странице проекта: hero, «О проекте», холлы, двор (см. complexMedia.ts).
  *
  * Преобразование — в `complexMedia.ts` (чистое, под тестами). Здесь только
  * чтение блоков, резервная копия и запись одной транзакцией.
@@ -17,9 +17,13 @@
 import 'reflect-metadata'
 import { AppDataSource } from '../config/database'
 import { Block } from '../models/Block'
+import { Page } from '../models/Page'
 import { MigrationError, MigrationResult, StructureNode } from './choiceToPlanTypes'
-import { migrateAboutBlock, migrateGalleryBlock } from './complexMedia'
+import { migrateAboutBlock, migrateGalleryBlock, migrateHeroBlock, migrateHeroInstances } from './complexMedia'
 import { flag, hasFlag, writeBackup } from './migrationIo'
+
+/** Блок «complex hero» шаблона проекта на .19. */
+const HERO_BLOCK_ID = 'e0098d6c-c1bf-4db4-a893-78e49c6e48d3'
 
 /** Блоки шаблона проекта на .19. */
 const TARGETS: Array<{ id: string; label: string; migrate: (s: StructureNode) => MigrationResult }> = [
@@ -34,6 +38,7 @@ const TARGETS: Array<{ id: string; label: string; migrate: (s: StructureNode) =>
     label: 'Двор',
     migrate: (s) => migrateGalleryBlock(s, 'Двор', { from: 'item.yard.gallery', to: 'item.yard.slides' }),
   },
+  { id: HERO_BLOCK_ID, label: 'Hero', migrate: migrateHeroBlock },
 ]
 
 async function main(): Promise<void> {
@@ -53,7 +58,22 @@ async function main(): Promise<void> {
       if (!result.alreadyMigrated) planned.push({ block, result })
     }
 
-    if (planned.length === 0) {
+    // Экземпляры hero на страницах: стили корня экземпляра ведёт страница.
+    const pages = await AppDataSource.getRepository(Page)
+      .createQueryBuilder('p')
+      .where('p.structure::text LIKE :id', { id: `%${HERO_BLOCK_ID}%` })
+      .getMany()
+    const plannedPages: Array<{ page: Page; result: MigrationResult }> = []
+    for (const page of pages) {
+      if (!page.structure) continue
+      const result = migrateHeroInstances(page.structure as unknown as StructureNode, HERO_BLOCK_ID)
+      if (result.alreadyMigrated) continue
+      console.log(`Страница «${page.name}»:`)
+      for (const change of result.changes) console.log(`  · ${change}`)
+      plannedPages.push({ page, result })
+    }
+
+    if (planned.length === 0 && plannedPages.length === 0) {
       console.log('\nПравок нет.')
       return
     }
@@ -62,17 +82,19 @@ async function main(): Promise<void> {
       return
     }
 
-    const backup = writeBackup(
-      outDir,
-      'complex-media-blocks',
-      planned.map(({ block }) => ({ id: block.id, name: block.name, structure: block.structure }))
-    )
-    console.log(`\nКопия блоков: ${backup}`)
+    const backup = writeBackup(outDir, 'complex-media-blocks', {
+      blocks: planned.map(({ block }) => ({ id: block.id, name: block.name, structure: block.structure })),
+      pages: plannedPages.map(({ page }) => ({ id: page.id, name: page.name, structure: page.structure })),
+    })
+    console.log(`\nКопия блоков и страниц: ${backup}`)
 
     await AppDataSource.transaction(async (m) => {
       for (const { block, result } of planned) {
         block.structure = result.structure as unknown as Block['structure']
         await m.getRepository(Block).save(block)
+      }
+      for (const { page, result } of plannedPages) {
+        await m.getRepository(Page).update(page.id, { structure: result.structure as never })
       }
     })
     console.log('Записано. Теперь нужен передеплой коллекции «Проекты (ЖК)».')

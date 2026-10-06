@@ -9,7 +9,7 @@
  */
 
 import { badgesFor, isShownPlanType, PlanGroupingConfig, PlanTypeCard, sitePlanTypes } from './planGrouping'
-import { aboutSlides, GalleryItem, galleryUrls, MediaSlide, toSlides } from './mediaSlides'
+import { aboutSlides, GalleryItem, galleryUrls, MediaSlide, posterOf, toSlides } from './mediaSlides'
 import { buildProjectMap, GeoPoint, MapPlace, PlaceTypeRow, ProjectMapDTO, SalesOffice } from './projectMap'
 
 export type Locale = 'ru' | 'uz' | 'en'
@@ -129,7 +129,7 @@ export interface ComplexRow {
   mapUrl: string
   mapImage: string
   panoramaUrl: string
-  heroImages: string[]
+  heroImages: GalleryItem[]
   gallery: GalleryItem[]
   hallGallery: GalleryItem[]
   yardGallery: GalleryItem[]
@@ -490,13 +490,17 @@ export interface ComplexDetailDTO extends ProjectMapDTO {
   logo: string
   logoClass: string
   media: string
+  /** Ссылки hero как есть (фото и видео вперемешку). */
   heroImages: string[]
+  /** Фото для фона/постера hero: первое фото слайдов, иначе media. */
+  heroPoster: string
   gallery: string[]
   hallGallery: string[]
   /**
    * Слайды медиа-каруселей (фото и видео, см. services/mediaSlides.ts).
    * Шаблон повторяет по ним слайд: фон — image, data-slide-video — video.
    */
+  heroSlides: MediaSlide[]
   aboutSlides: MediaSlide[]
   hallSlides: MediaSlide[]
   yard: {
@@ -937,10 +941,12 @@ export function buildComplexDetail(
     logo: c.logo,
     logoClass: c.logoClass,
     media: c.media,
-    heroImages: Array.isArray(c.heroImages) ? c.heroImages : [],
     // Списки ссылок — как раньше; кадрирование живёт только в *Slides.
+    heroImages: galleryUrls(c.heroImages),
+    heroPoster: posterOf(c.heroImages, c.media),
     gallery: galleryUrls(c.gallery),
     hallGallery: galleryUrls(c.hallGallery),
+    heroSlides: toSlides(c.heroImages, c.media),
     aboutSlides: aboutSlides(c),
     hallSlides: toSlides(c.hallGallery, c.media),
     yard: {
@@ -1000,7 +1006,7 @@ export function buildComplexListItem(
     name: c.name,
     className: c.className,
     intro: c.intro,
-    cardImage: c.cardImage || c.media || (Array.isArray(c.heroImages) && c.heroImages[0]) || '',
+    cardImage: c.cardImage || c.media || posterOf(c.heroImages),
     status: c.status,
     order: c.order,
     filterClass: c.filterClass || 'business',

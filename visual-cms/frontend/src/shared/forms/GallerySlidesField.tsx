@@ -29,10 +29,26 @@ import { MediaListField, MediaThumb } from './mediaFields'
  * колонку и карточка на всю ширину (до ~3.9:1), на телефоне ~0.9:1, на ПК
  * шире 1440px — колонка сетки дизайна (1.8–2.4:1, между крайними).
  */
-const FRAMES = [
+export interface SlideFrame {
+  label: string
+  hint: string
+  /** Ширина / высота кадра на сайте. */
+  ratio: number
+}
+
+const FRAMES: readonly SlideFrame[] = [
   { label: 'Широкий кадр', hint: 'ноутбук, планшет', ratio: 4 },
   { label: 'Узкий кадр', hint: 'телефон', ratio: 0.9 },
-] as const
+]
+
+/**
+ * Крайние пропорции hero: секция на весь экран под шапкой — на ПК около 2:1,
+ * на телефоне портрет около 0.55:1.
+ */
+export const HERO_FRAMES: readonly SlideFrame[] = [
+  { label: 'Широкий кадр', hint: 'ПК', ratio: 2 },
+  { label: 'Узкий кадр', hint: 'телефон', ratio: 0.55 },
+]
 
 const FIT_LABELS: Record<SlideFit, string> = { cover: 'Заполнить', contain: 'Целиком' }
 
@@ -41,7 +57,9 @@ export const GallerySlidesField: React.FC<{
   hint?: string
   value: GalleryItem[]
   onChange: (value: GalleryItem[]) => void
-}> = ({ label, hint, value, onChange }) => {
+  /** Крайние пропорции кадра на сайте; по умолчанию — карточка слайдера. */
+  frames?: readonly SlideFrame[]
+}> = ({ label, hint, value, onChange, frames = FRAMES }) => {
   const slides = readGallery(value)
 
   const update = (index: number, patch: Partial<SlideSettings>) =>
@@ -61,7 +79,7 @@ export const GallerySlidesField: React.FC<{
       {slides.length > 0 && (
         <div className="mt-2 space-y-2" data-testid="slide-framing">
           {slides.map((slide, i) => (
-            <SlideFramingRow key={`${i}:${slide.url}`} index={i} slide={slide} onChange={(patch) => update(i, patch)} />
+            <SlideFramingRow key={`${i}:${slide.url}`} index={i} slide={slide} frames={frames} onChange={(patch) => update(i, patch)} />
           ))}
         </div>
       )}
@@ -72,8 +90,9 @@ export const GallerySlidesField: React.FC<{
 const SlideFramingRow: React.FC<{
   index: number
   slide: SlideSettings
+  frames: readonly SlideFrame[]
   onChange: (patch: Partial<SlideSettings>) => void
-}> = ({ index, slide, onChange }) => {
+}> = ({ index, slide, frames, onChange }) => {
   const contain = slide.fit === 'contain'
   const src = resolveMediaUrl(slide.url)
 
@@ -129,7 +148,7 @@ const SlideFramingRow: React.FC<{
           )}
         </div>
         <div className="flex flex-wrap gap-3 items-end">
-          {FRAMES.map((frame) => (
+          {frames.map((frame) => (
             <figure key={frame.label} className="m-0">
               <FramePreview src={src} slide={slide} ratio={frame.ratio} />
               <figcaption className="mt-1 text-[11px] text-gray-400">

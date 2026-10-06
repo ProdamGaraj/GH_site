@@ -106,7 +106,8 @@ export interface ComplexDetail {
   mapImage: string
   /** Ссылка на панораму 360°; пусто — кнопки «Панорама 360°» на сайте нет. */
   panoramaUrl?: string
-  heroImages: string[]
+  /** Слайды hero: фото и видео, ссылка или ссылка с кадрированием. */
+  heroImages: GalleryItem[]
   /** Галереи слайдов: ссылка или ссылка с кадрированием (см. gallerySlides.ts). */
   gallery: GalleryItem[]
   hallGallery: GalleryItem[]
