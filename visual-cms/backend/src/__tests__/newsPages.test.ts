@@ -167,6 +167,23 @@ describe('блок «News feed» (живой снимок)', () => {
     expect(html).not.toMatch(/data-news-card=""/)
   })
 
+  it('уже лента со стилями v1 (стенд) — заменяется только CSS-секция: поиск строкой, фильтры под ним', () => {
+    const v1 = JSON.parse(JSON.stringify(result.structure))
+    const css: string = v1.metadata.globalCss
+    const start = css.indexOf(NEWS_FEED_CSS_HEAD)
+    v1.metadata.globalCss =
+      css.slice(0, start) + '/* ==== news-feed v1 ==== */\n.news-fsearch { flex: 1 1 260px; }\n.news-fpop { right: 0; }\n'
+    const up = migrateNewsFeedBlock(v1)
+    expect(up.alreadyMigrated).toBe(false)
+    expect(up.changes).toEqual(['CSS-секция news-feed v2: поиск отдельной строкой, фильтры под ним'])
+    const next: string = up.structure.metadata.globalCss
+    expect(next).not.toContain('news-feed v1')
+    expect(next).toContain('.news-fsearch { flex: 1 1 100%;')
+    expect(next.startsWith(css.slice(0, start).trimEnd())).toBe(true)
+    expect(up.structure.children).toEqual(v1.children)
+    expect(migrateNewsFeedBlock(up.structure).alreadyMigrated).toBe(true)
+  })
+
   it('повторный запуск ничего не меняет', () => {
     expect(migrateNewsFeedBlock(result.structure)).toMatchObject({ alreadyMigrated: true, changes: [] })
   })

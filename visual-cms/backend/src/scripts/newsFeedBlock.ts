@@ -152,7 +152,14 @@ export function templateCard(bound: StructureNode): StructureNode {
   return out
 }
 
-export const NEWS_FEED_CSS_HEAD = '/* ==== news-feed v1 ===='
+/** Начало любой версии CSS-секции ленты — с него секция заменяется. */
+const NEWS_FEED_CSS_PREFIX = '/* ==== news-feed'
+/**
+ * v2: поиск — отдельной строкой во всю ширину, рубрики, «Период» и «Теги» —
+ * строкой под ним. Кнопки больше не у правого края — окна открываются вправо
+ * от кнопки; на планшете (кнопки могут уйти к краю) — от левого края полосы.
+ */
+export const NEWS_FEED_CSS_HEAD = `${NEWS_FEED_CSS_PREFIX} v2 ====`
 export const NEWS_FEED_CSS = `${NEWS_FEED_CSS_HEAD} */
 /* Лента из news-service: полоса фильтров и подгрузка — services/runtime/news-feed-runtime.js. */
 .news-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); padding-left: clamp(16px, 10.4vw, 150px); padding-right: clamp(16px, 10.4vw, 150px); }
@@ -168,12 +175,12 @@ export const NEWS_FEED_CSS = `${NEWS_FEED_CSS_HEAD} */
 .news-feed-more { min-height: 1px; }
 .news-feed-status { padding: 24px 0; color: var(--muted, rgba(21, 24, 29, .6)); text-align: center; }
 .news-feed-status button { margin-left: 8px; text-decoration: underline; }
-.news-fbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.news-fsearch { flex: 1 1 260px; min-width: 0; padding: 12px 16px; border: 1px solid rgba(21, 24, 29, .14); border-radius: 999px; background: #fff; font: inherit; }
+.news-fbar { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.news-fsearch { flex: 1 1 100%; min-width: 0; padding: 12px 16px; border: 1px solid rgba(21, 24, 29, .14); border-radius: 999px; background: #fff; font: inherit; }
 .news-fchip, .news-fbtn { padding: 10px 16px; border: 1px solid rgba(21, 24, 29, .14); border-radius: 999px; background: #fff; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
 .news-fchip[aria-pressed="true"], .news-fbtn[aria-expanded="true"], .news-fbtn.is-set { border-color: rgba(253, 184, 42, .9); background: var(--gold, #fdb82a); color: var(--ink, #15181d); }
 .news-fdrop { position: relative; }
-.news-fpop { position: absolute; z-index: 30; top: calc(100% + 8px); right: 0; width: min(360px, 90vw); padding: 16px; border-radius: 18px; background: #fff; box-shadow: 0 24px 60px rgba(21, 24, 29, .18); }
+.news-fpop { position: absolute; z-index: 30; top: calc(100% + 8px); left: 0; width: min(360px, 90vw); padding: 16px; border-radius: 18px; background: #fff; box-shadow: 0 24px 60px rgba(21, 24, 29, .18); }
 .news-fpop[hidden] { display: none; }
 .news-ftabs { display: flex; gap: 4px; margin-bottom: 12px; padding: 4px; border-radius: 999px; background: rgba(21, 24, 29, .06); }
 .news-ftabs button { flex: 1; padding: 8px; border: 0; border-radius: 999px; background: transparent; font: inherit; font-weight: 700; cursor: pointer; }
@@ -191,6 +198,9 @@ export const NEWS_FEED_CSS = `${NEWS_FEED_CSS_HEAD} */
 .news-factive:empty { display: none; }
 .news-fpill { padding: 6px 10px; border: 0; border-radius: 999px; background: rgba(21, 24, 29, .08); font: inherit; font-size: 13px; cursor: pointer; }
 .news-freset { padding: 6px 10px; border: 0; background: none; font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
+@media (max-width: 1180px) {
+  .news-fdrop { position: static; }
+}
 @media (max-width: 680px) {
   .news-fpop { position: fixed; top: auto; right: 0; bottom: 0; left: 0; width: auto; max-height: 75vh; overflow: auto; border-radius: 22px 22px 0 0; }
 }
@@ -202,7 +212,15 @@ function slot(id: string, cls: string, attr: string, name: string): StructureNod
 }
 
 export function migrateNewsFeedBlock(input: StructureNode): MigrationResult {
-  if (input.attributes?.[NEWS_FEED_ATTR] !== undefined) return { structure: input, changes: [], alreadyMigrated: true }
+  if (input.attributes?.[NEWS_FEED_ATTR] !== undefined) {
+    // Блок уже лента — довносится только новая версия стилей.
+    const structure = clone(input)
+    const metadata = (structure.metadata ??= {}) as Record<string, unknown>
+    if (!upsertCssSection(metadata, NEWS_FEED_CSS_PREFIX, NEWS_FEED_CSS_HEAD, NEWS_FEED_CSS)) {
+      return { structure: input, changes: [], alreadyMigrated: true }
+    }
+    return { structure, changes: ['CSS-секция news-feed v2: поиск отдельной строкой, фильтры под ним'], alreadyMigrated: false }
+  }
   const structure = clone(input)
   const prototype = (structure.children ?? []).find((c) => hasClass(c, 'news-card'))
   if (!prototype) throw new MigrationError('В блоке нет карточки .news-card — не из чего взять вёрстку')
@@ -230,14 +248,14 @@ export function migrateNewsFeedBlock(input: StructureNode): MigrationResult {
   ]
   const metadata = (structure.metadata ??= {}) as Record<string, unknown>
   metadata.globalJs = ''
-  upsertCssSection(metadata, NEWS_FEED_CSS_HEAD, NEWS_FEED_CSS_HEAD, NEWS_FEED_CSS)
+  upsertCssSection(metadata, NEWS_FEED_CSS_PREFIX, NEWS_FEED_CSS_HEAD, NEWS_FEED_CSS)
   return {
     structure,
     changes: [
       `карточки из данных страницы (${NEWS_SOURCE}) вместо ${removed} вписанных руками; вёрстка — из первой`,
       'образец карточки для подгрузки, полоса фильтров, сообщения и метка подгрузки',
       'старый скрипт фильтра «Все / Акции / Новости» снят — фильтры и подгрузку ведёт news-feed-runtime',
-      'CSS-секция news-feed v1',
+      'CSS-секция news-feed v2',
       ...(layoutStripped ? ['встроенные колонки и отступы сетки убраны — раскладку ведёт CSS (ПК 3, планшет 2, телефон 1)'] : []),
     ],
     alreadyMigrated: false,
