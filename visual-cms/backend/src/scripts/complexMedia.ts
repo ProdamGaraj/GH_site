@@ -13,9 +13,12 @@
  *   Стрелки листают; при одном слайде рантайм их прячет, и слайдер выглядит
  *   как просто фото или видео. Автолистание, эффект, кнопки — в панели
  *   карусели редактора CMS;
- * - v3 (сейчас): кадрирование слайда из админки ЖК. Точка фокуса — это
+ * - v3: кадрирование слайда из админки ЖК. Точка фокуса — это
  *   background-position слайда (видео рантайм выравнивает по ней же), режим
- *   «целиком» — data-slide-fit="contain": кадр полностью на размытой подложке.
+ *   «целиком» — data-slide-fit="contain": кадр полностью на размытой подложке;
+ * - v4 (сейчас): настройки слайда из админки ЖК — тема шапки над слайдом
+ *   (data-header-theme; пусто — авто) и слайд-блок из библиотеки
+ *   (data-slide-block — блок разворачивает CMS при публикации).
  *
  * Слайды приходят из estate DTO: item.aboutSlides, item.hallSlides,
  * item.yard.slides — объекты {url, image, video, position, fit}
@@ -100,6 +103,20 @@ function slideTemplate(id: string): StructureNode {
       },
     },
   })
+}
+
+/**
+ * Привязки настроек слайда (v4): тема шапки и слайд-блок. Пустые значения —
+ * «авто» и «слайд-файл»: пустой data-header-theme шапка не считает меткой.
+ */
+const SLIDE_DATA_ATTRIBUTES = { 'data-header-theme': '{{$.theme}}', 'data-slide-block': '{{$.block}}' }
+
+/** Привязывает тему шапки и слайд-блок к шаблону слайда. true — если что-то поменялось. */
+function bindSlideData(slide: StructureNode): boolean {
+  const attrs = slide.attributes ?? {}
+  if (Object.entries(SLIDE_DATA_ATTRIBUTES).every(([k, v]) => attrs[k] === v)) return false
+  slide.attributes = { ...attrs, ...SLIDE_DATA_ATTRIBUTES }
+  return true
 }
 
 /** Привязывает кадрирование к шаблону слайда. true — если что-то поменялось. */
@@ -224,6 +241,9 @@ export function migrateAboutBlock(input: StructureNode): MigrationResult {
   }
   if (frameSlideTemplate(slideOf(trackOf(card)!, '«О проекте»'))) {
     changes.push('«О проекте»: кадрирование слайда — фокус и «целиком» из данных ЖК')
+  }
+  if (bindSlideData(slideOf(trackOf(card)!, '«О проекте»'))) {
+    changes.push('«О проекте»: тема шапки и слайд-блок из данных ЖК')
   }
 
   const metadata = (structure.metadata ??= {})
@@ -434,6 +454,9 @@ export function migrateGalleryBlock(input: StructureNode, label: string, source:
   if (frameSlideTemplate(slide)) {
     changes.push(`${label}: кадрирование слайда — фокус и «целиком» из данных ЖК`)
   }
+  if (bindSlideData(slide)) {
+    changes.push(`${label}: тема шапки и слайд-блок из данных ЖК`)
+  }
 
   const metadata = (structure.metadata ??= {})
   const js = typeof metadata.globalJs === 'string' ? metadata.globalJs : ''
@@ -512,6 +535,14 @@ ${HERO_CSS_MARKER}
 }
 `
 
+/** Снимает data-header-theme с узла (корень hero или его экземпляр). */
+function dropSectionTheme(node: StructureNode): boolean {
+  if (!node.attributes || !('data-header-theme' in node.attributes)) return false
+  const { ['data-header-theme']: _theme, ...rest } = node.attributes
+  node.attributes = rest
+  return true
+}
+
 /** Заменяет `{{item.heroImages.0}}` на постер во всех стилях и атрибутах дерева. */
 function replaceHeroFirstImage(root: StructureNode): number {
   let count = 0
@@ -563,6 +594,12 @@ export function migrateHeroBlock(input: StructureNode): MigrationResult {
   if (frameSlideTemplate(slide)) {
     changes.push('Hero: кадрирование слайда — фокус и «целиком» из данных ЖК')
   }
+  if (bindSlideData(slide)) {
+    changes.push('Hero: тема шапки и слайд-блок из данных ЖК')
+  }
+  // Тема шапки — у каждого слайда своя; общая «тёмная» на секции перебивала бы
+  // «авто» (шапка дошла бы до метки секции раньше, чем до фона слайда-блока).
+  if (dropSectionTheme(structure)) changes.push('Hero: общая тема шапки секции снята — тема у каждого слайда')
 
   const posters = replaceHeroFirstImage(structure)
   if (posters > 0) changes.push(`Hero: фон по первому фото (item.heroPoster) — ${posters}`)
@@ -584,11 +621,18 @@ export function migrateHeroBlock(input: StructureNode): MigrationResult {
 export function migrateHeroInstances(input: StructureNode, heroBlockId: string): MigrationResult {
   const structure: StructureNode = JSON.parse(JSON.stringify(input))
   let count = 0
+  let themes = 0
   const visit = (node: StructureNode) => {
-    if (node.metadata?.linkedBlockId === heroBlockId) count += replaceHeroFirstImage(node)
-    else for (const child of node.children ?? []) visit(child)
+    if (node.metadata?.linkedBlockId === heroBlockId) {
+      count += replaceHeroFirstImage(node)
+      // Атрибуты экземпляра перебивают атрибуты блока — снимаем и здесь.
+      if (dropSectionTheme(node)) themes++
+    } else for (const child of node.children ?? []) visit(child)
   }
   visit(structure)
-  if (count === 0) return { structure: input, changes: [], alreadyMigrated: true }
-  return { structure, changes: [`экземпляр hero: фон по первому фото (item.heroPoster) — ${count}`], alreadyMigrated: false }
+  const changes: string[] = []
+  if (count > 0) changes.push(`экземпляр hero: фон по первому фото (item.heroPoster) — ${count}`)
+  if (themes > 0) changes.push(`экземпляр hero: общая тема шапки секции снята — ${themes}`)
+  if (changes.length === 0) return { structure: input, changes, alreadyMigrated: true }
+  return { structure, changes, alreadyMigrated: false }
 }

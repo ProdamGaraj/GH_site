@@ -2,10 +2,10 @@
  * Слайды медиа-каруселей: фото и видео в одной галерее, кадрирование слайда.
  */
 import { galleryItemSchema } from '../schemas/estate.schema'
-import { aboutSlides, galleryUrls, isVideoUrl, posterOf, readGallery, toSlides } from '../services/mediaSlides'
+import { aboutSlides, blockIdOf, galleryUrls, isVideoUrl, posterOf, readGallery, toSlides } from '../services/mediaSlides'
 
 /** Слайд без настроек кадрирования. */
-const plain = (url: string, image: string, video: string) => ({ url, image, video, position: '50% 50%', fit: 'cover' })
+const plain = (url: string, image: string, video: string) => ({ url, image, video, position: '50% 50%', fit: 'cover', theme: '', block: '' })
 
 describe('isVideoUrl', () => {
   it('видео по расширению, с query и без учёта регистра', () => {
@@ -66,6 +66,8 @@ describe('кадрирование слайда', () => {
       video: '',
       position: '30% 80%',
       fit: 'cover',
+      theme: '',
+      block: '',
     })
   })
 
@@ -143,5 +145,45 @@ describe('aboutSlides', () => {
 
   it('совсем пусто — пусто', () => {
     expect(aboutSlides({})).toEqual([])
+  })
+})
+
+describe('тема шапки и слайд-блок', () => {
+  const BLOCK = 'block:3d23aed7-be04-4ed7-934f-f0281b9c4670'
+
+  it('тема слайда доходит до DTO; без темы — пусто (авто)', () => {
+    const [dark, auto] = toSlides([{ url: '/a.webp', theme: 'dark' }, '/b.webp'])
+    expect(dark.theme).toBe('dark')
+    expect(auto.theme).toBe('')
+    expect(toSlides([{ url: '/a.webp', theme: 'sepia' }])[0].theme).toBe('')
+  })
+
+  it('слайд-блок: id блока, без фона и видео, с темой', () => {
+    expect(toSlides(['/a.webp', { url: BLOCK, theme: 'light' }])[1]).toEqual({
+      url: BLOCK,
+      image: '',
+      video: '',
+      position: '50% 50%',
+      fit: 'cover',
+      theme: 'light',
+      block: '3d23aed7-be04-4ed7-934f-f0281b9c4670',
+    })
+  })
+
+  it('блок не постер и не ссылка на файл', () => {
+    expect(posterOf([BLOCK, '/v.mp4', '/p.webp'])).toBe('/p.webp')
+    expect(toSlides([BLOCK, '/v.mp4'], '/f.webp')[1].image).toBe('/f.webp')
+    expect(galleryUrls([BLOCK, '/a.webp'])).toEqual(['/a.webp'])
+  })
+
+  it('blockIdOf: только `block:<id>`', () => {
+    expect(blockIdOf(' block:abc ')).toBe('abc')
+    expect(blockIdOf('block:')).toBeNull()
+    expect(blockIdOf('/media/block.png')).toBeNull()
+  })
+
+  it('схема принимает тему и ссылку на блок', () => {
+    expect(galleryItemSchema.safeParse({ url: BLOCK, theme: 'dark' }).success).toBe(true)
+    expect(galleryItemSchema.safeParse({ url: '/a.webp', theme: 'sepia' }).success).toBe(false)
   })
 })

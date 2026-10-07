@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { focusAt, isVideoUrl, readGallery, slidePosition, withUrls, writeGallery, type SlideSettings } from './gallerySlides'
 
-const plain = (url: string): SlideSettings => ({ url, focus: null, fit: 'cover' })
+const plain = (url: string): SlideSettings => ({ url, focus: null, fit: 'cover', theme: null })
 
 describe('readGallery', () => {
   it('строки — слайды без настроек, объекты — с настройками', () => {
-    expect(readGallery(['/a.jpg', { url: '/b.jpg', focus: { x: 30, y: 80 }, fit: 'contain' }])).toEqual([
+    expect(readGallery(['/a.jpg', { url: '/b.jpg', focus: { x: 30, y: 80 }, fit: 'contain', theme: null }])).toEqual([
       plain('/a.jpg'),
-      { url: '/b.jpg', focus: { x: 30, y: 80 }, fit: 'contain' },
+      { url: '/b.jpg', focus: { x: 30, y: 80 }, fit: 'contain', theme: null },
     ])
   })
 
@@ -30,8 +30,8 @@ describe('writeGallery', () => {
   })
 
   it('с фокусом или «целиком» — объект, только с заданными полями', () => {
-    expect(writeGallery([{ url: '/a', focus: { x: 10, y: 20 }, fit: 'cover' }])).toEqual([{ url: '/a', focus: { x: 10, y: 20 } }])
-    expect(writeGallery([{ url: '/a', focus: null, fit: 'contain' }])).toEqual([{ url: '/a', fit: 'contain' }])
+    expect(writeGallery([{ url: '/a', focus: { x: 10, y: 20 }, fit: 'cover', theme: null }])).toEqual([{ url: '/a', focus: { x: 10, y: 20 } }])
+    expect(writeGallery([{ url: '/a', focus: null, fit: 'contain', theme: null }])).toEqual([{ url: '/a', fit: 'contain' }])
   })
 
   it('чтение и запись обратимы', () => {
@@ -41,7 +41,7 @@ describe('writeGallery', () => {
 })
 
 describe('withUrls', () => {
-  const framed: SlideSettings = { url: '/b', focus: { x: 10, y: 90 }, fit: 'cover' }
+  const framed: SlideSettings = { url: '/b', focus: { x: 10, y: 90 }, fit: 'cover', theme: null }
 
   it('переставили строки — настройки переехали вместе с фото', () => {
     expect(withUrls([plain('/a'), framed], ['/b', '/a'])).toEqual([framed, plain('/a')])
@@ -52,8 +52,8 @@ describe('withUrls', () => {
   })
 
   it('одинаковые ссылки разбираются по порядку', () => {
-    const first: SlideSettings = { url: '/a', focus: { x: 1, y: 1 }, fit: 'cover' }
-    const second: SlideSettings = { url: '/a', focus: null, fit: 'contain' }
+    const first: SlideSettings = { url: '/a', focus: { x: 1, y: 1 }, fit: 'cover', theme: null }
+    const second: SlideSettings = { url: '/a', focus: null, fit: 'contain', theme: null }
     expect(withUrls([first, second], ['/a', '/a'])).toEqual([first, second])
   })
 })
@@ -74,12 +74,12 @@ describe('focusAt', () => {
 
 describe('slidePosition', () => {
   it('фокус — позиция кадра, без фокуса — центр', () => {
-    expect(slidePosition({ url: '/a', focus: { x: 30, y: 80 }, fit: 'cover' })).toBe('30% 80%')
+    expect(slidePosition({ url: '/a', focus: { x: 30, y: 80 }, fit: 'cover', theme: null })).toBe('30% 80%')
     expect(slidePosition(plain('/a'))).toBe('50% 50%')
   })
 
   it('«целиком» — всегда центр', () => {
-    expect(slidePosition({ url: '/a', focus: { x: 0, y: 0 }, fit: 'contain' })).toBe('50% 50%')
+    expect(slidePosition({ url: '/a', focus: { x: 0, y: 0 }, fit: 'contain', theme: null })).toBe('50% 50%')
   })
 })
 

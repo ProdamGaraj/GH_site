@@ -7,8 +7,11 @@
  * пропорции) и режим вписывания: «заполнить» (обрезка вокруг фокуса) или
  * «целиком» (кадр полностью на размытой подложке).
  *
- * Элемент галереи в базе — ссылка строкой или {url, focus, fit}. Строкой
- * пишем слайд без настроек: так данные без кадрирования не меняют вид.
+ * Элемент галереи в базе — ссылка строкой или {url, focus, fit, theme}.
+ * Строкой пишем слайд без настроек: так данные без кадрирования не меняют вид.
+ * theme — тема шапки сайта над слайдом (dark | light; нет — авто). Ссылка
+ * `block:<id>` — слайд-блок из библиотеки CMS (его разворачивает CMS при
+ * публикации), у него нет кадрирования, только тема.
  * Разбор повторяет estate-service/src/services/mediaSlides.ts (readGallery,
  * позиция) — пакеты раздельные, держать в согласии.
  *
@@ -23,14 +26,30 @@ export interface SlideFocus {
   y: number
 }
 
+/** Тема шапки над слайдом: dark — светлый текст шапки, light — тёмный; null — авто. */
+export type SlideTheme = 'dark' | 'light'
+
 /** Элемент галереи, как он лежит в базе и приходит из API. */
-export type GalleryItem = string | { url: string; focus?: SlideFocus; fit?: SlideFit }
+export type GalleryItem = string | { url: string; focus?: SlideFocus; fit?: SlideFit; theme?: SlideTheme }
 
 /** Слайд в форме: всегда объект. */
 export interface SlideSettings {
   url: string
   focus: SlideFocus | null
   fit: SlideFit
+  theme: SlideTheme | null
+}
+
+/** Ссылка слайда-блока: `block:<id блока библиотеки>`. */
+export const BLOCK_PREFIX = 'block:'
+
+export const blockSlideUrl = (blockId: string): string => `${BLOCK_PREFIX}${blockId}`
+
+/** id блока слайда-блока или null — слайд-файл. */
+export function blockIdOf(url: string): string | null {
+  const v = url.trim()
+  if (!v.startsWith(BLOCK_PREFIX)) return null
+  return v.slice(BLOCK_PREFIX.length).trim() || null
 }
 
 export const CENTER_POSITION = '50% 50%'
@@ -53,7 +72,7 @@ export function readGallery(items: readonly unknown[] | null | undefined): Slide
   for (const raw of items) {
     if (typeof raw === 'string') {
       const url = raw.trim()
-      if (url) out.push({ url, focus: null, fit: 'cover' })
+      if (url) out.push({ url, focus: null, fit: 'cover', theme: null })
       continue
     }
     if (!raw || typeof raw !== 'object') continue
@@ -67,6 +86,7 @@ export function readGallery(items: readonly unknown[] | null | undefined): Slide
       url,
       focus: x === null || y === null ? null : { x, y },
       fit: item.fit === 'contain' ? 'contain' : 'cover',
+      theme: item.theme === 'dark' || item.theme === 'light' ? item.theme : null,
     })
   }
   return out
@@ -75,10 +95,11 @@ export function readGallery(items: readonly unknown[] | null | undefined): Slide
 /** Слайды формы → галерея для API. Без настроек — строкой. */
 export function writeGallery(slides: readonly SlideSettings[]): GalleryItem[] {
   return slides.map((slide) => {
-    if (!slide.focus && slide.fit === 'cover') return slide.url
-    const item: { url: string; focus?: SlideFocus; fit?: SlideFit } = { url: slide.url }
+    if (!slide.focus && slide.fit === 'cover' && !slide.theme) return slide.url
+    const item: { url: string; focus?: SlideFocus; fit?: SlideFit; theme?: SlideTheme } = { url: slide.url }
     if (slide.focus) item.focus = { ...slide.focus }
     if (slide.fit === 'contain') item.fit = 'contain'
+    if (slide.theme) item.theme = slide.theme
     return item
   })
 }
@@ -92,7 +113,7 @@ export function withUrls(slides: readonly SlideSettings[], urls: readonly string
   const unused = [...slides]
   return urls.map((url) => {
     const at = unused.findIndex((s) => s.url === url)
-    if (at === -1) return { url, focus: null, fit: 'cover' as const }
+    if (at === -1) return { url, focus: null, fit: 'cover' as const, theme: null }
     const [match] = unused.splice(at, 1)
     return match
   })

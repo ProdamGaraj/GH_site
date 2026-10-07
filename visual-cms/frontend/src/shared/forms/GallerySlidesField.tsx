@@ -1,7 +1,12 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
+import { Boxes } from 'lucide-react'
+import { blockApi } from '@/shared/api'
 import { resolveMediaUrl } from '@/shared/api/mediaApi'
 import { cn } from '@/shared/utils'
+import { BlockPicker } from '@/features/editor/components/BlockPicker'
 import {
+  blockIdOf,
+  blockSlideUrl,
   focusAt,
   isVideoUrl,
   readGallery,
@@ -11,6 +16,7 @@ import {
   type GalleryItem,
   type SlideFit,
   type SlideSettings,
+  type SlideTheme,
 } from './gallerySlides'
 import { MediaListField, MediaThumb } from './mediaFields'
 
@@ -52,6 +58,31 @@ export const HERO_FRAMES: readonly SlideFrame[] = [
 
 const FIT_LABELS: Record<SlideFit, string> = { cover: 'Заполнить', contain: 'Целиком' }
 
+const THEME_OPTIONS: Array<{ value: SlideTheme | null; label: string; title: string }> = [
+  { value: null, label: 'Авто', title: 'Фото — по яркости верха, видео — по кадрам, блок — по его фону' },
+  { value: 'dark', label: 'Тёмный фон', title: 'Под шапкой тёмное — текст шапки белый' },
+  { value: 'light', label: 'Светлый фон', title: 'Под шапкой светлое — текст шапки тёмный' },
+]
+
+/** Названия блоков библиотеки для строк слайдов-блоков (загрузка один раз). */
+function useBlockNames(enabled: boolean): Record<string, string> {
+  const [names, setNames] = useState<Record<string, string>>({})
+  useEffect(() => {
+    if (!enabled) return
+    let cancelled = false
+    blockApi
+      .getReusable()
+      .then((blocks) => {
+        if (!cancelled) setNames(Object.fromEntries(blocks.map((b) => [b.id, b.name])))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [enabled])
+  return names
+}
+
 export const GallerySlidesField: React.FC<{
   label: string
   hint?: string
@@ -59,8 +90,17 @@ export const GallerySlidesField: React.FC<{
   onChange: (value: GalleryItem[]) => void
   /** Крайние пропорции кадра на сайте; по умолчанию — карточка слайдера. */
   frames?: readonly SlideFrame[]
-}> = ({ label, hint, value, onChange, frames = FRAMES }) => {
+  /**
+   * Тема шапки над каждым слайдом (Авто / Тёмный / Светлый фон). Только там,
+   * где шаблон её читает (слайдеры страницы проекта); у новостей — нет.
+   */
+  withTheme?: boolean
+  /** Слайд-блок из библиотеки CMS (`block:<id>`); его разворачивает CMS при публикации. */
+  withBlocks?: boolean
+}> = ({ label, hint, value, onChange, frames = FRAMES, withTheme = false, withBlocks = false }) => {
   const slides = readGallery(value)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const blockNames = useBlockNames(withBlocks && slides.some((s) => blockIdOf(s.url)))
 
   const update = (index: number, patch: Partial<SlideSettings>) =>
     onChange(writeGallery(slides.map((s, i) => (i === index ? { ...s, ...patch } : s))))
@@ -76,23 +116,93 @@ export const GallerySlidesField: React.FC<{
         value={slides.map((s) => s.url)}
         onChange={(urls) => onChange(writeGallery(withUrls(slides, urls)))}
       />
+      {withBlocks && (
+        <>
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-700 border border-gray-300 rounded-md bg-white hover:bg-gray-50"
+          >
+            <Boxes size={14} /> Блок из библиотеки
+          </button>
+          <BlockPicker
+            isOpen={pickerOpen}
+            onClose={() => setPickerOpen(false)}
+            title="Блок — слайдом"
+            forcedMode="linked"
+            onPick={({ block }) => {
+              setPickerOpen(false)
+              onChange(writeGallery([...slides, { url: blockSlideUrl(block.id), focus: null, fit: 'cover', theme: null }]))
+            }}
+          />
+        </>
+      )}
       {slides.length > 0 && (
         <div className="mt-2 space-y-2" data-testid="slide-framing">
-          {slides.map((slide, i) => (
-            <SlideFramingRow key={`${i}:${slide.url}`} index={i} slide={slide} frames={frames} onChange={(patch) => update(i, patch)} />
-          ))}
+          {slides.map((slide, i) => {
+            const blockId = blockIdOf(slide.url)
+            const theme = withTheme ? <ThemeSwitch index={i} value={slide.theme} onChange={(t) => update(i, { theme: t })} /> : null
+            return blockId ? (
+              <div key={`${i}:${slide.url}`} className="flex gap-3 items-start rounded-md border border-indigo-200 bg-indigo-50/40 p-2" data-testid={`slide-${i}`}>
+                <div className="w-28 h-16 shrink-0 rounded bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                  <Boxes size={22} />
+                </div>
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="text-xs text-gray-700 truncate" title={slide.url}>
+                    {i + 1}. Блок «{blockNames[blockId] ?? blockId}»
+                  </div>
+                  <div className="text-[11px] text-gray-500">
+                    Слайд целиком — блок из библиотеки, с его текстами, стилями и переводами. На сайте появится после публикации.
+                  </div>
+                  {theme}
+                </div>
+              </div>
+            ) : (
+              <SlideFramingRow key={`${i}:${slide.url}`} index={i} slide={slide} frames={frames} onChange={(patch) => update(i, patch)}>
+                {theme}
+              </SlideFramingRow>
+            )
+          })}
         </div>
       )}
     </div>
   )
 }
 
+/** Тема шапки сайта над слайдом. */
+const ThemeSwitch: React.FC<{ index: number; value: SlideTheme | null; onChange: (theme: SlideTheme | null) => void }> = ({
+  index,
+  value,
+  onChange,
+}) => (
+  <div className="flex flex-wrap items-center gap-2 text-xs" role="group" aria-label={`Шапка над слайдом ${index + 1}`}>
+    <span className="text-gray-500">Шапка над слайдом:</span>
+    {THEME_OPTIONS.map((o) => (
+      <button
+        key={o.label}
+        type="button"
+        title={o.title}
+        onClick={() => onChange(o.value)}
+        aria-pressed={value === o.value}
+        className={cn(
+          'px-2 py-1 rounded border',
+          value === o.value ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-300 text-gray-600'
+        )}
+      >
+        {o.label}
+      </button>
+    ))}
+  </div>
+)
+
 const SlideFramingRow: React.FC<{
   index: number
   slide: SlideSettings
   frames: readonly SlideFrame[]
   onChange: (patch: Partial<SlideSettings>) => void
-}> = ({ index, slide, frames, onChange }) => {
+  /** Доп. настройки слайда под кадрированием (тема шапки). */
+  children?: React.ReactNode
+}> = ({ index, slide, frames, onChange, children }) => {
   const contain = slide.fit === 'contain'
   const src = resolveMediaUrl(slide.url)
 
@@ -147,6 +257,7 @@ const SlideFramingRow: React.FC<{
             </button>
           )}
         </div>
+        {children}
         <div className="flex flex-wrap gap-3 items-end">
           {frames.map((frame) => (
             <figure key={frame.label} className="m-0">

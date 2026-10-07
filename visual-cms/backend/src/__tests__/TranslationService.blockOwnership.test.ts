@@ -196,3 +196,26 @@ describe('«один текст для всех языков» и неперев
     ])
   })
 })
+
+describe('getBlockTreeTranslationMap — слайд-блок из данных', () => {
+  const tree = { id: 'promo-root', children: [{ id: 'promo-text', content: 'Акция' }, { id: 'nav-in', metadata: { linkedBlockId: NAV }, children: [{ id: 'nav-link' }] }] }
+
+  it('переводы блока и вложенного блока; «один для всех» не переводится', async () => {
+    repos.BlockTranslation.seed([
+      btr(PROMO, 'promo-text', 'Aksiya'),
+      btr(PROMO, 'promo-root', 'корень', 'uz', 'aria-label'),
+      btr(NAV, 'nav-link', 'Bosh sahifa'),
+      btr(NAV, 'nav-link', 'same', '*'),
+      btr(PROMO, 'promo-text', 'Promo', 'en'),
+    ])
+    expect(await translationService.getBlockTreeTranslationMap(PROMO, tree, 'uz')).toEqual({
+      'promo-text': { content: 'Aksiya' },
+      'promo-root': { 'aria-label': 'корень' },
+    })
+  })
+
+  it('чужой блок с тем же id узла — не применяется', async () => {
+    repos.BlockTranslation.seed([btr(NAV, 'promo-text', 'чужой')])
+    expect(await translationService.getBlockTreeTranslationMap(PROMO, tree, 'uz')).toEqual({})
+  })
+})

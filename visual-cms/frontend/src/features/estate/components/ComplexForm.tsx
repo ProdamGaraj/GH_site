@@ -6,7 +6,7 @@ import { estateApi } from '../api'
 import { getT, setT, setLabel, isRu } from './tfield'
 import { SECTION } from '../sections'
 import { FormSection, TextField, TextArea, NumberField, SelectField, StringListField, StatsField, LabelMapField } from './fields'
-import { GallerySlidesField, HERO_FRAMES } from './GallerySlidesField'
+import { HERO_FRAMES, ProjectSlidesField } from './GallerySlidesField'
 import { MediaField } from './mediaFields'
 import { ProjectMapSection } from './ProjectMapSection'
 import { SiteCardSection } from './SiteCardSection'
@@ -187,7 +187,7 @@ export const ComplexForm: React.FC<{
             />
           </div>
           {/* Hero — тот же слайдер фото и видео, что ниже, но кадр на весь экран. */}
-          <GallerySlidesField
+          <ProjectSlidesField
             label="Hero — слайды"
             hint="фото и видео; фон до загрузки видео — первое фото"
             frames={HERO_FRAMES}
@@ -198,14 +198,14 @@ export const ComplexForm: React.FC<{
               (.mp4/.webm). Порядок строк — порядок слайдов; при одном элементе
               навигации нет. Под списком — кадрирование каждого слайда.
               Поведение слайдера — в редакторе CMS. */}
-          <GallerySlidesField
+          <ProjectSlidesField
             label="О проекте — слайды"
             hint="фото и видео; пусто — About-видео, без него About-медиа"
             value={form.gallery}
             onChange={setField('gallery')}
           />
-          <GallerySlidesField label="Холлы — слайды" hint="фото и видео" value={form.hallGallery} onChange={setField('hallGallery')} />
-          <GallerySlidesField label="Двор — слайды" hint="фото и видео" value={form.yardGallery} onChange={setField('yardGallery')} />
+          <ProjectSlidesField label="Холлы — слайды" hint="фото и видео" value={form.hallGallery} onChange={setField('hallGallery')} />
+          <ProjectSlidesField label="Двор — слайды" hint="фото и видео" value={form.yardGallery} onChange={setField('yardGallery')} />
         </FormSection>
       )}
     </div>

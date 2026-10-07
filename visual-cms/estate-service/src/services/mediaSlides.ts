@@ -30,8 +30,26 @@ export interface SlideFocus {
   y: number
 }
 
+/** Тема шапки над слайдом: dark — светлый текст шапки, light — тёмный; без неё — авто. */
+export type SlideTheme = 'dark' | 'light'
+
 /** Элемент галереи ЖК, как он лежит в базе. */
-export type GalleryItem = string | { url: string; focus?: SlideFocus; fit?: SlideFit }
+export type GalleryItem = string | { url: string; focus?: SlideFocus; fit?: SlideFit; theme?: SlideTheme }
+
+/**
+ * Слайд-блок: вместо ссылки на файл — `block:<id блока библиотеки CMS>`.
+ * Блок со всем содержимым, стилями и переводами разворачивает CMS при
+ * публикации страницы (DeployService.expandDataSlideBlocks).
+ */
+export const BLOCK_PREFIX = 'block:'
+
+/** id блока слайда-блока или null — слайд-файл. */
+export function blockIdOf(url: string): string | null {
+  const v = url.trim()
+  if (!v.startsWith(BLOCK_PREFIX)) return null
+  const id = v.slice(BLOCK_PREFIX.length).trim()
+  return id || null
+}
 
 export interface MediaSlide {
   /** Исходная ссылка из галереи. */
@@ -44,6 +62,10 @@ export interface MediaSlide {
   position: string
   /** Вписывание: шаблон пишет его в data-slide-fit. */
   fit: SlideFit
+  /** Тема шапки над слайдом (data-header-theme); пусто — авто: фото — по яркости, видео — по кадрам. */
+  theme: '' | SlideTheme
+  /** id блока библиотеки для слайда-блока (data-slide-block); пусто — слайд-файл. */
+  block: string
 }
 
 /** Центр кадра — позиция слайда без фокуса и в режиме «целиком». */
@@ -60,6 +82,7 @@ export interface GallerySlideSettings {
   url: string
   focus: SlideFocus | null
   fit: SlideFit
+  theme: SlideTheme | null
 }
 
 function percent(value: unknown): number | null {
@@ -85,21 +108,28 @@ export function readGallery(value: unknown): GallerySlideSettings[] {
   for (const raw of value) {
     if (typeof raw === 'string') {
       const url = raw.trim()
-      if (url) out.push({ url, focus: null, fit: 'cover' })
+      if (url) out.push({ url, focus: null, fit: 'cover', theme: null })
       continue
     }
     if (!raw || typeof raw !== 'object') continue
     const item = raw as Record<string, unknown>
     const url = typeof item.url === 'string' ? item.url.trim() : ''
     if (!url) continue
-    out.push({ url, focus: readFocus(item.focus), fit: item.fit === 'contain' ? 'contain' : 'cover' })
+    out.push({
+      url,
+      focus: readFocus(item.focus),
+      fit: item.fit === 'contain' ? 'contain' : 'cover',
+      theme: item.theme === 'dark' || item.theme === 'light' ? item.theme : null,
+    })
   }
   return out
 }
 
-/** Только ссылки галереи — для полей DTO, которые отдают список строк. */
+/** Ссылки на файлы галереи — для полей DTO, которые отдают список строк. Слайды-блоки — не файлы. */
 export function galleryUrls(value: unknown): string[] {
-  return readGallery(value).map((item) => item.url)
+  return readGallery(value)
+    .filter((item) => !blockIdOf(item.url))
+    .map((item) => item.url)
 }
 
 /**
@@ -113,7 +143,7 @@ function positionOf(item: GallerySlideSettings): string {
 
 /** Слайд без настроек кадрирования. */
 function plainSlide(url: string, image: string, video: string): MediaSlide {
-  return { url, image, video, position: CENTER_POSITION, fit: 'cover' }
+  return { url, image, video, position: CENTER_POSITION, fit: 'cover', theme: '', block: '' }
 }
 
 /**
@@ -121,7 +151,7 @@ function plainSlide(url: string, image: string, video: string): MediaSlide {
  * Видео в фон CSS не годится — url() на .mp4 даёт пустой блок.
  */
 export function posterOf(value: unknown, fallback: string | null | undefined = ''): string {
-  return readGallery(value).find((item) => !isVideoUrl(item.url))?.url ?? (fallback ?? '').trim()
+  return readGallery(value).find((item) => !isVideoUrl(item.url) && !blockIdOf(item.url))?.url ?? (fallback ?? '').trim()
 }
 
 /**
@@ -132,6 +162,10 @@ export function toSlides(value: unknown, fallbackPoster = ''): MediaSlide[] {
   const items = readGallery(value)
   const poster = posterOf(items, fallbackPoster)
   return items.map((item) => {
+    const theme = item.theme ?? ''
+    const block = blockIdOf(item.url)
+    // Слайд-блок: ни фона, ни видео — содержимое даёт блок. Кадрирования нет.
+    if (block) return { url: item.url, image: '', video: '', position: CENTER_POSITION, fit: 'cover', theme, block }
     const video = isVideoUrl(item.url)
     return {
       url: item.url,
@@ -139,6 +173,8 @@ export function toSlides(value: unknown, fallbackPoster = ''): MediaSlide[] {
       video: video ? item.url : '',
       position: positionOf(item),
       fit: item.fit,
+      theme,
+      block: '',
     }
   })
 }

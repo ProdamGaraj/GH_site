@@ -55,8 +55,9 @@ const planGroupingSchema = z
   .nullable()
 
 /**
- * Элемент галереи слайдов: ссылка строкой или ссылка с кадрированием —
- * точкой фокуса (проценты кадра) и вписыванием. См. services/mediaSlides.ts.
+ * Элемент галереи слайдов: ссылка строкой или ссылка с настройками слайда —
+ * точкой фокуса (проценты кадра), вписыванием и темой шапки над слайдом.
+ * Ссылка `block:<id>` — слайд-блок из библиотеки CMS. См. services/mediaSlides.ts.
  */
 export const galleryItemSchema = z.union([
   z.string().max(500),
@@ -64,6 +65,7 @@ export const galleryItemSchema = z.union([
     url: z.string().min(1).max(500),
     focus: z.object({ x: z.number().min(0).max(100), y: z.number().min(0).max(100) }).optional(),
     fit: z.enum(['cover', 'contain']).optional(),
+    theme: z.enum(['dark', 'light']).optional(),
   }),
 ])
 

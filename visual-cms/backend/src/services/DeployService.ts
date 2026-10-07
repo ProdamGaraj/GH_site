@@ -17,7 +17,7 @@ import { DataBinding } from '../models/DataBinding'
 import { DataSource as DataSourceEntity } from '../models/DataSource'
 import { PageDataConfig } from './DataBindingGenerator'
 import type { BlockNode } from '../types/blockNode'
-import { translationService, applyVariableMediaTranslations, type TranslationMap } from './TranslationService'
+import { translationService, applyVariableMediaTranslations, applyNodeTranslations, type TranslationMap } from './TranslationService'
 import { languageService } from './LanguageService'
 import { MacroV2Client } from './MacroV2Client'
 import { logger } from './Logger'
@@ -1182,9 +1182,11 @@ export class DeployService {
       }
     }
 
-    // Тема шапки над фото-слайдами — после подстановки: у страниц коллекции
-    // фото слайдов приходят из данных элемента, до подстановки их не видно.
-    const pageStructure = await this.applyHeaderThemes(this.substituteItemData(p.templateStructure, item))
+    // Слайды-блоки и тема шапки над фото-слайдами — после подстановки: у
+    // страниц коллекции слайды приходят из данных элемента, до подстановки их
+    // не видно.
+    const withSlideBlocks = await this.expandDataSlideBlocks(this.substituteItemData(p.templateStructure, item), p.lang)
+    const pageStructure = await this.applyHeaderThemes(withSlideBlocks)
     const pageDataConfig = this.injectCollectionContext(p.templateDataConfig, collection, item, itemId)
     const enriched = this.enrichItemForCollections(item)
     const metaCtx = { item: enriched, $: enriched }
@@ -2576,7 +2578,52 @@ export class DeployService {
     if (defs.length === 0) return structure
     const item: Record<string, unknown> = {}
     for (const def of defs) item[def.name] = await this.fetchPublishData(def, lang)
-    return this.substituteItemData(structure, item)
+    return this.expandDataSlideBlocks(this.substituteItemData(structure, item), lang)
+  }
+
+  /**
+   * Слайды-блоки из данных: у слайда `data-slide-block="<id блока>"` (в данных
+   * ЖК — ссылка `block:<id>` в галерее). Блок библиотеки со вложенными блоками
+   * вставляется внутрь слайда и переводится переводами самого блока на язык
+   * страницы — на странице-шаблоне этого блока нет, и её переводы его не знают.
+   * Стили и скрипты блока лежат в его metadata и собираются генератором, как у
+   * любого блока. Блока нет (удалён) — слайд остаётся пустым, в лог.
+   *
+   * Структура уже копия (после substituteItemData) — правим на месте.
+   */
+  private async expandDataSlideBlocks(structure: any, lang?: string): Promise<any> {
+    const slots: any[] = []
+    const visit = (node: any) => {
+      if (!node || typeof node !== 'object') return
+      const id = node.attributes?.['data-slide-block']
+      if (typeof id === 'string' && id.trim()) slots.push(node)
+      for (const child of node.children ?? []) visit(child)
+      for (const variation of Object.values(node.variations ?? {}) as any[]) {
+        for (const child of variation?.specificChildren ?? []) visit(child)
+      }
+    }
+    visit(structure)
+    if (slots.length === 0) return structure
+
+    const ids = [...new Set(slots.map((slot) => String(slot.attributes['data-slide-block']).trim()))]
+    const blocks = await AppDataSource.getRepository(Block).find({ where: { id: In(ids) } })
+    const byId = new Map(blocks.map((b) => [b.id, b]))
+    const defaultLang = (await languageService.getActive()).find((l) => l.isDefault)?.code
+    for (const slot of slots) {
+      const blockId = String(slot.attributes['data-slide-block']).trim()
+      const block = byId.get(blockId)
+      if (!block?.structure) {
+        logger.warn(`Слайд-блок ${blockId} не найден в библиотеке — слайд пустой`)
+        continue
+      }
+      let tree = await linkedBlocksService.updateLinkedBlocks(JSON.parse(JSON.stringify(block.structure)))
+      if (lang && lang !== defaultLang) {
+        tree = applyNodeTranslations(tree, await translationService.getBlockTreeTranslationMap(blockId, tree, lang))
+      }
+      tree.metadata = { ...(tree.metadata ?? {}), name: tree.metadata?.name || block.name }
+      slot.children = [...(slot.children ?? []), tree]
+    }
+    return structure
   }
 
   private async fetchPublishData(def: PagePublishDataDef, lang?: string): Promise<unknown> {

@@ -856,6 +856,20 @@ export class TranslationService {
     return { locale, total: out.length, missing: missing.size, entries: out }
   }
 
+  /**
+   * Карта переводов дерева блока, вставленного не со страницы, а из данных
+   * (слайд-блок: `data-slide-block`). Узлы блока переводятся переводами самого
+   * блока (и вложенных в него блоков), с отметками «один текст для всех языков».
+   */
+  async getBlockTreeTranslationMap(blockId: string, expanded: any, locale: string): Promise<TranslationMap> {
+    const ownership = resolveOwnership({ id: '__data-slide__', metadata: { linkedBlockId: blockId }, children: [expanded] })
+    if (ownership.blockIds.length === 0) return {}
+    const rows = await this.blockRepository.find({ where: { blockId: In(ownership.blockIds), locale: In([locale, ALL_LOCALES]) } })
+    const lang = mergeRows(ownership, [], rows.filter((r) => r.locale === locale))
+    const marks = marksOf(mergeRows(ownership, [], rows.filter((r) => r.locale === ALL_LOCALES)))
+    return buildTranslationMap(lang, marks)
+  }
+
   /** Сколько полей страницы не переведено на язык (для noindex языковой версии). */
   async countMissing(pageId: string, locale: string): Promise<number> {
     const ctx = await this.context(pageId)
