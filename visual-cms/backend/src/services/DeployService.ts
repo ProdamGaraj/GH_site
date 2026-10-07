@@ -1181,7 +1181,9 @@ export class DeployService {
       }
     }
 
-    const pageStructure = this.substituteItemData(p.templateStructure, item)
+    // Тема шапки над фото-слайдами — после подстановки: у страниц коллекции
+    // фото слайдов приходят из данных элемента, до подстановки их не видно.
+    const pageStructure = await this.applyHeaderThemes(this.substituteItemData(p.templateStructure, item))
     const pageDataConfig = this.injectCollectionContext(p.templateDataConfig, collection, item, itemId)
     const enriched = this.enrichItemForCollections(item)
     const metaCtx = { item: enriched, $: enriched }
@@ -2028,27 +2030,36 @@ export class DeployService {
       arr = this.getNestedValue(ctx.item, cfg.source)
     }
 
-    if (!Array.isArray(arr)) {
-      node.children = []
-      return
-    }
+    const children: any[] = Array.isArray(node.children) ? node.children : []
+    // Шаблон — первый НЕстатический ребёнок, как в браузере (DataBindingGenerator,
+    // repeatTemplateHelper.getRepeatTemplate). Статические слайды гибридной
+    // карусели (data-carousel-static="true", в т.ч. слайды-блоки) остаются на
+    // своих местах: стоявшие до шаблона — перед копиями, после — за ними. Прочие
+    // соседи шаблона — образцы данных, их браузер прячет, здесь они отпадают.
+    // Раньше шаблоном брался children[0]: статический слайд перед шаблоном
+    // размножался по данным вместо шаблона, а стоявшие после пропадали.
+    const templateIndex = children.findIndex((c) => !this.isStaticSlide(c))
+    const template = templateIndex === -1 ? null : children[templateIndex]
+    const staticBefore = children.slice(0, templateIndex === -1 ? children.length : templateIndex)
+    const staticAfter = templateIndex === -1 ? [] : children.slice(templateIndex + 1).filter((c) => this.isStaticSlide(c))
+    for (const child of [...staticBefore, ...staticAfter]) this.substituteNode(child, ctx)
 
-    const offset = Math.max(0, cfg.offset ?? 0)
-    const sliced = arr.slice(offset, cfg.limit != null ? offset + cfg.limit : undefined)
-
-    const template = Array.isArray(node.children) && node.children.length > 0 ? node.children[0] : null
-    if (!template || sliced.length === 0) {
-      node.children = []
-      return
+    const clones: any[] = []
+    if (template && Array.isArray(arr)) {
+      const offset = Math.max(0, cfg.offset ?? 0)
+      const sliced = arr.slice(offset, cfg.limit != null ? offset + cfg.limit : undefined)
+      for (const arrItem of sliced) {
+        const clone = JSON.parse(JSON.stringify(template))
+        this.substituteNode(clone, { item: ctx.item, $: arrItem })
+        clones.push(clone)
+      }
     }
+    node.children = [...staticBefore, ...clones, ...staticAfter]
+  }
 
-    const newChildren: any[] = []
-    for (const arrItem of sliced) {
-      const clone = JSON.parse(JSON.stringify(template))
-      this.substituteNode(clone, { item: ctx.item, $: arrItem })
-      newChildren.push(clone)
-    }
-    node.children = newChildren
+  /** Статический слайд гибридной карусели — живёт рядом с шаблоном повтора. */
+  private isStaticSlide(node: any): boolean {
+    return node?.attributes?.['data-carousel-static'] === 'true'
   }
 
   private replaceTemplateVars(str: string, ctx: { item: any; $: any }): string {

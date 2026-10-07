@@ -25,6 +25,15 @@
  *    body проверен в стеке, а прозрачные они — белые. Битая картинка ничего
  *    не рисует и фото не считается.
  *
+ * 4. Скрытые слайды (2026-10-07). У перехода «перетекание» и «наплыв» все
+ *    слайды лежат стопкой, невидимые — прозрачностью, но в стеке под точкой
+ *    они есть. Если у активного слайда темы нет (слайд-блок с «Авто»), скрипт
+ *    брал метку или фото невидимого слайда сверху стопки. Теперь элементы
+ *    неактивных слайдов и копий по краям ленты пропускаются: под активным
+ *    слайдом-блоком решает его собственный фон, прозрачный — то, что под
+ *    каруселью, и дальше фон страницы. Пока карусель не разметила активный
+ *    слайд, ничего не пропускается — как раньше.
+ *
  * Правится globalJs блока и кэш-копии блока в страницах (linked-экземпляры):
  * на деплое берётся библиотечный блок, но старой логики не должно остаться
  * нигде. Чистое преобразование; запись — `migrate-nav-header-contrast.ts`.
@@ -135,6 +144,38 @@ function patchCarousel(js: string): string {
     .replace(LISTENER_ANCHOR, LISTENER_AFTER)
 }
 
+export const HIDDEN_SLIDE_FN = `  // Элемент внутри невидимого слайда карусели (неактивный — при «перетекании»
+  // все слайды лежат стопкой — или копия по краю ленты): он не виден за
+  // шапкой и решать её цвет не должен. Пока активного слайда нет (карусель не
+  // запустилась), не пропускаем ничего.
+  function inHiddenSlide(el) {
+    const slide = el.closest("[data-carousel-slide], [data-carousel-clone]");
+    if (!slide) return false;
+    const carousel = slide.closest("[data-carousel]");
+    if (!carousel) return false;
+    const activeClass = carousel.getAttribute("data-carousel-slide-active-class") || "is-active";
+    if (!carousel.querySelector("[data-carousel-slide]." + activeClass)) return false;
+    if (slide.hasAttribute("data-carousel-clone")) return true;
+    return !slide.classList.contains(activeClass);
+  }
+
+`
+
+export const HIDDEN_BEFORE = `      const slideTheme = carouselTheme(el);
+      if (slideTheme) return slideTheme;
+`
+
+export const HIDDEN_AFTER = `      const slideTheme = carouselTheme(el);
+      if (slideTheme) return slideTheme;
+      if (inHiddenSlide(el)) continue;
+`
+
+function patchHiddenSlides(js: string): string {
+  if (js.includes('function inHiddenSlide(el)')) return js
+  if (!js.includes(UNDER_POINT_HEAD) || !js.includes(HIDDEN_BEFORE)) return js
+  return js.replace(UNDER_POINT_HEAD, HIDDEN_SLIDE_FN + UNDER_POINT_HEAD).replace(HIDDEN_BEFORE, HIDDEN_AFTER)
+}
+
 function patchPageCanvas(js: string): string {
   if (js.includes('function isMedia(el, cs)')) return js
   if (![UNDER_POINT_HEAD, STACK_BEFORE, FALLBACK_BEFORE, RULES_BEFORE].every((anchor) => js.includes(anchor))) return js
@@ -146,11 +187,11 @@ function patchPageCanvas(js: string): string {
 }
 
 /**
- * Скрипт шапки с пробой за шапкой, темой активного слайда и фоном страницы;
- * остальное — как было.
+ * Скрипт шапки с пробой за шапкой, темой активного слайда, фоном страницы и
+ * без невидимых слайдов в стеке; остальное — как было.
  */
 export function patchContrastJs(js: string): string {
-  return patchPageCanvas(patchCarousel(patchProbe(js)))
+  return patchHiddenSlides(patchPageCanvas(patchCarousel(patchProbe(js))))
 }
 
 /** Скрипт шапки, который этот модуль правит (есть syncLogoContrast). */

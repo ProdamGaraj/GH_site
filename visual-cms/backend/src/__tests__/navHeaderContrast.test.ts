@@ -21,6 +21,9 @@ import {
   RULES_BEFORE,
   SKIP_AFTER,
   SKIP_BEFORE,
+  HIDDEN_AFTER,
+  HIDDEN_BEFORE,
+  HIDDEN_SLIDE_FN,
   STACK_AFTER,
   STACK_BEFORE,
   migrateNavHeaderContrast,
@@ -84,10 +87,12 @@ describe('после правки: проба за шапкой', () => {
     expect(textColor(mount(fixed, 0))).toBe('белый')
   })
 
-  it('заменены только проба, опрос слайда и фон страницы, остальной скрипт цел', () => {
+  it('заменены только проба, опрос слайда, фон страницы и пропуск скрытых слайдов, остальной скрипт цел', () => {
     expect(fixed).not.toContain(PROBE_BEFORE)
     expect(fixed).toContain(PROBE_AFTER)
     const reverted = fixed
+      .replace(HIDDEN_SLIDE_FN, '')
+      .replace(HIDDEN_AFTER, HIDDEN_BEFORE)
       .replace(PROBE_AFTER, PROBE_BEFORE)
       .replace(CAROUSEL_THEME_FN, '')
       .replace(SKIP_AFTER, SKIP_BEFORE)
@@ -222,6 +227,69 @@ describe('после правки: шапка над слайдером', () => 
   })
 })
 
+describe('после правки: слайды стопкой («перетекание»), активный — слайд-блок', () => {
+  const fixed = patchContrastJs(LIVE_JS)
+
+  /**
+   * Карусель с «перетеканием»: все слайды в одном месте, под точкой — вся
+   * стопка (невидимые прозрачны, но в стеке есть). Активный — слайд-блок без
+   * темы (`blockBg` — фон его содержимого), над ним в стопке — фото-слайд.
+   */
+  function mountStack(opts: { blockBg?: string; hiddenTheme?: string; carouselTheme?: string; active?: boolean; bodyBg?: string; js?: string }): HTMLElement {
+    const active = opts.active === false ? '' : ' is-active'
+    document.body.innerHTML = `
+      <section data-carousel="true" id="hero" ${opts.carouselTheme ? `data-header-theme="${opts.carouselTheme}"` : ''}>
+        <div data-carousel-track="true">
+          <div class="slide" data-carousel-slide="true" id="photo" ${opts.hiddenTheme ? `data-header-theme="${opts.hiddenTheme}"` : ''}
+               style="background-image: url('/media/p.jpg')"></div>
+          <div class="slide${active}" data-carousel-slide="true" id="block">
+            <div id="block-content" style="${opts.blockBg ? `background-color: ${opts.blockBg}` : ''}"></div>
+          </div>
+          <div class="slide" data-carousel-clone="true" id="clone" style="background-image: url('/media/c.jpg')"></div>
+        </div>
+      </section>
+      <nav class="gnav"></nav>`
+    const nav = document.querySelector('.gnav') as HTMLElement
+    nav.getBoundingClientRect = () => ({ ...HEADER, right: HEADER.left + HEADER.width, x: HEADER.left, y: HEADER.top }) as DOMRect
+    const $ = (id: string) => document.getElementById(id)!
+    document.body.style.backgroundColor = opts.bodyBg ?? ''
+    // Сверху стопки — копия и невидимое фото, под ними активный слайд-блок.
+    ;(document as any).elementsFromPoint = () => [nav, $('clone'), $('photo'), $('block-content'), $('block'), $('hero').firstElementChild!, $('hero'), document.body, document.documentElement]
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 })
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1920 })
+    new Function(opts.js ?? fixed)()
+    ;(window as any).syncLogoContrast()
+    return nav
+  }
+  afterEach(() => {
+    document.body.style.backgroundColor = ''
+  })
+
+  it('баг: до правки решала метка невидимого фото-слайда сверху стопки', () => {
+    const before = fixed.replace(HIDDEN_SLIDE_FN, '').replace(HIDDEN_AFTER, HIDDEN_BEFORE)
+    // Тёмный фон слайда-блока, сверху стопки невидимое фото с меткой «светлый».
+    expect(textColor(mountStack({ blockBg: 'rgb(20, 20, 20)', hiddenTheme: 'light', js: before }))).toBe('тёмный')
+  })
+
+  it('невидимые слайды и копии пропускаются: решает фон активного слайда-блока', () => {
+    expect(textColor(mountStack({ blockBg: 'rgb(20, 20, 20)', hiddenTheme: 'light' }))).toBe('белый')
+    expect(textColor(mountStack({ blockBg: 'rgb(250, 250, 250)', hiddenTheme: 'dark' }))).toBe('тёмный')
+  })
+
+  it('прозрачный слайд-блок — решает то, что под каруселью (метка секции)', () => {
+    expect(textColor(mountStack({ hiddenTheme: 'light', carouselTheme: 'dark' }))).toBe('белый')
+  })
+
+  it('прозрачно до самого низа — фон страницы; фото невидимых слайдов не в счёт', () => {
+    expect(textColor(mountStack({ hiddenTheme: 'dark' }))).toBe('тёмный')
+    expect(textColor(mountStack({ bodyBg: 'rgb(10, 10, 10)' }))).toBe('белый')
+  })
+
+  it('карусель ещё не разметила активный слайд — не пропускаем ничего, как раньше', () => {
+    expect(textColor(mountStack({ active: false, hiddenTheme: 'light' }))).toBe('тёмный')
+  })
+})
+
 describe('migrateNavHeaderContrast', () => {
   it('правит globalJs блока; повторный запуск ничего не меняет; исходник не мутируется', () => {
     const snapshot = JSON.stringify(BLOCK)
@@ -233,9 +301,12 @@ describe('migrateNavHeaderContrast', () => {
     expect(migrateNavHeaderContrast(once.structure)).toMatchObject({ alreadyMigrated: true, patched: [] })
   })
 
-  it('на стенде, где поправлены проба и слайдер, довносится только фон страницы', () => {
+  it('на стенде, где поправлены проба и слайдер, довносятся фон страницы и пропуск скрытых слайдов', () => {
     const fixed = patchContrastJs(LIVE_JS)
+    // Пропуска скрытых слайдов на стенде тогда ещё не было — он появился позже.
     const stand = fixed
+      .replace(HIDDEN_SLIDE_FN, '')
+      .replace(HIDDEN_AFTER, HIDDEN_BEFORE)
       .replace(MEDIA_FN, '')
       .replace(STACK_AFTER, STACK_BEFORE)
       .replace(FALLBACK_AFTER, FALLBACK_BEFORE)
@@ -251,6 +322,15 @@ describe('migrateNavHeaderContrast', () => {
     const out = migrateNavHeaderContrast(probeOnly)
     expect(out.alreadyMigrated).toBe(false)
     expect(out.structure.metadata!.globalJs).toBe(patchContrastJs(LIVE_JS))
+  })
+
+  it('на стенде, где поправлено всё прежнее, довносится только пропуск скрытых слайдов', () => {
+    const fixed = patchContrastJs(LIVE_JS)
+    const stand = fixed.replace(HIDDEN_SLIDE_FN, '').replace(HIDDEN_AFTER, HIDDEN_BEFORE)
+    expect(stand).toContain('function isMedia(el, cs)')
+    const out = migrateNavHeaderContrast({ ...BLOCK, metadata: { ...BLOCK.metadata, globalJs: stand } })
+    expect(out.alreadyMigrated).toBe(false)
+    expect(out.structure.metadata!.globalJs).toBe(fixed)
   })
 
   it('кэш-копия блока в странице (вложенный узел) правится так же', () => {
