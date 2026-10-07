@@ -89,6 +89,11 @@ export interface GeneratePageOptions {
    * Деплой передаёт всегда; превью — НЕ передаёт, чтобы не загрязнять статистику.
    */
   analyticsPageId?: string
+  /**
+   * Языковая версия переведена не полностью: поисковикам — noindex (ссылки
+   * по-прежнему обходятся). Посетитель видит недостающее на основном языке.
+   */
+  noindex?: boolean
 }
 
 export class HtmlGenerator {
@@ -155,6 +160,7 @@ export class HtmlGenerator {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${this.escapeHtml(metadata.title)}</title>
   <meta name="description" content="${this.escapeHtml(metadata.description)}">
+  ${options.noindex ? '<meta name="robots" content="noindex, follow">' : ''}
   ${metadata.keywords?.length ? `<meta name="keywords" content="${this.escapeHtml(metadata.keywords.join(', '))}">` : ''}
   ${metadata.ogImage ? `<meta property="og:image" content="${this.escapeHtml(metadata.ogImage)}">` : ''}
   <meta property="og:title" content="${this.escapeHtml(metadata.title)}">

@@ -75,6 +75,35 @@ export interface TranslationProgress {
   }
 }
 
+/** Отметка «один текст для всех языков»: same — всегда оригинал, translate — переводить. */
+export type SameMark = 'same' | 'translate'
+
+/** Чей перевод у поля: страницы или библиотечного блока (общий для его страниц). */
+export type TranslationOwner =
+  | { kind: 'page' }
+  | { kind: 'block'; blockId: string; blockName: string; pageCount: number }
+
+/** Поле страницы в панели переводов (GET /translations/:pageId/:locale/overview). */
+export interface TranslationOverviewEntry extends TranslationEntry {
+  translation?: string
+  translationStatus?: string
+  owner: TranslationOwner
+  mark?: SameMark
+  /** Действует ли «один текст для всех языков» (с учётом умолчания поля). */
+  same: boolean
+  /** Поле по умолчанию общее (ссылки, медиа). */
+  sameByDefault: boolean
+  /** Не переведено: из-за таких полей языковая версия закрыта noindex. */
+  missing: boolean
+}
+
+export interface TranslationOverview {
+  locale: string
+  total: number
+  missing: number
+  entries: TranslationOverviewEntry[]
+}
+
 export interface BulkTranslationRequest {
   translations: TranslationEntry[]
 }

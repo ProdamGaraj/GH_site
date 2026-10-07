@@ -45,6 +45,11 @@ export const upsertTranslationSchema = z.object({
   status: z.enum(['draft', 'review', 'approved', 'published']).optional(),
 })
 
+/** Отметка «один текст для всех языков»: same | translate | default (снять). */
+export const sameMarkSchema = z.object({
+  mode: z.enum(['same', 'translate', 'default']),
+})
+
 export const copyTranslationsSchema = z.object({
   fromLocale: z.string().min(2).max(10),
   toLocale: z.string().min(2).max(10),

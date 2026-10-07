@@ -32,6 +32,7 @@ jest.mock('../services/TranslationService', () => ({
   translationService: {
     getPageLocales: jest.fn(async () => ['uz']),
     getTranslationMap: jest.fn(async () => ({})),
+    countMissing: jest.fn(async () => 0),
     applyTranslations: jest.fn((structure: unknown, _map: unknown, metadata: unknown) => ({ structure, metadata })),
   },
 }))
@@ -186,4 +187,47 @@ it('коллекция без отчёта (estate) — сервисам нич�
   repo.findOne.mockResolvedValue({ ...collection, reportDeployTo: null })
   await svc.deployCollection('col-news')
   expect(fetchSpy).not.toHaveBeenCalled()
+})
+
+describe('язык — параметр сайта: все активные языки', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { languageService } = require('../services/LanguageService')
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { translationService } = require('../services/TranslationService')
+  const withEnglish = [
+    { code: 'ru', nativeName: 'Русский', isDefault: true, isActive: true, direction: 'ltr' },
+    { code: 'uz', nativeName: 'Oʻzbekcha', isDefault: false, isActive: true, direction: 'ltr' },
+    { code: 'en', nativeName: 'English', isDefault: false, isActive: true, direction: 'ltr' },
+  ]
+  let rendered: Array<{ lang?: string; itemSlug: string; noindex?: boolean }>
+
+  beforeEach(() => {
+    languageService.getActive.mockResolvedValue(withEnglish)
+    // Шаблон переведён на uz полностью, на en — нет ни строки.
+    translationService.countMissing.mockImplementation(async (_id: string, lang: string) => (lang === 'en' ? 7 : 0))
+    itemsByLang.en = [{ slug: 'vaucher-makro', title: 'Voucher' }]
+    rendered = []
+    svc.renderCollectionTemplateItem = async (p: { itemSlug: string; lang?: string; noindex?: boolean }) => {
+      rendered.push({ lang: p.lang, itemSlug: p.itemSlug, noindex: p.noindex })
+      return `<html>${p.lang}:${p.itemSlug}</html>`
+    }
+  })
+  afterEach(() => {
+    languageService.getActive.mockReset()
+    languageService.getActive.mockResolvedValue(withEnglish.slice(0, 2))
+    translationService.countMissing.mockReset()
+    translationService.countMissing.mockResolvedValue(0)
+  })
+
+  it('язык без переводов шаблона строится (текст основного языка) и закрыт noindex', async () => {
+    const result = await svc.deployCollection('col-news')
+    expect(result.errors).toEqual([])
+    expect(exists('en/news/vaucher-makro/index.html')).toBe(true)
+    expect(rendered.find((r) => r.lang === 'en')).toMatchObject({ noindex: true })
+  })
+
+  it('полностью переведённый язык — без noindex', async () => {
+    await svc.deployCollection('col-news')
+    expect(rendered.filter((r) => r.lang === 'uz').every((r) => r.noindex === false)).toBe(true)
+  })
 })

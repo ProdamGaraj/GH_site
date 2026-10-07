@@ -2,6 +2,17 @@ import { Request, Response } from 'express'
 import { translationService } from '../services/TranslationService'
 import { translationIOService } from '../services/TranslationIOService'
 import { asyncHandler, NotFoundError, ValidationError } from '../middleware'
+import { ALL_LOCALES } from '../services/translationOwnership'
+
+/**
+ * '*' — служебный «язык» отметок «один текст для всех языков». Обычные
+ * маршруты переводов его не пишут: отметка ставится только через /same.
+ */
+function assertRealLocale(...locales: string[]): void {
+  if (locales.some((l) => l === ALL_LOCALES)) {
+    throw new ValidationError('«*» — не язык: отметка «один текст для всех языков» ставится через /same')
+  }
+}
 
 export class TranslationController {
   /**
@@ -55,11 +66,35 @@ export class TranslationController {
   })
 
   /**
+   * GET /api/translations/:pageId/:locale/overview
+   * Поля страницы для панели: оригинал, перевод, владелец (страница или блок),
+   * отметка «один текст для всех языков», не переведено ли.
+   */
+  getOverview = asyncHandler(async (req: Request, res: Response) => {
+    const { pageId, locale } = req.params
+    assertRealLocale(locale)
+    res.json(await translationService.getOverview(pageId, locale))
+  })
+
+  /**
+   * PUT /api/translations/:pageId/same/:nodeId/:field  { mode }
+   * Отметка «один текст для всех языков» (same | translate | default).
+   * Уходит владельцу узла — у узла блока действует на всех его страницах.
+   */
+  setSameMark = asyncHandler(async (req: Request, res: Response) => {
+    const { pageId, nodeId, field } = req.params
+    const { mode } = req.body
+    await translationService.setSameMark(pageId, nodeId, field, mode)
+    res.status(204).send()
+  })
+
+  /**
    * PUT /api/translations/:pageId/:locale
    * Bulk upsert translations for a page in a specific locale
    */
   bulkUpsert = asyncHandler(async (req: Request, res: Response) => {
     const { pageId, locale } = req.params
+    assertRealLocale(locale)
     const { translations } = req.body
     const result = await translationService.bulkUpsert(pageId, locale, translations)
     res.json(result)
@@ -71,6 +106,7 @@ export class TranslationController {
    */
   upsertOne = asyncHandler(async (req: Request, res: Response) => {
     const { pageId, locale, nodeId, field } = req.params
+    assertRealLocale(locale)
     const { value, status } = req.body
     const result = await translationService.upsertOne(pageId, locale, nodeId, field, value, status)
     res.json(result)
@@ -82,6 +118,7 @@ export class TranslationController {
    */
   deleteOne = asyncHandler(async (req: Request, res: Response) => {
     const { pageId, locale, nodeId, field } = req.params
+    assertRealLocale(locale)
     const deleted = await translationService.deleteOne(pageId, locale, nodeId, field)
     if (!deleted) {
       throw new NotFoundError('Translation', `${pageId}/${locale}/${nodeId}/${field}`)
@@ -95,6 +132,7 @@ export class TranslationController {
    */
   deleteLocale = asyncHandler(async (req: Request, res: Response) => {
     const { pageId, locale } = req.params
+    assertRealLocale(locale)
     const count = await translationService.deleteLocale(pageId, locale)
     res.json({ deleted: count })
   })
@@ -106,6 +144,7 @@ export class TranslationController {
   copyTranslations = asyncHandler(async (req: Request, res: Response) => {
     const { pageId } = req.params
     const { fromLocale, toLocale } = req.body
+    assertRealLocale(fromLocale, toLocale)
     const result = await translationService.copyTranslations(pageId, fromLocale, toLocale)
     res.json(result)
   })

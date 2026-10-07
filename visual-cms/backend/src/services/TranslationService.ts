@@ -3,13 +3,35 @@
  * 
  * Подход: Translation Overlay
  * - Основной контент хранится в BlockNode tree (page.structure) на языке по умолчанию
- * - Переводы хранятся как оверлеи: (pageId, locale, nodeId, field) → value
- * - При рендеринге переводы применяются поверх оригинального контента
+ * - Переводы хранятся как оверлеи у владельца узла: собственные узлы страницы —
+ *   (pageId, locale, nodeId, field) в translations, узлы библиотечных блоков —
+ *   (blockId, locale, nodeId, field) в block_translations (translationOwnership.ts)
+ * - Перевод страницы = её строки + строки её блоков; запись уходит владельцу
+ * - При рендеринге переводы применяются поверх оригинального контента; нет
+ *   перевода — остаётся текст основного языка
  */
-import { In } from 'typeorm'
+import { In, Repository } from 'typeorm'
 import { AppDataSource } from '../config/database'
 import { Translation } from '../models/Translation'
+import { BlockTranslation } from '../models/BlockTranslation'
+import { Block } from '../models/Block'
 import { Page } from '../models/Page'
+import { languageService } from './LanguageService'
+import {
+  ALL_LOCALES,
+  Ownership,
+  RowSource,
+  SameMark,
+  blockOwnerOf,
+  buildTranslationMap,
+  isSameByDefault,
+  isSameEffective,
+  markOf,
+  marksOf,
+  mergeRows,
+  missingEntries,
+  resolveOwnership,
+} from './translationOwnership'
 import { extractBgUrl, bgUrlPatch } from './cssBackground'
 import { linkedBlocksService } from './LinkedBlocksService'
 
@@ -453,105 +475,170 @@ export function extractResponsiveMediaFields(root: any): TranslationEntry[] {
   return entries
 }
 
+/** Перевод, как его видит страница: строка страницы или блока. */
+export interface PageTranslationRow {
+  id: string
+  pageId: string
+  locale: string
+  nodeId: string
+  field: string
+  value: string
+  status: 'draft' | 'review' | 'approved' | 'published'
+  /** page — свой узел страницы; block — перевод блока; legacy — копия перевода блока в странице (до переноса). */
+  source: RowSource
+  /** Блок-владелец узла — для source block и legacy. */
+  blockId?: string
+}
+
+/** Поле страницы для панели переводов: оригинал, перевод языка, владелец, отметка. */
+export interface TranslationOverviewEntry extends TranslationEntry {
+  /** Перевод на запрошенный язык; нет — undefined. */
+  translation?: string
+  translationStatus?: string
+  owner: { kind: 'page' } | { kind: 'block'; blockId: string; blockName: string; pageCount: number }
+  /** Отметка «один текст для всех языков»; нет — по умолчанию поля. */
+  mark?: SameMark
+  /** Действует ли «один текст для всех языков» (с учётом умолчания). */
+  same: boolean
+  /** Поле по умолчанию общее (ссылки, медиа). */
+  sameByDefault: boolean
+  missing: boolean
+}
+
+export interface TranslationOverview {
+  locale: string
+  total: number
+  missing: number
+  entries: TranslationOverviewEntry[]
+}
+
+/** Дерево страницы с развёрнутыми блоками и владельцы его узлов. */
+interface PageContext {
+  page: Page
+  expanded: any
+  ownership: Ownership
+}
+
+type Scope = { pageId: string } | { blockId: string }
+
 export class TranslationService {
   private repository = AppDataSource.getRepository(Translation)
+  private blockRepository = AppDataSource.getRepository(BlockTranslation)
   private pageRepository = AppDataSource.getRepository(Page)
 
   /**
-   * Get all translations for a page in a specific locale
+   * Страница, её дерево с развёрнутыми блоками (как на деплое) и владельцы
+   * узлов. Страницы нет — пустой контекст: строки страницы видны как есть.
    */
-  async getPageTranslations(pageId: string, locale: string): Promise<Translation[]> {
-    return this.repository.find({
-      where: { pageId, locale },
-      order: { nodeId: 'ASC', field: 'ASC' },
+  private async context(pageId: string): Promise<PageContext | null> {
+    const page = await this.pageRepository.findOne({ where: { id: pageId } })
+    if (!page) return null
+    const expanded = page.structure ? await linkedBlocksService.updateLinkedBlocks(page.structure) : null
+    return { page, expanded, ownership: resolveOwnership(expanded) }
+  }
+
+  private ownershipOf(ctx: PageContext | null): Ownership {
+    return ctx?.ownership ?? { blockOf: new Map(), ambiguous: new Set(), blockIds: [] }
+  }
+
+  /** Строки языка (или '*'), как их видит страница: свои + блоков. */
+  private async effectiveRows(pageId: string, locale: string, ctx?: PageContext | null): Promise<PageTranslationRow[]> {
+    const context = ctx === undefined ? await this.context(pageId) : ctx
+    const ownership = this.ownershipOf(context)
+    const pageRows = await this.repository.find({ where: { pageId, locale } })
+    const blockRows = ownership.blockIds.length
+      ? await this.blockRepository.find({ where: { blockId: In(ownership.blockIds), locale } })
+      : []
+    const byKey = new Map<string, { id: string; status: string }>()
+    for (const r of pageRows) byKey.set(`page\u0000${r.nodeId}\u0000${r.field}`, r)
+    for (const r of blockRows) byKey.set(`${r.blockId}\u0000${r.nodeId}\u0000${r.field}`, r)
+    return mergeRows(ownership, pageRows, blockRows).map((row) => {
+      const stored = byKey.get(`${row.source === 'block' ? row.blockId : 'page'}\u0000${row.nodeId}\u0000${row.field}`)
+      return {
+        id: stored?.id ?? '',
+        pageId,
+        locale: row.locale,
+        nodeId: row.nodeId,
+        field: row.field,
+        value: row.value,
+        status: (row.status as PageTranslationRow['status']) ?? 'draft',
+        source: row.source,
+        ...(row.blockId ? { blockId: row.blockId } : {}),
+      }
     })
   }
 
   /**
-   * Get translations as a map: { [nodeId]: { [field]: value } }
+   * Переводы страницы на язык: строки её собственных узлов и переводы её
+   * блоков (у каждой строки — откуда она: source, blockId).
    */
-  async getTranslationMap(pageId: string, locale: string): Promise<TranslationMap> {
-    const translations = await this.getPageTranslations(pageId, locale)
-    const map: TranslationMap = {}
-    
-    for (const t of translations) {
-      if (!map[t.nodeId]) map[t.nodeId] = {}
-      map[t.nodeId][t.field] = t.value
-    }
-    
-    return map
+  async getPageTranslations(pageId: string, locale: string): Promise<PageTranslationRow[]> {
+    return this.effectiveRows(pageId, locale)
   }
 
   /**
-   * Get all locales that have translations for a page
+   * Карта переводов языка { [nodeId]: { [field]: value } } — то, что деплой
+   * накладывает на дерево. Поля «один текст для всех языков» в неё не входят:
+   * на всех языках остаётся текст основного языка.
+   */
+  async getTranslationMap(pageId: string, locale: string): Promise<TranslationMap> {
+    const ctx = await this.context(pageId)
+    const rows = await this.effectiveRows(pageId, locale, ctx)
+    const marks = marksOf(await this.effectiveRows(pageId, ALL_LOCALES, ctx))
+    return buildTranslationMap(rows, marks)
+  }
+
+  /**
+   * Языки, на которые у страницы есть хоть один перевод — своих узлов или её
+   * блоков. По ним переключатель языка показывает языковые версии.
+   * Отметки «один текст для всех языков» языком не считаются.
    */
   async getPageLocales(pageId: string): Promise<string[]> {
-    const result = await this.repository
+    const ctx = await this.context(pageId)
+    const ownership = this.ownershipOf(ctx)
+    const pageLocales = await this.repository
       .createQueryBuilder('t')
       .select('DISTINCT t.locale', 'locale')
       .where('t.pageId = :pageId', { pageId })
+      .andWhere('t.locale <> :all', { all: ALL_LOCALES })
       .getRawMany()
-    
-    return result.map((r: any) => r.locale)
-  }
-
-  /**
-   * Bulk upsert translations for a page in a specific locale
-   */
-  async bulkUpsert(pageId: string, locale: string, entries: TranslationEntry[]): Promise<Translation[]> {
-    const results: Translation[] = []
-
-    for (const entry of entries) {
-      let existing = await this.repository.findOne({
-        where: { pageId, locale, nodeId: entry.nodeId, field: entry.field },
+    const locales = new Set<string>(pageLocales.map((r: any) => r.locale))
+    if (ownership.blockIds.length) {
+      // Строки блока — только по узлам, которые на этой странице его.
+      const rows = await this.blockRepository.find({
+        where: { blockId: In(ownership.blockIds) },
+        select: { blockId: true, nodeId: true, locale: true },
       })
-
-      if (existing) {
-        existing.value = entry.value
-        if (entry.status) existing.status = entry.status
-        results.push(await this.repository.save(existing))
-      } else {
-        const translation = this.repository.create({
-          pageId,
-          locale,
-          nodeId: entry.nodeId,
-          field: entry.field,
-          value: entry.value,
-          status: entry.status || 'draft',
-        })
-        results.push(await this.repository.save(translation))
+      for (const r of rows) {
+        if (r.locale !== ALL_LOCALES && blockOwnerOf(ownership, r.nodeId) === r.blockId) locales.add(r.locale)
       }
     }
-
-    return results
+    return [...locales].sort()
   }
 
   /**
-   * Батчевый upsert переводов одной локали (P1: без N+1).
-   * Грузит существующие переводы локали ОДНИМ запросом, диффает в памяти и
-   * сохраняет изменения пачками. Записи с одинаковым (nodeId, field) во входе
-   * дедупятся — побеждает последняя. Возвращает счётчики вставок/обновлений.
+   * Пишет строки одного владельца одного языка пачкой: существующие —
+   * одним запросом, сохранение кусками. Повторы ключа во входе — побеждает
+   * последний.
    */
-  async bulkUpsertBatched(
-    pageId: string,
+  private async upsertScoped(
+    scope: Scope,
     locale: string,
-    entries: TranslationEntry[],
-  ): Promise<{ inserted: number; updated: number; unchanged: number }> {
-    if (entries.length === 0) return { inserted: 0, updated: 0, unchanged: 0 }
-
-    const existing = await this.repository.find({ where: { pageId, locale } })
-    const byKey = new Map<string, Translation>()
-    for (const t of existing) byKey.set(`${t.nodeId}::${t.field}`, t)
-
-    // Дедуп входа по ключу (последняя запись побеждает).
+    entries: TranslationEntry[]
+  ): Promise<{ saved: Array<Translation | BlockTranslation>; inserted: number; updated: number; unchanged: number }> {
+    const repo: Repository<Translation | BlockTranslation> =
+      'blockId' in scope ? (this.blockRepository as any) : (this.repository as any)
+    const existing = await repo.find({ where: { ...scope, locale } as any })
+    const byKey = new Map<string, Translation | BlockTranslation>()
+    for (const t of existing) byKey.set(`${t.nodeId}\u0000${t.field}`, t)
     const dedup = new Map<string, TranslationEntry>()
-    for (const e of entries) dedup.set(`${e.nodeId}::${e.field}`, e)
+    for (const e of entries) dedup.set(`${e.nodeId}\u0000${e.field}`, e)
 
-    const toSave: Translation[] = []
+    const toSave: Array<Translation | BlockTranslation> = []
+    const saved: Array<Translation | BlockTranslation> = []
     let inserted = 0
     let updated = 0
     let unchanged = 0
-
     for (const [key, e] of dedup) {
       const cur = byKey.get(key)
       if (cur) {
@@ -563,73 +650,125 @@ export class TranslationService {
           updated++
         } else {
           unchanged++
+          saved.push(cur)
         }
       } else {
-        toSave.push(
-          this.repository.create({
-            pageId,
-            locale,
-            nodeId: e.nodeId,
-            field: e.field,
-            value: e.value,
-            status: e.status || 'draft',
-          }),
-        )
+        toSave.push(repo.create({ ...scope, locale, nodeId: e.nodeId, field: e.field, value: e.value, status: e.status || 'draft' } as any) as any)
         inserted++
       }
     }
+    if (toSave.length > 0) saved.push(...(await repo.save(toSave as any[], { chunk: 200 })))
+    return { saved, inserted, updated, unchanged }
+  }
 
-    if (toSave.length > 0) {
-      await this.repository.save(toSave, { chunk: 200 })
+  /** Записи по владельцам узлов: страница и каждый блок отдельно. */
+  private groupByOwner(pageId: string, ownership: Ownership, entries: TranslationEntry[]): Array<{ scope: Scope; entries: TranslationEntry[] }> {
+    const groups = new Map<string, { scope: Scope; entries: TranslationEntry[] }>()
+    for (const e of entries) {
+      const blockId = blockOwnerOf(ownership, e.nodeId)
+      const key = blockId ? `block:${blockId}` : 'page'
+      const group = groups.get(key) ?? { scope: blockId ? { blockId } : { pageId }, entries: [] }
+      group.entries.push(e)
+      groups.set(key, group)
     }
-
-    return { inserted, updated, unchanged }
+    return [...groups.values()]
   }
 
   /**
-   * Update a single translation
+   * Пачка переводов языка. Каждая строка уходит владельцу узла: перевод
+   * текста блока — блоку (меняется на всех страницах с этим блоком), своих
+   * узлов — странице.
    */
-  async upsertOne(pageId: string, locale: string, nodeId: string, field: string, value: string, status?: string): Promise<Translation> {
-    let existing = await this.repository.findOne({
-      where: { pageId, locale, nodeId, field },
-    })
-
-    if (existing) {
-      existing.value = value
-      if (status) existing.status = status as any
-      return this.repository.save(existing)
+  async bulkUpsert(pageId: string, locale: string, entries: TranslationEntry[]): Promise<Array<Translation | BlockTranslation>> {
+    const ownership = this.ownershipOf(await this.context(pageId))
+    const saved: Array<Translation | BlockTranslation> = []
+    for (const group of this.groupByOwner(pageId, ownership, entries)) {
+      saved.push(...(await this.upsertScoped(group.scope, locale, group.entries)).saved)
     }
+    return saved
+  }
 
-    const translation = this.repository.create({
-      pageId,
-      locale,
-      nodeId,
-      field,
-      value,
-      status: (status as any) || 'draft',
-    })
-    return this.repository.save(translation)
+  /** Как bulkUpsert, но со счётчиками (импорт XLSX). */
+  async bulkUpsertBatched(
+    pageId: string,
+    locale: string,
+    entries: TranslationEntry[],
+  ): Promise<{ inserted: number; updated: number; unchanged: number }> {
+    const total = { inserted: 0, updated: 0, unchanged: 0 }
+    if (entries.length === 0) return total
+    const ownership = this.ownershipOf(await this.context(pageId))
+    for (const group of this.groupByOwner(pageId, ownership, entries)) {
+      const r = await this.upsertScoped(group.scope, locale, group.entries)
+      total.inserted += r.inserted
+      total.updated += r.updated
+      total.unchanged += r.unchanged
+    }
+    return total
+  }
+
+  /** Один перевод — владельцу узла. */
+  async upsertOne(pageId: string, locale: string, nodeId: string, field: string, value: string, status?: string): Promise<Translation | BlockTranslation> {
+    const [saved] = await this.bulkUpsert(pageId, locale, [{ nodeId, field, value, status: status as TranslationEntry['status'] }])
+    return saved
   }
 
   /**
-   * Delete a single translation
+   * Отметка «один текст для всех языков» у поля: same — всегда текст
+   * основного языка; translate — переводить, даже если поле по умолчанию
+   * общее (ссылки, медиа); default — снять отметку. Переводы языков при этом
+   * не удаляются: снятая отметка возвращает их в работу.
+   */
+  async setSameMark(pageId: string, nodeId: string, field: string, mode: SameMark | 'default'): Promise<void> {
+    if (mode === 'default') {
+      await this.deleteOne(pageId, ALL_LOCALES, nodeId, field)
+      return
+    }
+    await this.upsertOne(pageId, ALL_LOCALES, nodeId, field, mode, 'published')
+  }
+
+  /**
+   * Удаляет перевод поля у владельца. У перевода блока заодно уходят его
+   * копии в страницах с этим блоком (так хранилось до переноса) — иначе
+   * удалённый перевод вернулся бы из копии.
    */
   async deleteOne(pageId: string, locale: string, nodeId: string, field: string): Promise<boolean> {
-    const result = await this.repository.delete({ pageId, locale, nodeId, field })
-    return (result.affected ?? 0) > 0
+    const ownership = this.ownershipOf(await this.context(pageId))
+    const blockId = blockOwnerOf(ownership, nodeId)
+    if (!blockId) {
+      const result = await this.repository.delete({ pageId, locale, nodeId, field })
+      return (result.affected ?? 0) > 0
+    }
+    const own = await this.blockRepository.delete({ blockId, locale, nodeId, field })
+    const pageIds = await this.pagesLinkingBlock(blockId)
+    const copies = pageIds.length ? await this.repository.delete({ pageId: In(pageIds), locale, nodeId, field }) : { affected: 0 }
+    return (own.affected ?? 0) + (copies.affected ?? 0) > 0
+  }
+
+  /** Страницы, к которым подключён блок (по ссылке в структуре). */
+  private async pagesLinkingBlock(blockId: string): Promise<string[]> {
+    const rows = await this.pageRepository
+      .createQueryBuilder('p')
+      .select('p.id', 'id')
+      .where('p.structure::text LIKE :id', { id: `%${blockId}%` })
+      .getRawMany()
+    return rows.map((r: any) => r.id)
   }
 
   /**
-   * Delete all translations for a page in a specific locale
+   * Удаляет язык страницы: только переводы её собственных узлов. Переводы
+   * блоков (и их копии в странице до переноса) остаются — блок общий, и
+   * удаление языка на одной странице не должно стирать шапку на всех.
    */
   async deleteLocale(pageId: string, locale: string): Promise<number> {
-    const result = await this.repository.delete({ pageId, locale })
+    const ownership = this.ownershipOf(await this.context(pageId))
+    const rows = await this.repository.find({ where: { pageId, locale }, select: { id: true, nodeId: true } })
+    const ids = rows.filter((r) => !blockOwnerOf(ownership, r.nodeId)).map((r) => r.id)
+    if (ids.length === 0) return 0
+    const result = await this.repository.delete({ id: In(ids) })
     return result.affected ?? 0
   }
 
-  /**
-   * Delete all translations for a page (all locales)
-   */
+  /** Все строки страницы (страница удаляется). Переводы блоков не трогаются. */
   async deleteAllForPage(pageId: string): Promise<number> {
     const result = await this.repository.delete({ pageId })
     return result.affected ?? 0
@@ -646,11 +785,10 @@ export class TranslationService {
    * `applyTranslations` на деплое работает по `nodeId` и применил бы такие
    * строки — сломана была только выдача, из-за чего перевести их было нечем.
    */
-  async extractTranslatableContent(pageId: string): Promise<TranslationEntry[]> {
-    const page = await this.pageRepository.findOne({ where: { id: pageId } })
-    if (!page || !page.structure) return []
-
-    const structure = await linkedBlocksService.updateLinkedBlocks(page.structure)
+  async extractTranslatableContent(pageId: string, ctx?: PageContext | null): Promise<TranslationEntry[]> {
+    const context = ctx === undefined ? await this.context(pageId) : ctx
+    if (!context || !context.page.structure) return []
+    const { page, expanded: structure } = context
 
     const entries: TranslationEntry[] = []
 
@@ -679,30 +817,78 @@ export class TranslationService {
   }
 
   /**
-   * Get translation progress/stats for a page across all locales
+   * Поля страницы для панели переводов на язык: оригинал, перевод, чей узел
+   * (страницы или блока — и на скольких страницах блок), отметка «один текст
+   * для всех языков» и не переведено ли поле. Тот же расчёт решает noindex
+   * языковой версии на деплое — панель и сайт не расходятся.
+   */
+  async getOverview(pageId: string, locale: string): Promise<TranslationOverview> {
+    const ctx = await this.context(pageId)
+    const entries = await this.extractTranslatableContent(pageId, ctx)
+    const rows = await this.effectiveRows(pageId, locale, ctx)
+    const marks = marksOf(await this.effectiveRows(pageId, ALL_LOCALES, ctx))
+    const missing = new Set(missingEntries(entries, rows, marks).map((e) => `${e.nodeId}\u0000${e.field}`))
+    const byKey = new Map(rows.map((r) => [`${r.nodeId}\u0000${r.field}`, r]))
+
+    const ownership = this.ownershipOf(ctx)
+    const blockInfo = new Map<string, { blockName: string; pageCount: number }>()
+    if (ownership.blockIds.length) {
+      const blocks = await AppDataSource.getRepository(Block).find({ where: { id: In(ownership.blockIds) }, select: { id: true, name: true } })
+      for (const b of blocks) blockInfo.set(b.id, { blockName: b.name, pageCount: (await this.pagesLinkingBlock(b.id)).length })
+    }
+
+    const out: TranslationOverviewEntry[] = entries.map((e) => {
+      const key = `${e.nodeId}\u0000${e.field}`
+      const row = byKey.get(key)
+      const mark = markOf(marks, e.nodeId, e.field)
+      const blockId = blockOwnerOf(ownership, e.nodeId)
+      const info = blockId ? blockInfo.get(blockId) : undefined
+      return {
+        ...e,
+        ...(row ? { translation: row.value, translationStatus: row.status } : {}),
+        owner: blockId ? { kind: 'block', blockId, blockName: info?.blockName ?? 'Блок', pageCount: info?.pageCount ?? 0 } : { kind: 'page' },
+        ...(mark ? { mark } : {}),
+        same: isSameEffective(e.field, mark),
+        sameByDefault: isSameByDefault(e.field),
+        missing: missing.has(key),
+      }
+    })
+    return { locale, total: out.length, missing: missing.size, entries: out }
+  }
+
+  /** Сколько полей страницы не переведено на язык (для noindex языковой версии). */
+  async countMissing(pageId: string, locale: string): Promise<number> {
+    const ctx = await this.context(pageId)
+    const entries = await this.extractTranslatableContent(pageId, ctx)
+    const rows = await this.effectiveRows(pageId, locale, ctx)
+    const marks = marksOf(await this.effectiveRows(pageId, ALL_LOCALES, ctx))
+    return missingEntries(entries, rows, marks).length
+  }
+
+  /**
+   * Прогресс перевода страницы по всем активным языкам, кроме основного:
+   * переведено = есть перевод или поле «одно для всех языков».
    */
   async getProgress(pageId: string): Promise<TranslationProgress[]> {
-    const sourceFields = await this.extractTranslatableContent(pageId)
-    const total = sourceFields.length
-
-    const locales = await this.getPageLocales(pageId)
+    const ctx = await this.context(pageId)
+    const entries = await this.extractTranslatableContent(pageId, ctx)
+    const total = entries.length
+    const marks = marksOf(await this.effectiveRows(pageId, ALL_LOCALES, ctx))
+    const languages = (await languageService.getActive()).filter((l) => !l.isDefault)
     const progress: TranslationProgress[] = []
 
-    for (const locale of locales) {
-      const translations = await this.getPageTranslations(pageId, locale)
+    for (const { code: locale } of languages) {
+      const rows = await this.effectiveRows(pageId, locale, ctx)
       const byStatus = { draft: 0, review: 0, approved: 0, published: 0 }
-      
-      for (const t of translations) {
-        if (byStatus[t.status] !== undefined) {
-          byStatus[t.status]++
-        }
+      for (const t of rows) {
+        if (byStatus[t.status] !== undefined) byStatus[t.status]++
       }
-
+      const translated = total - missingEntries(entries, rows, marks).length
       progress.push({
         locale,
         total,
-        translated: translations.length,
-        percentage: total > 0 ? Math.round((translations.length / total) * 100) : 0,
+        translated,
+        percentage: total > 0 ? Math.round((translated / total) * 100) : 100,
         byStatus,
       })
     }
@@ -710,11 +896,9 @@ export class TranslationService {
     return progress
   }
 
-  /**
-   * Copy translations from one locale to another (useful for initializing)
-   */
-  async copyTranslations(pageId: string, fromLocale: string, toLocale: string): Promise<Translation[]> {
-    const source = await this.getPageTranslations(pageId, fromLocale)
+  /** Копирует переводы страницы между языками; строки уходят владельцам узлов. */
+  async copyTranslations(pageId: string, fromLocale: string, toLocale: string): Promise<Array<Translation | BlockTranslation>> {
+    const source = await this.effectiveRows(pageId, fromLocale)
     const entries: TranslationEntry[] = source.map(t => ({
       nodeId: t.nodeId,
       field: t.field,

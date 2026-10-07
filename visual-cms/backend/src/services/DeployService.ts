@@ -4,7 +4,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
-import { htmlGenerator, type ResolvedNavItem, type GeneratePageOptions } from './HtmlGenerator'
+import { htmlGenerator, type ResolvedNavItem, type GeneratePageOptions, type AvailableLanguage } from './HtmlGenerator'
 import { responsiveImageService } from './ResponsiveImageService'
 import { AppDataSource } from '../config/database'
 import { Page, PagePublishDataDef } from '../models/Page'
@@ -233,6 +233,35 @@ export class DeployService {
   }
 
   /**
+   * Языки, которые страница предлагает посетителю — переключатель языка и
+   * распознаватель в корне: основной и те, на которые у страницы есть хоть
+   * один перевод. Версии на остальных языках тоже строятся (язык — параметр
+   * сайта, недостающее показывается на основном языке), но посетителя туда не
+   * зовут и поисковикам они закрыты (noindex), пока перевод не полон.
+   */
+  private offeredLanguages<L extends { code: string; isActive: boolean; isDefault: boolean }>(
+    languages: L[],
+    translationLocales: string[]
+  ): L[] {
+    return languages.filter(l => l.isActive && (l.isDefault || translationLocales.includes(l.code)))
+  }
+
+  /** Список переключателя языка; переводов нет — переключателя нет. */
+  private switcherLanguages(
+    languages: Array<{ code: string; nativeName: string; flag?: string | null; isActive: boolean; isDefault: boolean; direction: string }>,
+    translationLocales: string[]
+  ): AvailableLanguage[] | undefined {
+    if (translationLocales.length === 0) return undefined
+    return this.offeredLanguages(languages, translationLocales).map(l => ({
+      code: l.code,
+      name: l.nativeName,
+      flag: l.flag || '🌐',
+      isDefault: l.isDefault,
+      direction: l.direction,
+    }))
+  }
+
+  /**
    * Деплоит одну страницу
    */
   async deployPage(pageId: string): Promise<DeployResult> {
@@ -305,12 +334,7 @@ export class DeployService {
 
       // Данные при публикации — до языковых префиксов: ссылки из данных тоже их получат.
       const pageStructure = await this.prepareForPublish(page, updatedStructure, defaultLang?.code)
-      let availableLangsForSwitcher: { code: string; name: string; flag: string; isDefault: boolean; direction: string }[] | undefined
-      if (translationLocales.length > 0) {
-        availableLangsForSwitcher = activeLanguages
-          .filter(l => l.isActive && (l.isDefault || translationLocales.includes(l.code)))
-          .map(l => ({ code: l.code, name: l.nativeName, flag: l.flag || '🌐', isDefault: l.isDefault, direction: l.direction }))
-      }
+      const availableLangsForSwitcher = this.switcherLanguages(activeLanguages, translationLocales)
 
       const isHome = this.isHomePage(page, page.site)
 
@@ -346,7 +370,7 @@ export class DeployService {
       // /<lang>/<path> по сохранённому выбору или языку браузера.
       this.writeLanguageEntry({
         siteDir, slug: page.slug, isHome,
-        languages: activeLanguages,
+        languages: this.offeredLanguages(activeLanguages, translationLocales),
         title: page.metadata?.title || page.name,
         deployedPages,
       })
@@ -488,12 +512,7 @@ export class DeployService {
     const activeLanguages = await languageService.getActive()
     const translationLocales = await translationService.getPageLocales(page.id)
     const defaultLang = activeLanguages.find(l => l.isDefault)
-    let availableLanguages: { code: string; name: string; flag: string; isDefault: boolean; direction: string }[] | undefined
-    if (translationLocales.length > 0) {
-      availableLanguages = activeLanguages
-        .filter(l => l.isActive && (l.isDefault || translationLocales.includes(l.code)))
-        .map(l => ({ code: l.code, name: l.nativeName, flag: l.flag || '🌐', isDefault: l.isDefault, direction: l.direction }))
-    }
+    const availableLanguages = this.switcherLanguages(activeLanguages, translationLocales)
 
     const isHome = this.isHomePage(page, page.site)
     // Превью с теми же данными, что получит публикация. Источник не ответил —
@@ -595,12 +614,7 @@ export class DeployService {
           const pageLangs = await translationService.getPageLocales(page.id)
           const allActiveLangs = await languageService.getActive()
           const defLang = allActiveLangs.find(l => l.isDefault)
-          let pageLangSwitcher: { code: string; name: string; flag: string; isDefault: boolean; direction: string }[] | undefined
-          if (pageLangs.length > 0) {
-            pageLangSwitcher = allActiveLangs
-              .filter(l => l.isActive && (l.isDefault || pageLangs.includes(l.code)))
-              .map(l => ({ code: l.code, name: l.nativeName, flag: l.flag || '🌐', isDefault: l.isDefault, direction: l.direction }))
-          }
+          const pageLangSwitcher = this.switcherLanguages(allActiveLangs, pageLangs)
           
           const isHome = this.isHomePage(page, page.site)
           const pageStructure = await this.prepareForPublish(page, updatedStructure, defLang?.code)
@@ -634,7 +648,7 @@ export class DeployService {
           // Распознаватель языка в корневом адресе страницы.
           this.writeLanguageEntry({
             siteDir, slug: page.slug, isHome,
-            languages: allActiveLangs,
+            languages: this.offeredLanguages(allActiveLangs, pageLangs),
             title: page.metadata?.title || page.name,
             deployedPages,
           })
@@ -737,12 +751,7 @@ export class DeployService {
           const pageLangs = await translationService.getPageLocales(page.id)
           const allActiveLangs = await languageService.getActive()
           const defLang = allActiveLangs.find(l => l.isDefault)
-          let pageLangSwitcher: { code: string; name: string; flag: string; isDefault: boolean; direction: string }[] | undefined
-          if (pageLangs.length > 0) {
-            pageLangSwitcher = allActiveLangs
-              .filter(l => l.isActive && (l.isDefault || pageLangs.includes(l.code)))
-              .map(l => ({ code: l.code, name: l.nativeName, flag: l.flag || '🌐', isDefault: l.isDefault, direction: l.direction }))
-          }
+          const pageLangSwitcher = this.switcherLanguages(allActiveLangs, pageLangs)
 
           const isHome = this.isHomePage(page, site)
           const pageStructure = await this.prepareForPublish(page, updatedStructure, defLang?.code)
@@ -777,7 +786,7 @@ export class DeployService {
           // /<lang>/<path> по сохранённому выбору или языку браузера.
           this.writeLanguageEntry({
             siteDir, slug: page.slug, isHome,
-            languages: allActiveLangs,
+            languages: this.offeredLanguages(allActiveLangs, pageLangs),
             title: page.metadata?.title || page.name,
             deployedPages,
           })
@@ -1032,7 +1041,7 @@ export class DeployService {
             siteDir,
             slug: `${basePathClean}/${itemSlug}`,
             isHome: false,
-            languages: await languageService.getActive(),
+            languages: this.offeredLanguages(await languageService.getActive(), await translationService.getPageLocales(templatePage.id)),
             title: itemTitle,
             deployedPages,
           })
@@ -1117,17 +1126,7 @@ export class DeployService {
     templatePageId: string
   ): Promise<GeneratePageOptions['availableLanguages']> {
     const locales = await translationService.getPageLocales(templatePageId)
-    if (locales.length === 0) return undefined
-    const languages = await languageService.getActive()
-    return languages
-      .filter(l => l.isActive && (l.isDefault || locales.includes(l.code)))
-      .map(l => ({
-        code: l.code,
-        name: l.nativeName,
-        flag: l.flag || '🌐',
-        isDefault: l.isDefault,
-        direction: l.direction,
-      }))
+    return this.switcherLanguages(await languageService.getActive(), locales)
   }
 
   private async renderCollectionTemplateItem(p: {
@@ -1153,6 +1152,8 @@ export class DeployService {
     /** Префикс языка для ссылок внутри страницы элемента. */
     langPathPrefix?: string
     translationMap?: TranslationMap
+    /** Перевод шаблона на язык неполон — закрыть от поисковиков. */
+    noindex?: boolean
   }): Promise<string> {
     const { collection, item, itemId, itemTitle } = p
 
@@ -1207,6 +1208,7 @@ export class DeployService {
       direction: p.direction,
       availableLanguages: p.availableLanguages,
       translationMap: p.translationMap,
+      noindex: p.noindex,
       ...this.siteAssetOptions(p.site),
     })
   }
@@ -1216,8 +1218,8 @@ export class DeployService {
    * источника с подстановкой {{lang}} (fallback на данные языка по умолчанию при
    * сбое), статика шаблона переводится translationMap страницы-шаблона. Файлы —
    * в /<lang>/<basePath>/<slug>/index.html. Кастомные страницы (override) остаются
-   * только на языке по умолчанию. Если у шаблона нет переводов — метод ничего не
-   * делает (поведение по умолчанию для существующих коллекций неизменно).
+   * только на языке по умолчанию. Строятся все активные языки: без перевода
+   * шаблона — текстом основного языка и с noindex.
    */
   private async deployCollectionTranslations(p: {
     collection: Collection
@@ -1240,23 +1242,17 @@ export class DeployService {
 
     const languages = await languageService.getActive()
     const translationLocales = await translationService.getPageLocales(templatePage.id)
-    if (translationLocales.length === 0) return deployedByLang
+    const availableLanguages = this.switcherLanguages(languages, translationLocales)
 
-    const availableLanguages = languages
-      .filter(l => l.isActive && (l.isDefault || translationLocales.includes(l.code)))
-      .map(l => ({
-        code: l.code,
-        name: l.nativeName,
-        flag: l.flag || '🌐',
-        isDefault: l.isDefault,
-        direction: l.direction,
-      }))
-
+    // Язык — параметр сайта: элементы строятся на всех активных языках, без
+    // перевода шаблона — текстом основного языка и с noindex.
     for (const lang of languages) {
       if (lang.isDefault || !lang.isActive) continue
-      if (!translationLocales.includes(lang.code)) continue
 
       try {
+        const missing = await translationService.countMissing(templatePage.id, lang.code)
+        if (missing > 0) logger.info(`Collection "${collection.name}" [${lang.code}]: шаблон переведён не полностью (не хватает ${missing}) — noindex`)
+
         // Данные на языке (fallback на данные языка по умолчанию при сбое)
         let langItems = p.defaultItems
         try {
@@ -1318,6 +1314,7 @@ export class DeployService {
               direction: lang.direction,
               availableLanguages,
               translationMap,
+              noindex: missing > 0,
             })
             const filePath = path.join(langCollectionDir, itemSlug, 'index.html')
             this.ensureDirectoryExists(path.dirname(filePath))
@@ -2926,27 +2923,18 @@ export class DeployService {
       const languages = await languageService.getActive()
       const defaultLang = languages.find(l => l.isDefault)
       const translationLocales = await translationService.getPageLocales(page.id)
+      const availableLanguages = this.switcherLanguages(languages, translationLocales)
 
-      if (translationLocales.length === 0) return
-
-      // Build available languages list for the switcher widget
-      const availableLanguages = languages
-        .filter(l => l.isActive && (l.isDefault || translationLocales.includes(l.code)))
-        .map(l => ({
-          code: l.code,
-          name: l.nativeName,
-          flag: l.flag || '🌐',
-          isDefault: l.isDefault,
-          direction: l.direction,
-        }))
-
+      // Язык — параметр сайта: версия строится на каждом активном языке.
+      // Нет перевода поля — текст основного языка; перевод неполон — noindex.
       for (const lang of languages) {
         // Skip default language — already deployed as the main file
-        if (lang.isDefault) continue
-        // Only deploy if we have translations for this locale
-        if (!translationLocales.includes(lang.code)) continue
+        if (lang.isDefault || !lang.isActive) continue
 
         try {
+          const missing = await translationService.countMissing(page.id, lang.code)
+          if (missing > 0) logger.info(`Page "${page.name}" [${lang.code}]: не хватает переводов ${missing} — noindex`)
+
           const translationMap = await translationService.getTranslationMap(page.id, lang.code)
           const { structure: translatedStructure, metadata: translatedMetadata } =
             translationService.applyTranslations(
@@ -2982,6 +2970,7 @@ export class DeployService {
             availableLanguages,
             // Карта переводов языка — для адаптивного медиа «экран × язык» (<picture>/фон-@media).
             translationMap,
+            noindex: missing > 0,
             analyticsPageId: page.id,
             ...this.siteAssetOptions(page.site),
           })
@@ -3005,8 +2994,7 @@ export class DeployService {
 
       // Generate language switcher data JSON for client-side switching
       if (translationLocales.length > 0) {
-        const langData = languages
-          .filter(l => l.isActive && (l.isDefault || translationLocales.includes(l.code)))
+        const langData = this.offeredLanguages(languages, translationLocales)
           .map(l => ({
             code: l.code,
             name: l.nativeName,
@@ -3413,8 +3401,12 @@ Golden House - Public Site
       const slug = (page.slug === 'index' || page.slug === 'home') ? '' : page.slug
       const pageUrl = `${baseUrl}/${slug}`.replace(/\/$/, '') || baseUrl
 
-      // Get translation locales for hreflang
-      const translationLocales = await translationService.getPageLocales(page.id)
+      // hreflang — только полностью переведённые версии: остальные под noindex.
+      const translationLocales: string[] = []
+      for (const lang of activeLanguages) {
+        if (lang.isDefault) continue
+        if ((await translationService.countMissing(page.id, lang.code)) === 0) translationLocales.push(lang.code)
+      }
 
       xml += '  <url>\n'
       xml += `    <loc>${this.escapeXml(pageUrl)}</loc>\n`

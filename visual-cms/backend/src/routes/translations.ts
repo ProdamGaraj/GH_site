@@ -2,7 +2,7 @@ import { Router } from 'express'
 import multer from 'multer'
 import { translationController } from '../controllers/TranslationController'
 import { validate } from '../middleware/validate'
-import { bulkTranslationSchema, upsertTranslationSchema, copyTranslationsSchema } from '../schemas/translation.schema'
+import { bulkTranslationSchema, upsertTranslationSchema, copyTranslationsSchema, sameMarkSchema } from '../schemas/translation.schema'
 
 const router = Router()
 
@@ -26,6 +26,13 @@ router.get('/:pageId/progress', translationController.getProgress)
 
 // POST /api/translations/:pageId/copy - copy translations between locales
 router.post('/:pageId/copy', validate(copyTranslationsSchema), translationController.copyTranslations)
+
+// PUT /api/translations/:pageId/same/:nodeId/:field - «один текст для всех языков»
+// (до /:pageId/:locale/:nodeId/:field, иначе 'same' поймался бы как язык)
+router.put('/:pageId/same/:nodeId/:field', validate(sameMarkSchema), translationController.setSameMark)
+
+// GET /api/translations/:pageId/:locale/overview - поля для панели переводов
+router.get('/:pageId/:locale/overview', translationController.getOverview)
 
 // GET /api/translations/:pageId/:locale - get all translations for locale
 router.get('/:pageId/:locale', translationController.getPageTranslations)

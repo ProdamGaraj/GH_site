@@ -12,6 +12,7 @@ import type {
   TranslationEntry,
   TranslationMap,
   TranslationProgress,
+  TranslationOverview,
   BulkTranslationRequest,
 } from '@/shared/types/translation'
 
@@ -51,6 +52,14 @@ export const translationApi = {
   /** Extract all translatable fields from source content */
   getTranslatableContent: (pageId: string) =>
     api.get<TranslationEntry[]>(`/translations/${pageId}/source`),
+
+  /** Поля страницы для панели: перевод, владелец, «один текст для всех языков», не переведено ли. */
+  getOverview: (pageId: string, locale: string) =>
+    api.get<TranslationOverview>(`/translations/${pageId}/${locale}/overview`),
+
+  /** «Один текст для всех языков»: same | translate | default (снять отметку). */
+  setSameMark: (pageId: string, nodeId: string, field: string, mode: 'same' | 'translate' | 'default') =>
+    api.put<void>(`/translations/${pageId}/same/${encodeURIComponent(nodeId)}/${encodeURIComponent(field)}`, { mode }),
 
   /** Get translation progress stats */
   getProgress: (pageId: string) =>

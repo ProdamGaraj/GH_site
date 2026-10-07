@@ -24,14 +24,19 @@ import {
   clearImportReport,
   selectTranslationsIoBusy,
   selectTranslationImportReport,
+  fetchTranslationOverview,
+  setSameMark,
+  selectTranslationOverview,
+  selectTranslationOverviewMissing,
 } from './translationsSlice'
+import { fieldKey, sameMarkMode } from './sameMark'
 import { selectRootNode, selectSelectedNode, setActiveRightPanel, updateNode } from '@/features/editor/editorSlice'
 import { Button } from '@/shared/components/Button'
 import {
   Globe, ChevronDown, Check, Search, Image, Type, Link,
   FileText, Save, Loader2, X, Languages, ArrowRight,
   Eye, EyeOff, Settings, MousePointer, Trash2, Film,
-  Download, Upload, AlertTriangle
+  Download, Upload, AlertTriangle, Layers, AlertCircle
 } from 'lucide-react'
 import type { TranslationEntry } from '@/shared/types/translation'
 import { pageApi } from '@/shared/api'
@@ -378,11 +383,15 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
   const rootNode = useAppSelector(selectRootNode)
   const ioBusy = useAppSelector(selectTranslationsIoBusy)
   const importReport = useAppSelector(selectTranslationImportReport)
+  const overview = useAppSelector(selectTranslationOverview)
+  const overviewMissing = useAppSelector(selectTranslationOverviewMissing)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCategory, setFilterCategory] = useState<FieldCategory>('all')
   const [showOnlySelected, setShowOnlySelected] = useState(false)
+  // Только непереведённые — из-за них версия языка закрыта от поиска (noindex).
+  const [onlyMissing, setOnlyMissing] = useState(false)
   const [editedValues, setEditedValues] = useState<Record<string, string>>({})
   const [showLangDropdown, setShowLangDropdown] = useState(false)
   // Сайт страницы — для экспорта/импорта XLSX.
@@ -419,7 +428,15 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
   useEffect(() => {
     if (pageId && activeLocale) {
       dispatch(fetchPageTranslations({ pageId, locale: activeLocale }))
+      dispatch(fetchTranslationOverview({ pageId, locale: activeLocale }))
     }
+  }, [dispatch, pageId, activeLocale])
+
+  // После сохранения: что ещё не переведено и прогресс языков.
+  const refreshStatus = useCallback(() => {
+    if (!pageId || !activeLocale) return
+    dispatch(fetchTranslationOverview({ pageId, locale: activeLocale }))
+    dispatch(fetchTranslationProgress(pageId))
   }, [dispatch, pageId, activeLocale])
 
   // Auto-select first non-default language
@@ -459,6 +476,10 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
       items = items.filter(e => e.nodeId === selectedNode.id)
     }
 
+    if (onlyMissing) {
+      items = items.filter(e => overview[fieldKey(e.nodeId, e.field)]?.missing)
+    }
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       items = items.filter(e =>
@@ -469,7 +490,22 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
     }
 
     return items
-  }, [sourceContent, filterCategory, showOnlySelected, selectedNode, searchQuery, translationMap, nodeNameMap])
+  }, [sourceContent, filterCategory, showOnlySelected, selectedNode, onlyMissing, overview, searchQuery, translationMap, nodeNameMap])
+
+  // Непереведённые медиа в этой панели не видны (их переводят там, где выбирают
+  // файл), но версию языка закрывают так же — их число подсказываем отдельно.
+  const hiddenMediaMissing = useMemo(
+    () => Object.values(overview).filter(e => e.missing && getFieldCategory(e.field) === 'media').length,
+    [overview]
+  )
+
+  const handleToggleSame = useCallback(async (nodeId: string, field: string, checked: boolean) => {
+    const info = overview[fieldKey(nodeId, field)]
+    if (!activeLocale || !info) return
+    await dispatch(setSameMark({ pageId, nodeId, field, mode: sameMarkMode(checked, info.sameByDefault) }))
+    dispatch(fetchPageTranslations({ pageId, locale: activeLocale }))
+    refreshStatus()
+  }, [dispatch, pageId, activeLocale, overview, refreshStatus])
 
   // Group by nodeId
   const groupedContent = useMemo(() => {
@@ -508,7 +544,8 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
       delete next[key]
       return next
     })
-  }, [dispatch, pageId, activeLocale, editedValues, translationMap])
+    refreshStatus()
+  }, [dispatch, pageId, activeLocale, editedValues, translationMap, refreshStatus])
 
   const handleSaveAll = async () => {
     if (!activeLocale) return
@@ -528,7 +565,7 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
     }))
     
     setEditedValues({})
-    dispatch(fetchTranslationProgress(pageId))
+    refreshStatus()
   }
 
   const currentProgress = progress.find(p => p.locale === activeLocale)
@@ -690,6 +727,29 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
           <span>{activeLang?.flag}</span>
           <span>{activeLang?.nativeName}</span>
         </div>
+
+        {/* Сколько не переведено: из-за этого версия языка закрыта от поиска */}
+        {activeLocale && (overviewMissing > 0 ? (
+          <div
+            className="flex items-start gap-1.5 p-2 rounded bg-red-50 border border-red-100 text-[11px] text-red-700"
+            data-testid="translation-missing-summary"
+          >
+            <AlertCircle size={12} className="mt-0.5 shrink-0" />
+            <div>
+              Не хватает переводов: {overviewMissing}. Пока они есть, версия на {activeLang?.nativeName || activeLocale} закрыта
+              от поисковиков (noindex), вместо недостающего — текст оригинала.
+              {hiddenMediaMissing > 0 && (
+                <div className="text-red-600/80 mt-0.5">
+                  Из них медиа: {hiddenMediaMissing} — в панели «Контент» (раздел «Языки и экраны»).
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 text-[11px] text-green-700" data-testid="translation-missing-summary">
+            <Check size={12} /> Переведено полностью
+          </div>
+        ))}
       </div>
 
       {/* Toolbar: Search & Filters */}
@@ -728,6 +788,19 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
             </button>
           ))}
           
+          <button
+            onClick={() => setOnlyMissing(!onlyMissing)}
+            aria-pressed={onlyMissing}
+            className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+              onlyMissing
+                ? 'bg-red-600 text-white border-red-600'
+                : 'bg-white text-gray-700 border-gray-200 hover:border-red-300'
+            }`}
+            title="Только непереведённые поля"
+          >
+            Непереведённые{overviewMissing > 0 ? ` (${overviewMissing})` : ''}
+          </button>
+
           <button
             onClick={() => setShowOnlySelected(!showOnlySelected)}
             className={`text-[10px] px-2 py-0.5 rounded border transition-colors ml-auto ${
@@ -785,7 +858,9 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
-            {Object.entries(groupedContent).map(([nodeId, entries]) => (
+            {Object.entries(groupedContent).map(([nodeId, entries]) => {
+              const owner = overview[fieldKey(nodeId, entries[0].field)]?.owner
+              return (
               <div key={nodeId} className="p-2">
                 {/* Node header */}
                 <div className="flex items-center gap-1 mb-1.5">
@@ -796,21 +871,63 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
                     <span className="text-[9px] text-gray-300 font-mono">{nodeId.slice(0, 8)}</span>
                   )}
                 </div>
+                {owner?.kind === 'block' && (
+                  <div
+                    className="flex items-center gap-1 mb-1.5 text-[10px] text-indigo-700 bg-indigo-50 rounded px-1.5 py-0.5"
+                    data-testid="translation-block-owner"
+                    title="Перевод хранится у блока библиотеки и показывается на всех страницах, где он подключён"
+                  >
+                    <Layers size={10} className="shrink-0" />
+                    <span className="truncate">
+                      Перевод блока «{owner.blockName}» — меняется на всех его страницах ({owner.pageCount})
+                    </span>
+                  </div>
+                )}
                 
                 {/* Fields */}
                 <div className="space-y-2">
                   {entries.map((entry) => {
-                    const key = `${nodeId}::${entry.field}`
+                    const key = fieldKey(nodeId, entry.field)
                     const currentTranslation = editedValues[key] ?? translationMap[nodeId]?.[entry.field] ?? ''
                     const isEdited = key in editedValues
+                    const info = overview[key]
+                    const same = !!info?.same
+                    // Непереведённое — пока не начали печатать перевод.
+                    const missing = !!info?.missing && !(isEdited && currentTranslation.trim())
 
                     return (
-                      <div key={key} className="space-y-1">
+                      <div
+                        key={key}
+                        className={`space-y-1 ${missing ? 'border-l-2 border-red-400 pl-1.5 -ml-2' : ''}`}
+                        data-testid="translation-row"
+                        data-missing={missing ? 'true' : 'false'}
+                      >
                         <div className="flex items-center gap-1">
                           <span className="text-gray-400">
                             {FIELD_ICON[entry.field] || <Type size={12} />}
                           </span>
                           <span className="text-[10px] text-gray-500">{fieldLabel(entry.field)}</span>
+                          {missing && (
+                            <span className="text-[9px] font-medium text-red-600 bg-red-50 rounded px-1">не переведено</span>
+                          )}
+                          {info && (
+                            <label
+                              className="ml-auto flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer select-none"
+                              title={
+                                owner?.kind === 'block'
+                                  ? 'На всех языках — текст оригинала (телефоны, почта, названия). Отметка общая для всех страниц блока.'
+                                  : 'На всех языках — текст оригинала (телефоны, почта, названия)'
+                              }
+                            >
+                              <input
+                                type="checkbox"
+                                checked={same}
+                                onChange={(e) => handleToggleSame(nodeId, entry.field, e.target.checked)}
+                                aria-label={`Один текст для всех языков: ${fieldLabel(entry.field)}`}
+                              />
+                              Один для всех языков
+                            </label>
+                          )}
                         </div>
 
                         {/* Source (original) */}
@@ -819,7 +936,11 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
                         </div>
 
                         {/* Translation input */}
-                        {entry.value.length > 80 ? (
+                        {same ? (
+                          <div className="text-[11px] text-gray-500 italic px-2 py-1">
+                            На всех языках — текст оригинала
+                          </div>
+                        ) : entry.value.length > 80 ? (
                           <textarea
                             value={currentTranslation}
                             onChange={(e) => handleEditValue(nodeId, entry.field, e.target.value)}
@@ -827,7 +948,7 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
                             placeholder="Введите перевод..."
                             rows={3}
                             className={`w-full text-xs border rounded px-2 py-1.5 focus:border-blue-400 focus:outline-none resize-none text-gray-900 placeholder-gray-400 ${
-                              isEdited ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-white'
+                              isEdited ? 'border-amber-300 bg-amber-50' : missing ? 'border-red-200 bg-white' : 'border-gray-200 bg-white'
                             }`}
                           />
                         ) : (
@@ -838,7 +959,7 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
                             onBlur={() => isEdited && handleSaveOne(nodeId, entry.field)}
                             placeholder="Введите перевод..."
                             className={`w-full text-xs border rounded px-2 py-1.5 focus:border-blue-400 focus:outline-none text-gray-900 placeholder-gray-400 ${
-                              isEdited ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-white'
+                              isEdited ? 'border-amber-300 bg-amber-50' : missing ? 'border-red-200 bg-white' : 'border-gray-200 bg-white'
                             }`}
                           />
                         )}
@@ -847,7 +968,8 @@ export const TranslationPanel: React.FC<TranslationPanelProps> = ({ pageId }) =>
                   })}
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

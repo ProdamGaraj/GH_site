@@ -10,7 +10,9 @@ import type {
   TranslationEntry,
   TranslationMap,
   TranslationProgress,
+  TranslationOverviewEntry,
 } from '@/shared/types/translation'
+import { fieldKey, type SameMode } from './sameMark'
 
 interface TranslationsState {
   // Languages
@@ -35,6 +37,10 @@ interface TranslationsState {
   // Progress stats
   progress: TranslationProgress[]
   progressLoading: boolean
+
+  // Обзор полей активного языка: владелец, «один текст для всех», не переведено
+  overview: Record<string, TranslationOverviewEntry>
+  overviewMissing: number
   
   // Translation panel open state
   panelOpen: boolean
@@ -63,6 +69,9 @@ const initialState: TranslationsState = {
   
   progress: [],
   progressLoading: false,
+
+  overview: {},
+  overviewMissing: 0,
 
   panelOpen: false,
 
@@ -147,6 +156,22 @@ export const fetchTranslationProgress = createAsyncThunk(
   'translations/fetchProgress',
   async (pageId: string) => {
     return await translationApi.getProgress(pageId)
+  }
+)
+
+export const fetchTranslationOverview = createAsyncThunk(
+  'translations/fetchOverview',
+  async ({ pageId, locale }: { pageId: string; locale: string }) => {
+    return await translationApi.getOverview(pageId, locale)
+  }
+)
+
+/** «Один текст для всех языков» у поля; у поля блока действует на всех его страницах. */
+export const setSameMark = createAsyncThunk(
+  'translations/setSameMark',
+  async ({ pageId, nodeId, field, mode }: { pageId: string; nodeId: string; field: string; mode: SameMode }) => {
+    await translationApi.setSameMark(pageId, nodeId, field, mode)
+    return { nodeId, field, mode }
   }
 )
 
@@ -255,6 +280,8 @@ const translationsSlice = createSlice({
       state.translationMap = {}
       state.sourceContent = []
       state.progress = []
+      state.overview = {}
+      state.overviewMissing = 0
     },
     clearImportReport: (state) => {
       state.importReport = null
@@ -404,6 +431,14 @@ const translationsSlice = createSlice({
         )
       })
       
+      // Обзор полей языка
+      .addCase(fetchTranslationOverview.fulfilled, (state, action) => {
+        const overview: Record<string, TranslationOverviewEntry> = {}
+        for (const e of action.payload.entries) overview[fieldKey(e.nodeId, e.field)] = e
+        state.overview = overview
+        state.overviewMissing = action.payload.missing
+      })
+
       // Progress
       .addCase(fetchTranslationProgress.pending, (state) => {
         state.progressLoading = true
@@ -472,6 +507,8 @@ export const selectTranslationPanelOpen = (state: RootState) => state.translatio
 export const selectTranslationsIoBusy = (state: RootState) => state.translations.ioBusy
 export const selectTranslationsIoError = (state: RootState) => state.translations.ioError
 export const selectTranslationImportReport = (state: RootState) => state.translations.importReport
+export const selectTranslationOverview = (state: RootState) => state.translations.overview
+export const selectTranslationOverviewMissing = (state: RootState) => state.translations.overviewMissing
 
 // Get translation for a specific node+field
 export const selectNodeTranslation = (nodeId: string, field: string) => (state: RootState) =>
