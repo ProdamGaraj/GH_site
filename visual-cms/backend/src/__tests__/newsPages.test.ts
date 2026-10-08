@@ -175,14 +175,36 @@ describe('блок «News feed» (живой снимок)', () => {
       css.slice(0, start) + '/* ==== news-feed v1 ==== */\n.news-fsearch { flex: 1 1 260px; }\n.news-fpop { right: 0; }\n'
     const up = migrateNewsFeedBlock(v1)
     expect(up.alreadyMigrated).toBe(false)
-    expect(up.changes).toEqual(['CSS-секция news-feed v3: лента по ширине hero, на телефоне поля 8px'])
+    expect(up.changes).toEqual([
+      'CSS-секция news-feed v4: ровные промежутки в полосе фильтров, лента по ширине hero',
+      'секция для своих правок стилей ленты (обновления её не трогают)',
+    ])
     const next: string = up.structure.metadata.globalCss
     expect(next).not.toContain('news-feed v1')
-    expect(next).toContain('news-feed v3')
+    expect(next).toContain('news-feed v4')
     expect(next).toContain('.news-fsearch { flex: 1 1 100%;')
     expect(next.startsWith(css.slice(0, start).trimEnd())).toBe(true)
     expect(up.structure.children).toEqual(v1.children)
     expect(migrateNewsFeedBlock(up.structure).alreadyMigrated).toBe(true)
+  })
+
+  it('полоса фильтров: рубрики не слипаются — группа рубрик не влияет на раскладку, промежуток один', () => {
+    const css: string = result.structure.metadata.globalCss
+    expect(css).toContain('.news-fcats { display: contents; }')
+    expect(css).toContain('gap: var(--news-filters-gap, 10px)')
+  })
+
+  it('свои правки в своей секции переживают обновление стилей ленты', () => {
+    const edited = JSON.parse(JSON.stringify(result.structure))
+    edited.metadata.globalCss = edited.metadata.globalCss
+      .replace(NEWS_FEED_CSS_HEAD, '/* ==== news-feed v3 ====')
+      .replace('/* Свои правки вида ленты', '.news-grid { --news-filters-gap: 14px; } /* Свои правки вида ленты')
+    const up = migrateNewsFeedBlock(edited)
+    const css: string = up.structure.metadata.globalCss
+    expect(css).toContain(NEWS_FEED_CSS_HEAD)
+    expect(css).not.toContain('news-feed v3')
+    expect(css).toContain('.news-grid { --news-filters-gap: 14px; }')
+    expect(css.split('правки ленты (свои)').length - 1).toBe(1)
   })
 
   it('повторный запуск ничего не меняет', () => {

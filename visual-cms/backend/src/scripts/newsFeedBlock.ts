@@ -160,8 +160,15 @@ const NEWS_FEED_CSS_PREFIX = '/* ==== news-feed'
  * от кнопки; на планшете (кнопки могут уйти к краю) — от левого края полосы.
  * v3: лента — по ширине hero раздела (до 1500px, поля как у дизайна
  * golden-house/news.html: clamp(16px, 4vw, 54px), на телефоне 8px).
+ * v4: ровные промежутки в полосе фильтров — рубрики («Все», «Акции»…) лежат
+ * в своей группе, у которой промежутка не было, и кнопки слипались; группа
+ * больше не влияет на раскладку. Промежуток — переменная --news-filters-gap.
+ *
+ * Полосу фильтров строит скрипт в браузере (по рубрикам и тегам сервиса),
+ * поэтому на канвасе редактора её нет — только пустое место. Вид правится
+ * CSS блока: своё — в секции NEWS_FEED_OWN_CSS, её обновления не трогают.
  */
-export const NEWS_FEED_CSS_HEAD = `${NEWS_FEED_CSS_PREFIX} v3 ====`
+export const NEWS_FEED_CSS_HEAD = `${NEWS_FEED_CSS_PREFIX} v4 ====`
 export const NEWS_FEED_CSS = `${NEWS_FEED_CSS_HEAD} */
 /* Лента из news-service: полоса фильтров и подгрузка — services/runtime/news-feed-runtime.js. */
 .news-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(16px, 2vw, 28px); box-sizing: content-box; max-width: 1500px; margin: clamp(18px, 2vw, 30px) auto 0; padding: 0 clamp(16px, 4vw, 54px) clamp(64px, 8vw, 112px); }
@@ -177,7 +184,8 @@ export const NEWS_FEED_CSS = `${NEWS_FEED_CSS_HEAD} */
 .news-feed-more { min-height: 1px; }
 .news-feed-status { padding: 24px 0; color: var(--muted, rgba(21, 24, 29, .6)); text-align: center; }
 .news-feed-status button { margin-left: 8px; text-decoration: underline; }
-.news-fbar { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.news-fbar { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: var(--news-filters-gap, 10px); }
+.news-fcats { display: contents; }
 .news-fsearch { flex: 1 1 100%; min-width: 0; padding: 12px 16px; border: 1px solid rgba(21, 24, 29, .14); border-radius: 999px; background: #fff; font: inherit; }
 .news-fchip, .news-fbtn { padding: 10px 16px; border: 1px solid rgba(21, 24, 29, .14); border-radius: 999px; background: #fff; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
 .news-fchip[aria-pressed="true"], .news-fbtn[aria-expanded="true"], .news-fbtn.is-set { border-color: rgba(253, 184, 42, .9); background: var(--gold, #fdb82a); color: var(--ink, #15181d); }
@@ -208,6 +216,29 @@ export const NEWS_FEED_CSS = `${NEWS_FEED_CSS_HEAD} */
 }
 `
 
+/**
+ * Секция для своих правок стилей ленты. Обновления (NEWS_FEED_CSS) меняют
+ * только свою секцию — от её заголовка до следующего «/* ==== », — поэтому
+ * эта, идущая после, переживает любые версии. Добавляется один раз, пустой.
+ */
+export const NEWS_FEED_OWN_CSS_HEAD = '/* ==== правки ленты (свои) ===='
+export const NEWS_FEED_OWN_CSS = `${NEWS_FEED_OWN_CSS_HEAD} */
+/* Свои правки вида ленты и полосы фильтров — сюда: обновления их не трогают.
+   Например:
+   .news-grid { --news-filters-gap: 12px; }
+   .news-fchip, .news-fbtn { padding: 10px 18px; } */
+`
+
+/** Дописывает секцию своих правок в конец стилей, если её ещё нет. */
+export function ensureOwnCssSection(metadata: Record<string, unknown>): boolean {
+  const css = typeof metadata.globalCss === 'string' ? metadata.globalCss : ''
+  if (css.includes(NEWS_FEED_OWN_CSS_HEAD)) return false
+  metadata.globalCss = `${css.trimEnd()}
+
+${NEWS_FEED_OWN_CSS}`
+  return true
+}
+
 /** Служебный узел ленты, растянутый на строку сетки. */
 function slot(id: string, cls: string, attr: string, name: string): StructureNode {
   return makeNode({ id, tagName: 'div', elementType: 'container', attributes: { class: cls, [attr]: '' }, metadata: { name } })
@@ -221,12 +252,14 @@ export function migrateNewsFeedBlock(input: StructureNode): MigrationResult {
     const metadata = (structure.metadata ??= {}) as Record<string, unknown>
     const css = upsertCssSection(metadata, NEWS_FEED_CSS_PREFIX, NEWS_FEED_CSS_HEAD, NEWS_FEED_CSS)
     const layout = stripFeedLayout(structure)
-    if (!css && !layout) return { structure: input, changes: [], alreadyMigrated: true }
+    const own = ensureOwnCssSection(metadata)
+    if (!css && !layout && !own) return { structure: input, changes: [], alreadyMigrated: true }
     return {
       structure,
       changes: [
-        ...(css ? ['CSS-секция news-feed v3: лента по ширине hero, на телефоне поля 8px'] : []),
+        ...(css ? ['CSS-секция news-feed v4: ровные промежутки в полосе фильтров, лента по ширине hero'] : []),
         ...(layout ? ['встроенные отступы и промежутки сетки убраны — их ведёт CSS'] : []),
+        ...(own ? ['секция для своих правок стилей ленты (обновления её не трогают)'] : []),
       ],
       alreadyMigrated: false,
     }
@@ -259,13 +292,14 @@ export function migrateNewsFeedBlock(input: StructureNode): MigrationResult {
   const metadata = (structure.metadata ??= {}) as Record<string, unknown>
   metadata.globalJs = ''
   upsertCssSection(metadata, NEWS_FEED_CSS_PREFIX, NEWS_FEED_CSS_HEAD, NEWS_FEED_CSS)
+  ensureOwnCssSection(metadata)
   return {
     structure,
     changes: [
       `карточки из данных страницы (${NEWS_SOURCE}) вместо ${removed} вписанных руками; вёрстка — из первой`,
       'образец карточки для подгрузки, полоса фильтров, сообщения и метка подгрузки',
       'старый скрипт фильтра «Все / Акции / Новости» снят — фильтры и подгрузку ведёт news-feed-runtime',
-      'CSS-секция news-feed v2',
+      'CSS-секция news-feed v4 и секция для своих правок',
       ...(layoutStripped ? ['встроенные колонки и отступы сетки убраны — раскладку ведёт CSS (ПК 3, планшет 2, телефон 1)'] : []),
     ],
     alreadyMigrated: false,
