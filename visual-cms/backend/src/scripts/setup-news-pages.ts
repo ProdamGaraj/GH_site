@@ -6,6 +6,8 @@
  *  2. Страница /news: данные при публикации `news` — первые карточки ленты.
  *  3. Библиотечный блок «News feed»: карточки из данных, образец для
  *     подгрузки, место под фильтры (scripts/newsFeedBlock.ts).
+ *  3б. Блок «News header» → hero-панель дизайна с переводами новых текстов
+ *     (scripts/newsListDesign.ts).
  *  4. Шаблон-страница «Новость» (slug news-template, черновик — сама на
  *     сайт не выкатывается): шапка и подвал как у страницы проекта, hero,
  *     шапка статьи, блоки (scripts/newsTemplate.ts). С переводами шапки и
@@ -49,6 +51,8 @@ import {
   upsertPublishData,
 } from './newsPagesSetup'
 import { NEWS_TEMPLATE_NAME, NEWS_TEMPLATE_SLUG, addBlockSectionVariant, buildNewsTemplate } from './newsTemplate'
+import { HERO_TRANSLATIONS, migrateNewsHeader } from './newsListDesign'
+import { BlockTranslation } from '../models/BlockTranslation'
 
 const DEFAULT_PROJECT_TEMPLATE_ID = '35c718b5-6718-4d51-bffc-9c047dc830ff'
 
@@ -102,6 +106,16 @@ async function main(): Promise<void> {
       backup.newsPageStructure = newsPage.structure
       plan.push(...instanceLayout.changes.map((c) => `страница /${newsSlug}: ${c}`))
     }
+
+    // 3б. «News header» → hero-панель дизайна (golden-house/news.html)
+    const headerInstance = findAll(newsPage.structure, (n) => Boolean(n.metadata?.linkedBlockId) && n.metadata?.name === 'News header')[0]
+    const headerBlock = headerInstance ? await blocks.findOne({ where: { id: String(headerInstance.metadata!.linkedBlockId) } }) : null
+    const hero = headerBlock ? migrateNewsHeader(headerBlock.structure as StructureNode) : null
+    if (hero && !hero.alreadyMigrated) {
+      backup.headerBlock = headerBlock!.structure
+      plan.push(...hero.changes.map((c) => `блок «${headerBlock!.name}»: ${c}`))
+      plan.push(`блок «${headerBlock!.name}»: переводы новых текстов hero — ${HERO_TRANSLATIONS.map((t) => t.locale).filter((l, i, a) => a.indexOf(l) === i).join(', ')}`)
+    } else if (!headerBlock) plan.push('на странице нет блока «News header» — hero не ставлю')
 
     // 4. Шаблон «Новость»
     const existingTemplate = await pages.findOne({ where: { slug: NEWS_TEMPLATE_SLUG } })
@@ -165,6 +179,15 @@ async function main(): Promise<void> {
       if (!instanceLayout.alreadyMigrated) await m.getRepository(Page).update(newsPage.id, { structure: instanceLayout.structure as never })
       // 3
       if (!feed.alreadyMigrated) await m.getRepository(Block).update(feedBlock.id, { structure: feed.structure as never })
+      // 3б
+      if (hero && !hero.alreadyMigrated) {
+        await m.getRepository(Block).update(headerBlock!.id, { structure: hero.structure as never })
+        const tr = m.getRepository(BlockTranslation)
+        for (const t of HERO_TRANSLATIONS) {
+          await tr.delete({ blockId: headerBlock!.id, nodeId: t.nodeId, field: 'content', locale: t.locale })
+          await tr.insert({ blockId: headerBlock!.id, nodeId: t.nodeId, field: 'content', locale: t.locale, value: t.value, status: 'draft' })
+        }
+      }
       // 4
       if (blockVariant?.changed) await m.getRepository(Page).update(existingTemplate!.id, { structure: blockVariant.structure as never })
       if (!writeTemplate) return existingTemplate!.id

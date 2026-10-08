@@ -1,0 +1,98 @@
+{
+ "id": "1782735614293_jfrghxi6c",
+ "styles": {
+  "properties": {
+   "marginTop": "125px",
+   "marginLeft": "180px",
+   "marginRight": "180px",
+   "marginBottom": "100px"
+  }
+ },
+ "tagName": "header",
+ "children": [
+  {
+   "id": "node-1782723530070-mp50aok3p",
+   "styles": {
+    "properties": {}
+   },
+   "tagName": "div",
+   "children": [
+    {
+     "id": "node-1782723530070-8dblmfd4p",
+     "styles": {
+      "properties": {
+       "color": "rgba(21, 24, 29, .7)",
+       "width": "max-content",
+       "display": "inline-flex",
+       "padding": "8px 18px",
+       "fontSize": "13px",
+       "minHeight": "36px",
+       "alignItems": "center",
+       "background": "var(--white)",
+       "fontWeight": "900",
+       "borderRadius": "999px",
+       "textTransform": "uppercase"
+      }
+     },
+     "content": "Golden House",
+     "tagName": "span",
+     "children": [],
+     "metadata": {},
+     "attributes": {
+      "class": "news-kicker"
+     },
+     "elementType": "text"
+    },
+    {
+     "id": "node-1782723530070-shrr44ypm",
+     "styles": {
+      "properties": {
+       "fontSize": "clamp(54px, 7vw, 112px)",
+       "maxWidth": "860px",
+       "marginTop": "18px",
+       "lineHeight": ".94",
+       "letterSpacing": "0"
+      }
+     },
+     "content": "Новости",
+     "tagName": "h1",
+     "children": [],
+     "metadata": {},
+     "attributes": {
+      "class": "news-title"
+     },
+     "elementType": "text"
+    }
+   ],
+   "metadata": {},
+   "attributes": {},
+   "elementType": "container"
+  },
+  {
+   "id": "node-1782723530070-1lypzefe5",
+   "styles": {
+    "properties": {
+     "color": "var(--muted)",
+     "fontSize": "clamp(18px, 1.8vw, 24px)",
+     "lineHeight": "1.45"
+    }
+   },
+   "content": "Акции, события компании, обновления проектов и важная информация для покупателей в одном разделе.",
+   "tagName": "p",
+   "children": [],
+   "metadata": {},
+   "attributes": {
+    "class": "news-lead"
+   },
+   "elementType": "text"
+  }
+ ],
+ "metadata": {
+  "name": "News header",
+  "globalCss": "/* Блок: Заголовок раздела новостей (.news-head) — block-уровень globalCss. */\n\n.news-head {\n  display: grid;\n  grid-template-columns: minmax(0, 1fr) minmax(280px, .42fr);\n  gap: clamp(20px, 4vw, 70px);\n  align-items: end;\n  margin-bottom: clamp(24px, 4vw, 54px);\n}\n\n@media (max-width: 1180px) {\n  .news-head {\n    grid-template-columns: 1fr;\n  }\n}\n\n@media (max-width: 680px) {\n  .news-title {\n    font-size: clamp(48px, 14vw, 72px);\n  }\n}"
+ },
+ "attributes": {
+  "class": "news-head"
+ },
+ "elementType": "container"
+}

@@ -175,9 +175,10 @@ describe('блок «News feed» (живой снимок)', () => {
       css.slice(0, start) + '/* ==== news-feed v1 ==== */\n.news-fsearch { flex: 1 1 260px; }\n.news-fpop { right: 0; }\n'
     const up = migrateNewsFeedBlock(v1)
     expect(up.alreadyMigrated).toBe(false)
-    expect(up.changes).toEqual(['CSS-секция news-feed v2: поиск отдельной строкой, фильтры под ним'])
+    expect(up.changes).toEqual(['CSS-секция news-feed v3: лента по ширине hero, на телефоне поля 8px'])
     const next: string = up.structure.metadata.globalCss
     expect(next).not.toContain('news-feed v1')
+    expect(next).toContain('news-feed v3')
     expect(next).toContain('.news-fsearch { flex: 1 1 100%;')
     expect(next.startsWith(css.slice(0, start).trimEnd())).toBe(true)
     expect(up.structure.children).toEqual(v1.children)
@@ -194,9 +195,12 @@ describe('блок «News feed» (живой снимок)', () => {
     expect(props).not.toHaveProperty('gridTemplateColumns')
     expect(props).not.toHaveProperty('paddingLeft')
     expect(props).not.toHaveProperty('paddingRight')
-    expect(props).toMatchObject({ display: 'grid', paddingBottom: '80px' })
+    // Нижний отступ и промежуток тоже ведёт CSS: встроенный стиль перебил бы его.
+    expect(props).not.toHaveProperty('paddingBottom')
+    expect(props).not.toHaveProperty('gap')
+    expect(props).toMatchObject({ display: 'grid' })
     const css = result.structure.metadata.globalCss
-    expect(css).toMatch(/@media \(max-width: 680px\) \{ \.news-grid \{ grid-template-columns: 1fr; \} \}/)
+    expect(css).toMatch(/@media \(max-width: 680px\) \{ \.news-grid \{ grid-template-columns: 1fr; padding: 0 8px 64px; \} \}/)
   })
 
   it('экземпляр на странице /news — так же; чужие узлы не трогаются, повтор — без правок', () => {

@@ -33,7 +33,7 @@ export const NEWS_SOURCE = 'item.news'
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v))
 
 /** Встроенная раскладка, перебивавшая CSS дизайна. */
-export const FEED_LAYOUT_PROPS = ['gridTemplateColumns', 'paddingLeft', 'paddingRight'] as const
+export const FEED_LAYOUT_PROPS = ['gridTemplateColumns', 'paddingLeft', 'paddingRight', 'paddingBottom', 'gap'] as const
 
 /** Убирает встроенную раскладку сетки; true — если было что убирать. */
 export function stripFeedLayout(node: StructureNode): boolean {
@@ -158,13 +158,15 @@ const NEWS_FEED_CSS_PREFIX = '/* ==== news-feed'
  * v2: поиск — отдельной строкой во всю ширину, рубрики, «Период» и «Теги» —
  * строкой под ним. Кнопки больше не у правого края — окна открываются вправо
  * от кнопки; на планшете (кнопки могут уйти к краю) — от левого края полосы.
+ * v3: лента — по ширине hero раздела (до 1500px, поля как у дизайна
+ * golden-house/news.html: clamp(16px, 4vw, 54px), на телефоне 8px).
  */
-export const NEWS_FEED_CSS_HEAD = `${NEWS_FEED_CSS_PREFIX} v2 ====`
+export const NEWS_FEED_CSS_HEAD = `${NEWS_FEED_CSS_PREFIX} v3 ====`
 export const NEWS_FEED_CSS = `${NEWS_FEED_CSS_HEAD} */
 /* Лента из news-service: полоса фильтров и подгрузка — services/runtime/news-feed-runtime.js. */
-.news-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); padding-left: clamp(16px, 10.4vw, 150px); padding-right: clamp(16px, 10.4vw, 150px); }
+.news-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(16px, 2vw, 28px); box-sizing: content-box; max-width: 1500px; margin: clamp(18px, 2vw, 30px) auto 0; padding: 0 clamp(16px, 4vw, 54px) clamp(64px, 8vw, 112px); }
 @media (max-width: 1180px) { .news-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 680px) { .news-grid { grid-template-columns: 1fr; } }
+@media (max-width: 680px) { .news-grid { grid-template-columns: 1fr; padding: 0 8px 64px; } }
 .news-filters, .news-feed-status, .news-feed-more { grid-column: 1 / -1; }
 .news-card { position: relative; }
 .news-card-link { color: inherit; text-decoration: none; }
@@ -213,13 +215,21 @@ function slot(id: string, cls: string, attr: string, name: string): StructureNod
 
 export function migrateNewsFeedBlock(input: StructureNode): MigrationResult {
   if (input.attributes?.[NEWS_FEED_ATTR] !== undefined) {
-    // Блок уже лента — довносится только новая версия стилей.
+    // Блок уже лента — довносится новая версия стилей и снимается встроенная
+    // раскладка, которая перебила бы её (встроенный стиль сильнее CSS блока).
     const structure = clone(input)
     const metadata = (structure.metadata ??= {}) as Record<string, unknown>
-    if (!upsertCssSection(metadata, NEWS_FEED_CSS_PREFIX, NEWS_FEED_CSS_HEAD, NEWS_FEED_CSS)) {
-      return { structure: input, changes: [], alreadyMigrated: true }
+    const css = upsertCssSection(metadata, NEWS_FEED_CSS_PREFIX, NEWS_FEED_CSS_HEAD, NEWS_FEED_CSS)
+    const layout = stripFeedLayout(structure)
+    if (!css && !layout) return { structure: input, changes: [], alreadyMigrated: true }
+    return {
+      structure,
+      changes: [
+        ...(css ? ['CSS-секция news-feed v3: лента по ширине hero, на телефоне поля 8px'] : []),
+        ...(layout ? ['встроенные отступы и промежутки сетки убраны — их ведёт CSS'] : []),
+      ],
+      alreadyMigrated: false,
     }
-    return { structure, changes: ['CSS-секция news-feed v2: поиск отдельной строкой, фильтры под ним'], alreadyMigrated: false }
   }
   const structure = clone(input)
   const prototype = (structure.children ?? []).find((c) => hasClass(c, 'news-card'))
