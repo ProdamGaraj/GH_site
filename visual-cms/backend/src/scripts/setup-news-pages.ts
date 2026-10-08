@@ -51,7 +51,7 @@ import {
   upsertPublishData,
 } from './newsPagesSetup'
 import { NEWS_TEMPLATE_NAME, NEWS_TEMPLATE_SLUG, addBlockSectionVariant, buildNewsTemplate } from './newsTemplate'
-import { HERO_TRANSLATIONS, migrateNewsHeader } from './newsListDesign'
+import { HERO_TRANSLATIONS, alignHeroInstance, migrateNewsHeader } from './newsListDesign'
 import { BlockTranslation } from '../models/BlockTranslation'
 
 const DEFAULT_PROJECT_TEMPLATE_ID = '35c718b5-6718-4d51-bffc-9c047dc830ff'
@@ -116,6 +116,12 @@ async function main(): Promise<void> {
       plan.push(...hero.changes.map((c) => `блок «${headerBlock!.name}»: ${c}`))
       plan.push(`блок «${headerBlock!.name}»: переводы новых текстов hero — ${HERO_TRANSLATIONS.map((t) => t.locale).filter((l, i, a) => a.indexOf(l) === i).join(', ')}`)
     } else if (!headerBlock) plan.push('на странице нет блока «News header» — hero не ставлю')
+    // Атрибуты экземпляра на странице перебивают атрибуты блока — класс тоже.
+    const heroInstance = headerBlock ? alignHeroInstance(instanceLayout.structure as StructureNode, headerBlock.id) : null
+    if (heroInstance && !heroInstance.alreadyMigrated) {
+      backup.newsPageStructure = newsPage.structure
+      plan.push(...heroInstance.changes.map((c) => `страница /${newsSlug}: ${c}`))
+    }
 
     // 4. Шаблон «Новость»
     const existingTemplate = await pages.findOne({ where: { slug: NEWS_TEMPLATE_SLUG } })
@@ -176,7 +182,10 @@ async function main(): Promise<void> {
       // 2
       const publish = upsertPublishData(newsPage.publishData as never, { name: NEWS_FEED_DATA_NAME, dataSourceId: source!.id, arrayPath: 'items' })
       if (publish.changed) await m.getRepository(Page).update(newsPage.id, { publishData: publish.defs as never })
-      if (!instanceLayout.alreadyMigrated) await m.getRepository(Page).update(newsPage.id, { structure: instanceLayout.structure as never })
+      const pageStructure = heroInstance && !heroInstance.alreadyMigrated ? heroInstance.structure : instanceLayout.structure
+      if (!instanceLayout.alreadyMigrated || (heroInstance && !heroInstance.alreadyMigrated)) {
+        await m.getRepository(Page).update(newsPage.id, { structure: pageStructure as never })
+      }
       // 3
       if (!feed.alreadyMigrated) await m.getRepository(Block).update(feedBlock.id, { structure: feed.structure as never })
       // 3б

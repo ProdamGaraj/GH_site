@@ -123,3 +123,29 @@ export function migrateNewsHeader(input: StructureNode): DesignResult {
     alreadyMigrated: false,
   }
 }
+
+/**
+ * Экземпляр «News header» на странице /news: атрибуты экземпляра перебивают
+ * атрибуты блока (LinkedBlocksService), а у экземпляра — копия прежних
+ * (class="news-head"). Без этой правки страница получала новые стили блока,
+ * но старый класс — и hero не применялся вовсе. Класс и тема шапки
+ * экземпляра приводятся к hero; прочие атрибуты не трогаются.
+ */
+export function alignHeroInstance(page: StructureNode, blockId: string): DesignResult {
+  const structure: StructureNode = JSON.parse(JSON.stringify(page))
+  let changed = 0
+  const visit = (n: StructureNode) => {
+    if (n.metadata?.linkedBlockId === blockId) {
+      const attrs = { ...(n.attributes ?? {}) }
+      if (attrs.class !== NEWS_HERO_CLASS || attrs['data-header-theme'] !== 'dark') {
+        n.attributes = { ...attrs, class: NEWS_HERO_CLASS, 'data-header-theme': 'dark' }
+        changed++
+      }
+      return
+    }
+    for (const c of n.children ?? []) visit(c)
+  }
+  visit(structure)
+  if (changed === 0) return { structure: page, changes: [], alreadyMigrated: true }
+  return { structure, changes: [`экземпляр «News header» на странице: класс hero (атрибуты экземпляра перебивают блок) — ${changed}`], alreadyMigrated: false }
+}

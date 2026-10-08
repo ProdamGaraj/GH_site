@@ -2,7 +2,7 @@
  * Hero раздела новостей по дизайну golden-house/news.html: живой блок
  * «News header» → hero-панель; узлы с переводами сохраняют id.
  */
-import { HERO_CSS_MARKER, HERO_DEFAULT_IMAGE, HERO_LEAD_ID, HERO_PILL_ID, HERO_TEXT, HERO_TITLE_ID, HERO_TRANSLATIONS, migrateNewsHeader } from '../scripts/newsListDesign'
+import { HERO_CSS_MARKER, HERO_DEFAULT_IMAGE, HERO_LEAD_ID, HERO_PILL_ID, HERO_TEXT, HERO_TITLE_ID, HERO_TRANSLATIONS, alignHeroInstance, migrateNewsHeader } from '../scripts/newsListDesign'
 import { MigrationError, StructureNode, findAll } from '../scripts/choiceToPlanTypes'
 
 const LIVE: StructureNode = require('./fixtures/newsHeaderBlockLive.json')
@@ -46,5 +46,29 @@ describe('migrateNewsHeader — живой блок', () => {
 
   it('блок изменился (нет узлов заголовка) — ошибка', () => {
     expect(() => migrateNewsHeader({ id: 'x', children: [] })).toThrow(MigrationError)
+  })
+})
+
+describe('alignHeroInstance — экземпляр на странице /news', () => {
+  const page = (): StructureNode => ({
+    id: 'root',
+    children: [
+      { id: 'nav', metadata: { linkedBlockId: 'nav-block' }, attributes: { class: 'site-header' } },
+      { id: 'hdr', metadata: { linkedBlockId: 'hero-block' }, attributes: { class: 'news-head', 'data-x': '1' } },
+    ],
+  })
+
+  it('класс и тема шапки экземпляра — hero (атрибуты экземпляра перебивают блок); прочее не трогается', () => {
+    const r = alignHeroInstance(page(), 'hero-block')
+    expect(r.alreadyMigrated).toBe(false)
+    expect(r.structure.children![1].attributes).toEqual({ class: 'news-hero', 'data-header-theme': 'dark', 'data-x': '1' })
+    expect(r.structure.children![0].attributes).toEqual({ class: 'site-header' })
+  })
+
+  it('повторно — без правок; исходник не мутирует', () => {
+    const input = page()
+    const r = alignHeroInstance(input, 'hero-block')
+    expect(input.children![1].attributes!.class).toBe('news-head')
+    expect(alignHeroInstance(r.structure, 'hero-block').alreadyMigrated).toBe(true)
   })
 })
