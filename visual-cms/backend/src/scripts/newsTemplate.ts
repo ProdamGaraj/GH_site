@@ -110,6 +110,40 @@ function articleHead(): StructureNode {
   })
 }
 
+/**
+ * Секция-блок: блок данных из библиотеки CMS. В слот кладутся id блока и
+ * значения его якорей; при публикации CMS вставляет блок внутрь слота и
+ * подставляет значения вместо `{{$.…}}` (DeployService.expandDataSlideBlocks).
+ */
+export const NEWS_BLOCK_VARIANT_ID = 'news-section-if-block'
+
+export function blockSectionVariant(): StructureNode {
+  const slot = node('news-section-block', 'div', {
+    cls: 'news-section news-section--block',
+    attributes: { 'data-slide-block': '{{$.blockId}}', 'data-block-values': '{{$.valuesJson}}' },
+    metadata: { name: 'Блок из библиотеки (разворачивается при публикации)' },
+  })
+  return repeat(NEWS_BLOCK_VARIANT_ID, '$.block', slot, 'Блок из библиотеки')
+}
+
+/**
+ * Шаблон, созданный до секций-блоков: дописывает заготовку блока к заготовкам
+ * секций. Структура копируется; уже есть — без правок.
+ */
+export function addBlockSectionVariant(input: StructureNode): { structure: StructureNode; changed: boolean } {
+  const structure: StructureNode = JSON.parse(JSON.stringify(input))
+  let variants: StructureNode | undefined
+  const visit = (n: StructureNode) => {
+    if (n.id === 'news-section-variants') variants = n
+    for (const c of n.children ?? []) visit(c)
+  }
+  visit(structure)
+  if (!variants) throw new Error('В шаблоне нет заготовок секций (news-section-variants)')
+  if ((variants.children ?? []).some((c) => c.id === NEWS_BLOCK_VARIANT_ID)) return { structure: input, changed: false }
+  variants.children = [...(variants.children ?? []), blockSectionVariant()]
+  return { structure, changed: true }
+}
+
 function sections(): StructureNode {
   const text = node('news-section-text', 'div', {
     cls: 'news-section news-section--text',
@@ -148,11 +182,12 @@ function sections(): StructureNode {
   // Каждая заготовка — под повтором 0..1: у блока заполнен ровно один массив.
   const variants = node('news-section-variants', 'div', {
     props: contents,
-    metadata: { name: 'Блок (заготовки трёх типов)' },
+    metadata: { name: 'Блок (заготовки всех типов)' },
     children: [
       repeat('news-section-if-text', '$.text', text, 'Текст'),
       repeat('news-section-if-photo', '$.photoText', photo, 'Фото + текст'),
       repeat('news-section-if-slider', '$.sliderText', slider, 'Слайдер + текст'),
+      blockSectionVariant(),
     ],
   })
   return node('news-body', 'div', {
@@ -184,6 +219,7 @@ export const NEWS_TEMPLATE_CSS = `/* Страница новости (шабло
 .news-article-lead { margin-top: 18px; color: rgba(21, 24, 29, .7); font-size: clamp(18px, 1.6vw, 22px); line-height: 1.5; }
 .news-body-sections { display: grid; gap: clamp(32px, 5vw, 64px); max-width: 1180px; margin: 0 auto; padding: 24px 20px clamp(48px, 7vw, 96px); }
 .news-section--text { max-width: 820px; margin: 0 auto; width: 100%; }
+.news-section--block { width: 100%; }
 .news-section--photo, .news-section--slider { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 4vw, 56px); align-items: center; }
 .news-section--media-right .news-section-media { order: 2; }
 .news-section-media { position: relative; overflow: hidden; margin: 0; border-radius: 24px; aspect-ratio: 4 / 3; background: rgba(21, 24, 29, .06); }

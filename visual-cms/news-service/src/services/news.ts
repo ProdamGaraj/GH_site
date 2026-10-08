@@ -34,9 +34,29 @@ export function normalizeLocale(input?: string | null): Locale {
 export const NEWS_BASE_PATH = 'news'
 
 export type NewsStatus = 'draft' | 'published' | 'archived'
-export type SectionType = 'text' | 'photoText' | 'sliderText'
+export type SectionType = 'text' | 'photoText' | 'sliderText' | 'block'
 export type MediaSide = 'left' | 'right'
-export const SECTION_TYPES: SectionType[] = ['text', 'photoText', 'sliderText']
+export const SECTION_TYPES: SectionType[] = ['text', 'photoText', 'sliderText', 'block']
+
+/** Вид якоря блока данных CMS (backend services/dataAnchors.ts). */
+export type BlockValueKind = 'text' | 'richtext' | 'image' | 'link'
+
+/** Значение якоря секции-блока, как лежит в базе. */
+export interface BlockValue {
+  kind: BlockValueKind
+  /** text/richtext/image — строка; link — {href, text}. */
+  value: string | { href: string; text: string }
+}
+
+/**
+ * Переводимая часть значения: текст, HTML, подпись ссылки. Картинка и адрес
+ * ссылки — общие для всех языков. null — переводить нечего.
+ */
+export function translatableValue(v: BlockValue): string | null {
+  if (v.kind === 'image') return null
+  if (v.kind === 'link') return typeof v.value === 'object' ? v.value.text : null
+  return typeof v.value === 'string' ? v.value : null
+}
 
 /** Блок тела новости, как лежит в базе. */
 export interface NewsSection {
@@ -49,6 +69,10 @@ export interface NewsSection {
   media: GalleryItem[]
   /** Сторона медиа относительно текста. */
   side: MediaSide
+  /** type block: блок данных из библиотеки CMS. */
+  blockId?: string
+  /** type block: значения якорей блока по ключу. */
+  values?: Record<string, BlockValue>
 }
 
 export interface NewsRow {
@@ -85,7 +109,7 @@ export interface TrRow {
 
 // --- Переводы ---
 
-/** Переводимые поля новости; sections — json { "<id секции>": { html } }. */
+/** Переводимые поля новости; sections — json { "<id секции>": { html } | { values: { <ключ>: текст } } }. */
 export const NEWS_TR_FIELDS = ['title', 'lead', 'sections'] as const
 
 /** Текст новости на языке. */
@@ -94,27 +118,43 @@ export interface NewsText {
   lead: string
   /** id секции → HTML. */
   sections: Record<string, string>
+  /** id секции-блока → ключ якоря → переводимый текст (текст, HTML, подпись ссылки). */
+  blocks: Record<string, Record<string, string>>
 }
 
 function baseText(news: NewsRow): NewsText {
   const sections: Record<string, string> = {}
-  for (const s of news.sections) sections[s.id] = s.html
-  return { title: news.title, lead: news.lead, sections }
+  const blocks: Record<string, Record<string, string>> = {}
+  for (const s of news.sections) {
+    sections[s.id] = s.html
+    if (s.type !== 'block') continue
+    blocks[s.id] = {}
+    for (const [key, v] of Object.entries(s.values ?? {})) {
+      const text = translatableValue(v)
+      if (text !== null) blocks[s.id][key] = text
+    }
+  }
+  return { title: news.title, lead: news.lead, sections, blocks }
 }
 
-function parseSectionTranslations(value: string | undefined): Record<string, string> {
-  if (!value) return {}
+/** json переводов секций → HTML секций и тексты якорей секций-блоков. */
+export function parseSectionTranslations(value: string | undefined): Pick<NewsText, 'sections' | 'blocks'> {
+  const out: Pick<NewsText, 'sections' | 'blocks'> = { sections: {}, blocks: {} }
+  if (!value) return out
   try {
     const parsed = JSON.parse(value)
-    if (!parsed || typeof parsed !== 'object') return {}
-    const out: Record<string, string> = {}
+    if (!parsed || typeof parsed !== 'object') return out
     for (const [id, entry] of Object.entries(parsed as Record<string, unknown>)) {
-      const html = entry && typeof entry === 'object' ? (entry as Record<string, unknown>).html : undefined
-      if (typeof html === 'string') out[id] = html
+      if (!entry || typeof entry !== 'object') continue
+      const { html, values } = entry as Record<string, unknown>
+      if (typeof html === 'string') out.sections[id] = html
+      if (values && typeof values === 'object') {
+        out.blocks[id] = Object.fromEntries(Object.entries(values as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === 'string'))
+      }
     }
     return out
   } catch {
-    return {}
+    return out
   }
 }
 
@@ -126,7 +166,7 @@ export function textIn(news: NewsRow, translations: readonly TrRow[], locale: Lo
   return {
     title: (field('title') ?? '').trim(),
     lead: (field('lead') ?? '').trim(),
-    sections: parseSectionTranslations(field('sections')),
+    ...parseSectionTranslations(field('sections')),
   }
 }
 
@@ -142,6 +182,16 @@ export function missingTranslation(news: NewsRow, translations: readonly TrRow[]
   if (news.title.trim() && !text.title) missing.push('title')
   if (news.lead.trim() && !text.lead) missing.push('lead')
   news.sections.forEach((section, i) => {
+    if (section.type === 'block') {
+      // Секция-блок не переведена, пока не переведено хоть одно её значение с текстом.
+      const own = text.blocks[section.id] ?? {}
+      const untranslated = Object.entries(section.values ?? {}).some(([key, v]) => {
+        const base = translatableValue(v)
+        return base !== null && hasText(base) && !hasText(own[key])
+      })
+      if (untranslated) missing.push(`section:${i + 1}`)
+      return
+    }
     if (hasText(section.html) && !hasText(text.sections[section.id])) missing.push(`section:${i + 1}`)
   })
   return missing
@@ -192,6 +242,12 @@ export interface SectionDTO {
   text: Array<{ html: string }>
   photoText: Array<{ html: string; image: string; position: string; fit: string; side: MediaSide }>
   sliderText: Array<{ html: string; slides: MediaSlide[]; side: MediaSide }>
+  /**
+   * Секция-блок 0..1: блок данных CMS и значения его якорей JSON-строкой.
+   * Шаблон кладёт их в data-slide-block / data-block-values; CMS при
+   * публикации разворачивает блок и подставляет значения вместо `{{$.…}}`.
+   */
+  block: Array<{ blockId: string; valuesJson: string }>
 }
 
 export interface NewsDetailDTO extends NewsCardDTO {
@@ -243,9 +299,13 @@ export function buildCard(news: NewsRow, translations: readonly TrRow[], locale:
  * «Фото + текст» без фото и «слайдер + текст» без слайдов рисуются как
  * текст — пустая рамка под картинку на странице хуже.
  */
-export function buildSection(section: NewsSection, html: string): SectionDTO {
+export function buildSection(section: NewsSection, html: string, blockText: Record<string, string> = {}): SectionDTO {
   const slides = toSlides(section.media)
-  const out: SectionDTO = { id: section.id, type: section.type, side: section.side, text: [], photoText: [], sliderText: [] }
+  const out: SectionDTO = { id: section.id, type: section.type, side: section.side, text: [], photoText: [], sliderText: [], block: [] }
+  if (section.type === 'block') {
+    if (section.blockId) out.block = [{ blockId: section.blockId, valuesJson: JSON.stringify(blockValuesIn(section, blockText)) }]
+    return out
+  }
   if (section.type === 'photoText' && slides.length > 0) {
     const [first] = slides
     out.photoText = [{ html, image: first.image, position: first.position, fit: first.fit, side: section.side }]
@@ -257,12 +317,26 @@ export function buildSection(section: NewsSection, html: string): SectionDTO {
   return out
 }
 
+/**
+ * Значения якорей на языке страницы: { <ключ>: строка | {href, text} }.
+ * Тексты — из перевода языка (для ru — база), картинки и адреса ссылок — общие.
+ */
+export function blockValuesIn(section: NewsSection, blockText: Record<string, string>): Record<string, string | { href: string; text: string }> {
+  const out: Record<string, string | { href: string; text: string }> = {}
+  for (const [key, v] of Object.entries(section.values ?? {})) {
+    if (v.kind === 'image') out[key] = typeof v.value === 'string' ? v.value : ''
+    else if (v.kind === 'link') out[key] = { href: typeof v.value === 'object' ? v.value.href : '', text: blockText[key] ?? '' }
+    else out[key] = blockText[key] ?? ''
+  }
+  return out
+}
+
 export function buildDetail(news: NewsRow, translations: readonly TrRow[], locale: Locale, dict: Dictionaries): NewsDetailDTO {
   const text = textIn(news, translations, locale)
   return {
     ...buildCard(news, translations, locale, dict),
     hero: toSlides(news.hero),
-    sections: news.sections.map((s) => buildSection(s, text.sections[s.id] ?? '')),
+    sections: news.sections.map((s) => buildSection(s, text.sections[s.id] ?? '', text.blocks[s.id] ?? {})),
   }
 }
 
@@ -276,6 +350,9 @@ export function byNewest(a: NewsRow, b: NewsRow): number {
 /** Текст новости для поиска: заголовок отдельно, тело — анонс и секции. */
 export function searchText(news: NewsRow, translations: readonly TrRow[], locale: Locale): { title: string; body: string } {
   const text = textIn(news, translations, locale)
-  const body = [text.lead, ...news.sections.map((s) => plainText(text.sections[s.id]))].join(' ')
+  const body = [
+    text.lead,
+    ...news.sections.map((s) => (s.type === 'block' ? Object.values(text.blocks[s.id] ?? {}).map(plainText).join(' ') : plainText(text.sections[s.id]))),
+  ].join(' ')
   return { title: text.title, body }
 }

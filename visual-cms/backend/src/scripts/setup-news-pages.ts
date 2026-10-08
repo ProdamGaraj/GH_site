@@ -48,7 +48,7 @@ import {
   rowsToCopy,
   upsertPublishData,
 } from './newsPagesSetup'
-import { NEWS_TEMPLATE_NAME, NEWS_TEMPLATE_SLUG, buildNewsTemplate } from './newsTemplate'
+import { NEWS_TEMPLATE_NAME, NEWS_TEMPLATE_SLUG, addBlockSectionVariant, buildNewsTemplate } from './newsTemplate'
 
 const DEFAULT_PROJECT_TEMPLATE_ID = '35c718b5-6718-4d51-bffc-9c047dc830ff'
 
@@ -113,10 +113,15 @@ async function main(): Promise<void> {
       breakpoints: (projectTemplate.structure.metadata?.breakpoints as unknown[]) ?? [],
     })
     const writeTemplate = !existingTemplate || rebuild
+    // Шаблон, созданный до секций-блоков, получает заготовку блока — без пересоздания.
+    const blockVariant = existingTemplate && !rebuild && existingTemplate.structure ? addBlockSectionVariant(existingTemplate.structure as StructureNode) : null
     if (!existingTemplate) plan.push(`шаблон-страница «${NEWS_TEMPLATE_NAME}» (/${NEWS_TEMPLATE_SLUG}, черновик)`)
     else if (rebuild) {
       backup.template = existingTemplate.structure
       plan.push(`шаблон-страница «${NEWS_TEMPLATE_NAME}»: структура пересоздана`)
+    } else if (blockVariant?.changed) {
+      backup.template = existingTemplate.structure
+      plan.push(`шаблон-страница «${NEWS_TEMPLATE_NAME}»: добавлена заготовка секции «Блок из библиотеки»`)
     } else plan.push(`шаблон-страница «${NEWS_TEMPLATE_NAME}» уже есть — не трогаю (пересоздать: --rebuild-template)`)
 
     // Переводы шапки и подвала — с шаблона проекта, для узлов этих блоков.
@@ -161,6 +166,7 @@ async function main(): Promise<void> {
       // 3
       if (!feed.alreadyMigrated) await m.getRepository(Block).update(feedBlock.id, { structure: feed.structure as never })
       // 4
+      if (blockVariant?.changed) await m.getRepository(Page).update(existingTemplate!.id, { structure: blockVariant.structure as never })
       if (!writeTemplate) return existingTemplate!.id
       const repo = m.getRepository(Page)
       const page = existingTemplate ?? repo.create({ name: NEWS_TEMPLATE_NAME, slug: NEWS_TEMPLATE_SLUG, siteId: newsPage.siteId, status: 'draft' })

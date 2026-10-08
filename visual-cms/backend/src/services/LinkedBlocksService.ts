@@ -238,6 +238,14 @@ export class LinkedBlocksService {
     return usages
   }
 
+  /** Библиотечные блоки, внутри которых подключён данный (вложенный linked-блок). */
+  async findBlocksContaining(blockId: string): Promise<Array<{ id: string; name: string }>> {
+    const blocks = await blockRepository.find()
+    return blocks
+      .filter((b) => b.id !== blockId && b.structure && this._containsLinkedBlock(b.structure, blockId))
+      .map((b) => ({ id: b.id, name: b.name }))
+  }
+
   /**
    * Для всех блоков из библиотеки — находит какие страницы их используют.
    */

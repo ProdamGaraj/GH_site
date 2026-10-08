@@ -1,0 +1,3606 @@
+[
+ {
+  "id": "3d23aed7-be04-4ed7-934f-f0281b9c4670",
+  "name": "Navigation",
+  "structure": {
+   "id": "1783510137682_yxhgb8705",
+   "styles": {
+    "properties": {
+     "display": "flex",
+     "position": "absolute"
+    }
+   },
+   "tagName": "div",
+   "children": [
+    {
+     "id": "1783407262039_12n69ivq8",
+     "styles": {
+      "properties": {}
+     },
+     "tagName": "nav",
+     "children": [
+      {
+       "id": "1783407262039_y76oy7ql9",
+       "styles": {
+        "properties": {}
+       },
+       "tagName": "a",
+       "children": [
+        {
+         "id": "1783407262039_nrpccst0r",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "img",
+         "children": [],
+         "metadata": {
+          "name": "Логотип — при белом тексте"
+         },
+         "attributes": {
+          "alt": "Golden House",
+          "src": "/media/762e0b48-40f3-4a61-aa9c-b7dde371b1a4.png",
+          "class": "glogo-light"
+         },
+         "elementType": "image"
+        },
+        {
+         "id": "1783407262039_nrpccst0r-dark",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "img",
+         "children": [],
+         "metadata": {
+          "name": "Логотип — при тёмном тексте"
+         },
+         "attributes": {
+          "src": "/media/d3505e4a-f939-4941-8416-ef6069df4f29.png",
+          "class": "glogo-dark",
+          "aria-hidden": "true"
+         },
+         "elementType": "image"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "href": "/",
+        "class": "glogo",
+        "data-page-id": "f547f635-b867-412a-81ec-92bbac9de57e"
+       },
+       "variations": {
+        "mobile": {
+         "inheritedOverrides": {
+          "1783333830712_d6mn3ele8": {
+           "styles": {
+            "display": "flex",
+            "flexDirection": "row"
+           },
+           "attributes": {
+            "src": "/media/7551d0d5-9ac0-4c0c-9084-96fed39303f0.png"
+           }
+          }
+         }
+        }
+       },
+       "elementType": "text"
+      },
+      {
+       "id": "1783407262039_9boidmiy6",
+       "styles": {
+        "properties": {
+         "display": "flex"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "1783407262039_xn4gypog7",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Главная",
+         "tagName": "a",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "href": "/",
+          "data-page-id": "f547f635-b867-412a-81ec-92bbac9de57e"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "1783407262039_lznb0ds4m",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Жилые комплексы",
+         "tagName": "a",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "href": "index.html#complexes"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "1783407262039_w3m2jybxy",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Коммерция",
+         "tagName": "a",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "href": "/commercev2",
+          "data-page-id": "546876fa-2939-4549-beed-b7064370c2c3"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "1783407262039_3rgvzxi4e",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Новости",
+         "tagName": "a",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "href": "/news",
+          "data-page-id": "a216e4fe-78bb-4094-adaa-c916324aaf28"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "1783407262039_a9ofydovd",
+         "styles": {
+          "properties": {
+           "display": "block",
+           "textAlign": "center"
+          }
+         },
+         "content": "О компании",
+         "tagName": "a",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "href": "/about",
+          "data-page-id": "385c861b-a205-4304-aad6-7f1c083ec39c"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "1783407262039_a6a6z5u9c",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Покупателям",
+         "tagName": "a",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "href": "/buyers",
+          "data-page-id": "deaff6cc-b744-4c6d-b54d-338406075871"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "1783407262039_elue2mxnb",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Контакты",
+         "tagName": "a",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "href": "/contact",
+          "data-page-id": "42163d9f-e2e3-456d-9ce9-b155ae2ac2aa"
+         },
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gmenu"
+       },
+       "layoutMode": "flex",
+       "elementType": "container"
+      },
+      {
+       "id": "1783407262039_z4j3yu24t",
+       "styles": {
+        "properties": {
+         "display": "flex",
+         "flexDirection": "row"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "1783407262039_c1qb83ob8",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "a",
+         "children": [
+          {
+           "id": "1783407262039_gzuoz6dir",
+           "styles": {
+            "properties": {}
+           },
+           "content": "+998 78 150-11-11",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "class": "label"
+           },
+           "elementType": "text"
+          },
+          {
+           "id": "1783407262039_nnvaon4u3",
+           "styles": {
+            "properties": {}
+           },
+           "content": "↗",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "class": "arw",
+            "aria-hidden": "true"
+           },
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "href": "tel:+998781501111",
+          "class": "gbook",
+          "aria-label": "Позвонить в Golden House"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "1783407262039_u47zf5tn3",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "div",
+         "children": [
+          {
+           "id": "1783407262039_31tqqpw2q",
+           "styles": {
+            "properties": {}
+           },
+           "content": "RU",
+           "tagName": "button",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "type": "button",
+            "aria-pressed": "true",
+            "data-lang-active": "ru",
+            "data-lang-switch": "ru"
+           },
+           "elementType": "button"
+          },
+          {
+           "id": "1783407262039_jmc2rek03",
+           "styles": {
+            "properties": {}
+           },
+           "content": "UZ",
+           "tagName": "button",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "type": "button",
+            "aria-pressed": "false",
+            "data-lang-active": "uz",
+            "data-lang-switch": "uz"
+           },
+           "elementType": "button"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "language-switch",
+          "aria-label": "Переключение языка"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "1783407262039_6h32v4j8q",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "button",
+         "children": [
+          {
+           "id": "1783407262039_o9eaq6ifu",
+           "styles": {
+            "properties": {}
+           },
+           "tagName": "span",
+           "children": [
+            {
+             "id": "1783407262039_98ja7sme9",
+             "styles": {
+              "properties": {}
+             },
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            },
+            {
+             "id": "1783407262039_r8hm9mkm6",
+             "styles": {
+              "properties": {}
+             },
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            },
+            {
+             "id": "1783407262039_fpmllu09p",
+             "styles": {
+              "properties": {}
+             },
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            }
+           ],
+           "metadata": {},
+           "attributes": {
+            "class": "gburger-lines",
+            "aria-hidden": "true"
+           },
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "type": "button",
+          "class": "gburger",
+          "aria-label": "Открыть меню",
+          "aria-controls": "gnav-drawer",
+          "aria-expanded": "false"
+         },
+         "elementType": "button"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "nav-actions"
+       },
+       "layoutMode": "flex",
+       "elementType": "container"
+      }
+     ],
+     "metadata": {},
+     "attributes": {
+      "class": "gnav",
+      "aria-label": "Главное меню"
+     },
+     "elementType": "container"
+    },
+    {
+     "id": "1783407262039_l3gzcypes",
+     "styles": {
+      "properties": {}
+     },
+     "tagName": "div",
+     "children": [
+      {
+       "id": "node-1783407897984-bw08qda8o",
+       "styles": {
+        "properties": {}
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783419364179-t7ac1tpqb",
+         "styles": {
+          "properties": {}
+         },
+         "content": "+998 78\n          150-11-11",
+         "tagName": "a",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "href": "tel:+998781501111",
+          "class": "gnav-drawer-phone",
+          "aria-label": "Позвонить в Golden House"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783407897984-w47ldhwzn",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "div",
+         "children": [
+          {
+           "id": "node-1783407897984-agfdg804m",
+           "styles": {
+            "properties": {}
+           },
+           "content": "RU",
+           "tagName": "button",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "type": "button",
+            "aria-pressed": "true",
+            "data-lang-active": "ru",
+            "data-lang-switch": "ru"
+           },
+           "elementType": "button"
+          },
+          {
+           "id": "node-1783407897984-8mmh9xgga",
+           "styles": {
+            "properties": {}
+           },
+           "content": "UZ",
+           "tagName": "button",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "type": "button",
+            "aria-pressed": "false",
+            "data-lang-active": "uz",
+            "data-lang-switch": "uz"
+           },
+           "elementType": "button"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "language-switch gnav-drawer-lang",
+          "aria-label": "Переключение языка"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783407897984-soa3o5g23",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "nav",
+         "children": [
+          {
+           "id": "1783407262039_7ti4s5cz5",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Главная",
+           "tagName": "a",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "href": "index.html#top"
+           },
+           "elementType": "text"
+          },
+          {
+           "id": "1783407262039_kw6jyuozg",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Жилые комплексы",
+           "tagName": "a",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "href": "index.html#complexes"
+           },
+           "elementType": "text"
+          },
+          {
+           "id": "1783407262039_rewzvpc79",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Коммерция",
+           "tagName": "a",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "href": "commerce.html"
+           },
+           "elementType": "text"
+          },
+          {
+           "id": "1783407262039_skqnbfzxh",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Новости",
+           "tagName": "a",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "href": "news.html"
+           },
+           "elementType": "text"
+          },
+          {
+           "id": "1783407262039_0wjuzik3x",
+           "styles": {
+            "properties": {}
+           },
+           "content": "О компании",
+           "tagName": "a",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "href": "about.html"
+           },
+           "elementType": "text"
+          },
+          {
+           "id": "1783407262039_3ggcd45rb",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Покупателям",
+           "tagName": "a",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "href": "buyers.html"
+           },
+           "elementType": "text"
+          },
+          {
+           "id": "1783407262039_nfe1a1ney",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Контакты",
+           "tagName": "a",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "href": "contacts.html"
+           },
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "gnav-drawer-menu",
+          "aria-label": "Мобильное меню"
+         },
+         "elementType": "container"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gnav-drawer-panel"
+       },
+       "elementType": "container"
+      }
+     ],
+     "metadata": {},
+     "attributes": {
+      "id": "gnav-drawer",
+      "role": "dialog",
+      "class": "gnav-drawer",
+      "aria-label": "Меню",
+      "aria-modal": "true"
+     },
+     "elementType": "container"
+    }
+   ],
+   "metadata": {
+    "name": "Navigation"
+   },
+   "attributes": {
+    "class": "site-header"
+   },
+   "layoutMode": "flex",
+   "variations": {
+    "mobile": {
+     "inheritedOverrides": {
+      "1783333830712_egumtvloc": {
+       "styles": {
+        "gap": "12px",
+        "top": "0",
+        "display": "flex",
+        "flexWrap": "nowrap",
+        "alignItems": "center",
+        "justifyItems": "start",
+        "flexDirection": "row",
+        "justifyContent": "space-between",
+        "gridTemplateRows": "auto",
+        "gridTemplateColumns": "repeat(2, 1fr)"
+       }
+      }
+     }
+    },
+    "tablet": {
+     "inheritedOverrides": {
+      "node-1782985531430-1sffc5rfb": {
+       "styles": {
+        "display": "flex",
+        "alignItems": "flex-start",
+        "flexDirection": "row",
+        "justifyContent": "center"
+       }
+      }
+     }
+    }
+   },
+   "elementType": "container"
+  }
+ },
+ {
+  "id": "66f591ba-b80a-4cf1-9297-d15d0cc41875",
+  "name": "Trust main page V2",
+  "structure": {
+   "id": "1783323441561_k11geovls",
+   "styles": {
+    "properties": {}
+   },
+   "tagName": "section",
+   "children": [
+    {
+     "id": "node-1783319728173-lckgbnlgq",
+     "styles": {
+      "properties": {
+       "width": "100%",
+       "display": "flex"
+      }
+     },
+     "tagName": "div",
+     "children": [
+      {
+       "id": "node-1783319728173-somxcsldf",
+       "styles": {
+        "properties": {
+         "backgroundSize": "cover",
+         "backgroundImage": "url(\"/media/658dc974-c1db-4279-a488-4c6dc1df767e.png\")"
+        }
+       },
+       "tagName": "article",
+       "children": [
+        {
+         "id": "node-1783319728173-ixmvgzega",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "div",
+         "children": [
+          {
+           "id": "node-1783319728173-k0liinp4c",
+           "styles": {
+            "properties": {}
+           },
+           "content": "О компании",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {
+            "class": "section-pill"
+           },
+           "elementType": "text"
+          },
+          {
+           "id": "node-1783319728173-4x8qkoeda",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Мы создаём облик столицы",
+           "tagName": "h2",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          },
+          {
+           "id": "node-1783319728173-2kizqylay",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Golden House развивает жилые кварталы, коммерческие объекты и городские пространства, где архитектура, сервис и повседневный комфорт работают как единая среда.",
+           "tagName": "p",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "position-content"
+         },
+         "variations": {
+          "mobile": {
+           "inheritedOverrides": {
+            "node-1783319728173-2kizqylay": {
+             "styles": {
+              "display": "flex",
+              "flexDirection": "row",
+              "justifyContent": "flex-start"
+             }
+            },
+            "node-1783319728173-4x8qkoeda": {
+             "styles": {
+              "display": "flex"
+             }
+            },
+            "node-1783319728173-k0liinp4c": {
+             "styles": {
+              "display": "inline-block",
+              "position": "static"
+             }
+            }
+           }
+          }
+         },
+         "elementType": "container"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "position-card"
+       },
+       "variations": {
+        "mobile": {
+         "inheritedOverrides": {
+          "node-1783319728173-ixmvgzega": {
+           "styles": {}
+          }
+         }
+        }
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783319728173-8lgkgamen",
+       "styles": {
+        "properties": {
+         "gap": "clamp(18px, 2vw, 28px)",
+         "display": "grid",
+         "maxWidth": "100%"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783319728173-ow75kxthx",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "article",
+         "children": [
+          {
+           "id": "node-1783319728173-t0r28q81f",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Блок доверия",
+           "tagName": "h3",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          },
+          {
+           "id": "node-1783319728173-fyk2a8j5t",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Golden House строит жилую и коммерческую недвижимость с понятной историей, масштабом и подтвержденной репутацией.",
+           "tagName": "p",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          },
+          {
+           "id": "node-1783319728173-rgm6i5ymb",
+           "styles": {
+            "properties": {
+             "display": "grid",
+             "gridTemplateRows": "repeat(2, 1fr)",
+             "gridTemplateColumns": "repeat(2, 1fr)"
+            }
+           },
+           "tagName": "div",
+           "children": [
+            {
+             "id": "node-1783319728173-i4zyr6xo5",
+             "styles": {
+              "properties": {
+               "display": "flex",
+               "alignItems": "center",
+               "justifyContent": "center"
+              }
+             },
+             "tagName": "div",
+             "children": [
+              {
+               "id": "node-1783319728173-xrgvrg7kn",
+               "styles": {
+                "properties": {}
+               },
+               "tagName": "b",
+               "children": [
+                {
+                 "id": "node-1783319728173-j7ye8okrr",
+                 "styles": {
+                  "properties": {
+                   "fontSize": "32px"
+                  }
+                 },
+                 "content": "30 тыс.",
+                 "tagName": "span",
+                 "children": [],
+                 "metadata": {},
+                 "attributes": {},
+                 "elementType": "text"
+                }
+               ],
+               "metadata": {},
+               "attributes": {},
+               "elementType": "container"
+              },
+              {
+               "id": "node-1783319728173-bx0gkqpso",
+               "styles": {
+                "properties": {
+                 "gap": "0",
+                 "display": "flex",
+                 "flexWrap": "wrap",
+                 "fontSize": "20px"
+                }
+               },
+               "content": "людей уже живут \nв наших домах",
+               "tagName": "span",
+               "children": [],
+               "metadata": {},
+               "attributes": {},
+               "elementType": "text"
+              }
+             ],
+             "metadata": {},
+             "attributes": {
+              "class": "metric-tile"
+             },
+             "elementType": "container"
+            },
+            {
+             "id": "node-1783319728173-5u8zkqbmw",
+             "styles": {
+              "properties": {
+               "display": "flex",
+               "alignItems": "center",
+               "justifyContent": "center"
+              }
+             },
+             "tagName": "div",
+             "children": [
+              {
+               "id": "node-1783319728173-msxab7sns",
+               "styles": {
+                "properties": {}
+               },
+               "tagName": "b",
+               "children": [
+                {
+                 "id": "node-1783319728173-xgd83y8vj",
+                 "styles": {
+                  "properties": {
+                   "fontSize": "32px"
+                  }
+                 },
+                 "content": "1 млн+",
+                 "tagName": "span",
+                 "children": [],
+                 "metadata": {},
+                 "attributes": {},
+                 "elementType": "text"
+                }
+               ],
+               "metadata": {},
+               "attributes": {},
+               "elementType": "container"
+              },
+              {
+               "id": "node-1783319728173-izq5lvale",
+               "styles": {
+                "properties": {
+                 "fontSize": "20px"
+                }
+               },
+               "content": "м² построено",
+               "tagName": "span",
+               "children": [],
+               "metadata": {},
+               "attributes": {},
+               "elementType": "text"
+              }
+             ],
+             "metadata": {},
+             "attributes": {
+              "class": "metric-tile"
+             },
+             "elementType": "container"
+            },
+            {
+             "id": "node-1783319728173-cjleq0ysx",
+             "styles": {
+              "properties": {
+               "display": "flex",
+               "alignItems": "center",
+               "justifyContent": "center"
+              }
+             },
+             "tagName": "div",
+             "children": [
+              {
+               "id": "node-1783319728173-55xwdozqq",
+               "styles": {
+                "properties": {}
+               },
+               "tagName": "b",
+               "children": [
+                {
+                 "id": "node-1783319728173-p1cc6juir",
+                 "styles": {
+                  "properties": {
+                   "fontSize": "32px"
+                  }
+                 },
+                 "content": "15+ ",
+                 "tagName": "span",
+                 "children": [],
+                 "metadata": {},
+                 "attributes": {},
+                 "elementType": "text"
+                }
+               ],
+               "metadata": {},
+               "attributes": {},
+               "elementType": "container"
+              },
+              {
+               "id": "node-1783319728173-kr8ia3xts",
+               "styles": {
+                "properties": {
+                 "fontSize": "20px"
+                }
+               },
+               "content": "лет опыта",
+               "tagName": "span",
+               "children": [],
+               "metadata": {},
+               "attributes": {},
+               "elementType": "text"
+              }
+             ],
+             "metadata": {},
+             "attributes": {
+              "class": "metric-tile"
+             },
+             "elementType": "container"
+            },
+            {
+             "id": "node-1783319728173-pxahoiiuz",
+             "styles": {
+              "properties": {
+               "display": "flex",
+               "alignItems": "center",
+               "justifyContent": "center"
+              }
+             },
+             "tagName": "div",
+             "children": [
+              {
+               "id": "node-1783319728173-yhz0hxej1",
+               "styles": {
+                "properties": {}
+               },
+               "tagName": "b",
+               "children": [
+                {
+                 "id": "node-1783319728173-g20qvxqbb",
+                 "styles": {
+                  "properties": {
+                   "fontSize": "32px"
+                  }
+                 },
+                 "content": "65 ",
+                 "tagName": "span",
+                 "children": [],
+                 "metadata": {},
+                 "attributes": {},
+                 "elementType": "text"
+                }
+               ],
+               "metadata": {},
+               "attributes": {},
+               "elementType": "container"
+              },
+              {
+               "id": "node-1783319728173-zp12a0n8l",
+               "styles": {
+                "properties": {
+                 "fontSize": "20px"
+                }
+               },
+               "content": "проектов в портфолио",
+               "tagName": "span",
+               "children": [],
+               "metadata": {},
+               "attributes": {},
+               "elementType": "text"
+              }
+             ],
+             "metadata": {},
+             "attributes": {
+              "class": "metric-tile"
+             },
+             "elementType": "container"
+            }
+           ],
+           "metadata": {},
+           "attributes": {
+            "class": "trust-metrics"
+           },
+           "elementType": "container"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "trust-card"
+         },
+         "variations": {
+          "mobile": {
+           "inheritedOverrides": {
+            "node-1783319728173-rgm6i5ymb": {
+             "styles": {
+              "display": "grid",
+              "gridTemplateRows": "auto",
+              "gridTemplateColumns": "repeat(1, 1fr)"
+             }
+            }
+           }
+          },
+          "desktop-fhd": {
+           "inheritedOverrides": {
+            "node-1783319728173-rgm6i5ymb": {
+             "styles": {
+              "display": "grid",
+              "flexDirection": "column",
+              "gridTemplateColumns": "repeat(2, 1fr)"
+             }
+            }
+           }
+          }
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783319728173-se4zsu3da",
+         "styles": {
+          "properties": {
+           "display": "flex"
+          }
+         },
+         "tagName": "article",
+         "children": [
+          {
+           "id": "node-1783319728173-4zs8y3ubz",
+           "styles": {
+            "properties": {
+             "display": "flex",
+             "alignItems": "center",
+             "justifyContent": "center"
+            }
+           },
+           "tagName": "div",
+           "children": [
+            {
+             "id": "node-1783319728173-32popqx5z",
+             "styles": {
+              "properties": {}
+             },
+             "tagName": "img",
+             "children": [],
+             "metadata": {},
+             "attributes": {
+              "alt": "Премия Бренд года 2020",
+              "src": "/media/a360f223-ad10-4218-90d7-74cdea71179d.png"
+             },
+             "elementType": "image"
+            }
+           ],
+           "metadata": {},
+           "attributes": {
+            "class": "award-figure"
+           },
+           "variations": {
+            "mobile": {
+             "inheritedOverrides": {
+              "node-1783319728173-32popqx5z": {
+               "styles": {
+                "display": "flex",
+                "justifyContent": "center"
+               }
+              }
+             }
+            }
+           },
+           "elementType": "container"
+          },
+          {
+           "id": "node-1783319728173-5tiddkuth",
+           "styles": {
+            "properties": {
+             "display": "block",
+             "maxWidth": "70%",
+             "alignItems": "center",
+             "justifyItems": "start",
+             "justifyContent": "flex-start"
+            }
+           },
+           "tagName": "div",
+           "children": [
+            {
+             "id": "node-1783319728173-cfj8uyt4i",
+             "styles": {
+              "properties": {
+               "fontFamily": "Arial"
+              }
+             },
+             "content": "Девелопер года — это про нас!",
+             "tagName": "h3",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            },
+            {
+             "id": "node-1783319728173-9qe3bayua",
+             "styles": {
+              "properties": {}
+             },
+             "content": "Golden House участвовал в открытом голосовании III Международного маркетингового бизнес-форума MAKON Marketing Forum и получил премию «Бренд Года 2020» в категории «Девелоперы».",
+             "tagName": "p",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            },
+            {
+             "id": "node-1783319728173-v6ki2rk3t",
+             "styles": {
+              "properties": {}
+             },
+             "content": "«Бренд Года» — ежегодная премия для лучших брендов Узбекистана по мнению населения и ведущих экспертов среди наиболее популярных категорий товаров и услуг.",
+             "tagName": "p",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            },
+            {
+             "id": "node-1783319728173-xj0qev8ax",
+             "styles": {
+              "properties": {}
+             },
+             "content": "Мы рады, что наши проекты были признаны и по достоинству оценены профессиональным сообществом. Поздравляем всех наших жильцов с правильным выбором!",
+             "tagName": "p",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            }
+           ],
+           "metadata": {},
+           "attributes": {
+            "class": "award-copy"
+           },
+           "elementType": "container"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "award-card"
+         },
+         "variations": {
+          "mobile": {
+           "inheritedOverrides": {
+            "node-1783319728173-4zs8y3ubz": {
+             "styles": {
+              "display": "flex"
+             }
+            }
+           }
+          },
+          "1783506944181-z6i5oo7m5": {
+           "inheritedOverrides": {
+            "node-1783319728173-4zs8y3ubz": {
+             "styles": {
+              "width": "100%"
+             }
+            },
+            "node-1783319728173-5tiddkuth": {
+             "styles": {
+              "display": "block",
+              "maxWidth": "100%",
+              "minWidth": "75%",
+              "alignItems": "center",
+              "justifyItems": "start",
+              "justifyContent": "flex-start",
+              "gridTemplateRows": "auto",
+              "gridTemplateColumns": "repeat(auto-fill, minmax(200px, 1fr))"
+             }
+            }
+           }
+          }
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783319728173-3af055qz4",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "article",
+         "children": [
+          {
+           "id": "node-1783319728173-jo8qho1oh",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Банки-партнеры",
+           "tagName": "h3",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          },
+          {
+           "id": "node-1783319728173-8npvjlw6f",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Для покупателей доступны ипотека, рассрочка и специальные условия от партнерских банков.",
+           "tagName": "p",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          },
+          {
+           "id": "node-1783319728173-e10e2cqim",
+           "styles": {
+            "properties": {
+             "width": "100%",
+             "display": "flex",
+             "justifyContent": "space-between"
+            }
+           },
+           "tagName": "div",
+           "children": [
+            {
+             "id": "node-1783319728173-zjqgt6l31",
+             "styles": {
+              "properties": {
+               "width": "100%",
+               "display": "flex",
+               "alignItems": "center",
+               "justifyContent": "center"
+              }
+             },
+             "tagName": "span",
+             "children": [
+              {
+               "id": "node-1783319728173-a025z63kt",
+               "styles": {
+                "properties": {
+                 "display": "flex",
+                 "alignItems": "center",
+                 "justifyContent": "center"
+                }
+               },
+               "tagName": "img",
+               "children": [],
+               "metadata": {},
+               "attributes": {
+                "alt": "Orient Finans Bank",
+                "src": "/media/98846eac-229b-4ead-b217-d6a391c6101e.png"
+               },
+               "elementType": "image"
+              }
+             ],
+             "metadata": {},
+             "attributes": {
+              "class": "bank-chip"
+             },
+             "variations": {
+              "mobile": {
+               "inheritedOverrides": {
+                "node-1783319728173-a025z63kt": {
+                 "styles": {}
+                }
+               }
+              }
+             },
+             "elementType": "text"
+            },
+            {
+             "id": "node-1783319728173-1pkkeocx4",
+             "styles": {
+              "properties": {
+               "width": "100%",
+               "display": "flex",
+               "alignItems": "center",
+               "justifyContent": "center"
+              }
+             },
+             "tagName": "span",
+             "children": [
+              {
+               "id": "node-1783319728173-499f55xun",
+               "styles": {
+                "properties": {
+                 "display": "flex",
+                 "alignItems": "center",
+                 "justifyContent": "center"
+                }
+               },
+               "tagName": "img",
+               "children": [],
+               "metadata": {},
+               "attributes": {
+                "alt": "Trustbank",
+                "src": "/media/351e0678-a0f6-4a3b-8019-c711039b637e.png"
+               },
+               "elementType": "image"
+              }
+             ],
+             "metadata": {},
+             "attributes": {
+              "class": "bank-chip"
+             },
+             "variations": {
+              "mobile": {
+               "inheritedOverrides": {
+                "node-1783319728173-499f55xun": {
+                 "styles": {}
+                }
+               }
+              }
+             },
+             "elementType": "text"
+            }
+           ],
+           "metadata": {},
+           "attributes": {
+            "class": "bank-grid",
+            "aria-label": "Список банков-партнеров"
+           },
+           "elementType": "container"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "banks-card"
+         },
+         "elementType": "container"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "trust-stack"
+       },
+       "layoutMode": "grid",
+       "variations": {
+        "mobile": {
+         "inheritedOverrides": {
+          "node-1783319728173-se4zsu3da": {
+           "styles": {
+            "flexDirection": "column"
+           }
+          }
+         }
+        },
+        "tablet": {
+         "inheritedOverrides": {
+          "node-1783319728173-ow75kxthx": {
+           "styles": {
+            "width": "100%"
+           }
+          }
+         }
+        },
+        "desktop-fhd": {
+         "inheritedOverrides": {
+          "node-1783319728173-ow75kxthx": {
+           "styles": {
+            "gap": "8px",
+            "display": "flex",
+            "flexDirection": "column"
+           }
+          }
+         }
+        },
+        "1783506944181-z6i5oo7m5": {
+         "inheritedOverrides": {
+          "node-1783319728173-se4zsu3da": {
+           "styles": {
+            "alignItems": "center",
+            "justifyContent": "flex-start"
+           }
+          }
+         }
+        }
+       },
+       "elementType": "container"
+      }
+     ],
+     "metadata": {},
+     "attributes": {
+      "class": "trust-wrap"
+     },
+     "variations": {
+      "mobile": {
+       "inheritedOverrides": {
+        "node-1783319728173-8lgkgamen": {
+         "styles": {
+          "maxWidth": "100%"
+         }
+        },
+        "node-1783319728173-somxcsldf": {
+         "styles": {
+          "display": "flex"
+         }
+        }
+       }
+      },
+      "tablet": {
+       "inheritedOverrides": {
+        "node-1783319728173-8lgkgamen": {
+         "styles": {
+          "gap": "clamp(18px, 2vw, 28px)",
+          "display": "grid",
+          "maxWidth": "100%"
+         }
+        }
+       }
+      },
+      "desktop-fhd": {
+       "inheritedOverrides": {
+        "node-1783319728173-8lgkgamen": {
+         "styles": {
+          "gap": "clamp(18px, 2vw, 28px)",
+          "display": "grid",
+          "maxWidth": "100%"
+         }
+        }
+       }
+      },
+      "1783506944181-z6i5oo7m5": {
+       "inheritedOverrides": {
+        "node-1783319728173-8lgkgamen": {
+         "styles": {
+          "maxWidth": "100%"
+         }
+        }
+       }
+      }
+     },
+     "elementType": "container"
+    }
+   ],
+   "metadata": {},
+   "attributes": {
+    "id": "about",
+    "class": "trust-section",
+    "aria-label": "Доверие к Golden House"
+   },
+   "variations": {
+    "mobile": {
+     "inheritedOverrides": {
+      "node-1783319728173-lckgbnlgq": {
+       "styles": {
+        "flexDirection": "column"
+       }
+      }
+     }
+    },
+    "tablet": {
+     "inheritedOverrides": {
+      "node-1783319728173-lckgbnlgq": {
+       "styles": {
+        "flexDirection": "column"
+       }
+      }
+     }
+    },
+    "desktop-hd": {
+     "inheritedOverrides": {
+      "node-1783319728173-lckgbnlgq": {
+       "styles": {
+        "top": "0",
+        "display": "flex"
+       }
+      }
+     }
+    },
+    "desktop-fhd": {
+     "inheritedOverrides": {
+      "node-1783319728173-lckgbnlgq": {
+       "styles": {
+        "display": "grid",
+        "alignItems": "stretch",
+        "flexDirection": "row",
+        "justifyContent": "center",
+        "gridTemplateRows": "auto"
+       }
+      }
+     }
+    },
+    "1783506944181-z6i5oo7m5": {
+     "inheritedOverrides": {
+      "node-1783319728173-lckgbnlgq": {
+       "styles": {
+        "flexDirection": "column"
+       }
+      }
+     }
+    }
+   },
+   "elementType": "container"
+  }
+ },
+ {
+  "id": "252e9334-3fc8-45d5-840b-84d62f875200",
+  "name": "Roadmap",
+  "structure": {
+   "id": "1783335824373_pc4bjnw27",
+   "styles": {
+    "properties": {
+     "width": "100%",
+     "marginLeft": "150px",
+     "marginRight": "150px"
+    }
+   },
+   "tagName": "div",
+   "children": [
+    {
+     "id": "node-1783335688059-kwqbejdpz",
+     "styles": {
+      "properties": {}
+     },
+     "tagName": "div",
+     "children": [
+      {
+       "id": "node-1783335688059-pl4dwcqhz",
+       "styles": {
+        "properties": {}
+       },
+       "content": "История развития",
+       "tagName": "span",
+       "children": [],
+       "metadata": {},
+       "attributes": {
+        "class": "about-kicker"
+       },
+       "elementType": "text"
+      }
+     ],
+     "metadata": {},
+     "attributes": {
+      "class": "gh-roadmap-head"
+     },
+     "elementType": "container"
+    },
+    {
+     "id": "node-1783335688060-se93bsggx",
+     "styles": {
+      "properties": {}
+     },
+     "tagName": "div",
+     "children": [
+      {
+       "id": "node-1783335688060-vyq4ry7ad",
+       "styles": {
+        "properties": {
+         "inset": "0",
+         "width": "100%",
+         "height": "100%",
+         "overflow": "visible",
+         "position": "absolute"
+        }
+       },
+       "tagName": "svg",
+       "children": [
+        {
+         "id": "node-1783335688059-9xykxvsou",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "path",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "d": "M120,300 L900,300 A165,165 0 0 1 1065,465 L1065,580 A165,165 0 0 1 900,745 L210,745 A165,165 0 0 0 45,910 L45,1005 A165,165 0 0 0 210,1170 L1000,1170",
+          "id": "gh-roadmap-path",
+          "fill": "none",
+          "class": "gh-roadmap-path"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-5amvgu01f",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "line",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "x1": "585",
+          "x2": "585",
+          "y1": "300",
+          "y2": "468",
+          "class": "gh-roadmap-connector",
+          "data-roadmap-reveal": "0.132"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-dcttncltw",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "line",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "x1": "760",
+          "x2": "760",
+          "y1": "745",
+          "y2": "602",
+          "class": "gh-roadmap-connector",
+          "data-roadmap-reveal": "0.44"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-xgh2r4l4q",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "line",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "x1": "710",
+          "x2": "710",
+          "y1": "1170",
+          "y2": "1378",
+          "class": "gh-roadmap-connector",
+          "data-roadmap-reveal": "0.918"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-j899cnbb0",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "line",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "x1": "325",
+          "x2": "325",
+          "y1": "300",
+          "y2": "372",
+          "class": "gh-roadmap-connector dotted",
+          "data-roadmap-reveal": "0.058"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-1a2xaw2uj",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "line",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "x1": "765",
+          "x2": "765",
+          "y1": "300",
+          "y2": "226",
+          "class": "gh-roadmap-connector dotted",
+          "data-roadmap-reveal": "0.183"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-bu0g934zw",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "line",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "x1": "430",
+          "x2": "430",
+          "y1": "745",
+          "y2": "815",
+          "class": "gh-roadmap-connector dotted",
+          "data-roadmap-reveal": "0.534"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-1efv7jk6n",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "line",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "x1": "325",
+          "x2": "325",
+          "y1": "1170",
+          "y2": "1242",
+          "class": "gh-roadmap-connector dotted",
+          "data-roadmap-reveal": "0.809"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-xy803kgbu",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "circle",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "r": "7",
+          "cx": "120",
+          "cy": "300",
+          "class": "gh-roadmap-dot",
+          "data-roadmap-reveal": "0"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-mk1z3xb4v",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "circle",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "r": "7",
+          "cx": "325",
+          "cy": "300",
+          "class": "gh-roadmap-dot",
+          "data-roadmap-reveal": "0.058"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-z4ncmsj2s",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "circle",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "r": "7",
+          "cx": "585",
+          "cy": "300",
+          "class": "gh-roadmap-dot",
+          "data-roadmap-reveal": "0.132"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-vjfwposgj",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "circle",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "r": "7",
+          "cx": "765",
+          "cy": "300",
+          "class": "gh-roadmap-dot",
+          "data-roadmap-reveal": "0.183"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-clx2h45j0",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "circle",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "r": "7",
+          "cx": "760",
+          "cy": "745",
+          "class": "gh-roadmap-dot",
+          "data-roadmap-reveal": "0.44"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-owtdwxbte",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "circle",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "r": "7",
+          "cx": "430",
+          "cy": "745",
+          "class": "gh-roadmap-dot",
+          "data-roadmap-reveal": "0.534"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-p1a0ee586",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "circle",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "r": "7",
+          "cx": "325",
+          "cy": "1170",
+          "class": "gh-roadmap-dot",
+          "data-roadmap-reveal": "0.809"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-2a47to6x0",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "circle",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "r": "7",
+          "cx": "710",
+          "cy": "1170",
+          "class": "gh-roadmap-dot",
+          "data-roadmap-reveal": "0.918"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-hmp6mpvam",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "circle",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "r": "7",
+          "cx": "1000",
+          "cy": "1170",
+          "class": "gh-roadmap-dot",
+          "data-roadmap-reveal": "0.99"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-i6tyxcwnu",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "circle",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "r": "13",
+          "cx": "120",
+          "cy": "300",
+          "id": "gh-roadmap-head-glow",
+          "class": "gh-roadmap-head-glow"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-nrq1ma048",
+         "styles": {
+          "properties": {
+           "fill": "var(--roadmap-gold)",
+           "opacity": "0"
+          }
+         },
+         "tagName": "circle",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "r": "6",
+          "cx": "120",
+          "cy": "300",
+          "id": "gh-roadmap-head",
+          "class": "gh-roadmap-head-dot"
+         },
+         "elementType": "container"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-svg",
+        "viewBox": "0 0 1140 1600",
+        "focusable": "false",
+        "aria-hidden": "true"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-srmuswt2m",
+       "styles": {
+        "properties": {
+         "top": "14%",
+         "left": "22.5%",
+         "color": "var(--roadmap-gold)",
+         "fontSize": "clamp(42px, 5.8vw, 76px)",
+         "fontWeight": "500",
+         "lineHeight": "1"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783335688060-9qg52s62u",
+         "styles": {
+          "properties": {}
+         },
+         "content": "2009",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-label gh-roadmap-year gh-rm-y2009",
+        "data-roadmap-reveal": "0"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-fx2lzf4lq",
+       "styles": {
+        "properties": {
+         "top": "23.6%",
+         "left": "14.5%",
+         "width": "34%",
+         "textAlign": "center"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783335688060-jwchtnb27",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Создание строительной компании",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783335688060-xexm4uwyn",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "br",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-6egix76ke",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "strong",
+         "children": [
+          {
+           "id": "node-1783335688060-14hatfxmn",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Golden House Development",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "container"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-label gh-roadmap-note gh-rm-text2009",
+        "data-roadmap-reveal": "0.058"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-mulak4bik",
+       "styles": {
+        "properties": {
+         "top": "7.8%",
+         "left": "48.5%",
+         "width": "30%",
+         "textAlign": "center"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783335688060-01yvhva78",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Присуждена награда",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783335688060-17dnpe49o",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "br",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-d10ejbmd9",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "strong",
+         "children": [
+          {
+           "id": "node-1783335688060-vwng4uw8a",
+           "styles": {
+            "properties": {}
+           },
+           "content": "«Бренд года»",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-mq4doz0iw",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "br",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-4j9gc8itn",
+         "styles": {
+          "properties": {}
+         },
+         "content": "в категории «Девелопер»",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-label gh-roadmap-note gh-rm-award2020",
+        "data-roadmap-reveal": "0.183"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-pdd56t7vk",
+       "styles": {
+        "properties": {
+         "top": "20.6%",
+         "left": "57%",
+         "color": "var(--roadmap-gold)",
+         "fontSize": "clamp(42px, 5.8vw, 76px)",
+         "fontWeight": "500",
+         "lineHeight": "1"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783335688060-1bxs41re7",
+         "styles": {
+          "properties": {}
+         },
+         "content": "2020",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-label gh-roadmap-year gh-rm-y2020",
+        "data-roadmap-reveal": "0.16"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-tlhqihod3",
+       "styles": {
+        "properties": {
+         "gap": "clamp(8px, 1.3vw, 16px)",
+         "top": "28%",
+         "left": "34.8%",
+         "width": "42%",
+         "display": "flex",
+         "alignItems": "baseline"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783335688060-b78phtrv1",
+         "styles": {
+          "properties": {
+           "color": "var(--ink)",
+           "fontSize": "clamp(42px, 5.4vw, 74px)",
+           "fontWeight": "600",
+           "lineHeight": ".95"
+          }
+         },
+         "content": "29",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "gh-roadmap-big"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783335688060-8af9bp6ks",
+         "styles": {
+          "properties": {}
+         },
+         "content": "жилых домов сданы в эксплуатацию(строительство и надзор)",
+         "tagName": "span",
+         "children": [
+          {
+           "id": "node-1783335688060-4b256zkdq",
+           "styles": {
+            "properties": {}
+           },
+           "tagName": "br",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "container"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "gh-roadmap-note"
+         },
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-label gh-roadmap-row gh-rm-built29",
+        "data-roadmap-reveal": "0.132"
+       },
+       "layoutMode": "flex",
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-53n5q4cxz",
+       "styles": {
+        "properties": {
+         "gap": "clamp(8px, 1.3vw, 16px)",
+         "top": "35%",
+         "left": "53.8%",
+         "width": "26%",
+         "display": "flex",
+         "alignItems": "baseline"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783335688060-60hq0otqt",
+         "styles": {
+          "properties": {
+           "color": "var(--ink)",
+           "fontSize": "clamp(42px, 5.4vw, 74px)",
+           "fontWeight": "600",
+           "lineHeight": ".95"
+          }
+         },
+         "content": ">50",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "gh-roadmap-big"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783335688060-n17y1bd2a",
+         "styles": {
+          "properties": {}
+         },
+         "content": "проектов сдано",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "gh-roadmap-note"
+         },
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-label gh-roadmap-row gh-rm-done50",
+        "data-roadmap-reveal": "0.44"
+       },
+       "layoutMode": "flex",
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-ddp1backv",
+       "styles": {
+        "properties": {
+         "top": "41.7%",
+         "left": "31.5%",
+         "color": "var(--roadmap-gold)",
+         "fontSize": "clamp(42px, 5.8vw, 76px)",
+         "fontWeight": "500",
+         "lineHeight": "1"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783335688060-1cftluj68",
+         "styles": {
+          "properties": {}
+         },
+         "content": "2022",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-label gh-roadmap-year gh-rm-y2022",
+        "data-roadmap-reveal": "0.5"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-qrffbga7p",
+       "styles": {
+        "properties": {
+         "top": "50.4%",
+         "left": "20.5%",
+         "width": "24%",
+         "textAlign": "center"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783335688060-bpzgxmzjv",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Сдано",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783335688060-4j8su2phd",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "strong",
+         "children": [
+          {
+           "id": "node-1783335688060-x5jy56zrs",
+           "styles": {
+            "properties": {}
+           },
+           "content": "15 проектов",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "container"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-label gh-roadmap-note gh-rm-text2022",
+        "data-roadmap-reveal": "0.534"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-thuwqdb1d",
+       "styles": {
+        "properties": {}
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783335688060-2he8p6wxj",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "img",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "alt": "Golden House",
+          "src": "/media/59333d80-b197-4a0f-8f78-400f9c6fef87.png"
+         },
+         "elementType": "image"
+        },
+        {
+         "id": "node-1783335688060-8fq98wjv3",
+         "styles": {
+          "properties": {
+           "display": "flex",
+           "alignItems": "flex-start",
+           "flexDirection": "column"
+          }
+         },
+         "tagName": "div",
+         "children": [
+          {
+           "id": "node-1783335688060-vvpwxdh0j",
+           "styles": {
+            "properties": {}
+           },
+           "tagName": "b",
+           "children": [
+            {
+             "id": "node-1783335688060-3d6nn8c3g",
+             "styles": {
+              "properties": {}
+             },
+             "content": "Преобразование в холдинг:",
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            }
+           ],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "container"
+          },
+          {
+           "id": "node-1783335688060-2154n2baz",
+           "styles": {
+            "properties": {
+             "display": "flex",
+             "flexDirection": "row-reverse"
+            }
+           },
+           "content": "Golden House Development дочерняя компания",
+           "tagName": "span",
+           "children": [
+            {
+             "id": "node-1783335688060-sjucf9z1w",
+             "styles": {
+              "properties": {}
+             },
+             "tagName": "em",
+             "children": [
+              {
+               "id": "node-1783335688060-bfultf3dx",
+               "styles": {
+                "properties": {}
+               },
+               "content": "→",
+               "tagName": "span",
+               "children": [],
+               "metadata": {},
+               "attributes": {},
+               "elementType": "text"
+              }
+             ],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "container"
+            }
+           ],
+           "metadata": {},
+           "attributes": {},
+           "layoutMode": "flex",
+           "elementType": "text"
+          },
+          {
+           "id": "node-1783335688060-t79b6jdgp",
+           "styles": {
+            "properties": {
+             "display": "flex",
+             "flexDirection": "row-reverse"
+            }
+           },
+           "content": "Golden House Property Group управляющая компания",
+           "tagName": "span",
+           "children": [
+            {
+             "id": "node-1783335688060-khzlc9gvh",
+             "styles": {
+              "properties": {}
+             },
+             "tagName": "em",
+             "children": [
+              {
+               "id": "node-1783335688060-8q6jy9rck",
+               "styles": {
+                "properties": {}
+               },
+               "content": "→",
+               "tagName": "span",
+               "children": [],
+               "metadata": {},
+               "attributes": {},
+               "elementType": "text"
+              }
+             ],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "container"
+            }
+           ],
+           "metadata": {},
+           "attributes": {},
+           "layoutMode": "flex",
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {},
+         "layoutMode": "flex",
+         "elementType": "container"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-label gh-roadmap-holding gh-rm-holding",
+        "data-roadmap-reveal": "0.64"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-ks55oq9zf",
+       "styles": {
+        "properties": {
+         "top": "68.7%",
+         "left": "22.5%",
+         "color": "var(--roadmap-gold)",
+         "fontSize": "clamp(42px, 5.8vw, 76px)",
+         "fontWeight": "500",
+         "lineHeight": "1"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783335688060-fjlhxv5yv",
+         "styles": {
+          "properties": {}
+         },
+         "content": "2024",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-label gh-roadmap-year gh-rm-y2024",
+        "data-roadmap-reveal": "0.776"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-5gd8p347y",
+       "styles": {
+        "properties": {
+         "top": "78%",
+         "left": "21.5%",
+         "width": "27%",
+         "textAlign": "center"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783335688060-ylwr7qi77",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Golden House становится",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783335688060-3ehwegu0a",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "strong",
+         "children": [
+          {
+           "id": "node-1783335688060-wnus2gw2s",
+           "styles": {
+            "properties": {}
+           },
+           "content": "девелопером полного цикла",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-meahi2myo",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "br",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-t76ecu2gu",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "br",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-toawcnyww",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Открыты первые",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783335688060-mlzkbirj2",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "strong",
+         "children": [
+          {
+           "id": "node-1783335688060-58877eguk",
+           "styles": {
+            "properties": {}
+           },
+           "content": "региональные офисы продаж",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "container"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-label gh-roadmap-note gh-rm-text2024",
+        "data-roadmap-reveal": "0.809"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-8636hwn8m",
+       "styles": {
+        "properties": {
+         "top": "74.3%",
+         "left": "57%",
+         "color": "var(--roadmap-gold)",
+         "fontSize": "clamp(42px, 5.8vw, 76px)",
+         "fontWeight": "500",
+         "lineHeight": "1"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783335688060-849pz5dvy",
+         "styles": {
+          "properties": {
+           "display": "flex",
+           "flexDirection": "row-reverse",
+           "justifyContent": "flex-start"
+          }
+         },
+         "content": "2025",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "layoutMode": "flex",
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-label gh-roadmap-year gh-rm-y2025",
+        "data-roadmap-reveal": "0.88"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-0mqsgy2i6",
+       "styles": {
+        "properties": {
+         "gap": "clamp(8px, 1.3vw, 16px)",
+         "top": "85%",
+         "left": "54.5%",
+         "width": "19%",
+         "display": "flex",
+         "alignItems": "baseline"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783335688060-o30u38op3",
+         "styles": {
+          "properties": {
+           "color": "var(--ink)",
+           "fontSize": "clamp(42px, 5.4vw, 74px)",
+           "fontWeight": "600",
+           "lineHeight": ".95"
+          }
+         },
+         "content": "11",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "gh-roadmap-big"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783335688060-t7pmyaoc3",
+         "styles": {
+          "properties": {}
+         },
+         "content": "проектов в продаже",
+         "tagName": "span",
+         "children": [
+          {
+           "id": "node-1783335688060-sj24a46em",
+           "styles": {
+            "properties": {}
+           },
+           "tagName": "br",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "container"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "class": "gh-roadmap-note"
+         },
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-label gh-roadmap-row gh-rm-text2025",
+        "data-roadmap-reveal": "0.918"
+       },
+       "layoutMode": "flex",
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-fawrzge02",
+       "styles": {
+        "properties": {
+         "top": "74.3%",
+         "left": "77.5%",
+         "color": "rgba(21, 24, 29, .34)",
+         "width": "21%",
+         "fontSize": "clamp(22px, 2.7vw, 38px)",
+         "fontWeight": "500",
+         "lineHeight": "1.12"
+        }
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783335688060-z4b2pvrs9",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Мы строим",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783335688060-u07dktgdk",
+         "styles": {
+          "properties": {}
+         },
+         "tagName": "br",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783335688060-6u052n7xb",
+         "styles": {
+          "properties": {}
+         },
+         "content": "будущее",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-label gh-roadmap-future gh-rm-future",
+        "data-roadmap-reveal": "0.97"
+       },
+       "elementType": "container"
+      }
+     ],
+     "metadata": {},
+     "attributes": {
+      "id": "gh-roadmap-stage",
+      "class": "gh-roadmap-stage",
+      "aria-label": "Дорожная карта развития Golden House"
+     },
+     "elementType": "container"
+    },
+    {
+     "id": "node-1783335688060-zhndqb1ef",
+     "styles": {
+      "properties": {}
+     },
+     "tagName": "div",
+     "children": [
+      {
+       "id": "node-1783335688060-7y650r50p",
+       "styles": {
+        "properties": {}
+       },
+       "tagName": "article",
+       "children": [
+        {
+         "id": "node-1783335688060-wrt5uyhmb",
+         "styles": {
+          "properties": {}
+         },
+         "content": "2009",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "gh-roadmap-mobile-year"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783335688060-3rq4qymup",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Создание строительной компании.",
+         "tagName": "p",
+         "children": [
+          {
+           "id": "node-1783335688060-lqrq8sr4y",
+           "styles": {
+            "properties": {}
+           },
+           "tagName": "strong",
+           "children": [
+            {
+             "id": "node-1783335688060-0g0y4m690",
+             "styles": {
+              "properties": {}
+             },
+             "content": "Golden House Development",
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            }
+           ],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "container"
+          }
+         ],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-mobile-item"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-13esux4lh",
+       "styles": {
+        "properties": {}
+       },
+       "tagName": "article",
+       "children": [
+        {
+         "id": "node-1783335688060-w19h9pur1",
+         "styles": {
+          "properties": {}
+         },
+         "content": "2020",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "gh-roadmap-mobile-year"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783335688060-887p5nsu7",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Присуждена наградав категории «Девелопер». 29 жилых домов сданы в эксплуатацию, более 50 проектов сдано.",
+         "tagName": "p",
+         "children": [
+          {
+           "id": "node-1783335688060-sa5ndwzkb",
+           "styles": {
+            "properties": {}
+           },
+           "tagName": "strong",
+           "children": [
+            {
+             "id": "node-1783335688060-d55rdtasc",
+             "styles": {
+              "properties": {}
+             },
+             "content": "«Бренд года»",
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            }
+           ],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "container"
+          }
+         ],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-mobile-item"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-kme0k0zs3",
+       "styles": {
+        "properties": {}
+       },
+       "tagName": "article",
+       "children": [
+        {
+         "id": "node-1783335688060-xpvgdy1wo",
+         "styles": {
+          "properties": {}
+         },
+         "content": "2022",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "gh-roadmap-mobile-year"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783335688060-n1f3kjr8m",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Сдано. Golden House Development и Golden House Property Group сформировали холдинговую структуру.",
+         "tagName": "p",
+         "children": [
+          {
+           "id": "node-1783335688060-4yjqee0i5",
+           "styles": {
+            "properties": {}
+           },
+           "tagName": "strong",
+           "children": [
+            {
+             "id": "node-1783335688060-ryrnyqs1g",
+             "styles": {
+              "properties": {}
+             },
+             "content": "15 проектов",
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            }
+           ],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "container"
+          }
+         ],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-mobile-item"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-zr3whcmdg",
+       "styles": {
+        "properties": {}
+       },
+       "tagName": "article",
+       "children": [
+        {
+         "id": "node-1783335688060-zahf3yclj",
+         "styles": {
+          "properties": {}
+         },
+         "content": "2024",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "gh-roadmap-mobile-year"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783335688060-yp3zz38pk",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Golden House становится. Открыты первые региональные офисы продаж.",
+         "tagName": "p",
+         "children": [
+          {
+           "id": "node-1783335688060-hx3vhb2vp",
+           "styles": {
+            "properties": {}
+           },
+           "tagName": "strong",
+           "children": [
+            {
+             "id": "node-1783335688060-gadoy1w37",
+             "styles": {
+              "properties": {}
+             },
+             "content": "девелопером полного цикла",
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            }
+           ],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "container"
+          }
+         ],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-mobile-item"
+       },
+       "elementType": "container"
+      },
+      {
+       "id": "node-1783335688060-nj7f89l77",
+       "styles": {
+        "properties": {}
+       },
+       "tagName": "article",
+       "children": [
+        {
+         "id": "node-1783335688060-h17uk5za5",
+         "styles": {
+          "properties": {}
+         },
+         "content": "2025",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "class": "gh-roadmap-mobile-year"
+         },
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783335688060-0dfe3w0u3",
+         "styles": {
+          "properties": {}
+         },
+         "content": "в продаже. Мы строим будущее.",
+         "tagName": "p",
+         "children": [
+          {
+           "id": "node-1783335688060-mnbu4y7wh",
+           "styles": {
+            "properties": {}
+           },
+           "tagName": "strong",
+           "children": [
+            {
+             "id": "node-1783335688060-50lm33ngq",
+             "styles": {
+              "properties": {}
+             },
+             "content": "11 проектов",
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            }
+           ],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "container"
+          }
+         ],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "gh-roadmap-mobile-item"
+       },
+       "elementType": "container"
+      }
+     ],
+     "metadata": {},
+     "attributes": {
+      "class": "gh-roadmap-mobile",
+      "aria-label": "Дорожная карта развития Golden House для мобильных устройств"
+     },
+     "elementType": "container"
+    }
+   ],
+   "metadata": {
+    "name": "Roadmap"
+   },
+   "attributes": {
+    "class": "wide-card gh-roadmap-card"
+   },
+   "elementType": "container"
+  }
+ },
+ {
+  "id": "4782e167-45e2-45b9-b8de-bd60d4bd05ae",
+  "name": "Commerce hero",
+  "structure": {
+   "id": "1783404201248_gizbymdo4",
+   "styles": {
+    "properties": {
+     "width": "90%",
+     "display": "flex",
+     "maxWidth": "100%",
+     "marginTop": "15vh",
+     "alignItems": "flex-end",
+     "marginLeft": "150px",
+     "marginRight": "150px",
+     "backgroundSize": "cover",
+     "justifyContent": "space-between",
+     "backgroundImage": "url(\"/media/328beaaf-a918-4d84-b64f-1cfc465bdcfa.jpg\")",
+     "backgroundRepeat": "no-repeat",
+     "backgroundPosition": "center"
+    }
+   },
+   "tagName": "article",
+   "children": [
+    {
+     "id": "1784097137809-k1cam71ax",
+     "styles": {
+      "properties": {
+       "top": "0",
+       "left": "0",
+       "right": "0",
+       "width": "100%",
+       "bottom": "0",
+       "height": "100%",
+       "zIndex": "1",
+       "opacity": "0.2",
+       "position": "absolute",
+       "background": "#000"
+      }
+     },
+     "tagName": "div",
+     "children": [],
+     "metadata": {
+      "name": "Div"
+     },
+     "attributes": {},
+     "elementType": "container"
+    },
+    {
+     "id": "node-1783403800819-pgoelsv7f",
+     "styles": {
+      "properties": {
+       "zIndex": "2"
+      }
+     },
+     "tagName": "div",
+     "children": [
+      {
+       "id": "node-1783403800819-2vvunmq8m",
+       "styles": {
+        "properties": {}
+       },
+       "content": "Коммерческая недвижимость",
+       "tagName": "h1",
+       "children": [],
+       "metadata": {},
+       "attributes": {},
+       "elementType": "text"
+      },
+      {
+       "id": "node-1783403800819-x5w7h9avt",
+       "styles": {
+        "properties": {}
+       },
+       "content": "Проекты для компаний, ритейла и инвесторов: продуманные планировки, сильные локации, медиа-материалы и понятные условия покупки.",
+       "tagName": "p",
+       "children": [],
+       "metadata": {},
+       "attributes": {},
+       "elementType": "text"
+      },
+      {
+       "id": "node-1783403800819-6ndbdh94s",
+       "styles": {
+        "properties": {}
+       },
+       "tagName": "div",
+       "children": [
+        {
+         "id": "node-1783403800819-g6snk7lsz",
+         "styles": {
+          "properties": {}
+         },
+         "content": "Офисы",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783403800819-24hfv8yq1",
+         "styles": {
+          "properties": {}
+         },
+         "content": "ТРЦ",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        },
+        {
+         "id": "node-1783403800819-u6mllwwa8",
+         "styles": {
+          "properties": {}
+         },
+         "content": "БЦ",
+         "tagName": "span",
+         "children": [],
+         "metadata": {},
+         "attributes": {},
+         "elementType": "text"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "commerce-types"
+       },
+       "elementType": "container"
+      }
+     ],
+     "metadata": {},
+     "attributes": {
+      "class": "commerce-copy"
+     },
+     "elementType": "container"
+    },
+    {
+     "id": "node-1783403800819-qs3dk8us5",
+     "styles": {
+      "properties": {
+       "zIndex": "2"
+      }
+     },
+     "tagName": "aside",
+     "children": [
+      {
+       "id": "node-1783403800819-a7ftuf5n8",
+       "styles": {
+        "properties": {}
+       },
+       "content": "Забронировать объект",
+       "tagName": "h2",
+       "children": [],
+       "metadata": {},
+       "attributes": {},
+       "elementType": "text"
+      },
+      {
+       "id": "node-1783403800819-gnl6np1u1",
+       "styles": {
+        "properties": {}
+       },
+       "content": "Оставьте контакты, и менеджер подберет помещение под формат бизнеса.",
+       "tagName": "p",
+       "children": [],
+       "metadata": {},
+       "attributes": {},
+       "elementType": "text"
+      },
+      {
+       "id": "node-1783403800819-fop42qqs2",
+       "styles": {
+        "properties": {
+         "display": "flex",
+         "flexDirection": "column"
+        }
+       },
+       "tagName": "form",
+       "children": [
+        {
+         "id": "node-1783403800819-34d0v0pu4",
+         "styles": {
+          "properties": {
+           "borderWidth": "0.5px",
+           "borderRadius": "40px",
+           "backgroundColor": "rgba(255, 255, 255, 0.1)"
+          }
+         },
+         "tagName": "input",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "name": "name",
+          "type": "text",
+          "aria-label": "Ваше имя",
+          "placeholder": "Ваше имя"
+         },
+         "elementType": "input"
+        },
+        {
+         "id": "node-1783403800819-br6gpracj",
+         "styles": {
+          "properties": {
+           "borderWidth": "0.5px",
+           "borderRadius": "40px",
+           "backgroundColor": "rgba(255, 255, 255, 0.1)"
+          }
+         },
+         "tagName": "input",
+         "children": [],
+         "metadata": {},
+         "attributes": {
+          "name": "phone",
+          "type": "tel",
+          "aria-label": "Телефон",
+          "placeholder": "+998 __ ___ __ __"
+         },
+         "elementType": "input"
+        },
+        {
+         "id": "node-1783403800819-arytkatb8",
+         "styles": {
+          "properties": {
+           "borderWidth": "1px",
+           "borderRadius": "40px",
+           "backgroundColor": "rgba(255, 255, 255, 0.1)"
+          }
+         },
+         "tagName": "select",
+         "children": [
+          {
+           "id": "node-1783403800819-2kebfevij",
+           "styles": {
+            "properties": {}
+           },
+           "tagName": "option",
+           "children": [
+            {
+             "id": "node-1783403800819-jmkevok3y",
+             "styles": {
+              "properties": {}
+             },
+             "content": "Офис",
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            }
+           ],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "container"
+          },
+          {
+           "id": "node-1783403800819-g6gd0stb1",
+           "styles": {
+            "properties": {}
+           },
+           "tagName": "option",
+           "children": [
+            {
+             "id": "node-1783403800819-oid0f17f3",
+             "styles": {
+              "properties": {}
+             },
+             "content": "ТРЦ",
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            }
+           ],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "container"
+          },
+          {
+           "id": "node-1783403800819-na5mytbmo",
+           "styles": {
+            "properties": {}
+           },
+           "tagName": "option",
+           "children": [
+            {
+             "id": "node-1783403800819-s08xs6wuq",
+             "styles": {
+              "properties": {}
+             },
+             "content": "Бизнес-центр",
+             "tagName": "span",
+             "children": [],
+             "metadata": {},
+             "attributes": {},
+             "elementType": "text"
+            }
+           ],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "container"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "name": "object",
+          "aria-label": "Тип объекта"
+         },
+         "elementType": "container"
+        },
+        {
+         "id": "node-1783403800819-7yahyggdi",
+         "styles": {
+          "properties": {
+           "color": "#000000",
+           "borderRadius": "40px",
+           "backgroundColor": "rgba(255, 255, 255, 1)"
+          }
+         },
+         "tagName": "button",
+         "children": [
+          {
+           "id": "node-1783403800819-4z7s28zi1",
+           "styles": {
+            "properties": {}
+           },
+           "content": "Забронировать помещение",
+           "tagName": "span",
+           "children": [],
+           "metadata": {},
+           "attributes": {},
+           "elementType": "text"
+          }
+         ],
+         "metadata": {},
+         "attributes": {
+          "type": "button",
+          "class": "commerce-submit"
+         },
+         "elementType": "button"
+        }
+       ],
+       "metadata": {},
+       "attributes": {
+        "class": "commerce-form"
+       },
+       "elementType": "container"
+      }
+     ],
+     "metadata": {},
+     "attributes": {
+      "id": "contacts",
+      "class": "commerce-lead-card"
+     },
+     "elementType": "container"
+    }
+   ],
+   "metadata": {},
+   "attributes": {
+    "class": "commerce-hero"
+   },
+   "elementType": "container"
+  }
+ }
+]

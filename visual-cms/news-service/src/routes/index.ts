@@ -49,6 +49,7 @@ for (const [path, dict] of [
 }
 
 admin.post('/deployed', validate(deployedSchema), AdminController.deployed)
+admin.get('/block-usage/:blockId', AdminController.blockUsage)
 
 router.use('/api/admin', admin)
 

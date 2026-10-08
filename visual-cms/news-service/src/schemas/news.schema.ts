@@ -17,14 +17,28 @@ export const galleryItemSchema = z.union([
 const keySchema = z.string().regex(/^[a-z0-9_-]{1,40}$/, 'латиница, цифры, - и _')
 const html = z.string().max(50000)
 
-/** Блок тела новости. id генерирует админка — по нему привязан перевод. */
-export const sectionSchema = z.object({
-  id: z.string().uuid(),
-  type: z.enum(['text', 'photoText', 'sliderText']),
-  html: html.default(''),
-  media: z.array(galleryItemSchema).max(30).default([]),
-  side: z.enum(['left', 'right']).default('right'),
+/** Ключ якоря блока данных (плейсхолдер {{$.<ключ>}} в блоке CMS). */
+const anchorKeySchema = z.string().regex(/^[a-zA-Z0-9_]{1,64}$/, 'ключ якоря: латиница, цифры, _')
+
+/** Значение якоря: текст, форматированный текст, картинка или ссылка {href, text}. */
+export const blockValueSchema = z.object({
+  kind: z.enum(['text', 'richtext', 'image', 'link']),
+  value: z.union([z.string().max(50000), z.object({ href: z.string().max(500), text: z.string().max(2000) })]),
 })
+
+/** Блок тела новости. id генерирует админка — по нему привязан перевод. */
+export const sectionSchema = z
+  .object({
+    id: z.string().uuid(),
+    type: z.enum(['text', 'photoText', 'sliderText', 'block']),
+    html: html.default(''),
+    media: z.array(galleryItemSchema).max(30).default([]),
+    side: z.enum(['left', 'right']).default('right'),
+    /** type block: блок данных из библиотеки CMS и значения его якорей. */
+    blockId: z.string().uuid().optional(),
+    values: z.record(anchorKeySchema, blockValueSchema).default({}),
+  })
+  .refine((s) => s.type !== 'block' || Boolean(s.blockId), { message: 'у секции-блока нужен blockId', path: ['blockId'] })
 
 /** Переводы: { uz: { title, lead, sections: { "<id секции>": html } }, en: … } */
 export const translationsSchema = z
@@ -34,6 +48,8 @@ export const translationsSchema = z
       title: z.string().max(300).optional(),
       lead: z.string().max(2000).optional(),
       sections: z.record(z.string().uuid(), html).optional(),
+      /** Секции-блоки: id секции → ключ якоря → перевод (текст, HTML или подпись ссылки). */
+      blocks: z.record(z.string().uuid(), z.record(anchorKeySchema, z.string().max(50000))).optional(),
     })
   )
   .optional()

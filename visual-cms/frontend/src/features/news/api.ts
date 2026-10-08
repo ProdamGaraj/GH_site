@@ -1,7 +1,7 @@
 import { api } from '@/shared/api'
 import { apiFetch, readJson } from '@/shared/api/http'
 import type { ProvisionBody, ProvisionResult } from '@/shared/components/ProvisionCollectionModal'
-import type { DictionaryEntry, DictionaryKind, NewsDetail, NewsDraft, NewsListItem } from './types'
+import type { AnchorKind, BlockAnchorInfo, DictionaryEntry, DictionaryKind, MakeDataBlockResult, NewsDetail, NewsDraft, NewsListItem } from './types'
 
 /**
  * Клиент news-service через прокси /news-api (vite dev / nginx prod).
@@ -46,4 +46,13 @@ export const newsApi = {
  */
 export const newsCmsApi = {
   provisionCollection: (body: ProvisionBody) => api.post<ProvisionResult>('/collections/provision-news', body),
+  /**
+   * Якоря блока библиотеки; withUsage — ещё где блок используется и что с ним
+   * можно сделать (use | copy | rewrite). Без usage — для формы секции.
+   */
+  dataAnchors: (blockId: string, withUsage = true) =>
+    api.get<BlockAnchorInfo>(`/blocks/${blockId}/data-anchors${withUsage ? '' : '?usage=0'}`),
+  /** Переписать блок якорями или создать копию-блок данных; возвращает id блока данных. */
+  makeDataBlock: (blockId: string, body: { mode: 'rewrite' | 'copy'; picks: Array<{ nodeId: string; kind: AnchorKind; label: string }>; name?: string }) =>
+    api.post<MakeDataBlockResult>(`/blocks/${blockId}/data-anchors`, body),
 }

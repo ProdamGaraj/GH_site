@@ -3,7 +3,7 @@ import { S1 } from './helpers/newsFixtures'
 
 describe('схемы ввода', () => {
   it('секция: id обязателен и uuid; тип и сторона — из списка; значения по умолчанию', () => {
-    expect(sectionSchema.parse({ id: S1, type: 'text' })).toEqual({ id: S1, type: 'text', html: '', media: [], side: 'right' })
+    expect(sectionSchema.parse({ id: S1, type: 'text' })).toEqual({ id: S1, type: 'text', html: '', media: [], side: 'right', values: {} })
     expect(sectionSchema.safeParse({ type: 'text' }).success).toBe(false)
     expect(sectionSchema.safeParse({ id: 'x', type: 'text' }).success).toBe(false)
     expect(sectionSchema.safeParse({ id: S1, type: 'video' }).success).toBe(false)

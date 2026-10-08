@@ -25,7 +25,7 @@ describe('языки', () => {
   it('ru — база; перевод без фолбэка на ru', () => {
     const news = newsRow()
     expect(textIn(news, [], 'ru').title).toBe('Заголовок')
-    expect(textIn(news, [], 'uz')).toEqual({ title: '', lead: '', sections: {} })
+    expect(textIn(news, [], 'uz')).toEqual({ title: '', lead: '', sections: {}, blocks: {} })
     expect(textIn(news, fullTranslation(news, 'uz'), 'uz').title).toBe('UZ заголовок')
   })
 
@@ -36,7 +36,7 @@ describe('языки', () => {
       ...fullTranslation(other, 'uz'),
       { newsId: news.id, locale: 'uz', field: 'sections', value: '{не json' },
     ]
-    expect(textIn(news, rows, 'uz')).toEqual({ title: '', lead: '', sections: {} })
+    expect(textIn(news, rows, 'uz')).toEqual({ title: '', lead: '', sections: {}, blocks: {} })
   })
 })
 
@@ -98,7 +98,7 @@ describe('isAvailableIn', () => {
 
 describe('buildSection — ровно одна заготовка', () => {
   it('текст', () => {
-    expect(buildSection(section(S1), '<p>т</p>')).toEqual({ id: S1, type: 'text', side: 'right', text: [{ html: '<p>т</p>' }], photoText: [], sliderText: [] })
+    expect(buildSection(section(S1), '<p>т</p>')).toEqual({ id: S1, type: 'text', side: 'right', text: [{ html: '<p>т</p>' }], photoText: [], sliderText: [], block: [] })
   })
 
   it('фото + текст: первое фото, точка фокуса, сторона', () => {

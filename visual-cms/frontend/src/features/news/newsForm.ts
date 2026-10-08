@@ -6,7 +6,7 @@
  * хватает, ещё до сохранения. Решает всё равно сервис: при сохранении он
  * проверит перевод заново и не даст отметить язык с неполным переводом.
  */
-import type { ExtraLocale, MediaSide, NewsDetail, NewsDraft, NewsSection, NewsStatus, SectionType } from './types'
+import type { BlockValue, DataAnchor, ExtraLocale, MediaSide, NewsDetail, NewsDraft, NewsSection, NewsStatus, SectionType } from './types'
 import { EXTRA_LOCALES } from './types'
 
 export const STATUS_LABELS: Record<NewsStatus, string> = {
@@ -19,7 +19,11 @@ export const SECTION_TYPE_LABELS: Record<SectionType, string> = {
   text: 'Текст',
   photoText: 'Фото + текст',
   sliderText: 'Слайдер + текст',
+  block: 'Блок из библиотеки',
 }
+
+/** Типы, которые выбираются списком: секция-блок создаётся только из библиотеки. */
+export const PLAIN_SECTION_TYPES: SectionType[] = ['text', 'photoText', 'sliderText']
 
 export const SIDE_LABELS: Record<MediaSide, string> = { left: 'Медиа слева', right: 'Медиа справа' }
 
@@ -28,7 +32,12 @@ export function draftOf(news: NewsDetail): NewsDraft {
   const translations = {} as NewsDraft['translations']
   for (const locale of EXTRA_LOCALES) {
     const t = news.translations?.[locale]
-    translations[locale] = { title: t?.title ?? '', lead: t?.lead ?? '', sections: { ...(t?.sections ?? {}) } }
+    translations[locale] = {
+      title: t?.title ?? '',
+      lead: t?.lead ?? '',
+      sections: { ...(t?.sections ?? {}) },
+      blocks: Object.fromEntries(Object.entries(t?.blocks ?? {}).map(([id, v]) => [id, { ...v }])),
+    }
   }
   return {
     slug: news.slug,
@@ -38,7 +47,7 @@ export function draftOf(news: NewsDetail): NewsDraft {
     lead: news.lead,
     cover: news.cover,
     hero: [...news.hero],
-    sections: news.sections.map((s) => ({ ...s, media: [...s.media] })),
+    sections: news.sections.map((s) => ({ ...s, media: [...s.media], ...(s.values ? { values: { ...s.values } } : {}) })),
     publishOn: [...news.publishOn],
     publishedAt: news.publishedAt,
     translations,
@@ -52,6 +61,29 @@ function newId(): string {
 /** Новый блок: id сразу — по нему в той же правке можно сохранить перевод. */
 export function newSection(type: SectionType): NewsSection {
   return { id: newId(), type, html: '', media: [], side: 'right' }
+}
+
+/**
+ * Секция-блок: блок данных из библиотеки; значения якорей заполнены образцами —
+ * тем, что было в блоке до замены якорями.
+ */
+export function newBlockSection(blockId: string, anchors: readonly DataAnchor[]): NewsSection {
+  const values: Record<string, BlockValue> = {}
+  for (const a of anchors) values[a.key] = { kind: a.kind, value: a.kind === 'link' ? (typeof a.sample === 'object' ? { ...a.sample } : { href: '', text: '' }) : typeof a.sample === 'string' ? a.sample : '' }
+  return { id: newId(), type: 'block', html: '', media: [], side: 'right', blockId, values }
+}
+
+/** Переводимая часть значения: текст, HTML, подпись ссылки; картинка — null (общая). */
+export function translatableValue(v: BlockValue): string | null {
+  if (v.kind === 'image') return null
+  if (v.kind === 'link') return typeof v.value === 'object' ? v.value.text : null
+  return typeof v.value === 'string' ? v.value : null
+}
+
+/** Ключи значений, якорей которых в блоке больше нет (блок правили). */
+export function orphanValueKeys(section: NewsSection, anchors: readonly DataAnchor[]): string[] {
+  const live = new Set(anchors.map((a) => a.key))
+  return Object.keys(section.values ?? {}).filter((k) => !live.has(k))
 }
 
 export function updateSection(list: readonly NewsSection[], index: number, patch: Partial<NewsSection>): NewsSection[] {
@@ -88,6 +120,15 @@ export function missingTranslation(draft: NewsDraft, locale: ExtraLocale): strin
   if (draft.title.trim() && !t.title.trim()) missing.push('title')
   if (draft.lead.trim() && !t.lead.trim()) missing.push('lead')
   draft.sections.forEach((section, i) => {
+    if (section.type === 'block') {
+      const own = t.blocks?.[section.id] ?? {}
+      const untranslated = Object.entries(section.values ?? {}).some(([key, v]) => {
+        const base = translatableValue(v)
+        return base !== null && hasText(base) && !hasText(own[key])
+      })
+      if (untranslated) missing.push(`section:${i + 1}`)
+      return
+    }
     if (hasText(section.html) && !hasText(t.sections[section.id])) missing.push(`section:${i + 1}`)
   })
   return missing

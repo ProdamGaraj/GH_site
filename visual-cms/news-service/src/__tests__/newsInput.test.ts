@@ -52,7 +52,7 @@ describe('translationRows / translationsForAdmin', () => {
   })
 
   it('из базы в форму админки и обратно — без потерь', () => {
-    const input = { uz: { title: 'T', lead: 'L', sections: { [S1]: '<p>a</p>' } }, en: { title: 'E', lead: '', sections: {} } }
+    const input = { uz: { title: 'T', lead: 'L', sections: { [S1]: '<p>a</p>' }, blocks: {} }, en: { title: 'E', lead: '', sections: {}, blocks: {} } }
     const rows = translationRows('n1', input, sections)
     expect(translationsForAdmin(rows)).toEqual(input)
   })

@@ -45,6 +45,18 @@ export function sanitizeRichText(input: string | null | undefined): string {
   return clean.trim()
 }
 
+/**
+ * Адрес ссылки из значения якоря: только http(s), mailto, tel, относительный
+ * путь и якорь страницы. Иное (javascript:, data:) — пустая строка.
+ */
+export function safeHref(input: string | null | undefined): string {
+  const href = (input ?? '').trim()
+  if (!href) return ''
+  if (/^(https?:|mailto:|tel:)/i.test(href)) return href
+  if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('//')) return ''
+  return href
+}
+
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", apos: "'", nbsp: ' ' }
 
 /** Текст без разметки: для поиска, полноты перевода и анонсов. */

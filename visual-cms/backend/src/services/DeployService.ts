@@ -2589,6 +2589,10 @@ export class DeployService {
    * Стили и скрипты блока лежат в его metadata и собираются генератором, как у
    * любого блока. Блока нет (удалён) — слайд остаётся пустым, в лог.
    *
+   * Блок данных (якоря `{{$.<ключ>}}`, services/dataAnchors.ts): значения — в
+   * `data-block-values` слота (JSON, секция-блок новости). Подставляются после
+   * перевода статики блока; атрибут со значениями в HTML не попадает.
+   *
    * Структура уже копия (после substituteItemData) — правим на месте.
    */
   private async expandDataSlideBlocks(structure: any, lang?: string): Promise<any> {
@@ -2621,6 +2625,17 @@ export class DeployService {
         tree = applyNodeTranslations(tree, await translationService.getBlockTreeTranslationMap(blockId, tree, lang))
       }
       tree.metadata = { ...(tree.metadata ?? {}), name: tree.metadata?.name || block.name }
+      const rawValues = slot.attributes['data-block-values']
+      if (typeof rawValues === 'string') {
+        delete slot.attributes['data-block-values']
+        let values: unknown = {}
+        try {
+          values = rawValues ? JSON.parse(rawValues) : {}
+        } catch {
+          logger.warn(`Слайд-блок ${blockId}: значения якорей не разобраны — подставлено пустое`)
+        }
+        this.substituteNode(tree, { item: {}, $: values && typeof values === 'object' ? values : {} })
+      }
       slot.children = [...(slot.children ?? []), tree]
     }
     return structure

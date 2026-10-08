@@ -30,6 +30,22 @@ export const updateBlockSchema = z.object({
 })
 
 // POST /api/blocks/:id/enable-template
+/** POST /api/blocks/:id/data-anchors — блок данных из библиотечного блока. */
+export const makeDataBlockSchema = z.object({
+  mode: z.enum(['rewrite', 'copy']),
+  picks: z
+    .array(
+      z.object({
+        nodeId: z.string().min(1).max(255),
+        kind: z.enum(['text', 'richtext', 'image', 'link']),
+        label: z.string().trim().min(1).max(120),
+      })
+    )
+    .max(200),
+  /** Имя копии; по умолчанию «<имя> — для новостей». */
+  name: z.string().trim().max(255).optional(),
+})
+
 export const enableTemplateSchema = z.object({
   templateCategory: z.string().max(100).optional().default('custom'),
   autoDetectFields: z.boolean().optional().default(true),

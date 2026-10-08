@@ -3,7 +3,7 @@
  *
  * Умеют ровно то, что зовут TranslationService, LinkedBlocksService и скрипт
  * переноса переводов: find/findOne по равенству и In(), select, create, save
- * (одной строкой и пачкой), delete по условию и запросы createQueryBuilder
+ * и insert (одной строкой и пачкой), delete по условию и запросы createQueryBuilder
  * «DISTINCT locale» и «structure::text LIKE». Всё прочее — ошибка: тест не
  * должен молча проходить на неподдержанном запросе.
  */
@@ -66,6 +66,16 @@ export class MemoryRepo {
       return { ...row }
     })
     return Array.isArray(input) ? out : out[0]
+  }
+
+  async insert(input: Row | Row[]): Promise<{ identifiers: Array<{ id: string }> }> {
+    const list = Array.isArray(input) ? input : [input]
+    const ids = list.map((data) => {
+      const row = { ...data, id: data.id ?? randomUUID() }
+      this.rows.push(row)
+      return { id: row.id }
+    })
+    return { identifiers: ids }
   }
 
   async delete(where: Row): Promise<{ affected: number }> {

@@ -179,7 +179,7 @@ describe('NewsTranslationForm', () => {
     fireEvent.change(screen.getByLabelText('Блок 1 · UZ'), { target: { value: '<p>Matn</p>' } })
     expect(screen.getByText('Перевод полный.')).toBeTruthy()
     fireEvent.click(publishBox())
-    expect(draftState()).toEqual({ publishOn: ['uz'], uz: { title: 'Makro vaucheri', lead: 'Anons', sections: { [S1]: '<p>Matn</p>' } } })
+    expect(draftState()).toEqual({ publishOn: ['uz'], uz: { title: 'Makro vaucheri', lead: 'Anons', sections: { [S1]: '<p>Matn</p>' }, blocks: {} } })
   })
 
   it('отметка уже стоит, а перевод неполный — предупреждение, снять отметку можно', () => {

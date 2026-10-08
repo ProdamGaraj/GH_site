@@ -2,11 +2,22 @@
 import type { GalleryItem } from '@/shared/forms/gallerySlides'
 
 export type NewsStatus = 'draft' | 'published' | 'archived'
-export type SectionType = 'text' | 'photoText' | 'sliderText'
+export type SectionType = 'text' | 'photoText' | 'sliderText' | 'block'
 export type MediaSide = 'left' | 'right'
 /** Языки перевода: новость публикуется на них по отметке и при полном переводе. */
 export type ExtraLocale = 'uz' | 'en'
 export const EXTRA_LOCALES: ExtraLocale[] = ['uz', 'en']
+
+/** Вид якоря блока данных CMS. */
+export type AnchorKind = 'text' | 'richtext' | 'image' | 'link'
+export type LinkValue = { href: string; text: string }
+
+/** Значение якоря секции-блока. */
+export interface BlockValue {
+  kind: AnchorKind
+  /** text/richtext/image — строка; link — {href, text}. */
+  value: string | LinkValue
+}
 
 /** Блок тела новости. id генерирует админка — по нему привязан перевод текста. */
 export interface NewsSection {
@@ -17,6 +28,10 @@ export interface NewsSection {
   /** «Фото + текст» — первое фото, «слайдер + текст» — все слайды. */
   media: GalleryItem[]
   side: MediaSide
+  /** type block: блок данных из библиотеки CMS. */
+  blockId?: string
+  /** type block: значения якорей по ключу. */
+  values?: Record<string, BlockValue>
 }
 
 /** Перевод новости на язык: текст секций — по id секции. */
@@ -24,6 +39,52 @@ export interface NewsTranslation {
   title: string
   lead: string
   sections: Record<string, string>
+  /** Секции-блоки: id секции → ключ якоря → перевод текста (картинки и адреса — общие). */
+  blocks?: Record<string, Record<string, string>>
+}
+
+/** Якорь блока данных (CMS GET /blocks/:id/data-anchors). */
+export interface DataAnchor {
+  nodeId: string
+  key: string
+  label: string
+  kind: AnchorKind
+  /** Прежнее содержимое узла — образец значения. */
+  sample: string | LinkValue
+}
+
+/** Кандидат в якоря: «данные» (suggested) или «похоже на интерфейс» (noiseReason). */
+export interface AnchorCandidate {
+  nodeId: string
+  kind: AnchorKind
+  label: string
+  sample: string | LinkValue
+  suggested: boolean
+  noiseReason?: string
+}
+
+export interface BlockDataUsage {
+  pages: Array<{ id: string; name: string; slug: string }>
+  blocks: Array<{ id: string; name: string }>
+  projects: string[]
+  news: Array<{ id: string; title: string }>
+  unchecked: string[]
+}
+
+export type AnchorAction = 'use' | 'copy' | 'rewrite'
+
+export interface BlockAnchorInfo {
+  block: { id: string; name: string }
+  anchors: DataAnchor[]
+  candidates: AnchorCandidate[]
+  usage: BlockDataUsage
+  actions: AnchorAction[]
+}
+
+export interface MakeDataBlockResult {
+  blockId: string
+  name: string
+  anchors: DataAnchor[]
 }
 
 export interface LocaleState {

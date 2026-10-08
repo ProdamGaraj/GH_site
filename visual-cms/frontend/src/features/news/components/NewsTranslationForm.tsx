@@ -3,7 +3,9 @@ import { FormSection, TextArea, TextField } from '@/shared/forms/fields'
 import { RichTextField } from '@/shared/forms/RichTextField'
 import { cn } from '@/shared/utils'
 import type { ExtraLocale, NewsDraft, NewsTranslation } from '../types'
-import { SECTION_TYPE_LABELS, hasText, missingTranslation, missingText } from '../newsForm'
+import { SECTION_TYPE_LABELS, hasText, missingTranslation, missingText, translatableValue } from '../newsForm'
+import type { NewsSection } from '../types'
+import { useBlockAnchors } from './useBlockAnchors'
 
 /**
  * Перевод новости на uz/en. Новость появится на этом языке, только если язык
@@ -11,6 +13,51 @@ import { SECTION_TYPE_LABELS, hasText, missingTranslation, missingText } from '.
  * нельзя поставить, пока перевод неполный; если она уже стоит, а перевод стал
  * неполным (добавили блок), новость пропадёт с языка до перевода.
  */
+/**
+ * Перевод секции-блока: по полю на якорь с текстом (картинки и адреса ссылок
+ * общие для всех языков — их здесь нет).
+ */
+const BlockSectionTranslation: React.FC<{
+  section: NewsSection
+  index: number
+  label: string
+  value: Record<string, string>
+  onChange: (key: string, text: string) => void
+}> = ({ section, index, label, value, onChange }) => {
+  const { data } = useBlockAnchors(section.blockId)
+  const entries = Object.entries(section.values ?? {}).filter(([, v]) => {
+    const base = translatableValue(v)
+    return base !== null && hasText(base)
+  })
+  const labelOf = (key: string) => data?.anchors.find((a) => a.key === key)?.label ?? key
+  if (entries.length === 0) {
+    return <p className="text-sm text-gray-400">Блок {index + 1} (из библиотеки) без текста — переводить нечего.</p>
+  }
+  return (
+    <div className="space-y-3 rounded-md border border-indigo-100 p-3" data-testid="news-block-translation">
+      <div className="text-sm font-medium text-gray-700">
+        Блок {index + 1} · {data ? `«${data.name}»` : SECTION_TYPE_LABELS.block}
+      </div>
+      {entries.map(([key, v]) =>
+        v.kind === 'richtext' ? (
+          <div key={key} className="grid gap-4 xl:grid-cols-2 items-start">
+            <RichTextField label={`${labelOf(key)} · RU`} value={translatableValue(v) ?? ''} onChange={() => undefined} readOnly />
+            <RichTextField label={`${labelOf(key)} · ${label}`} value={value[key] ?? ''} onChange={(html) => onChange(key, html)} placeholder="Перевод" />
+          </div>
+        ) : (
+          <TextField
+            key={key}
+            label={`${labelOf(key)}${v.kind === 'link' ? ' (подпись ссылки)' : ''} · ${label}`}
+            value={value[key] ?? ''}
+            placeholder={translatableValue(v) ?? ''}
+            onChange={(text) => onChange(key, text)}
+          />
+        )
+      )}
+    </div>
+  )
+}
+
 export const NewsTranslationForm: React.FC<{
   draft: NewsDraft
   locale: ExtraLocale
@@ -24,6 +71,8 @@ export const NewsTranslationForm: React.FC<{
   const setT = (patch: Partial<NewsTranslation>) =>
     onChange({ ...draft, translations: { ...draft.translations, [locale]: { ...t, ...patch } } })
   const setSection = (id: string, html: string) => setT({ sections: { ...t.sections, [id]: html } })
+  const setBlockValue = (id: string, key: string, text: string) =>
+    setT({ blocks: { ...(t.blocks ?? {}), [id]: { ...(t.blocks?.[id] ?? {}), [key]: text } } })
   const setEnabled = (on: boolean) =>
     onChange({ ...draft, publishOn: on ? [...draft.publishOn, locale] : draft.publishOn.filter((l) => l !== locale) })
 
@@ -59,7 +108,16 @@ export const NewsTranslationForm: React.FC<{
       <FormSection id={`news-sections-${locale}`} title={`Блоки — ${label}`}>
         {draft.sections.length === 0 && <p className="text-sm text-gray-400">В новости нет блоков.</p>}
         {draft.sections.map((section, i) =>
-          hasText(section.html) ? (
+          section.type === 'block' ? (
+            <BlockSectionTranslation
+              key={section.id}
+              section={section}
+              index={i}
+              label={label}
+              value={t.blocks?.[section.id] ?? {}}
+              onChange={(key, text) => setBlockValue(section.id, key, text)}
+            />
+          ) : hasText(section.html) ? (
             <div key={section.id} className="grid gap-4 xl:grid-cols-2 items-start" data-testid="news-section-translation">
               <RichTextField
                 label={`Блок ${i + 1} · ${SECTION_TYPE_LABELS[section.type]} · RU`}

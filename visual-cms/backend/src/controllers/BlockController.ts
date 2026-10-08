@@ -6,6 +6,7 @@ import { linkedBlocksService } from '../services/LinkedBlocksService'
 import { asyncHandler, NotFoundError, ValidationError } from '../middleware'
 import { cacheService } from '../services/CacheService'
 import { logger } from '../services/Logger'
+import { blockDataAnchorsService } from '../services/BlockDataAnchorsService'
 
 const blockRepository = AppDataSource.getRepository(Block)
 
@@ -67,6 +68,27 @@ export class BlockController {
     res.status(201).json(block)
   })
 
+  /**
+   * GET /api/blocks/:id/data-anchors — якоря блока, кандидаты в якоря
+   * («данные» / «похоже на интерфейс»), где блок используется и что с ним
+   * можно сделать для новости (use | copy | rewrite).
+   */
+  getDataAnchors = asyncHandler(async (req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store')
+    res.json(await blockDataAnchorsService.info(req.params.id, req.query.usage !== '0'))
+  })
+
+  /**
+   * POST /api/blocks/:id/data-anchors { mode, picks, name? } — переписать блок
+   * якорями (только если он нигде не показывается со своим текстом) или
+   * создать копию-блок данных с новыми id. Возвращает id блока данных.
+   */
+  makeDataBlock = asyncHandler(async (req: Request, res: Response) => {
+    const { mode, picks, name } = req.body
+    const result = await blockDataAnchorsService.makeDataBlock(req.params.id, mode, picks, name)
+    res.status(mode === 'copy' ? 201 : 200).json(result)
+  })
+
   update = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params
     const block = await blockRepository.findOne({ where: { id } })
@@ -100,6 +122,18 @@ export class BlockController {
     await blockRepository.save(block)
     await cacheService.invalidateByTag('blocks')
 
+    // Пропавшие якоря, которые используют новости: сохраняем, но предупреждаем.
+    let lostAnchors: { keys: string[]; news: Array<{ id: string; title: string }> } | undefined
+    if (req.body.structure) {
+      try {
+        const lost = await blockDataAnchorsService.lostAnchorsInNews(id, oldStructure, block.structure)
+        if (lost.keys.length > 0 && lost.news.length > 0) lostAnchors = lost
+      } catch (err) {
+        logger.warn(`Проверка якорей блока ${id} не удалась: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
+    const warn = lostAnchors ? { _lostAnchors: lostAnchors } : {}
+
     // Синхронизируем обновлённый блок на все страницы, где он используется
     if (req.body.structure) {
       try {
@@ -115,6 +149,7 @@ export class BlockController {
         // Возвращаем результат синхронизации вместе с блоком
         res.json({
           ...block,
+          ...warn,
           _syncResult: {
             updatedPages: syncResult.updatedPages,
             errors: syncResult.errors,
@@ -123,7 +158,7 @@ export class BlockController {
       } catch (syncErr: any) {
         logger.error('[BlockSync] Sync failed', syncErr instanceof Error ? syncErr : undefined)
         // Блок уже сохранён — возвращаем его даже если синхронизация упала
-        res.json(block)
+        res.json({ ...block, ...warn })
       }
     } else {
       res.json(block)

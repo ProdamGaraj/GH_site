@@ -1,13 +1,16 @@
-import React from 'react'
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
+import React, { useState } from 'react'
+import { ArrowDown, ArrowUp, Boxes, Plus, Trash2 } from 'lucide-react'
+import { BlockPicker } from '@/features/editor/components/BlockPicker'
 import { GallerySlidesField } from '@/shared/forms/GallerySlidesField'
 import { MediaField } from '@/shared/forms/mediaFields'
 import { RichTextField } from '@/shared/forms/RichTextField'
 import { cn } from '@/shared/utils'
 import type { MediaSide, NewsSection, SectionType } from '../types'
-import { SECTION_TYPE_LABELS, SIDE_LABELS, moveSection, newSection, removeSection, updateSection } from '../newsForm'
+import { PLAIN_SECTION_TYPES, SECTION_TYPE_LABELS, SIDE_LABELS, moveSection, newBlockSection, newSection, removeSection, updateSection } from '../newsForm'
+import { BlockAnchorsDialog } from './BlockAnchorsDialog'
+import { BlockSectionFields } from './BlockSectionFields'
 
-const TYPES: SectionType[] = ['text', 'photoText', 'sliderText']
+const TYPES = PLAIN_SECTION_TYPES
 
 /** Первое фото «фото + текст» — строкой адреса для поля медиа. */
 function firstUrl(section: NewsSection): string {
@@ -25,6 +28,8 @@ export const SectionsEditor: React.FC<{
   onChange: (sections: NewsSection[]) => void
 }> = ({ value, onChange }) => {
   const add = (type: SectionType) => onChange([...value, newSection(type)])
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickedBlock, setPickedBlock] = useState<string | null>(null)
 
   return (
     <div className="space-y-4">
@@ -32,11 +37,17 @@ export const SectionsEditor: React.FC<{
 
       {value.map((section, i) => {
         const patch = (p: Partial<NewsSection>) => onChange(updateSection(value, i, p))
-        const hasMedia = section.type !== 'text'
+        const isBlock = section.type === 'block'
+        const hasMedia = section.type !== 'text' && !isBlock
         return (
           <div key={section.id} data-testid="news-section" className="rounded-lg border border-gray-200 bg-gray-50/60 p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm font-semibold text-gray-700">Блок {i + 1}</span>
+              {isBlock ? (
+                <span className="flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-xs text-indigo-700">
+                  <Boxes size={12} /> {SECTION_TYPE_LABELS.block}
+                </span>
+              ) : (
               <select
                 aria-label={`Тип блока ${i + 1}`}
                 className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm"
@@ -49,6 +60,7 @@ export const SectionsEditor: React.FC<{
                   </option>
                 ))}
               </select>
+              )}
               {hasMedia && (
                 <div className="flex rounded-md border border-gray-300 bg-white text-xs" role="group" aria-label={`Сторона медиа, блок ${i + 1}`}>
                   {(['left', 'right'] as MediaSide[]).map((side) => (
@@ -84,6 +96,9 @@ export const SectionsEditor: React.FC<{
               </div>
             </div>
 
+            {isBlock ? (
+              <BlockSectionFields section={section} index={i} onChange={patch} />
+            ) : (
             <div className={cn(hasMedia && 'grid gap-4 xl:grid-cols-2 items-start')}>
               <RichTextField value={section.html} onChange={(html) => patch({ html })} placeholder="Текст блока" />
               {section.type === 'photoText' && (
@@ -93,6 +108,7 @@ export const SectionsEditor: React.FC<{
                 <GallerySlidesField label="Слайды" hint="фото и видео" value={section.media} onChange={(media) => patch({ media })} />
               )}
             </div>
+            )}
           </div>
         )
       })}
@@ -108,7 +124,34 @@ export const SectionsEditor: React.FC<{
             <Plus size={14} /> {SECTION_TYPE_LABELS[type]}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="flex items-center gap-1.5 rounded-md border border-dashed border-indigo-300 px-3 py-1.5 text-sm text-indigo-700 hover:border-indigo-500"
+        >
+          <Boxes size={14} /> {SECTION_TYPE_LABELS.block}
+        </button>
       </div>
+      <BlockPicker
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title="Блок из библиотеки — в новость"
+        forcedMode="linked"
+        onPick={({ block }) => {
+          setPickerOpen(false)
+          setPickedBlock(block.id)
+        }}
+      />
+      {pickedBlock && (
+        <BlockAnchorsDialog
+          blockId={pickedBlock}
+          onClose={() => setPickedBlock(null)}
+          onReady={(blockId, _name, anchors) => {
+            setPickedBlock(null)
+            onChange([...value, newBlockSection(blockId, anchors)])
+          }}
+        />
+      )}
     </div>
   )
 }

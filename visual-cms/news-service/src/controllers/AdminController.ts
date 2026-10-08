@@ -112,6 +112,20 @@ export class AdminController {
     })
   })
 
+  /**
+   * GET /api/admin/block-usage/:blockId — новости, где блок данных CMS стоит
+   * секцией (CMS решает по этому, можно ли переписать блок якорями).
+   */
+  static blockUsage = handle('admin.blockUsage', async (req, res) => {
+    const blockId = req.params.blockId
+    const news = await newsRepo().find({ order: { updatedAt: 'DESC' } })
+    res.json({
+      items: news
+        .filter((n) => n.sections.some((s) => s.type === 'block' && s.blockId === blockId))
+        .map((n) => ({ id: n.id, title: n.title, status: n.status })),
+    })
+  })
+
   /** GET /api/admin/news/:id */
   static getNews = handle('admin.getNews', async (req, res) => {
     res.json(await adminView(req.params.id))

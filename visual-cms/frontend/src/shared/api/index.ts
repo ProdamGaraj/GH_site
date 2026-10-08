@@ -1,6 +1,7 @@
 ﻿import { getApiBaseUrl } from './baseUrl'
 import { apiFetch, ApiError } from './http'
 import { describeHttpFailure } from './errorMessages'
+import { warnLostAnchors } from './lostAnchors'
 
 const API_BASE_URL = getApiBaseUrl()
 
@@ -114,7 +115,8 @@ export const blockApi = {
   getUsages: (id: string) => api.get<Array<{ type: 'page' | 'block'; id: string; name: string; nodePath?: string }>>(`/blocks/${id}/usages`),
   getAllWithUsages: () => api.get<Array<Block & { usages: Array<{ type: 'page' | 'block'; id: string; name: string }> }>>('/blocks/with-usages'),
   create: (data: CreateBlockDto) => api.post<Block>('/blocks', data),
-  update: (id: string, data: UpdateBlockDto) => api.put<Block>(`/blocks/${id}`, data),
+  // Из блока данных пропали якоря, которые используют новости, — предупреждаем.
+  update: (id: string, data: UpdateBlockDto) => api.put<Block>(`/blocks/${id}`, data).then(warnLostAnchors),
   delete: (id: string) => api.delete<void>(`/blocks/${id}`),
 }
 

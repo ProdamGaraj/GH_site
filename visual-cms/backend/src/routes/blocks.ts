@@ -6,6 +6,7 @@ import {
   updateBlockSchema,
   enableTemplateSchema,
   createFromElementSchema,
+  makeDataBlockSchema,
 } from '../schemas/block.schema'
 import { responseCache } from '../middleware'
 
@@ -20,6 +21,8 @@ router.get('/reusable', blockController.getReusable)
 router.get('/with-usages', blockController.getAllWithUsages)
 router.get('/:id', responseCache({ ttl: 30, tags: ['blocks'] }), blockController.getById)
 router.get('/:id/usages', blockController.getUsages)
+router.get('/:id/data-anchors', blockController.getDataAnchors)
+router.post('/:id/data-anchors', validate(makeDataBlockSchema), blockController.makeDataBlock)
 router.post('/', validate(createBlockSchema), blockController.create)
 router.post('/create-from-element', validate(createFromElementSchema), blockController.createFromElement)
 router.put('/:id', validate(updateBlockSchema), blockController.update)

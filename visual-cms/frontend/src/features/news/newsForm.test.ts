@@ -55,7 +55,7 @@ describe('draftOf', () => {
 
   it('нет перевода на язык в ответе — пустой перевод', () => {
     const news = detail({ translations: { uz: { title: 'T', lead: '', sections: {} } } as NewsDetail['translations'] })
-    expect(draftOf(news).translations.en).toEqual({ title: '', lead: '', sections: {} })
+    expect(draftOf(news).translations.en).toEqual({ title: '', lead: '', sections: {}, blocks: {} })
   })
 })
 
