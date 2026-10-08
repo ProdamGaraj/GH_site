@@ -5,7 +5,7 @@
  */
 import { sectionSchema, translationsSchema } from '../schemas/news.schema'
 import { safeHref } from '../services/html'
-import { blockValuesIn, buildSection, missingTranslation, searchText, type NewsSection, type TrRow } from '../services/news'
+import { blockValuesIn, buildSection, coverOf, missingTranslation, searchText, type NewsSection, type TrRow } from '../services/news'
 import { normalizeBlockValues, normalizeSections, translationRows, translationsForAdmin } from '../services/newsInput'
 import { S1, S2, newsRow, section } from './helpers/newsFixtures'
 
@@ -126,5 +126,20 @@ describe('поиск', () => {
     expect(body).toContain('Без переплат')
     expect(body).toContain('Подать заявку')
     expect(body).not.toContain('/media/p.jpg')
+  })
+})
+
+describe('обложка карточки', () => {
+  it('своя обложка → первое фото hero → первое фото в блоках (в т.ч. картинка секции-блока)', () => {
+    expect(coverOf(newsRow({ cover: '/media/c.jpg' }))[0].image).toBe('/media/c.jpg')
+    expect(coverOf(newsRow({ cover: null, hero: ['/media/h.mp4', '/media/h.jpg'] }))[0].image).toBe('/media/h.jpg')
+    const blockOnly = newsRow({ cover: null, hero: [], sections: [section(S1), blockSection()] })
+    expect(coverOf(blockOnly)).toEqual([{ image: '/media/p.jpg', position: '50% 50%' }])
+    const photoFirst = newsRow({ cover: null, hero: [], sections: [section(S1, { type: 'photoText', media: ['/media/s.jpg'] }), blockSection()] })
+    expect(coverOf(photoFirst)[0].image).toBe('/media/s.jpg')
+  })
+
+  it('картинок нигде нет — карточка без обложки', () => {
+    expect(coverOf(newsRow({ cover: null, hero: [], sections: [section(S1)] }))).toEqual([])
   })
 })

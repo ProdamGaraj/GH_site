@@ -307,6 +307,53 @@
 
   // --- Загрузка ---
 
+  /** Адреса карточек в ленте по порядку — чтобы сравнить HTML с живой лентой. */
+  function cardUrls(view) {
+    return Array.prototype.slice.call(view.list.querySelectorAll('[data-news-card] [data-news-link]')).map(function (a) {
+      return a.getAttribute('href') || ''
+    })
+  }
+
+  /**
+   * Первые карточки в HTML — снимок на момент публикации страницы списка.
+   * Новость, выкаченная позже, в нём отсутствует, а подгрузка без полной
+   * порции не начинается — новость не видна до перепубликации списка. Поэтому
+   * при открытии без фильтров сверяемся с живой лентой и, если она другая,
+   * тихо подменяем карточки. Сбой — остаются карточки из HTML, без сообщений.
+   */
+  function refresh(view) {
+    var seq = ++view.seq
+    view.loading = true
+    return getJson(API + '?' + queryString(view, 0))
+      .then(function (page) {
+        if (seq !== view.seq) return
+        var fresh = (page.items || []).map(function (c) {
+          return c.url
+        })
+        // Пустая живая лента при карточках в HTML — скорее сбой отчёта о
+        // деплое, чем «новостей нет»: карточки из HTML не стираем.
+        if (fresh.length === 0 && cardsIn(view) > 0) return
+        if (fresh.join(' ') !== cardUrls(view).join(' ')) {
+          Array.prototype.slice.call(view.list.querySelectorAll('[data-news-card]')).forEach(function (c) {
+            c.parentNode.removeChild(c)
+          })
+          ;(page.items || []).forEach(function (card) {
+            view.list.appendChild(renderCard(view, card))
+          })
+        }
+        view.hasMore = Boolean(page.hasMore)
+        view.total = page.total
+        view.tagModeTotals = page.tagModeTotals || null
+        status(view, cardsIn(view) === 0 ? 'empty' : 'idle')
+      })
+      .catch(function (err) {
+        console.warn('[news-feed] refresh:', err && err.message ? err.message : err)
+      })
+      .then(function () {
+        if (seq === view.seq) view.loading = false
+      })
+  }
+
   /** Порция ленты. replace — заново с первой карточки (фильтры сменились). */
   function load(view, replace) {
     if (view.loading && !replace) return Promise.resolve()
@@ -713,8 +760,10 @@
         console.warn('[news-feed] facets:', err && err.message ? err.message : err)
       })
 
-    // Пришли по ссылке с фильтрами — карточки из HTML не те, грузим заново.
+    // Пришли по ссылке с фильтрами — карточки из HTML не те, грузим заново;
+    // без фильтров — сверяем снимок из HTML с живой лентой.
     if (isFiltered(view.state)) load(view, true)
+    else refresh(view)
 
     if (view.more) {
       whenNear(view.more, function () {

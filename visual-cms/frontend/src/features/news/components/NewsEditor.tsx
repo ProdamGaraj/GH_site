@@ -205,7 +205,7 @@ export const NewsEditor: React.FC = () => {
                     }}
                   />
                 </div>
-                <MediaField label="Обложка карточки" hint="пусто — первое фото hero" value={coverUrl(draft.cover)} onChange={(url) => set({ cover: url || null })} />
+                <MediaField label="Обложка карточки" hint="пусто — первое фото hero, а без него — первое фото в блоках страницы" value={coverUrl(draft.cover)} onChange={(url) => set({ cover: url || null })} />
               </div>
               <div>
                 <Label hint="по ним фильтруют ленту">Теги</Label>

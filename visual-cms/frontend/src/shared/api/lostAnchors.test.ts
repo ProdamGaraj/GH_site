@@ -2,7 +2,9 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { lostAnchorsMessage, warnLostAnchors } from './lostAnchors'
 
 describe('lostAnchors', () => {
-  afterEach(() => vi.restoreAllMocks())
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
 
   it('нет пропаж или новостей — без предупреждения', () => {
     expect(lostAnchorsMessage(undefined)).toBeNull()

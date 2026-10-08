@@ -80,13 +80,41 @@ function page(staticCount: number, lang = 'ru') {
 
 type Feed = { items: unknown[]; total: number; hasMore: boolean; tagModeTotals?: unknown }
 let feedResponder: (params: URLSearchParams) => Feed | Promise<Feed> | number
+/**
+ * Сверка снимка из HTML с живой лентой при открытии без фильтров — первый
+ * запрос ленты. По умолчанию живая лента = карточки из HTML (ничего не
+ * поменялось); тесты сверки задают свою.
+ */
+let refreshResponder: () => Feed | number
+let refreshCalls: URL[]
 let fetchMock: jest.Mock
+
+/** Живая первая порция, совпадающая с карточками из HTML. */
+function mirrorOfStatic(): Feed {
+  const links = [...document.querySelectorAll('[data-news-list] [data-news-card] [data-news-link]')]
+  return { items: links.map((a, i) => card(i, { url: a.getAttribute('href') })), total: links.length, hasMore: links.length >= 12 }
+}
+
+const UNFILTERED = new Set(['lang', 'offset', 'limit'])
+const isUnfiltered = (u: URL) => u.searchParams.get('offset') === '0' && [...u.searchParams.keys()].every((k) => UNFILTERED.has(k))
 let notifyMore: (visible: boolean) => void
 
+let feedSeen = 0
+
 function install() {
+  feedSeen = 0
+  refreshCalls = []
   fetchMock = jest.fn(async (url: string) => {
     const u = new URL(url, 'http://localhost')
     if (u.pathname === '/news-api/public/news/facets') return { ok: true, status: 200, json: async () => FACETS }
+    if (refreshCalls.length === 0 && feedSeen === 0 && isUnfiltered(u)) {
+      feedSeen++
+      refreshCalls.push(u)
+      const live = refreshResponder()
+      if (typeof live === 'number') return { ok: false, status: live, json: async () => ({}) }
+      return { ok: true, status: 200, json: async () => live }
+    }
+    feedSeen++
     const body = await feedResponder(u.searchParams)
     if (typeof body === 'number') return { ok: false, status: body, json: async () => ({}) }
     return { ok: true, status: 200, json: async () => body }
@@ -107,7 +135,11 @@ async function flush() {
   for (let i = 0; i < 30; i++) await Promise.resolve()
 }
 
-const feedCalls = () => fetchMock.mock.calls.map((c) => new URL(c[0], 'http://localhost')).filter((u) => u.pathname === '/news-api/public/news')
+/** Запросы порций ленты — без сверки при открытии (она всегда первая; её считает refreshCalls). */
+const feedCalls = () => {
+  const all = fetchMock.mock.calls.map((c) => new URL(c[0], 'http://localhost')).filter((u) => u.pathname === '/news-api/public/news')
+  return refreshCalls.length > 0 ? all.slice(1) : all
+}
 const lastFeedParams = () => feedCalls().slice(-1)[0].searchParams
 const cards = () => [...document.querySelectorAll('[data-news-list] [data-news-card]')] as HTMLElement[]
 const titles = () => cards().map((c) => c.querySelector('[data-news-link]')!.textContent)
@@ -117,6 +149,7 @@ let warn: jest.SpyInstance
 beforeEach(() => {
   history.replaceState(null, '', '/ru/news/')
   feedResponder = () => ({ items: [], total: 0, hasMore: false })
+  refreshResponder = mirrorOfStatic
   install()
   warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
 })
@@ -403,5 +436,67 @@ describe('rangeOf', () => {
     expect(rangeOf({ kind: 'month', value: '2026-02' }, new Date())).toEqual({ from: '2026-02-01', to: '2026-02-28' })
     expect(rangeOf({ kind: 'quick', value: 'week' }, new Date(2026, 0, 3))).toEqual({ from: '2025-12-28', to: '' })
     expect(rangeOf({ kind: 'all' }, new Date())).toEqual({ from: '', to: '' })
+  })
+})
+
+describe('сверка с живой лентой при открытии', () => {
+  it('новость вышла после публикации списка — карточки подменяются живой лентой', async () => {
+    page(2)
+    refreshResponder = () => ({ items: [card(1), card(2), card(3)], total: 3, hasMore: false })
+    run()
+    await flush()
+    expect(refreshCalls).toHaveLength(1)
+    expect(refreshCalls[0].searchParams.get('offset')).toBe('0')
+    expect(titles()).toEqual(['Новость 1', 'Новость 2', 'Новость 3'])
+    expect(cards()[0].querySelector('img')!.getAttribute('src')).toBe('/media/c1.webp')
+  })
+
+  it('живая лента совпадает с HTML — карточки не трогаются', async () => {
+    page(3)
+    const before = cards()
+    run()
+    await flush()
+    expect(refreshCalls).toHaveLength(1)
+    expect(cards()).toEqual(before)
+    expect(cards()[0]).toBe(before[0])
+  })
+
+  it('после подмены живая лента решает, есть ли продолжение', async () => {
+    page(2)
+    refreshResponder = () => ({ items: Array.from({ length: 12 }, (_, i) => card(i)), total: 20, hasMore: true })
+    feedResponder = () => ({ items: [card(12), card(13)], total: 20, hasMore: false })
+    run()
+    await flush()
+    notifyMore(true)
+    await flush()
+    expect(lastFeedParams().get('offset')).toBe('12')
+    expect(cards()).toHaveLength(14)
+  })
+
+  it('живая лента пустая при карточках в HTML (сбой отчёта о деплое) — карточки остаются', async () => {
+    page(2)
+    refreshResponder = () => ({ items: [], total: 0, hasMore: false })
+    run()
+    await flush()
+    expect(titles()).toEqual(['Статичная 0', 'Статичная 1'])
+    expect(document.querySelector('[data-news-status]')!.textContent).toBe('')
+  })
+
+  it('сбой сверки — карточки из HTML без сообщения об ошибке', async () => {
+    page(2)
+    refreshResponder = () => 502
+    run()
+    await flush()
+    expect(titles()).toEqual(['Статичная 0', 'Статичная 1'])
+    expect(document.querySelector('[data-news-status]')!.textContent).toBe('')
+  })
+
+  it('пришли с фильтрами — сверки нет, сразу загрузка по фильтрам', async () => {
+    history.replaceState(null, '', '/ru/news/?category=promo')
+    page(2)
+    run()
+    await flush()
+    expect(refreshCalls).toHaveLength(0)
+    expect(lastFeedParams().get('category')).toBe('promo')
   })
 })

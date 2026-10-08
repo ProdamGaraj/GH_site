@@ -265,9 +265,24 @@ export function newsUrl(slug: string, locale: Locale): string {
   return `/${locale}/${NEWS_BASE_PATH}/${slug}/`
 }
 
-function coverOf(news: NewsRow): Array<{ image: string; position: string }> {
-  const source = news.cover ? [news.cover] : news.hero
-  const [first] = toSlides(source).filter((s) => !s.video)
+/**
+ * Обложка карточки: своя обложка → первое фото hero → первое фото в блоках
+ * новости (фото + текст, слайдер, картинка в секции-блоке). У новости, где
+ * картинки только внутри блоков, карточка иначе осталась бы пустой.
+ */
+export function coverOf(news: NewsRow): Array<{ image: string; position: string }> {
+  const photo = (items: GalleryItem[]) => toSlides(items).find((s) => !s.video && s.image)
+  const first =
+    (news.cover ? photo([news.cover]) : undefined) ??
+    photo(news.hero) ??
+    news.sections.reduce<ReturnType<typeof photo>>((found, section) => {
+      if (found) return found
+      if (section.type === 'block') {
+        const image = Object.values(section.values ?? {}).find((v) => v.kind === 'image' && typeof v.value === 'string' && v.value.trim())
+        return image ? photo([image.value as string]) : undefined
+      }
+      return section.type === 'text' ? undefined : photo(section.media)
+    }, undefined)
   return first ? [{ image: first.image, position: first.position }] : []
 }
 
