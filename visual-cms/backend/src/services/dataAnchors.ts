@@ -130,8 +130,10 @@ const KIND_LABEL: Record<string, string> = {
 
 function labelOf(node: AnchorNode, kind: AnchorKind, sample: string): string {
   const name = typeof node.metadata?.name === 'string' ? node.metadata.name.trim() : ''
+  // Фон узла — это не сам узел: у секции с именем «Акция» поле «Фон · Акция».
+  if (kind === 'image' && tagOf(node) !== 'img') return name ? `Фон · ${name}` : 'Фон'
   if (name) return name
-  const base = kind === 'image' && tagOf(node) !== 'img' ? 'Фон' : KIND_LABEL[tagOf(node)] ?? (kind === 'image' ? 'Картинка' : 'Текст')
+  const base = KIND_LABEL[tagOf(node)] ?? (kind === 'image' ? 'Картинка' : 'Текст')
   const snippet = sample.replace(/\s+/g, ' ').trim()
   return snippet && kind !== 'image' ? `${base} · «${snippet.length > 32 ? snippet.slice(0, 32) + '…' : snippet}»` : base
 }
@@ -225,7 +227,7 @@ export function anchorKeyFor(label: string, taken: Set<string>): string {
   const base =
     label
       .toLowerCase()
-      .replace(/«.*$/, '')
+      .replace(/\s·\s.*$/, '')
       .split('')
       .map((ch) => TRANSLIT[ch] ?? ch)
       .join('')

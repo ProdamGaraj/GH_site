@@ -81,6 +81,11 @@ describe('detectAnchorCandidates', () => {
     for (const n of noise) expect(n.noiseReason).toBeTruthy()
   })
 
+  it('фон секции с именем — «Фон · <имя>», а не имя блока', () => {
+    const named = { ...promo, metadata: { name: 'Акция' } }
+    expect(detectAnchorCandidates(named).find((c) => c.nodeId === 'root')!.label).toBe('Фон · Акция')
+  })
+
   it('живая «Navigation»: почти всё — интерфейс (меню, языки), данных мало', () => {
     const c = detectAnchorCandidates(live('Navigation'))
     expect(c.filter((x) => !x.suggested).length).toBeGreaterThan(0)
@@ -114,6 +119,7 @@ describe('anchorKeyFor', () => {
     expect(anchorKeyFor('Заголовок', taken)).toBe('zagolovok_2')
     expect(anchorKeyFor('30 лет', taken)).toBe('f_30_let')
     expect(anchorKeyFor('!!!', taken)).toBe('field')
+    expect(anchorKeyFor('Фон · ТЕСТ Акция', taken)).toBe('fon')
   })
 })
 
