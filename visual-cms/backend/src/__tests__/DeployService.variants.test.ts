@@ -32,7 +32,7 @@ interface Svc {
   unpublishPage(id: string): Promise<{ success: boolean; removed: string[] }>
   pageRepository: { findOne: jest.Mock; find: jest.Mock; save: jest.Mock; update: jest.Mock }
   siteRepository: { save: jest.Mock }
-  generateSitemap: jest.Mock
+  finalizeSite: jest.Mock
 }
 
 type PageStub = { id: string; name: string; slug: string; status: string; siteId: string; site: typeof SITE; structure?: unknown }
@@ -62,7 +62,7 @@ function service(pages: PageStub[]): Svc {
     update: jest.fn(async (id: string, patch: Partial<PageStub>) => Object.assign(byId.get(id)!, patch)),
   }
   svc.siteRepository = { save: jest.fn() }
-  svc.generateSitemap = jest.fn()
+  svc.finalizeSite = jest.fn()
   return svc
 }
 
@@ -116,7 +116,7 @@ describe('replacePublishedVariant', () => {
     expect(exists('en/harizma/index.html')).toBe(false) // был только у прежнего
     expect(exists('uz/harizma/index.html')).toBe(true) // перезаписан новым
     expect(exists('ru/harizma/index.html')).toBe(true)
-    expect(svc.generateSitemap).toHaveBeenCalledWith(SITE)
+    expect(svc.finalizeSite).toHaveBeenCalledWith(SITE)
   })
 
   it('вариант главной: главная сайта переходит на новый вариант', async () => {

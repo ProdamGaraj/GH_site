@@ -4,7 +4,7 @@
  * Главный инвариант (то, ради чего вводился бэкенд-эндпоинт превью): превью
  * рендерится ТЕМ ЖЕ каноническим генератором, что и деплой. Поэтому в выводе
  * обязаны присутствовать прод-маркеры, которых не было в старом упрощённом
- * фронтовом рендере: шрифт Muller (@font-face), carousel runtime, reset.
+ * фронтовом рендере: шрифт Muller (@font-face, когда файлы шрифта есть), carousel runtime, reset.
  *
  * Дополнительно проверяем:
  *  - инъекцию <base href> (паритет ассетов /fonts,/images с продом) и нормализацию;
@@ -84,8 +84,17 @@ describe('DeployService — превью (паритет с продом)', () =
   })
 
   describe('renderPagePreview без pageId (черновик)', () => {
+    it('файлов Muller на сайте нет — @font-face не печатается (иначе 404 на каждый файл)', async () => {
+      const svc: any = new DeployService()
+      svc.hasMullerFonts = () => false
+      const html = await svc.renderPagePreview({ structure: node() })
+      expect(html).not.toContain('@font-face')
+      expect(html).toContain("font-family: 'Muller'") // запасные шрифты в стеке остаются
+    })
+
     it('рендерит канонический документ: шрифт Muller, carousel runtime, reset', async () => {
       const svc: any = new DeployService()
+      svc.hasMullerFonts = () => true
       const html = await svc.renderPagePreview({ structure: node() })
 
       expect(html).toContain("font-family: 'Muller'")

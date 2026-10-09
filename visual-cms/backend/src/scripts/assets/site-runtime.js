@@ -1,4 +1,10 @@
-/* Общий скрипт сайта Golden House (Site JS), v1.
+/* Общий скрипт сайта Golden House (Site JS), v2.
+
+   v2: тексты окон на языке страницы (ru/uz/en по <html lang>); промо-окно —
+   через 35 с или после половины страницы и один раз за сессию (раньше —
+   через секунду на каждой странице, пока не нажмут); чат на телефоне —
+   круглая кнопка, при открытом меню и окне консультации спрятан; в событиях
+   — адрес страницы и язык (раньше page был «index.html» везде).
 
    Единственная копия. Раньше этот код лежал в JS 14 блоков и страницы news:
    на страницах проектов выполнялся дважды (два промо-окна), на главной не
@@ -26,11 +32,80 @@ function widgetsDisabled() {
   return Boolean(meta) && (meta.getAttribute("content") || "").trim().toLowerCase() === "off";
 }
 
+/* Тексты окон по языку страницы. Язык без своих текстов — русский
+   (основной язык сайта). Узбекские и английские — на вычитку. */
+const SITE_TEXT = {
+  ru: {
+    chatTitle: "Онлайн-консультация",
+    chatText: "Напишите вопрос по проектам, условиям покупки или документам. Менеджер Golden House свяжется с вами.",
+    chatButton: "Чат-бот",
+    close: "Закрыть",
+    consultTitle: "Получить консультацию",
+    consultText: "Оставьте имя и телефон. Менеджер Golden House свяжется с вами и подберет подходящий проект.",
+    name: "Имя",
+    phone: "Телефон",
+    send: "Отправить",
+    sent: "Заявка отправлена",
+    families: "семей с нами",
+    promoText: "Golden House подберет квартиру с рассрочкой, актуальными акциями и удобной локацией в Ташкенте.",
+    promoButton: "Получить подборку",
+    later: "Позже",
+    exitTitle: "Не уходите без консультации",
+    exitText: "Оставьте заявку, и мы подберем проект под ваш бюджет и сроки."
+  },
+  uz: {
+    chatTitle: "Onlayn maslahat",
+    chatText: "Loyihalar, xarid shartlari yoki hujjatlar bo‘yicha savolingizni yozing. Golden House menejeri siz bilan bog‘lanadi.",
+    chatButton: "Chat-bot",
+    close: "Yopish",
+    consultTitle: "Maslahat olish",
+    consultText: "Ismingiz va telefon raqamingizni qoldiring. Golden House menejeri siz bilan bog‘lanib, mos loyihani tanlab beradi.",
+    name: "Ism",
+    phone: "Telefon",
+    send: "Yuborish",
+    sent: "Ariza yuborildi",
+    families: "oila biz bilan",
+    promoText: "Golden House Toshkentda muddatli to‘lov, dolzarb aksiyalar va qulay joylashuvga ega kvartirani tanlab beradi.",
+    promoButton: "Tanlovni olish",
+    later: "Keyinroq",
+    exitTitle: "Maslahatsiz ketmang",
+    exitText: "Ariza qoldiring — byudjetingiz va muddatlaringizga mos loyihani tanlab beramiz."
+  },
+  en: {
+    chatTitle: "Online consultation",
+    chatText: "Ask about our projects, purchase terms or documents. A Golden House manager will contact you.",
+    chatButton: "Chat",
+    close: "Close",
+    consultTitle: "Get a consultation",
+    consultText: "Leave your name and phone number. A Golden House manager will contact you and suggest a suitable project.",
+    name: "Name",
+    phone: "Phone",
+    send: "Send",
+    sent: "Request sent",
+    families: "families with us",
+    promoText: "Golden House will find you an apartment in Tashkent with an installment plan, current offers and a convenient location.",
+    promoButton: "Get a selection",
+    later: "Later",
+    exitTitle: "Don’t leave without a consultation",
+    exitText: "Leave a request and we’ll find a project that fits your budget and timeline."
+  }
+};
+
+function pageLang() {
+  return (document.documentElement.getAttribute("lang") || "").toLowerCase().split("-")[0];
+}
+
+function siteText(key) {
+  const texts = SITE_TEXT[pageLang()] || SITE_TEXT.ru;
+  return texts[key] || SITE_TEXT.ru[key] || "";
+}
+
 function trackEvent(eventName, payload = {}) {
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({
     event: eventName,
-    page: location.pathname.split("/").pop() || "index.html",
+    page: location.pathname,
+    lang: pageLang(),
     ...payload
   });
 }
@@ -42,7 +117,7 @@ function setupCrmForms() {
     const sendLead = () => {
       const lead = {
         id: `GH-${Date.now()}`,
-        page: document.title,
+        page: location.pathname,
         createdAt: new Date().toISOString(),
         fields: Object.fromEntries(new FormData(form).entries())
       };
@@ -54,12 +129,12 @@ function setupCrmForms() {
 
       const original = sendButtons[0]?.textContent;
       sendButtons.forEach((button) => {
-        button.textContent = "Заявка отправлена";
+        button.textContent = siteText("sent");
       });
 
       window.setTimeout(() => {
         sendButtons.forEach((button) => {
-          button.textContent = original || "Отправить";
+          button.textContent = original || siteText("send");
         });
       }, 2400);
     };
@@ -78,17 +153,38 @@ function setupCrmForms() {
   });
 }
 
+/* Промо-окно: пауза до показа и доля прокрутки, после которой оно
+   показывается раньше. */
+const PROMO_DELAY_MS = 35000;
+const PROMO_SCROLL_SHARE = 0.5;
+
+/* Строка доверия промо- и exit-окна: фото, «30 000+», подпись. */
+function popupTrustRow() {
+  const avatars = [
+    "photo-1535713875002-d1d0cf377fde",
+    "photo-1527980965255-d3b416303d12",
+    "photo-1438761681033-6461ffad8d80"
+  ].map((id) => `<span style="background-image:url('https://images.unsplash.com/${id}?auto=format&fit=crop&w=100&q=80')"></span>`).join("");
+  return `<div class="popup-trust-row">
+        <div class="popup-avatars" aria-hidden="true">${avatars}</div>
+        <span class="popup-stat">30 000+</span>
+        <span class="popup-label">${siteText("families")}</span>
+      </div>`;
+}
+
 function injectSupportWidgets() {
   if (!document.querySelector("#gh-widget-style")) {
     const style = document.createElement("style");
     style.id = "gh-widget-style";
     style.textContent = `
       .chat-widget{position:fixed;right:22px;bottom:22px;z-index:9998;display:grid;gap:10px;justify-items:end}
+      body.gnav-menu-open .chat-widget,body:has(.consult-backdrop.is-open) .chat-widget{display:none}
       .chat-panel{width:min(330px,calc(100vw - 32px));padding:18px;border-radius:22px;background:rgba(17,20,25,.9);color:#fff;box-shadow:0 18px 44px rgba(0,0,0,.28);backdrop-filter:blur(18px);display:none}
       .chat-panel.is-open{display:block}
       .chat-panel h3{font-size:18px;margin-bottom:8px}.chat-panel p{color:rgba(255,255,255,.72);font-size:14px;line-height:1.5}
       .chat-button{position:relative;min-height:48px;overflow:hidden;border:0;border-radius:999px;background:linear-gradient(115deg,#fdb82a 0%,#ffe08a 24%,#c98715 46%,#fdb82a 68%,#fff2b8 100%);background-size:240% 240%;color:#fff;padding:0 18px;font-weight:900;cursor:pointer;text-shadow:0 1px 10px rgba(88,54,0,.3);box-shadow:0 14px 34px rgba(253,184,42,.34),0 0 0 1px rgba(255,255,255,.26) inset;animation:chatGoldFlow 3.2s ease-in-out infinite,chatGoldPulse 2.4s ease-in-out infinite}
       .chat-button::before{content:"";position:absolute;inset:-45%;background:linear-gradient(110deg,transparent 38%,rgba(255,255,255,.58) 50%,transparent 62%);transform:translateX(-70%) rotate(8deg);animation:chatGoldShine 3.8s ease-in-out infinite;pointer-events:none}
+      .chat-button{display:inline-flex;align-items:center;justify-content:center;gap:8px}.chat-icon{position:relative;width:20px;height:20px;flex:0 0 auto}
       .chat-button:hover{box-shadow:0 18px 42px rgba(253,184,42,.46),0 0 0 1px rgba(255,255,255,.34) inset}
       @keyframes chatGoldFlow{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
       @keyframes chatGoldPulse{0%,100%{filter:saturate(1);transform:translateY(0)}50%{filter:saturate(1.15);transform:translateY(-1px)}}
@@ -117,8 +213,8 @@ function injectSupportWidgets() {
       .consult-form input:focus{border-color:rgba(253,184,42,.8);box-shadow:0 0 0 4px rgba(253,184,42,.16)}
       .consult-submit{min-height:48px;border:0;border-radius:13px;background:#fdb82a;color:#fff;font-size:15px;font-weight:900;cursor:pointer;box-shadow:0 14px 28px rgba(253,184,42,.34)}
       .consult-submit:disabled{cursor:default;opacity:.86}
-      @media(max-width:680px){.chat-widget{right:12px;bottom:12px}.promo-popup,.exit-popup{right:12px;bottom:78px;width:min(406px,calc(100vw - 24px));padding:20px;border-radius:22px;transform:translateY(calc(100% + 78px))}.promo-popup.is-visible,.exit-popup.is-visible{transform:translateY(0)}.popup-actions{grid-template-columns:1fr}.popup-button,.popup-close{width:100%}.popup-button{min-height:52px;font-size:16px}.popup-label{font-size:15px}.popup-stat{font-size:15px}.popup-avatars span{width:34px;height:34px}.consult-modal{width:calc(100vw - 24px);padding:18px;border-radius:22px}.consult-close{top:12px;right:12px}.consult-form input,.consult-submit{min-height:48px}}
-      @media(max-width:420px){.promo-popup,.exit-popup{right:8px;bottom:76px;width:calc(100vw - 16px);padding:18px;border-radius:22px;transform:translateY(calc(100% + 76px))}.promo-popup.is-visible,.exit-popup.is-visible{transform:translateY(0)}.popup-trust-row{gap:8px}.popup-message{margin-top:18px;font-size:16px}.popup-message b{font-size:22px}.popup-button{padding:0 14px;font-size:15px}.popup-arrow{width:32px;height:32px}.consult-modal h3{font-size:24px}.consult-modal p{font-size:14px}}
+      @media(max-width:680px){.chat-widget{right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px))}.chat-button{width:52px;height:52px;min-height:52px;padding:0;border-radius:50%}.chat-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.promo-popup,.exit-popup{right:12px;bottom:76px;width:min(406px,calc(100vw - 24px));padding:16px;border-radius:20px;transform:translateY(calc(100% + 78px))}.promo-popup.is-visible,.exit-popup.is-visible{transform:translateY(0)}.popup-message{margin-top:10px;font-size:14px}.popup-actions{grid-template-columns:1fr auto;margin-top:14px}.popup-button{min-height:46px;font-size:15px}.popup-label{font-size:15px}.popup-stat{font-size:15px}.popup-avatars span{width:34px;height:34px}.consult-modal{width:calc(100vw - 24px);padding:18px;border-radius:22px}.consult-close{top:12px;right:12px}.consult-form input,.consult-submit{min-height:48px}}
+      @media(max-width:420px){.promo-popup,.exit-popup{right:8px;bottom:72px;width:calc(100vw - 16px);padding:14px;border-radius:20px;transform:translateY(calc(100% + 76px))}.promo-popup.is-visible,.exit-popup.is-visible{transform:translateY(0)}.popup-trust-row{gap:8px}.popup-avatars{display:none}.popup-message{margin-top:8px;font-size:14px}.popup-message b{font-size:19px}.popup-button{padding:0 12px;font-size:14px}.popup-arrow{width:32px;height:32px}.consult-modal h3{font-size:24px}.consult-modal p{font-size:14px}}
     `;
     document.head.appendChild(style);
   }
@@ -152,10 +248,10 @@ function injectSupportWidgets() {
     chat.className = "chat-widget";
     chat.innerHTML = `
       <div class="chat-panel" id="chatPanel">
-        <h3>Онлайн-консультация</h3>
-        <p>Напишите вопрос по проектам, условиям покупки или документам. Менеджер Golden House свяжется с вами.</p>
+        <h3>${siteText("chatTitle")}</h3>
+        <p>${siteText("chatText")}</p>
       </div>
-      <button class="chat-button" type="button">Чат-бот</button>
+      <button class="chat-button" type="button" aria-controls="chatPanel"><svg class="chat-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/></svg><span class="chat-label">${siteText("chatButton")}</span></button>
     `;
     document.body.appendChild(chat);
     chat.querySelector(".chat-button").addEventListener("click", () => {
@@ -172,13 +268,13 @@ function injectSupportWidgets() {
     consult.className = "consult-backdrop";
     consult.innerHTML = `
       <div class="consult-modal" role="dialog" aria-modal="true" aria-labelledby="consultTitle">
-        <button class="consult-close" type="button" aria-label="Закрыть">×</button>
-        <h3 id="consultTitle">Получить консультацию</h3>
-        <p>Оставьте имя и телефон. Менеджер Golden House свяжется с вами и подберет подходящий проект.</p>
+        <button class="consult-close" type="button" aria-label="${siteText("close")}">×</button>
+        <h3 id="consultTitle">${siteText("consultTitle")}</h3>
+        <p>${siteText("consultText")}</p>
         <form class="consult-form">
-          <input type="text" name="name" placeholder="Имя" aria-label="Имя" required>
-          <input type="tel" name="phone" placeholder="Телефон" aria-label="Телефон" required>
-          <button class="consult-submit" type="submit">Отправить</button>
+          <input type="text" name="name" placeholder="${siteText("name")}" aria-label="${siteText("name")}" required>
+          <input type="tel" name="phone" placeholder="${siteText("phone")}" aria-label="${siteText("phone")}" required>
+          <button class="consult-submit" type="submit">${siteText("send")}</button>
         </form>
       </div>
     `;
@@ -197,7 +293,7 @@ function injectSupportWidgets() {
       event.preventDefault();
       const lead = {
         id: `GH-${Date.now()}`,
-        page: document.title,
+        page: location.pathname,
         createdAt: new Date().toISOString(),
         fields: Object.fromEntries(new FormData(consultForm).entries())
       };
@@ -207,7 +303,7 @@ function injectSupportWidgets() {
       localStorage.setItem("goldenHouseLeads", JSON.stringify(leads));
       trackEvent("crm_lead_created", lead);
 
-      consultSubmit.textContent = "Заявка отправлено";
+      consultSubmit.textContent = siteText("sent");
       consultSubmit.disabled = true;
     });
   }
@@ -220,7 +316,7 @@ function injectSupportWidgets() {
     const consultSubmit = consult.querySelector(".consult-submit");
     consultForm?.reset();
     if (consultSubmit) {
-      consultSubmit.textContent = "Отправить";
+      consultSubmit.textContent = siteText("send");
       consultSubmit.disabled = false;
     }
     consult.classList.add("is-open");
@@ -232,36 +328,46 @@ function injectSupportWidgets() {
     button.addEventListener("click", openConsultModal);
   });
 
+  // Промо-окно: через PROMO_DELAY_MS или когда посетитель прокрутил половину
+  // страницы — что раньше; один раз за сессию (отметка — при показе: раньше
+  // ставилась только по нажатию, и окно выскакивало на каждой странице).
   if (floating && !sessionStorage.getItem("promoPopupShown")) {
     const popup = document.createElement("div");
     popup.className = "promo-popup";
     popup.innerHTML = `
-      <div class="popup-trust-row">
-        <div class="popup-avatars" aria-hidden="true">
-          <span style="background-image:url('https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80')"></span>
-          <span style="background-image:url('https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=100&q=80')"></span>
-          <span style="background-image:url('https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=100&q=80')"></span>
-        </div>
-        <span class="popup-stat">30 000+</span>
-        <span class="popup-label">семей с нами</span>
-      </div>
-      <p class="popup-message">Golden House подберет квартиру с рассрочкой, актуальными акциями и удобной локацией в Ташкенте.</p>
-      <div class="popup-actions"><button class="popup-button" type="button">Получить подборку <span class="popup-arrow" aria-hidden="true">&#8599;</span></button><button class="popup-close" type="button">Позже</button></div>
+      ${popupTrustRow()}
+      <p class="popup-message">${siteText("promoText")}</p>
+      <div class="popup-actions"><button class="popup-button" type="button">${siteText("promoButton")} <span class="popup-arrow" aria-hidden="true">&#8599;</span></button><button class="popup-close" type="button">${siteText("later")}</button></div>
     `;
     document.body.appendChild(popup);
-    window.setTimeout(() => {
-      if (hasOpenModal()) return;
+
+    let shown = false;
+    const onScroll = () => {
+      const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+      if (scrollable > 0 && window.scrollY >= scrollable * PROMO_SCROLL_SHARE) showPromo();
+    };
+    const timer = window.setTimeout(() => showPromo(), PROMO_DELAY_MS);
+    function showPromo() {
+      if (shown) return;
+      // Открыто меню или окно — не перебиваем; покажем при следующей прокрутке.
+      if (hasOpenModal() || document.body.classList.contains("gnav-menu-open")) return;
+      shown = true;
+      window.clearTimeout(timer);
+      window.removeEventListener("scroll", onScroll);
+      sessionStorage.setItem("promoPopupShown", "true");
       closeFloatingPopups();
       popup.classList.add("is-visible");
-    }, 1200);
+      trackEvent("promo_popup_show");
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+
     popup.querySelectorAll("button").forEach((button) => {
       button.addEventListener("click", () => {
         popup.classList.remove("is-visible");
-        sessionStorage.setItem("promoPopupShown", "true");
         if (button.classList.contains("popup-button")) {
           openConsultModal();
         }
-        trackEvent("promo_popup_click", { action: button.textContent.trim() });
+        trackEvent("promo_popup_click", { action: button.classList.contains("popup-button") ? "open" : "later" });
       });
     });
   }
@@ -274,17 +380,9 @@ function injectSupportWidgets() {
     const popup = document.createElement("div");
     popup.className = "exit-popup is-visible";
     popup.innerHTML = `
-      <div class="popup-trust-row">
-        <div class="popup-avatars" aria-hidden="true">
-          <span style="background-image:url('https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80')"></span>
-          <span style="background-image:url('https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=100&q=80')"></span>
-          <span style="background-image:url('https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=100&q=80')"></span>
-        </div>
-        <span class="popup-stat">30 000+</span>
-        <span class="popup-label">семей с нами</span>
-      </div>
-      <p class="popup-message"><b>Не уходите без консультации</b>Оставьте заявку, и мы подберем проект под ваш бюджет и сроки.</p>
-      <div class="popup-actions"><button class="popup-button" type="button">Получить консультацию <span class="popup-arrow" aria-hidden="true">&#8599;</span></button><button class="popup-close" type="button">Закрыть</button></div>
+      ${popupTrustRow()}
+      <p class="popup-message"><b>${siteText("exitTitle")}</b>${siteText("exitText")}</p>
+      <div class="popup-actions"><button class="popup-button" type="button">${siteText("consultTitle")} <span class="popup-arrow" aria-hidden="true">&#8599;</span></button><button class="popup-close" type="button">${siteText("close")}</button></div>
     `;
     document.body.appendChild(popup);
     popup.querySelectorAll("button").forEach((button) => {
@@ -293,7 +391,7 @@ function injectSupportWidgets() {
         if (button.classList.contains("popup-button")) {
           openConsultModal();
         }
-        trackEvent("exit_popup_click", { action: button.textContent.trim() });
+        trackEvent("exit_popup_click", { action: button.classList.contains("popup-button") ? "open" : "close" });
       });
     });
     trackEvent("exit_popup_show");

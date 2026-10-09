@@ -4,7 +4,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
-import { htmlGenerator, type ResolvedNavItem, type GeneratePageOptions, type AvailableLanguage } from './HtmlGenerator'
+import { htmlGenerator, MULLER_FONT_FILES, type ResolvedNavItem, type GeneratePageOptions, type AvailableLanguage } from './HtmlGenerator'
 import { responsiveImageService } from './ResponsiveImageService'
 import { AppDataSource } from '../config/database'
 import { Page, PagePublishDataDef } from '../models/Page'
@@ -35,10 +35,13 @@ import { applyAutoHeaderThemes, slideMediaRefs } from './headerTheme'
 import { findAssetsByStorageUuids, storageUuidOf } from './mediaAssetLookup'
 import { pruneCollectionItems, writeCollectionManifest } from './collectionOutput'
 import { isDeployReportTarget, reportCollectionDeploy } from './deployReport'
+import { applyPublishedSeo, notFoundHtml, robotsTxt } from './publishedSeo'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
 const PUBLIC_SITE_URL = process.env.PUBLIC_SITE_URL || 'https://localhost'
+/** Тестовый стенд: robots.txt закрывает сайт целиком (боевой — не задаёт). */
+const PUBLIC_SITE_NOINDEX = /^(1|true|yes)$/i.test(process.env.PUBLIC_SITE_NOINDEX || '')
 
 export interface DeployResult {
   success: boolean
@@ -151,9 +154,10 @@ export class DeployService {
    * srcset-инъекция применялась ко всем путям деплоя (страницы, сайты, переводы).
    */
   private async generatePageHtml(
-    ...args: Parameters<typeof htmlGenerator.generatePage>
+    structure: Parameters<typeof htmlGenerator.generatePage>[0],
+    options: GeneratePageOptions,
   ): Promise<string> {
-    const html = htmlGenerator.generatePage(...args)
+    const html = htmlGenerator.generatePage(structure, { fontFaces: this.hasMullerFonts(), ...options })
     return responsiveImageService.enrich(html)
   }
 
@@ -164,14 +168,26 @@ export class DeployService {
    */
   private siteAssetOptions(
     site?: Site | null,
-  ): Pick<GeneratePageOptions, 'siteCss' | 'siteJs' | 'siteCustomHead' | 'siteCustomBodyEnd'> {
+  ): Pick<GeneratePageOptions, 'siteCss' | 'siteJs' | 'siteCustomHead' | 'siteCustomBodyEnd' | 'siteFavicon' | 'siteDescription' | 'siteOgImage'> {
     const s = site?.settings
     return {
       siteCss: s?.globalCss || undefined,
       siteJs: s?.globalJs || undefined,
       siteCustomHead: s?.customHeadHtml || undefined,
       siteCustomBodyEnd: s?.customBodyEndHtml || undefined,
+      siteFavicon: s?.favicon || undefined,
+      siteDescription: s?.defaultDescription || undefined,
+      siteOgImage: s?.ogImage || undefined,
     }
+  }
+
+  /**
+   * Лежат ли файлы шрифта Muller в общей папке шрифтов сайта (их копирует
+   * copyAssetsToDir). Нет — @font-face не печатается: иначе 404 на каждый файл.
+   */
+  private hasMullerFonts(): boolean {
+    const dir = path.join(PUBLIC_DIR, 'fonts')
+    return Object.keys(MULLER_FONT_FILES).every((file) => fs.existsSync(path.join(dir, file)))
   }
 
   /**
@@ -382,10 +398,9 @@ export class DeployService {
       page.status = 'published'
       await this.pageRepository.save(page)
 
-      // Regenerate sitemap for the site
+      // Карта сайта, ссылки языков, robots, 404
       if (page.site) {
-        await this.generateSitemap(page.site)
-        this.generateRobotsTxt(page.site)
+        await this.finalizeSite(page.site)
       }
 
       logger.info(`Deployed: ${relPath} (site: ${page.site?.slug || 'default'})`)
@@ -664,8 +679,7 @@ export class DeployService {
 
       // Generate sitemap.xml and robots.txt per site
       for (const [siteKey, site] of sitesMap.entries()) {
-        await this.generateSitemap(site)
-        this.generateRobotsTxt(site)
+        await this.finalizeSite(site)
       }
 
       return {
@@ -791,7 +805,7 @@ export class DeployService {
             deployedPages,
           })
 
-          await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir, isHome)
+          await this.deployPageTranslations(page, updatedStructure, dataConfig, deployedPages, errors, siteDir, isHome, { site, navigation: resolvedNav })
           logger.info(`Site "${site.slug}" deployed: ${relPath}`)
         } catch (err: any) {
           errors.push(`Ошибка "${page.name}": ${err.message}`)
@@ -799,8 +813,7 @@ export class DeployService {
       }
 
       // Generate SEO files
-      await this.generateSitemap(site)
-      this.generateRobotsTxt(site)
+      await this.finalizeSite(site)
 
       // НОВОЕ: деплой коллекций сайта (используем уже загруженные siteCollections)
       for (const collection of siteCollections) {
@@ -1065,6 +1078,8 @@ export class DeployService {
       })
       if (defaultLangCode) deployedByLang.set(defaultLangCode, defaultSlugs)
       errors.push(...(await this.reportCollectionDeploy(collection, deployedByLang)))
+      // Карта сайта и ссылки языков — с новыми страницами коллекции.
+      if (collection.site) await this.finalizeSite(collection.site)
 
       return {
         success: errors.filter(e => !isNonFatalDeployNote(e)).length === 0,
@@ -2203,7 +2218,7 @@ export class DeployService {
     page.status = 'draft'
     await this.pageRepository.save(page)
     if (page.site) {
-      await this.generateSitemap(page.site)
+      await this.finalizeSite(page.site)
     }
     logger.info(`Unpublished: /${page.slug} (${removed.length} файлов)`)
     return { success: true, message: `Страница /${page.slug} снята с публикации`, removed }
@@ -2272,7 +2287,7 @@ export class DeployService {
 
     const written = result.deployedPages.map(rel => path.join(siteDir, rel))
     removePublishedFiles(siteDir, leftoverFiles(previousFiles, written), codes)
-    if (site) await this.generateSitemap(site)
+    if (site) await this.finalizeSite(site)
     logger.info(`Вариант «${page.name}» опубликован на /${page.slug} вместо «${occupant.name}»`)
     return {
       ...result,
@@ -2969,7 +2984,12 @@ export class DeployService {
   }
 
   /**
-   * Генерирует HTML-страницы для всех языковых версий
+   * Генерирует HTML-страницы для всех языковых версий.
+   *
+   * `site` и `navigation` — те же, что у версии основного языка. Сайт берётся
+   * явно, а не только из page.site: deploySite загружает страницы без связи
+   * site, и языковые версии выходили без Site CSS/JS и head сайта (на /uz/ не
+   * было ни виджетов, ни дорожной карты).
    */
   private async deployPageTranslations(
     page: Page,
@@ -2979,8 +2999,10 @@ export class DeployService {
     errors: string[],
     siteDir?: string,
     isHome: boolean = page.slug === 'index' || page.slug === 'home',
+    context: { site?: Site | null; navigation?: ResolvedNavItem[] } = {},
   ): Promise<void> {
     const deployDir = siteDir || PUBLIC_DIR
+    const site = context.site ?? page.site
     try {
       const languages = await languageService.getActive()
       const defaultLang = languages.find(l => l.isDefault)
@@ -3034,7 +3056,8 @@ export class DeployService {
             translationMap,
             noindex: missing > 0,
             analyticsPageId: page.id,
-            ...this.siteAssetOptions(page.site),
+            ...(context.navigation ? { navigation: localizeNavigation(context.navigation, langPrefix(lang.code)) } : {}),
+            ...this.siteAssetOptions(site),
           })
 
           // Create language directory: /en/, /kz/, etc.
@@ -3435,94 +3458,36 @@ Golden House - Public Site
       const subdomain = site.hostname || site.slug
       return `https://${subdomain}.${baseHost}`
     }
-    // path-prefix
-    const prefix = site.hostname || `/${site.slug}`
-    return `${PUBLIC_SITE_URL}${prefix}`
+    // path-prefix; корневой сайт (без slug) лежит в корне домена — без
+    // префикса, иначе адреса выходили с двойным слешем (https://site//about).
+    const prefix = site.hostname || (site.slug ? `/${site.slug}` : '')
+    return `${PUBLIC_SITE_URL.replace(/\/+$/, '')}${prefix}`
   }
 
   /**
-   * Generate sitemap.xml for a site
+   * Служебные файлы сайта после любой выкладки: sitemap.xml, ссылки между
+   * языковыми версиями (canonical, hreflang) в head страниц, robots.txt и
+   * 404.html. Всё строится по тому, что лежит на диске (publishedSeo.ts):
+   * один источник правды для страниц, коллекций и вариантов.
+   *
+   * Сбой здесь не отменяет уже выложенные страницы — только пишется в лог.
    */
-  async generateSitemap(site: Site): Promise<void> {
-    const siteDir = this.resolveSiteDir(site)
-    this.ensureDirectoryExists(siteDir)
+  async finalizeSite(site: Site): Promise<void> {
+    try {
+      const siteDir = this.resolveSiteDir(site)
+      this.ensureDirectoryExists(siteDir)
+      const siteUrl = this.resolveSiteUrl(site)
+      const languages = (await languageService.getActive()).filter(l => l.isActive)
 
-    const pages = await this.pageRepository.find({
-      where: { siteId: site.id, status: 'published' },
-    })
-
-    const baseUrl = this.resolveSiteUrl(site)
-    const activeLanguages = await languageService.getActive()
-    const defaultLang = activeLanguages.find(l => l.isDefault)
-
-    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n'
-    xml += '        xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
-
-    for (const page of pages) {
-      const slug = (page.slug === 'index' || page.slug === 'home') ? '' : page.slug
-      const pageUrl = `${baseUrl}/${slug}`.replace(/\/$/, '') || baseUrl
-
-      // hreflang — только полностью переведённые версии: остальные под noindex.
-      const translationLocales: string[] = []
-      for (const lang of activeLanguages) {
-        if (lang.isDefault) continue
-        if ((await translationService.countMissing(page.id, lang.code)) === 0) translationLocales.push(lang.code)
-      }
-
-      xml += '  <url>\n'
-      xml += `    <loc>${this.escapeXml(pageUrl)}</loc>\n`
-      xml += `    <lastmod>${page.updatedAt.toISOString().split('T')[0]}</lastmod>\n`
-
-      // Add hreflang links for multi-language pages
-      if (translationLocales.length > 0 && defaultLang) {
-        // Default language version
-        xml += `    <xhtml:link rel="alternate" hreflang="${defaultLang.code}" href="${this.escapeXml(pageUrl)}" />\n`
-
-        for (const locale of translationLocales) {
-          const localizedUrl = `${baseUrl}/${locale}/${slug}`.replace(/\/$/, '')
-          xml += `    <xhtml:link rel="alternate" hreflang="${locale}" href="${this.escapeXml(localizedUrl)}" />\n`
-        }
-
-        // x-default (for language pickers)
-        xml += `    <xhtml:link rel="alternate" hreflang="x-default" href="${this.escapeXml(pageUrl)}" />\n`
-      }
-
-      xml += '  </url>\n'
+      const { pages, rewritten } = applyPublishedSeo(siteDir, { siteUrl, languages })
+      fs.writeFileSync(path.join(siteDir, 'robots.txt'), robotsTxt(siteUrl, PUBLIC_SITE_NOINDEX), 'utf-8')
+      fs.writeFileSync(path.join(siteDir, '404.html'), notFoundHtml({ siteName: site.name, languages }), 'utf-8')
+      logger.info(`Site "${site.slug || site.name}": sitemap ${pages.length} адресов, ссылки языков обновлены в ${rewritten} файлах${PUBLIC_SITE_NOINDEX ? ', robots закрыт (PUBLIC_SITE_NOINDEX)' : ''}`)
+    } catch (err: any) {
+      logger.error(`Site "${site.slug || site.name}": sitemap/robots/404 не обновлены: ${err?.message || err}`)
     }
-
-    xml += '</urlset>\n'
-
-    fs.writeFileSync(path.join(siteDir, 'sitemap.xml'), xml, 'utf-8')
-    logger.info(`Generated sitemap.xml for site "${site.slug}" (${pages.length} pages)`)
   }
 
-  /**
-   * Generate robots.txt for a site
-   */
-  generateRobotsTxt(site: Site): void {
-    const siteDir = this.resolveSiteDir(site)
-    this.ensureDirectoryExists(siteDir)
-
-    const baseUrl = this.resolveSiteUrl(site)
-
-    let robots = 'User-agent: *\n'
-    robots += 'Allow: /\n'
-    robots += '\n'
-    robots += `Sitemap: ${baseUrl}/sitemap.xml\n`
-
-    fs.writeFileSync(path.join(siteDir, 'robots.txt'), robots, 'utf-8')
-    logger.info(`Generated robots.txt for site "${site.slug}"`)
-  }
-
-  private escapeXml(str: string): string {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;')
-  }
 }
 
 export const deployService = new DeployService()

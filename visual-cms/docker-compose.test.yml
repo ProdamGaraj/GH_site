@@ -22,3 +22,5 @@ services:
   backend:
     environment:
       - PUBLIC_SITE_URL=https://test_analytics.gh.uz
+      # Тестовый стенд закрыт для поисковиков: robots.txt «Disallow: /».
+      - PUBLIC_SITE_NOINDEX=true

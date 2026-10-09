@@ -1,4 +1,5 @@
 import {
+  declaredWidth,
   extractMediaUuids,
   injectResponsiveImages,
   optimizeMediaInHtml,
@@ -55,6 +56,16 @@ describe('injectResponsiveImages (<img>)', () => {
   it('sizes — не шире файла: логотип без CSS-ширины не растягивается на весь экран', () => {
     const out = injectResponsiveImages(`<img src="/media/${ID}.png">`, mapOf(rendition(ID, 'png', { width: 1100 })))
     expect(out).toContain('sizes="(max-width: 1100px) 100vw, 1100px"')
+  })
+
+  it('ширина в разметке (атрибут width) — sizes по ней: логотип 118px не берёт вариант 1024px', () => {
+    const out = injectResponsiveImages(`<img src="/media/${ID}.png" width="118" />`, mapOf(rendition(ID)))
+    expect(out).toContain('sizes="118px"')
+  })
+
+  it('ширина во встроенном стиле в px — sizes по ней; не шире файла', () => {
+    expect(injectResponsiveImages(`<img src="/media/${ID}.png" style="height: 40px; width: 178px">`, mapOf(rendition(ID)))).toContain('sizes="178px"')
+    expect(injectResponsiveImages(`<img src="/media/${ID}.png" width="5000">`, mapOf(rendition(ID)))).toContain('sizes="3840px"')
   })
 
   it('ширина файла неизвестна — только лёгкий src, без srcset (sizes не посчитать)', () => {
@@ -181,5 +192,19 @@ describe('extractMediaUuids', () => {
   it('пусто без ссылок на медиатеку', () => {
     expect(extractMediaUuids('<div>hi</div>')).toEqual([])
     expect(extractMediaUuids('')).toEqual([])
+  })
+})
+
+describe('declaredWidth', () => {
+  it('атрибут width, затем width в px во встроенном стиле', () => {
+    expect(declaredWidth('<img width="118" style="width: 50px">')).toBe(118)
+    expect(declaredWidth('<img style="max-width: 300px; width: 120.5px">')).toBe(121)
+  })
+
+  it('проценты, max-width и ширина без единиц в стиле — не ширина', () => {
+    expect(declaredWidth('<img style="width: 100%">')).toBeNull()
+    expect(declaredWidth('<img style="max-width: 300px">')).toBeNull()
+    expect(declaredWidth('<img data-width="40">')).toBeNull()
+    expect(declaredWidth('<img>')).toBeNull()
   })
 })

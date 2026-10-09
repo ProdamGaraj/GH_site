@@ -89,6 +89,32 @@ describe('deployPageTranslations: все активные языки', () => {
     ])
   })
 
+  it('сайт передан явно (deploySite грузит страницы без связи site) — Site JS и навигация у каждой версии', async () => {
+    const seen: Array<{ lang: string; siteJs?: string; nav?: string }> = []
+    svc.generatePageHtml = async (_s: unknown, o: { lang: string; siteJs?: string; navigation?: Array<{ href: string }> }) => {
+      seen.push({ lang: o.lang, siteJs: o.siteJs, nav: o.navigation?.[0]?.href })
+      return '<html></html>'
+    }
+    const bare = { ...page, site: undefined }
+    const site = { id: 's', slug: '', settings: { globalJs: 'siteInit()' } }
+    const navigation = [{ label: 'О нас', href: '/about', children: [] }]
+    await svc.deployPageTranslations(bare, root, undefined, [], [], dir, false, { site, navigation })
+    expect(seen).toEqual([
+      { lang: 'uz', siteJs: 'siteInit()', nav: '/uz/about' },
+      { lang: 'en', siteJs: 'siteInit()', nav: '/en/about' },
+    ])
+  })
+
+  it('без контекста — сайт страницы (page.site)', async () => {
+    const seen: Array<string | undefined> = []
+    svc.generatePageHtml = async (_s: unknown, o: { siteJs?: string }) => {
+      seen.push(o.siteJs)
+      return '<html></html>'
+    }
+    await svc.deployPageTranslations({ ...page, site: { ...page.site, settings: { globalJs: 'own()' } } }, root, undefined, [], [], dir, false)
+    expect(seen).toEqual(['own()', 'own()'])
+  })
+
   it('переключатель — основной и языки с переводом (en без перевода в нём нет)', async () => {
     await svc.deployPageTranslations(page, root, undefined, [], [], dir, false)
     for (const c of calls) expect(c.switcher).toEqual(['ru', 'uz'])
@@ -114,20 +140,42 @@ describe('offeredLanguages / switcherLanguages', () => {
   })
 })
 
-describe('sitemap: hreflang только для полных переводов', () => {
-  it('uz полный — в hreflang, en неполный — нет', async () => {
+describe('finalizeSite: sitemap, robots, 404 по выложенным файлам', () => {
+  it('hreflang — только индексируемые версии (en под noindex — нет), robots и 404 на месте', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sitemap-'))
     const svc = new DeployService() as any
     svc.resolveSiteDir = () => dir
-    svc.resolveSiteUrl = () => 'https://example.uz'
-    svc.pageRepository = { find: async () => [page] }
+    const put = (rel: string, noindex = false) => {
+      fs.mkdirSync(path.join(dir, rel), { recursive: true })
+      fs.writeFileSync(
+        path.join(dir, rel, 'index.html'),
+        `<html><head><title>t</title>${noindex ? '<meta name="robots" content="noindex, follow">' : ''}</head></html>`,
+      )
+    }
+    put('ru/about')
+    put('uz/about')
+    put('en/about', true)
     try {
-      await svc.generateSitemap(page.site)
+      await svc.finalizeSite({ ...page.site, name: 'GH' })
       const xml = fs.readFileSync(path.join(dir, 'sitemap.xml'), 'utf-8')
       expect(xml).toContain('hreflang="uz"')
       expect(xml).not.toContain('hreflang="en"')
+      expect(fs.readFileSync(path.join(dir, 'robots.txt'), 'utf-8')).toContain('Allow: /')
+      expect(fs.readFileSync(path.join(dir, '404.html'), 'utf-8')).toContain('404')
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('resolveSiteUrl', () => {
+  const svc = new DeployService() as any
+
+  it('корневой сайт (без slug) — адрес без двойного слеша', () => {
+    expect(svc.resolveSiteUrl({ slug: '', routingMode: 'path-prefix' })).toBe('https://localhost')
+  })
+
+  it('сайт с slug — под префиксом', () => {
+    expect(svc.resolveSiteUrl({ slug: 'main', routingMode: 'path-prefix' })).toBe('https://localhost/main')
   })
 })

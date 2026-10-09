@@ -1050,3 +1050,36 @@ describe('CarouselRuntime — бесконечная лента', () => {
     expect(trackEl().style.width).toBe('100%')
   })
 })
+
+describe('CarouselRuntime: подписи точек (доступность)', () => {
+  afterEach(() => {
+    document.body.innerHTML = ''
+    document.documentElement.removeAttribute('lang')
+  })
+
+  it('«Слайд N из M» на языке страницы и aria-current у текущей', async () => {
+    document.documentElement.setAttribute('lang', 'ru')
+    await boot(buildBody(3))
+    const dots = dotsAt()
+    expect(dots.map((d) => d.getAttribute('aria-label'))).toEqual(['Слайд 1 из 3', 'Слайд 2 из 3', 'Слайд 3 из 3'])
+    expect(dots.map((d) => d.getAttribute('aria-current'))).toEqual(['true', null, null])
+    document.querySelector<HTMLElement>('[data-carousel-next]')!.click()
+    await new Promise((r) => setTimeout(r, 20))
+    expect(dotsAt().map((d) => d.getAttribute('aria-current'))).toEqual([null, 'true', null])
+  })
+
+  it('узбекская и неизвестная страница: свои подписи / английский', async () => {
+    document.documentElement.setAttribute('lang', 'uz')
+    await boot(buildBody(2))
+    expect(dotsAt()[1].getAttribute('aria-label')).toBe('Slayd 2 / 2')
+    document.body.innerHTML = ''
+    document.documentElement.setAttribute('lang', 'kz')
+    await boot(buildBody(2))
+    expect(dotsAt()[0].getAttribute('aria-label')).toBe('Slide 1 of 2')
+  })
+
+  it('подпись автора не перезаписывается', async () => {
+    await boot(buildBody(2).replace('data-element-id="dot-1"', 'data-element-id="dot-1" aria-label="Второй кадр"'))
+    expect(dotsAt()[1].getAttribute('aria-label')).toBe('Второй кадр')
+  })
+})

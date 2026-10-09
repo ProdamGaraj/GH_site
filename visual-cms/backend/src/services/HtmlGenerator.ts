@@ -37,6 +37,30 @@ interface PageMetadata {
 
 import { localizeLink } from './linkLocalization'
 
+/**
+ * Шрифт Muller на сайте: файл в `/fonts/` → насыщенность. @font-face
+ * печатается, только если файлы есть (см. GeneratePageOptions.fontFaces).
+ */
+export const MULLER_FONT_FILES: Record<string, number> = {
+  'Muller-Light.woff2': 300,
+  'Muller-Regular.woff2': 400,
+  'Muller-Medium.woff2': 500,
+  'Muller-Bold.woff2': 700,
+  'Muller-ExtraBold.woff2': 800,
+}
+
+const MULLER_FONT_FACES = Object.entries(MULLER_FONT_FILES)
+  .map(([file, weight]) => `    @font-face { font-family: 'Muller'; src: url('/fonts/${file}') format('woff2'); font-weight: ${weight}; font-style: normal; }\n`)
+  .join('')
+
+/** Код языка страницы → og:locale (язык_СТРАНА). */
+const OG_LOCALES: Record<string, string> = { ru: 'ru_RU', uz: 'uz_UZ', en: 'en_US' }
+
+export function ogLocale(lang: string): string {
+  const code = lang.toLowerCase().split('-')[0]
+  return OG_LOCALES[code] ?? code
+}
+
 export interface ResolvedNavItem {
   label: string
   href: string
@@ -78,6 +102,18 @@ export interface GeneratePageOptions {
   siteCustomHead?: string
   /** Сырой HTML сайта перед </body> (Site.settings.customBodyEndHtml). */
   siteCustomBodyEnd?: string
+  /** Значок сайта (Site.settings.favicon): `<link rel="icon">`. */
+  siteFavicon?: string
+  /** Описание по умолчанию (Site.settings.defaultDescription) — если у страницы пусто. */
+  siteDescription?: string
+  /** Картинка для соцсетей по умолчанию (Site.settings.ogImage) — если у страницы нет своей. */
+  siteOgImage?: string
+  /**
+   * Подключать ли шрифт Muller (@font-face на /fonts/Muller-*.woff2). Только
+   * когда файлы есть на сайте: без них каждое объявление давало 404, а текст
+   * всё равно шёл запасным шрифтом.
+   */
+  fontFaces?: boolean
   /**
    * Переводы активного языка (плоская карта nodeId→field→value) для разрешения
    * адаптивного медиа «экран × язык». Для дефолтного языка не передаётся ({}).
@@ -128,6 +164,12 @@ export class HtmlGenerator {
       specificHideCSS = `\n    /* Hide viewport-specific elements by default */\n    ${selectors.join(',\n    ')} { display: none !important; }\n`
     }
 
+    const description = metadata.description || options.siteDescription || ''
+    const ogImage = metadata.ogImage || options.siteOgImage || ''
+    const faviconLink = options.siteFavicon
+      ? `<link rel="icon" href="${this.escapeHtml(options.siteFavicon)}"${/\.svg(\?|$)/i.test(options.siteFavicon) ? ' type="image/svg+xml"' : ''}>`
+      : ''
+
     // Custom HTML injected by user via source code editor
     const customHeadHtml = structure.metadata?.customHeadHtml || ''
     const customBodyEndHtml = structure.metadata?.customBodyEndHtml || ''
@@ -159,48 +201,18 @@ export class HtmlGenerator {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${this.escapeHtml(metadata.title)}</title>
-  <meta name="description" content="${this.escapeHtml(metadata.description)}">
+  <meta name="description" content="${this.escapeHtml(description)}">
   ${options.noindex ? '<meta name="robots" content="noindex, follow">' : ''}
   ${metadata.keywords?.length ? `<meta name="keywords" content="${this.escapeHtml(metadata.keywords.join(', '))}">` : ''}
-  ${metadata.ogImage ? `<meta property="og:image" content="${this.escapeHtml(metadata.ogImage)}">` : ''}
+  ${ogImage ? `<meta property="og:image" content="${this.escapeHtml(ogImage)}">` : ''}
   <meta property="og:title" content="${this.escapeHtml(metadata.title)}">
-  <meta property="og:description" content="${this.escapeHtml(metadata.description)}">
+  <meta property="og:description" content="${this.escapeHtml(description)}">
   <meta property="og:type" content="website">
+  <meta property="og:locale" content="${ogLocale(lang || 'ru')}">
   
-  <!-- Muller Font -->
+  ${faviconLink}
   <style>
-    @font-face {
-      font-family: 'Muller';
-      src: url('/fonts/Muller-Light.woff2') format('woff2');
-      font-weight: 300;
-      font-style: normal;
-    }
-    @font-face {
-      font-family: 'Muller';
-      src: url('/fonts/Muller-Regular.woff2') format('woff2');
-      font-weight: 400;
-      font-style: normal;
-    }
-    @font-face {
-      font-family: 'Muller';
-      src: url('/fonts/Muller-Medium.woff2') format('woff2');
-      font-weight: 500;
-      font-style: normal;
-    }
-    @font-face {
-      font-family: 'Muller';
-      src: url('/fonts/Muller-Bold.woff2') format('woff2');
-      font-weight: 700;
-      font-style: normal;
-    }
-    @font-face {
-      font-family: 'Muller';
-      src: url('/fonts/Muller-ExtraBold.woff2') format('woff2');
-      font-weight: 800;
-      font-style: normal;
-    }
-    
-${styleGenerator.getBaseCss()}
+${options.fontFaces ? MULLER_FONT_FACES : ''}${styleGenerator.getBaseCss()}
 ${authoredCss}
     /* Keyframes for animations */
     ${keyframes}

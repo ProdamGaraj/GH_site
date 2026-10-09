@@ -22,7 +22,7 @@ interface Svc {
   unpublishPage(id: string): Promise<{ success: boolean; message: string; removed: string[] }>
   undeployPage(slug: string, siteSlug?: string): Promise<boolean>
   pageRepository: { findOne: jest.Mock; save: jest.Mock }
-  generateSitemap: jest.Mock
+  finalizeSite: jest.Mock
 }
 
 function put(rel: string): void {
@@ -37,7 +37,7 @@ const SITE = { id: 'site', slug: '', homepageId: 'home' }
 function service(page: Record<string, unknown> | null): Svc {
   const svc = new DeployService() as unknown as Svc
   svc.pageRepository = { findOne: jest.fn().mockResolvedValue(page), save: jest.fn() }
-  svc.generateSitemap = jest.fn()
+  svc.finalizeSite = jest.fn()
   return svc
 }
 
@@ -64,7 +64,7 @@ describe('unpublishPage', () => {
     expect(exists('ru/about/index.html')).toBe(true)
     expect(page.status).toBe('draft')
     expect(svc.pageRepository.save).toHaveBeenCalledWith(page)
-    expect(svc.generateSitemap).toHaveBeenCalledWith(SITE)
+    expect(svc.finalizeSite).toHaveBeenCalledWith(SITE)
   })
 
   it('главную не снимает: корень сайта без неё отдаёт 404', async () => {
@@ -87,7 +87,7 @@ describe('unpublishPage', () => {
     const svc = service(null)
     const result = await svc.unpublishPage('nope')
     expect(result.success).toBe(false)
-    expect(svc.generateSitemap).not.toHaveBeenCalled()
+    expect(svc.finalizeSite).not.toHaveBeenCalled()
   })
 
   it('страница без файлов на сайте всё равно становится черновиком', async () => {

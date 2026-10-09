@@ -77,6 +77,20 @@ export function sizesFor(width: number): string {
   return `(max-width: ${width}px) 100vw, ${width}px`
 }
 
+/**
+ * Ширина, которую картинке задали в разметке: атрибут `width` или `width` в
+ * px во встроенном стиле. Тогда `sizes` — она: логотип шириной 118px не
+ * скачивает вариант 1024px. Ширина из CSS-класса здесь не видна — её
+ * задают атрибутом.
+ */
+export function declaredWidth(tag: string): number | null {
+  const attr = tag.match(/\swidth\s*=\s*"(\d+(?:\.\d+)?)"/i)
+  if (attr) return Math.ceil(Number(attr[1]))
+  const style = tag.match(/\sstyle\s*=\s*"([^"]*)"/i)?.[1] ?? ''
+  const inline = style.match(/(?:^|;)\s*width\s*:\s*(\d+(?:\.\d+)?)px/i)
+  return inline ? Math.ceil(Number(inline[1])) : null
+}
+
 function enrichImgTag(tag: string, renditions: Map<string, MediaRendition>): string {
   // Уважаем уже выставленный srcset (ручной или из другого источника).
   if (/\ssrcset\s*=/i.test(tag)) return tag
@@ -107,7 +121,9 @@ function enrichImgTag(tag: string, renditions: Map<string, MediaRendition>): str
   }
 
   const hasSizes = /\ssizes\s*=/i.test(out)
-  const additions = ` srcset="${candidates.join(', ')}"` + (hasSizes ? '' : ` sizes="${sizesFor(rendition.width)}"`)
+  const fixed = declaredWidth(tag)
+  const sizes = fixed ? `${Math.min(fixed, rendition.width)}px` : sizesFor(rendition.width)
+  const additions = ` srcset="${candidates.join(', ')}"` + (hasSizes ? '' : ` sizes="${sizes}"`)
   // Вставляем перед закрытием тега (поддержка и `/>`, и `>`).
   if (out.endsWith('/>')) return out.slice(0, -2).trimEnd() + additions + ' />'
   if (out.endsWith('>')) return out.slice(0, -1) + additions + '>'

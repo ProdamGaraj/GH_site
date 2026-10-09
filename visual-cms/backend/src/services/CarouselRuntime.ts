@@ -85,6 +85,30 @@ ${BREAKPOINT_RUNTIME_JS}
   var SLIDE_ACTIVE_CLASS_DEFAULT = 'is-active';
   var EFFECT_DEFAULT = 'slide';
 
+  // Подпись точки для экранного чтения — на языке страницы (<html lang>);
+  // язык без своей подписи — английский.
+  var DOT_LABELS = {
+    ru: function(n, total){ return 'Слайд ' + n + ' из ' + total; },
+    uz: function(n, total){ return 'Slayd ' + n + ' / ' + total; },
+    en: function(n, total){ return 'Slide ' + n + ' of ' + total; }
+  };
+  function dotLabel(n, total) {
+    var lang = String(document.documentElement.getAttribute('lang') || '').toLowerCase().split('-')[0];
+    return (DOT_LABELS[lang] || DOT_LABELS.en)(n, total);
+  }
+  /**
+   * Точка — кнопка без текста: подпись «Слайд 2 из 4» и aria-current у
+   * текущей. Подпись, которую задал автор, не трогаем.
+   */
+  function labelDot(dot, i, total, current) {
+    if (!dot.hasAttribute('aria-label') || dot.getAttribute('data-carousel-dot-label') === 'auto') {
+      dot.setAttribute('aria-label', dotLabel(i + 1, total));
+      dot.setAttribute('data-carousel-dot-label', 'auto');
+    }
+    if (current) dot.setAttribute('aria-current', 'true');
+    else dot.removeAttribute('aria-current');
+  }
+
   // Реестр типов перехода. stacked = слайды лежат друг на друге (переход рисуется
   // прозрачностью/трансформом), иначе двигается сам трек.
   // hidden/shown — стили неактивного и активного слайда, между ними и идёт анимация.
@@ -575,6 +599,7 @@ ${BREAKPOINT_RUNTIME_JS}
       }
       for (var i = 0; i < state.dots.length; i++) {
         var dot = state.dots[i];
+        labelDot(dot, i, state.dots.length, i === state.index);
         if (i === state.index) {
           dot.classList.add(activeClass);
           applyDotStyle(dot, state.dotActiveStyle);

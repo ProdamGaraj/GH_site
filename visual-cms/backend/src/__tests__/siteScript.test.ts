@@ -96,6 +96,17 @@ describe('planSiteScript', () => {
     expect(again.siteJs).toBe(first.siteJs)
   })
 
+  it('наш скрипт прежней версии заменяется текущим', () => {
+    const v1 = '/* Общий скрипт сайта Golden House (Site JS), v1.\n   старое */\nfunction old() {}'
+    const plan = planSiteScript(v1, RUNTIME, [])
+    expect(plan.siteJs).toBe(RUNTIME)
+    expect(plan.changes).toEqual([expect.stringContaining('обновлён до новой версии')])
+  })
+
+  it('текущая версия уже стоит (даже с другим хвостом пробелов) — без правок', () => {
+    expect(planSiteScript(`\n${RUNTIME}\n`, RUNTIME, []).changes).toEqual([])
+  })
+
   it('чужой код в Site JS не затирается молча', () => {
     expect(() => planSiteScript('console.log("кто-то написал")', RUNTIME, [])).toThrow(MigrationError)
   })

@@ -50,6 +50,15 @@ describe('DeployService.siteAssetOptions', () => {
     })
   })
 
+  it('значок, описание и og:image сайта по умолчанию', () => {
+    const site = { settings: { favicon: '/media/i.png', defaultDescription: 'Описание', ogImage: '/media/og.jpg' } }
+    expect(svc.siteAssetOptions(site)).toMatchObject({
+      siteFavicon: '/media/i.png',
+      siteDescription: 'Описание',
+      siteOgImage: '/media/og.jpg',
+    })
+  })
+
   it('site = undefined → все поля undefined (нет пустых тегов)', () => {
     expect(svc.siteAssetOptions(undefined)).toEqual({
       siteCss: undefined,

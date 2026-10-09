@@ -16,8 +16,11 @@
  */
 import { MigrationError } from './choiceToPlanTypes'
 
-/** Первая строка канонического Site JS — по ней видно, что он уже стоит. */
-export const SITE_JS_MARKER = '/* Общий скрипт сайта Golden House (Site JS), v1.'
+/** Начало первой строки Site JS любой версии — по нему узнаём свой скрипт. */
+export const SITE_JS_HEAD = '/* Общий скрипт сайта Golden House (Site JS), v'
+
+/** Первая строка текущей версии — по ней видно, что она уже стоит. */
+export const SITE_JS_MARKER = `${SITE_JS_HEAD}2.`
 
 /** Начало скрипта шапки во всех найденных версиях. */
 const HEADER_START = 'function syncLogoContrast() {'
@@ -75,8 +78,10 @@ export interface SiteScriptPlan {
 /**
  * План сведения: что положить в Site JS и какие JS блоков/страниц переписать.
  *
- * Site JS, в котором уже что-то есть (и это не наш скрипт), не трогаем —
- * ошибка: чужой код молча затирать нельзя.
+ * Наш скрипт прежней версии (начинается с SITE_JS_HEAD) заменяется текущим
+ * целиком — правки руками в нём не предусмотрены, копия старого уходит в
+ * резервную копию миграции. Site JS, в котором уже что-то есть (и это не наш
+ * скрипт), не трогаем — ошибка: чужой код молча затирать нельзя.
  */
 export function planSiteScript(
   currentSiteJs: string,
@@ -89,10 +94,14 @@ export function planSiteScript(
   const changes: string[] = []
   let siteJs = currentSiteJs
   const current = (currentSiteJs || '').trim()
-  if (!current.includes(SITE_JS_MARKER)) {
-    if (current) {
-      throw new MigrationError('В Site JS уже есть другой код — проверьте его и очистите вручную')
-    }
+  if (current.startsWith(SITE_JS_MARKER)) {
+    // Текущая версия уже стоит.
+  } else if (current.startsWith(SITE_JS_HEAD)) {
+    siteJs = runtime
+    changes.push('Site JS: обновлён до новой версии (тексты окон на языке страницы, промо-окно реже, чат на телефоне)')
+  } else if (current) {
+    throw new MigrationError('В Site JS уже есть другой код — проверьте его и очистите вручную')
+  } else {
     siteJs = runtime
     changes.push('Site JS: общий скрипт сайта (виджеты, формы, дорожная карта, события)')
   }
