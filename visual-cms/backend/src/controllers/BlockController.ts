@@ -7,6 +7,7 @@ import { asyncHandler, NotFoundError, ValidationError } from '../middleware'
 import { cacheService } from '../services/CacheService'
 import { logger } from '../services/Logger'
 import { blockDataAnchorsService } from '../services/BlockDataAnchorsService'
+import { blockStructureFromElement, stripInstanceArtifacts } from '../services/blockFromElement'
 
 const blockRepository = AppDataSource.getRepository(Block)
 
@@ -17,12 +18,6 @@ const blockRepository = AppDataSource.getRepository(Block)
  * любом пути записи в библиотеку; вложенные linkedBlockId не трогаем — это легальные
  * ссылки на другие блоки.
  */
-function stripInstanceArtifacts(structure: any): void {
-  if (structure?.metadata) {
-    delete structure.metadata.linkedBlockId
-    delete structure.metadata.styleOverrides
-  }
-}
 
 export class BlockController {
   getAll = asyncHandler(async (req: Request, res: Response) => {
@@ -312,8 +307,12 @@ export class BlockController {
   })
 
   createFromElement = asyncHandler(async (req: Request, res: Response) => {
-    const { name, structure, enableTemplate = false, templateCategory = 'custom' } = req.body
-    stripInstanceArtifacts(structure)
+    const { name, enableTemplate = false, templateCategory = 'custom' } = req.body
+    // Экземпляр блока библиотеки — основа из блока библиотеки, с его CSS.
+    const structure: any = await blockStructureFromElement(req.body.structure, async (id) => {
+      const library = await blockRepository.findOne({ where: { id } })
+      return (library?.structure as any) ?? null
+    })
 
     const block = blockRepository.create({
       name: name || 'New Block',
@@ -328,6 +327,8 @@ export class BlockController {
     })
 
     await blockRepository.save(block)
+    // Как у create: иначе список библиотеки из кэша не покажет новый блок.
+    await cacheService.invalidateByTag('blocks')
     res.status(201).json(block)
   })
 }

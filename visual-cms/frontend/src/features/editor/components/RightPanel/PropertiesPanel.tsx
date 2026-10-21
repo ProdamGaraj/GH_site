@@ -91,7 +91,11 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, isPageRo
     }
   }
 
-  const isRootElement = !node.id.includes('-') || node.metadata?.name === 'Root Container'
+  // Корень дерева (страница или редактируемый блок) — его RightPanel знает
+  // точно. Раньше корнем считался любой узел с id без дефиса: у узлов
+  // импортированных страниц id вида «1783407262039_nrpccst0r», и у них
+  // пропадали «Создать блок из элемента», удаление и перенос между экранами.
+  const isRootElement = isPageRoot === true
 
   const handleMoveToViewport = (targetBreakpoint: string | null) => {
     dispatch(moveNodeToViewport({ nodeId: node.id, targetBreakpoint }))

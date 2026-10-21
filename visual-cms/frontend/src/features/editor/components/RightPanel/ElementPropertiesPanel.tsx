@@ -28,7 +28,8 @@ export const ElementPropertiesPanel: React.FC = () => {
   const nodeBreakpointId = rootNode ? getNodeBreakpoint(selectedNode.id, rootNode) : null
   const nodeBreakpoint = nodeBreakpointId ? breakpoints.find(bp => bp.id === nodeBreakpointId) : null
   const isBaseElement = nodeBreakpointId === null
-  const isRootElement = !selectedNode.id.includes('-') || selectedNode.metadata?.name === 'Root Container'
+  // Корень — сам корень дерева, а не узел с id без дефиса (см. PropertiesPanel).
+  const isRootElement = selectedNode.id === rootNode?.id
   
   const getIcon = (iconName?: string) => {
     switch (iconName) {
