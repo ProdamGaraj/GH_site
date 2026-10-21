@@ -275,3 +275,61 @@ describe('updateDataSettingsSchema.publishData', () => {
     expect(updateDataSettingsSchema.safeParse({ publishData: [{ ...ok, dataSourceId: 'abc' }] }).success).toBe(false)
   })
 })
+
+describe('данные при публикации: статический JSON и «Поля в корень»', () => {
+  /** Блок карты, как у страницы проекта: заголовок из item, точки — повтор по item.mapPoints. */
+  function mapBlock(): any {
+    return {
+      id: 'root', elementType: 'container', tagName: 'div', styles: { properties: {} }, attributes: {},
+      children: [
+        { id: 'title', elementType: 'text', tagName: 'h2', styles: { properties: {} }, attributes: {}, content: '{{item.locationTitle}}', children: [] },
+        {
+          id: 'points', elementType: 'container', tagName: 'div', styles: { properties: {} }, attributes: {},
+          _repeat: { source: 'item.mapPoints' },
+          children: [{ id: 'pt', elementType: 'container', tagName: 'span', styles: { properties: {} }, attributes: { 'data-lat': '{{$.lat}}' }, content: '{{$.name}}', children: [] }],
+        },
+      ],
+    }
+  }
+  const MAP = { locationTitle: 'Офис продаж', mapPoints: [{ name: 'Офис', lat: 41.3 }, { name: 'Метро', lat: 41.31 }] }
+  const STATIC_DS = { id: DS_ID, type: 'static', config: { type: 'static', data: { ru: MAP, uz: { ...MAP, locationTitle: 'Savdo ofisi' } } } }
+
+  it('статический источник: без адреса, данные из самого источника; «в корень» — блок проекта работает как есть', async () => {
+    const svc = svcWith(STATIC_DS)
+    const page = { id: 'p1', publishData: [{ name: 'map', dataSourceId: DS_ID, arrayPath: '{{lang}}', spread: true }] }
+    const out = await svc.applyPublishData(page, mapBlock(), 'ru')
+    expect(out.children[0].content).toBe('Офис продаж')
+    expect(out.children[1].children.map((c: any) => [c.content, c.attributes['data-lat']])).toEqual([['Офис', '41.3'], ['Метро', '41.31']])
+  })
+
+  it('{{lang}} в пути к данным — свой язык из одного JSON', async () => {
+    const svc = svcWith(STATIC_DS)
+    const page = { id: 'p1', publishData: [{ name: 'map', dataSourceId: DS_ID, arrayPath: '{{lang}}', spread: true }] }
+    const out = await svc.applyPublishData(page, mapBlock(), 'uz')
+    expect(out.children[0].content).toBe('Savdo ofisi')
+  })
+
+  it('без «в корень» данные — в item.<имя>, поля блока проекта пусты', async () => {
+    const svc = svcWith(STATIC_DS)
+    const page = { id: 'p1', publishData: [{ name: 'map', dataSourceId: DS_ID, arrayPath: 'ru' }] }
+    const out = await svc.applyPublishData(page, mapBlock(), 'ru')
+    expect(out.children[0].content).toBe('')
+  })
+
+  it('«в корень» с массивом — понятная ошибка (страница не публикуется пустой)', async () => {
+    const svc = svcWith({ ...STATIC_DS, config: { type: 'static', data: [1, 2] } })
+    const page = { id: 'p1', publishData: [{ name: 'map', dataSourceId: DS_ID, spread: true }] }
+    await expect(svc.applyPublishData(page, mapBlock(), 'ru')).rejects.toThrow(/«map».*нужен объект.*массив/)
+  })
+
+  it('статический источник без данных — ошибка с именем данных', async () => {
+    const svc = svcWith({ id: DS_ID, type: 'static', config: { type: 'static' } })
+    const page = { id: 'p1', publishData: [{ name: 'map', dataSourceId: DS_ID, spread: true }] }
+    await expect(svc.applyPublishData(page, mapBlock(), 'ru')).rejects.toThrow(/no data/)
+  })
+
+  it('схема принимает «Поля в корень»', () => {
+    expect(updateDataSettingsSchema.safeParse({ publishData: [{ name: 'map', dataSourceId: DS_ID, spread: true }] }).success).toBe(true)
+    expect(updateDataSettingsSchema.safeParse({ publishData: [{ name: 'map', dataSourceId: DS_ID, spread: 'yes' }] }).success).toBe(false)
+  })
+})

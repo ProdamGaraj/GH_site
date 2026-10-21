@@ -103,7 +103,10 @@ export const PagePublishData: React.FC<{ pageId: string }> = ({ pageId }) => {
           Источник запрашивается при публикации, на каждом языке (в адресе источника —{' '}
           <code className="bg-gray-100 px-1 rounded">{'{{lang}}'}</code>), и подставляется в блоки страницы: узел
           повторяется по <code className="bg-gray-100 px-1 rounded">item.имя</code>, поля элемента —{' '}
-          <code className="bg-gray-100 px-1 rounded">{'{{$.поле}}'}</code>. Источник не ответил — страница не
+          <code className="bg-gray-100 px-1 rounded">{'{{$.поле}}'}</code>. «Поля в корень» кладёт поля объекта
+          прямо в <code className="bg-gray-100 px-1 rounded">item</code> — так блок, сделанный под данные проекта
+          (карта), работает на любой странице. Статический JSON можно разложить по языкам: путь{' '}
+          <code className="bg-gray-100 px-1 rounded">{'{{lang}}'}</code>. Источник не ответил — страница не
           публикуется, на сайте остаётся прежняя.
         </p>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -180,6 +183,17 @@ export const PagePublishData: React.FC<{ pageId: string }> = ({ pageId }) => {
                 />
               </div>
             </div>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={!!def.spread}
+                onChange={(e) => update(idx, { spread: e.target.checked })}
+              />
+              Поля в корень
+              <span className="text-xs text-gray-400">
+                {def.spread ? '{{item.поле}} — поля объекта прямо в item' : `{{item.${def.name.trim() || 'имя'}}}`}
+              </span>
+            </label>
             <div className="flex items-center justify-between">
               <span className="text-xs text-red-600">{errors[idx] ?? ''}</span>
               <button

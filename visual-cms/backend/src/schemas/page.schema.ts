@@ -75,6 +75,7 @@ const pagePublishDataSchema = z.object({
   name: z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, 'Имя — латиница, цифры и _, с буквы'),
   dataSourceId: z.string().uuid('Invalid data source ID'),
   arrayPath: z.string().max(255).optional(),
+  spread: z.boolean().optional(),
 })
 
 // PUT /api/pages/:id/data-settings

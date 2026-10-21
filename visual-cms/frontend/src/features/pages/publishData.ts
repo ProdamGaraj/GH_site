@@ -22,10 +22,15 @@ export function publishDataErrors(defs: PagePublishDataDef[]): Record<number, st
   return errors
 }
 
-/** То, что уходит на сервер: без пробелов по краям и без пустого пути. */
+/** То, что уходит на сервер: без пробелов по краям, без пустого пути и выключенного «в корень». */
 export function cleanPublishData(defs: PagePublishDataDef[]): PagePublishDataDef[] {
   return defs.map((def) => {
     const arrayPath = def.arrayPath?.trim()
-    return { name: def.name.trim(), dataSourceId: def.dataSourceId, ...(arrayPath ? { arrayPath } : {}) }
+    return {
+      name: def.name.trim(),
+      dataSourceId: def.dataSourceId,
+      ...(arrayPath ? { arrayPath } : {}),
+      ...(def.spread ? { spread: true } : {}),
+    }
   })
 }

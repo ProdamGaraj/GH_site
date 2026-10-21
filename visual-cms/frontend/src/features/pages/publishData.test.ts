@@ -50,3 +50,17 @@ describe('cleanPublishData', () => {
     ])
   })
 })
+
+describe('cleanPublishData: «Поля в корень»', () => {
+  it('включённое — сохраняется, выключенное — не пишется', () => {
+    expect(
+      cleanPublishData([
+        { name: 'map', dataSourceId: DS, arrayPath: '{{lang}}', spread: true },
+        { name: 'news', dataSourceId: DS, spread: false },
+      ]),
+    ).toEqual([
+      { name: 'map', dataSourceId: DS, arrayPath: '{{lang}}', spread: true },
+      { name: 'news', dataSourceId: DS },
+    ])
+  })
+})

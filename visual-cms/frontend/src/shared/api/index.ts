@@ -623,6 +623,8 @@ export interface PagePublishDataDef {
   name: string
   dataSourceId: string
   arrayPath?: string
+  /** Поля объекта-ответа — прямо в item (`{{item.поле}}`), а не в item.<имя>. */
+  spread?: boolean
 }
 
 /** Что получат блоки: число элементов и первый элемент, либо ошибка источника. */

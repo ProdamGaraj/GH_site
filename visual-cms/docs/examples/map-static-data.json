@@ -1,0 +1,290 @@
+{
+  "ru": {
+    "locationTitle": "В центре активной жизни",
+    "locationText": "Harizma расположен в Яшнабадском районе Ташкента, рядом с парком Ашхабад и Central Park. Расположение обеспечивает удобный доступ к основным городским маршрутам, местам отдыха и повседневной инфраструктуре.",
+    "mapHouse": [
+      {
+        "name": "Harizma",
+        "lat": 41.306262,
+        "lng": 69.325643
+      }
+    ],
+    "mapOffices": [
+      {
+        "name": "Отдел продаж",
+        "address": "улица Истикбол, 39Б",
+        "lat": 41.302006,
+        "lng": 69.292259
+      }
+    ],
+    "mapPoints": [
+      {
+        "id": "house",
+        "kind": "house",
+        "type": "",
+        "name": "Harizma",
+        "lat": 41.306262,
+        "lng": 69.325643,
+        "color": "",
+        "distance": ""
+      },
+      {
+        "id": "office",
+        "kind": "office",
+        "type": "",
+        "name": "Отдел продаж",
+        "lat": 41.302006,
+        "lng": 69.292259,
+        "color": "",
+        "distance": "≈ 2,8 км"
+      },
+      {
+        "id": "487d0abc-150f-44fb-80ec-3b72fe6aff18",
+        "kind": "place",
+        "type": "school",
+        "name": "Diplomat International School",
+        "lat": 41.303199,
+        "lng": 69.31814,
+        "color": "#2f6fdf",
+        "distance": "≈ 710 м"
+      },
+      {
+        "id": "42f957dd-6181-4045-abba-c4d216d49968",
+        "kind": "place",
+        "type": "school",
+        "name": "Специализированная IT школа",
+        "lat": 41.302684,
+        "lng": 69.316054,
+        "color": "#2f6fdf",
+        "distance": "≈ 890 м"
+      },
+      {
+        "id": "f3a8b292-70dd-4634-ad1d-e9b7090df5bf",
+        "kind": "place",
+        "type": "hospital",
+        "name": "EraMed",
+        "lat": 41.304973,
+        "lng": 69.311061,
+        "color": "#e04848",
+        "distance": "≈ 1,2 км"
+      },
+      {
+        "id": "76b2b882-457b-41a8-b3af-f92484824a4c",
+        "kind": "place",
+        "type": "shop",
+        "name": "Makro",
+        "lat": 41.303849,
+        "lng": 69.322469,
+        "color": "#c0569a",
+        "distance": "≈ 380 м"
+      },
+      {
+        "id": "bf9d7011-431d-43d3-8810-b41b6b4099fa",
+        "kind": "place",
+        "type": "mall",
+        "name": "Atrium",
+        "lat": 41.304492,
+        "lng": 69.307611,
+        "color": "#a8458a",
+        "distance": "≈ 1,5 км"
+      },
+      {
+        "id": "6ec56636-df9a-4bde-b44d-b1ea8b2506fc",
+        "kind": "place",
+        "type": "sport",
+        "name": "Legenda Fitness",
+        "lat": 41.304648,
+        "lng": 69.32114,
+        "color": "#1f9bc9",
+        "distance": "≈ 420 м"
+      }
+    ],
+    "mapLegend": [
+      {
+        "type": "school",
+        "name": "Школа",
+        "color": "#2f6fdf",
+        "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M14 22v-4a2 2 0 1 0-4 0v4\"/> <path d=\"m18 10 3.447 1.724a1 1 0 0 1 .553.894V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7.382a1 1 0 0 1 .553-.894L6 10\"/> <path d=\"M18 5v17\"/> <path d=\"m4 6 7.106-3.553a2 2 0 0 1 1.788 0L20 6\"/> <path d=\"M6 5v17\"/> <circle cx=\"12\" cy=\"9\" r=\"2\"/></svg>",
+        "count": 2
+      },
+      {
+        "type": "hospital",
+        "name": "Больница",
+        "color": "#e04848",
+        "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 6v4\"/> <path d=\"M14 14h-4\"/> <path d=\"M14 18h-4\"/> <path d=\"M14 8h-4\"/> <path d=\"M18 12h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2\"/> <path d=\"M18 22V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v18\"/></svg>",
+        "count": 1
+      },
+      {
+        "type": "shop",
+        "name": "Магазин",
+        "color": "#c0569a",
+        "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"21\" r=\"1\"/> <circle cx=\"19\" cy=\"21\" r=\"1\"/> <path d=\"M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12\"/></svg>",
+        "count": 1
+      },
+      {
+        "type": "mall",
+        "name": "Торговый центр",
+        "color": "#a8458a",
+        "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z\"/> <path d=\"M3 6h18\"/> <path d=\"M16 10a4 4 0 0 1-8 0\"/></svg>",
+        "count": 1
+      },
+      {
+        "type": "sport",
+        "name": "Спорт",
+        "color": "#1f9bc9",
+        "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M14.4 14.4 9.6 9.6\"/> <path d=\"M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z\"/> <path d=\"m21.5 21.5-1.4-1.4\"/> <path d=\"M3.9 3.9 2.5 2.5\"/> <path d=\"M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z\"/></svg>",
+        "count": 1
+      }
+    ],
+    "mapImages": [],
+    "panorama": [
+      {
+        "url": "https://uzbekistan360.uz/ru/location/gh-tehnologstan-vid-s-pticego-polyota"
+      }
+    ]
+  },
+  "uz": {
+    "locationTitle": "Faol hayot markazida",
+    "locationText": "Harizma Toshkentning Yashnobod tumanida, Ashxobod bog‘i va Central Park yaqinida joylashgan. Joylashuv asosiy shahar yo‘nalishlari, dam olish maskanlari va kundalik infratuzilmaga qulay chiqish imkonini beradi.",
+    "mapHouse": [
+      {
+        "name": "Harizma",
+        "lat": 41.306262,
+        "lng": 69.325643
+      }
+    ],
+    "mapOffices": [
+      {
+        "name": "Sotuv ofisi",
+        "address": "улица Истикбол, 39Б",
+        "lat": 41.302006,
+        "lng": 69.292259
+      }
+    ],
+    "mapPoints": [
+      {
+        "id": "house",
+        "kind": "house",
+        "type": "",
+        "name": "Harizma",
+        "lat": 41.306262,
+        "lng": 69.325643,
+        "color": "",
+        "distance": ""
+      },
+      {
+        "id": "office",
+        "kind": "office",
+        "type": "",
+        "name": "Sotuv ofisi",
+        "lat": 41.302006,
+        "lng": 69.292259,
+        "color": "",
+        "distance": "≈ 2,8 km"
+      },
+      {
+        "id": "487d0abc-150f-44fb-80ec-3b72fe6aff18",
+        "kind": "place",
+        "type": "school",
+        "name": "Diplomat International School",
+        "lat": 41.303199,
+        "lng": 69.31814,
+        "color": "#2f6fdf",
+        "distance": "≈ 710 m"
+      },
+      {
+        "id": "42f957dd-6181-4045-abba-c4d216d49968",
+        "kind": "place",
+        "type": "school",
+        "name": "Специализированная IT школа",
+        "lat": 41.302684,
+        "lng": 69.316054,
+        "color": "#2f6fdf",
+        "distance": "≈ 890 m"
+      },
+      {
+        "id": "f3a8b292-70dd-4634-ad1d-e9b7090df5bf",
+        "kind": "place",
+        "type": "hospital",
+        "name": "EraMed",
+        "lat": 41.304973,
+        "lng": 69.311061,
+        "color": "#e04848",
+        "distance": "≈ 1,2 km"
+      },
+      {
+        "id": "76b2b882-457b-41a8-b3af-f92484824a4c",
+        "kind": "place",
+        "type": "shop",
+        "name": "Makro",
+        "lat": 41.303849,
+        "lng": 69.322469,
+        "color": "#c0569a",
+        "distance": "≈ 380 m"
+      },
+      {
+        "id": "bf9d7011-431d-43d3-8810-b41b6b4099fa",
+        "kind": "place",
+        "type": "mall",
+        "name": "Atrium",
+        "lat": 41.304492,
+        "lng": 69.307611,
+        "color": "#a8458a",
+        "distance": "≈ 1,5 km"
+      },
+      {
+        "id": "6ec56636-df9a-4bde-b44d-b1ea8b2506fc",
+        "kind": "place",
+        "type": "sport",
+        "name": "Legenda Fitness",
+        "lat": 41.304648,
+        "lng": 69.32114,
+        "color": "#1f9bc9",
+        "distance": "≈ 420 m"
+      }
+    ],
+    "mapLegend": [
+      {
+        "type": "school",
+        "name": "Maktab",
+        "color": "#2f6fdf",
+        "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M14 22v-4a2 2 0 1 0-4 0v4\"/> <path d=\"m18 10 3.447 1.724a1 1 0 0 1 .553.894V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7.382a1 1 0 0 1 .553-.894L6 10\"/> <path d=\"M18 5v17\"/> <path d=\"m4 6 7.106-3.553a2 2 0 0 1 1.788 0L20 6\"/> <path d=\"M6 5v17\"/> <circle cx=\"12\" cy=\"9\" r=\"2\"/></svg>",
+        "count": 2
+      },
+      {
+        "type": "hospital",
+        "name": "Kasalxona",
+        "color": "#e04848",
+        "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 6v4\"/> <path d=\"M14 14h-4\"/> <path d=\"M14 18h-4\"/> <path d=\"M14 8h-4\"/> <path d=\"M18 12h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2\"/> <path d=\"M18 22V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v18\"/></svg>",
+        "count": 1
+      },
+      {
+        "type": "shop",
+        "name": "Doʻkon",
+        "color": "#c0569a",
+        "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"21\" r=\"1\"/> <circle cx=\"19\" cy=\"21\" r=\"1\"/> <path d=\"M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12\"/></svg>",
+        "count": 1
+      },
+      {
+        "type": "mall",
+        "name": "Savdo markazi",
+        "color": "#a8458a",
+        "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z\"/> <path d=\"M3 6h18\"/> <path d=\"M16 10a4 4 0 0 1-8 0\"/></svg>",
+        "count": 1
+      },
+      {
+        "type": "sport",
+        "name": "Sport",
+        "color": "#1f9bc9",
+        "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M14.4 14.4 9.6 9.6\"/> <path d=\"M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z\"/> <path d=\"m21.5 21.5-1.4-1.4\"/> <path d=\"M3.9 3.9 2.5 2.5\"/> <path d=\"M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z\"/></svg>",
+        "count": 1
+      }
+    ],
+    "mapImages": [],
+    "panorama": [
+      {
+        "url": "https://uzbekistan360.uz/ru/location/gh-tehnologstan-vid-s-pticego-polyota"
+      }
+    ]
+  }
+}

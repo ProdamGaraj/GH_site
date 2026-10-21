@@ -92,3 +92,23 @@ describe('PagePublishData', () => {
     expect(await screen.findByText('Имена данных не должны повторяться')).toBeTruthy()
   })
 })
+
+describe('PagePublishData: «Поля в корень»', () => {
+  beforeEach(() => {
+    vi.mocked(fetchDataSourceOptions).mockReset().mockResolvedValue([{ id: DS, name: 'Карта офиса (JSON)' }])
+    vi.mocked(pagePublishDataApi.update).mockReset().mockResolvedValue({ publishData: [] })
+  })
+  afterEach(() => cleanup())
+
+  it('галочка уходит на сервер как spread: true; подсказка — куда лягут поля', async () => {
+    await mount([{ name: 'map', dataSourceId: DS, arrayPath: '' }])
+    const box = screen.getByRole('checkbox', { name: /Поля в корень/ })
+    expect(screen.getByText('{{item.map}}')).toBeTruthy()
+    fireEvent.click(box)
+    expect(screen.getByText(/поля объекта прямо в item/)).toBeTruthy()
+    fireEvent.click(saveButton())
+    await waitFor(() =>
+      expect(pagePublishDataApi.update).toHaveBeenCalledWith('p1', [{ name: 'map', dataSourceId: DS, spread: true }]),
+    )
+  })
+})

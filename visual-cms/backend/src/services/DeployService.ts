@@ -1405,6 +1405,12 @@ export class DeployService {
     ds: DataSourceEntity
   ): Promise<{ fetchConfig: FetchConfig; authConfig?: AuthConfig }> {
     const config = ds.config as any
+    // Статический JSON: данные лежат в самом источнике, запроса нет —
+    // SecureDataSourceService отдаёт config.data как ответ.
+    if (ds.type === 'static') {
+      if (config?.data === undefined || config?.data === null) throw new Error(`Static data source has no data: ${ds.id}`)
+      return { fetchConfig: { type: 'static', data: config.data } }
+    }
     if (!config?.url) throw new Error(`Data source has no URL: ${ds.id}`)
 
     let authConfig: AuthConfig | undefined
@@ -2619,9 +2625,31 @@ export class DeployService {
   private async applyPublishData(page: Page, structure: any, lang?: string): Promise<any> {
     const defs = page.publishData ?? []
     if (defs.length === 0) return structure
+    return this.expandDataSlideBlocks(this.substituteItemData(structure, await this.publishDataItem(defs, lang)), lang)
+  }
+
+  /**
+   * item для данных при публикации: каждый источник — item.<имя>, а с
+   * «Поля в корень» (spread) поля объекта-ответа ложатся прямо в item. Так
+   * блок, сделанный под данные проекта (`{{item.mapPoints}}`, повтор по
+   * item.mapOffices), работает на обычной странице без перепривязки: его
+   * данные — статический JSON того же вида. Порядок источников — порядок
+   * строк: позднее перекрывает раннее.
+   */
+  private async publishDataItem(defs: PagePublishDataDef[], lang?: string): Promise<Record<string, unknown>> {
     const item: Record<string, unknown> = {}
-    for (const def of defs) item[def.name] = await this.fetchPublishData(def, lang)
-    return this.expandDataSlideBlocks(this.substituteItemData(structure, item), lang)
+    for (const def of defs) {
+      const data = await this.fetchPublishData(def, lang)
+      if (!def.spread) {
+        item[def.name] = data
+        continue
+      }
+      if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        throw new Error(`Данные страницы «${def.name}»: «Поля в корень» — нужен объект, а пришёл ${Array.isArray(data) ? 'массив' : typeof data}`)
+      }
+      Object.assign(item, data)
+    }
+    return item
   }
 
   /**
@@ -2693,7 +2721,10 @@ export class DeployService {
     if (!result.success) {
       throw new Error(`Данные страницы «${def.name}»: ${result.error?.message || 'источник не ответил'}`)
     }
-    return def.arrayPath ? this.getNestedValue(result.data, def.arrayPath) : result.data
+    // {{lang}} в пути — данные на языке версии: у статического JSON вида
+    // {"ru": {...}, "uz": {...}} путь «{{lang}}» берёт свой язык.
+    const path = def.arrayPath && lang ? def.arrayPath.replace(/\{\{\s*lang\s*\}\}/g, lang) : def.arrayPath
+    return path ? this.getNestedValue(result.data, path) : result.data
   }
 
   /**

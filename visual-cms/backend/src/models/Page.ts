@@ -7,6 +7,11 @@ export interface PagePublishDataDef {
   name: string
   dataSourceId: string
   arrayPath?: string
+  /**
+   * Поля объекта-ответа — прямо в item (`{{item.поле}}`), а не в item.<имя>.
+   * Для блоков, привязанных к полям элемента коллекции (карта проекта).
+   */
+  spread?: boolean
 }
 
 @Entity('pages')
