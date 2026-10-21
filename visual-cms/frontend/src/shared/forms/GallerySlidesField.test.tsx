@@ -105,3 +105,58 @@ describe('GallerySlidesField', () => {
     expect(screen.queryByTestId('media-thumbs')).toBeNull()
   })
 })
+
+describe('GallerySlidesField: медиа по экранам', () => {
+  afterEach(() => cleanup())
+
+  const SCREENS = [
+    { id: 'tablet', name: 'Tablet', width: 768 },
+    { id: 'desktop-hd', name: 'Desktop HD', width: 1440 },
+    { id: 'mobile', name: 'Mobile', width: 375 },
+  ]
+
+  function setupScreens(value: GalleryItem[]) {
+    const onChange = vi.fn()
+    render(<GallerySlidesField label="Hero — слайды" value={value} onChange={onChange} screens={SCREENS} />)
+    return onChange
+  }
+
+  it('без экранов шаблона раздела нет', () => {
+    setup(['/a.jpg'])
+    expect(screen.queryByTestId('screens-0')).toBeNull()
+  })
+
+  it('поле на каждый экран, от широкого к узкому; пустой экран берёт экран шире или основное', () => {
+    setupScreens([{ url: '/a.jpg', screens: { tablet: { url: '/t.jpg' } } }])
+    const box = screen.getByTestId('screens-0')
+    const labels = within(box).getAllByRole('textbox').map((el) => el.getAttribute('aria-label'))
+    expect(labels).toEqual(['Desktop HD · 1440 px', 'Tablet · 768 px', 'Mobile · 375 px'])
+    expect(within(screen.getByTestId('screen-0-desktop-hd')).getByText('пусто — как основное')).toBeTruthy()
+    expect(within(screen.getByTestId('screen-0-mobile')).getByText('пусто — как у «Tablet»')).toBeTruthy()
+    expect(box.textContent).toContain('своё у 1 из 3')
+  })
+
+  it('ссылка экрана пишется в слайд; очистка убирает экран', () => {
+    const onChange = setupScreens(['/a.jpg'])
+    fireEvent.change(screen.getByLabelText('Mobile · 375 px'), { target: { value: '/m.jpg' } })
+    expect(onChange).toHaveBeenLastCalledWith([{ url: '/a.jpg', screens: { mobile: { url: '/m.jpg' } } }])
+    cleanup()
+    const onClear = setupScreens([{ url: '/a.jpg', screens: { mobile: { url: '/m.jpg' } } }])
+    fireEvent.click(screen.getByLabelText('Очистить: Mobile · 375 px'))
+    expect(onClear).toHaveBeenLastCalledWith(['/a.jpg'])
+  })
+
+  it('точка фокуса экрана — своя, у слайда не меняется', () => {
+    const onChange = setupScreens([{ url: '/a.jpg', focus: { x: 10, y: 10 }, screens: { mobile: { url: '/m.jpg' } } }])
+    const target = screen.getByTestId('screen-focus-0-mobile')
+    stubRect(target)
+    fireEvent.click(target, { clientX: 100, clientY: 20 })
+    expect(onChange).toHaveBeenLastCalledWith([{ url: '/a.jpg', focus: { x: 10, y: 10 }, screens: { mobile: { url: '/m.jpg', focus: { x: 50, y: 20 } } } }])
+  })
+
+  it('«целиком» — фокус экрана не нужен; у слайда-блока экранов нет', () => {
+    setupScreens([{ url: '/a.jpg', fit: 'contain', screens: { mobile: { url: '/m.jpg' } } }, 'block:b1'])
+    expect(screen.queryByTestId('screen-focus-0-mobile')).toBeNull()
+    expect(screen.queryByTestId('screens-1')).toBeNull()
+  })
+})

@@ -187,3 +187,63 @@ describe('тема шапки и слайд-блок', () => {
     expect(galleryItemSchema.safeParse({ url: '/a.webp', theme: 'sepia' }).success).toBe(false)
   })
 })
+
+describe('медиа по экранам шаблона', () => {
+  it('фото экрана — фон и позиция по фокусу экрана; без экранов поля _responsive нет', () => {
+    const [slide] = toSlides([
+      { url: '/wide.jpg', focus: { x: 10, y: 20 }, screens: { mobile: { url: '/tall.jpg', focus: { x: 50, y: 30 } }, tablet: { url: '/mid.jpg' } } },
+    ])
+    expect(slide.image).toBe('/wide.jpg')
+    expect(slide.position).toBe('10% 20%')
+    expect(slide._responsive).toEqual({
+      image: { mobile: '/tall.jpg', tablet: '/mid.jpg' },
+      position: { mobile: '50% 30%', tablet: '50% 50%' },
+    })
+    expect(toSlides(['/a.jpg'])[0]).not.toHaveProperty('_responsive')
+  })
+
+  it('видео-слайд: фото на экране — видео на нём нет (пустая строка), видео экрана — своё', () => {
+    const [slide] = toSlides([
+      '/poster.jpg',
+      { url: '/wide.mp4', screens: { mobile: { url: '/tall.jpg' }, tablet: { url: '/mid.mp4' } } },
+    ]).slice(1)
+    expect(slide.video).toBe('/wide.mp4')
+    expect(slide._responsive).toEqual({
+      image: { mobile: '/tall.jpg' },
+      video: { mobile: '', tablet: '/mid.mp4' },
+      position: { mobile: '50% 50%', tablet: '50% 50%' },
+    })
+  })
+
+  it('фото-слайд с видео на экране: видео экрана, постер — фото слайда', () => {
+    const [slide] = toSlides([{ url: '/wide.jpg', screens: { mobile: { url: '/tall.mp4' } } }])
+    expect(slide._responsive).toEqual({ video: { mobile: '/tall.mp4' }, position: { mobile: '50% 50%' } })
+  })
+
+  it('«целиком» — позиция экрана по центру, даже с фокусом', () => {
+    const [slide] = toSlides([{ url: '/a.jpg', fit: 'contain', screens: { mobile: { url: '/b.jpg', focus: { x: 1, y: 1 } } } }])
+    expect(slide._responsive?.position).toEqual({ mobile: '50% 50%' })
+  })
+
+  it('мусорные экраны отбрасываются: неверный id, пустая ссылка, ссылка на блок; у слайда-блока экранов нет', () => {
+    const items = readGallery([
+      { url: '/a.jpg', screens: { 'bad id': { url: '/x.jpg' }, mobile: { url: ' ' }, tablet: { url: 'block:abc' }, 'desktop-hd': { url: '/ok.jpg' } } },
+      { url: 'block:b1', screens: { mobile: { url: '/x.jpg' } } },
+      { url: '/c.jpg', screens: ['/x.jpg'] },
+    ])
+    expect(items.map((i) => i.screens)).toEqual([{ 'desktop-hd': { url: '/ok.jpg', focus: null } }, {}, {}])
+  })
+
+  it('экраны не попадают в списки ссылок и постер', () => {
+    const gallery = [{ url: '/a.mp4', screens: { mobile: { url: '/m.jpg' } } }]
+    expect(galleryUrls(gallery)).toEqual(['/a.mp4'])
+    expect(posterOf(gallery, '/fallback.jpg')).toBe('/fallback.jpg')
+  })
+
+  it('схема: экраны с id брейкпоинта, ссылкой и фокусом; неверный id и пустая ссылка — ошибка', () => {
+    expect(galleryItemSchema.safeParse({ url: '/a.jpg', screens: { mobile: { url: '/m.jpg', focus: { x: 1, y: 2 } }, 'desktop-hd': { url: '/d.mp4' } } }).success).toBe(true)
+    expect(galleryItemSchema.safeParse({ url: '/a.jpg', screens: { 'bad id': { url: '/m.jpg' } } }).success).toBe(false)
+    expect(galleryItemSchema.safeParse({ url: '/a.jpg', screens: { mobile: { url: '' } } }).success).toBe(false)
+    expect(galleryItemSchema.safeParse({ url: '/a.jpg', screens: { mobile: { url: '/m.jpg', focus: { x: 200, y: 0 } } } }).success).toBe(false)
+  })
+})

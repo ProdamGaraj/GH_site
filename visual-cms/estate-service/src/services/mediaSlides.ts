@@ -18,6 +18,14 @@
  * {url, focus, fit}. Строки остаются валидными: старые данные и сиды не
  * требуют переноса, а админка пишет объект только когда есть настройки.
  *
+ * Экраны. У слайда может быть своё медиа для отдельных экранов шаблона
+ * (`screens: { mobile: { url, focus } }`; ключ — id брейкпоинта страницы-
+ * шаблона в CMS). Экран без своего медиа берёт медиа экрана шире, а самый
+ * широкий — основное. Вписывание и тема шапки — общие для слайда. В DTO
+ * экраны уходят полем `_responsive` (формат слайдов CMS:
+ * `_responsive[поле][экран] = значение`) — по нему CMS при публикации пишет
+ * @media-правила фона и карту видео по экранам.
+ *
  * Чистые функции без БД.
  */
 
@@ -33,8 +41,25 @@ export interface SlideFocus {
 /** Тема шапки над слайдом: dark — светлый текст шапки, light — тёмный; без неё — авто. */
 export type SlideTheme = 'dark' | 'light'
 
+/** Своё медиа слайда для одного экрана шаблона. */
+export interface SlideScreen {
+  url: string
+  focus?: SlideFocus
+}
+
 /** Элемент галереи ЖК, как он лежит в базе. */
-export type GalleryItem = string | { url: string; focus?: SlideFocus; fit?: SlideFit; theme?: SlideTheme }
+export type GalleryItem =
+  | string
+  | { url: string; focus?: SlideFocus; fit?: SlideFit; theme?: SlideTheme; screens?: Record<string, SlideScreen> }
+
+/** id экрана — как id брейкпоинта в CMS: `mobile`, `desktop-hd`. */
+export const SCREEN_ID_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/i
+
+/**
+ * Значения полей слайда по экранам: `_responsive[поле][экран]`. Пустая
+ * строка — явно «нет»: например, на телефоне фото вместо видео.
+ */
+export type SlideResponsive = Partial<Record<'image' | 'video' | 'position', Record<string, string>>>
 
 /**
  * Слайд-блок: вместо ссылки на файл — `block:<id блока библиотеки CMS>`.
@@ -66,6 +91,8 @@ export interface MediaSlide {
   theme: '' | SlideTheme
   /** id блока библиотеки для слайда-блока (data-slide-block); пусто — слайд-файл. */
   block: string
+  /** Медиа по экранам; нет — слайд одинаковый на всех экранах. */
+  _responsive?: SlideResponsive
 }
 
 /** Центр кадра — позиция слайда без фокуса и в режиме «целиком». */
@@ -77,12 +104,20 @@ export function isVideoUrl(url: string): boolean {
   return VIDEO_RE.test(url.trim())
 }
 
+/** Своё медиа экрана после разбора. */
+export interface ScreenSettings {
+  url: string
+  focus: SlideFocus | null
+}
+
 /** Элемент галереи после разбора: всегда объект, без мусора. */
 export interface GallerySlideSettings {
   url: string
   focus: SlideFocus | null
   fit: SlideFit
   theme: SlideTheme | null
+  /** Свои медиа экранов; пусто — слайд одинаковый на всех экранах. */
+  screens: Record<string, ScreenSettings>
 }
 
 function percent(value: unknown): number | null {
@@ -98,6 +133,23 @@ function readFocus(value: unknown): SlideFocus | null {
 }
 
 /**
+ * Экраны слайда: только известного вида id и с непустой ссылкой; слайд-блок
+ * экранов не бывает — блок один на все экраны.
+ */
+function readScreens(value: unknown): Record<string, ScreenSettings> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const out: Record<string, ScreenSettings> = {}
+  for (const [id, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (!SCREEN_ID_RE.test(id) || !raw || typeof raw !== 'object') continue
+    const screen = raw as Record<string, unknown>
+    const url = typeof screen.url === 'string' ? screen.url.trim() : ''
+    if (!url || blockIdOf(url)) continue
+    out[id] = { url, focus: readFocus(screen.focus) }
+  }
+  return out
+}
+
+/**
  * Галерея из базы → список настроек слайдов. Строка — слайд без настроек;
  * объект без ссылки, пустые строки и прочий мусор отбрасываются. Не массив —
  * пустой список: колонка jsonb могла быть заполнена руками.
@@ -108,7 +160,7 @@ export function readGallery(value: unknown): GallerySlideSettings[] {
   for (const raw of value) {
     if (typeof raw === 'string') {
       const url = raw.trim()
-      if (url) out.push({ url, focus: null, fit: 'cover', theme: null })
+      if (url) out.push({ url, focus: null, fit: 'cover', theme: null, screens: {} })
       continue
     }
     if (!raw || typeof raw !== 'object') continue
@@ -120,6 +172,7 @@ export function readGallery(value: unknown): GallerySlideSettings[] {
       focus: readFocus(item.focus),
       fit: item.fit === 'contain' ? 'contain' : 'cover',
       theme: item.theme === 'dark' || item.theme === 'light' ? item.theme : null,
+      screens: blockIdOf(url) ? {} : readScreens(item.screens),
     })
   }
   return out
@@ -136,9 +189,37 @@ export function galleryUrls(value: unknown): string[] {
  * Позиция кадра. В режиме «целиком» кадр виден полностью, и фокус только
  * сдвинул бы видео к краю полосы — поэтому центр.
  */
-function positionOf(item: GallerySlideSettings): string {
+function positionOf(item: { fit: SlideFit; focus: SlideFocus | null }): string {
   if (item.fit === 'contain' || !item.focus) return CENTER_POSITION
   return `${item.focus.x}% ${item.focus.y}%`
+}
+
+/**
+ * Значения слайда по экранам. Фото экрана — его фон (видео на этом экране
+ * нет, если у слайда оно есть); видео экрана — его видео, постером остаётся
+ * фон слайда. Позиция — фокус экрана (свой кадр — своя точка), вписывание —
+ * общее для слайда.
+ */
+function responsiveOf(item: GallerySlideSettings, hasVideo: boolean): SlideResponsive | undefined {
+  const ids = Object.keys(item.screens)
+  if (ids.length === 0) return undefined
+  const image: Record<string, string> = {}
+  const video: Record<string, string> = {}
+  const position: Record<string, string> = {}
+  for (const id of ids) {
+    const screen = item.screens[id]
+    if (isVideoUrl(screen.url)) {
+      video[id] = screen.url
+    } else {
+      image[id] = screen.url
+      if (hasVideo) video[id] = ''
+    }
+    position[id] = positionOf({ fit: item.fit, focus: screen.focus })
+  }
+  const out: SlideResponsive = { position }
+  if (Object.keys(image).length > 0) out.image = image
+  if (Object.keys(video).length > 0) out.video = video
+  return out
 }
 
 /** Слайд без настроек кадрирования. */
@@ -167,7 +248,7 @@ export function toSlides(value: unknown, fallbackPoster = ''): MediaSlide[] {
     // Слайд-блок: ни фона, ни видео — содержимое даёт блок. Кадрирования нет.
     if (block) return { url: item.url, image: '', video: '', position: CENTER_POSITION, fit: 'cover', theme, block }
     const video = isVideoUrl(item.url)
-    return {
+    const slide: MediaSlide = {
       url: item.url,
       image: video ? poster : item.url,
       video: video ? item.url : '',
@@ -176,6 +257,9 @@ export function toSlides(value: unknown, fallbackPoster = ''): MediaSlide[] {
       theme,
       block: '',
     }
+    const responsive = responsiveOf(item, video)
+    if (responsive) slide._responsive = responsive
+    return slide
   })
 }
 

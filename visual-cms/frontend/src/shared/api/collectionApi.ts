@@ -146,6 +146,13 @@ export interface CollectionRequestPreview {
   warnings: string[]
 }
 
+/** Экран страницы-шаблона (брейкпоинт): id, название, ширина в px. */
+export interface TemplateScreen {
+  id: string
+  name: string
+  width: number
+}
+
 export const collectionApi = {
   getAll: (siteId?: string) => {
     const qs = siteId ? `?siteId=${siteId}` : ''
@@ -166,6 +173,12 @@ export const collectionApi = {
   /** Превью цепочки запросов (основной + доп.источники на образце-элементе) */
   previewRequest: (id: string) =>
     api.get<CollectionRequestPreview>(`/collections/${id}/preview-request`),
+
+  /**
+   * Экраны страниц-шаблонов коллекций сервиса — для полей медиа слайда по
+   * экранам в админках ЖК и новостей.
+   */
+  screens: (kind: 'estate' | 'news') => api.get<{ screens: TemplateScreen[] }>(`/collections/screens/${kind}`),
 
   /** Деплой конкретной коллекции */
   deploy: (id: string) => api.post<{ success: boolean; deployedPages: string[]; errors: string[] }>(

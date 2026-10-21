@@ -16,6 +16,9 @@ const router = Router()
 router.post('/provision-estate', validate(provisionEstateSchema), CollectionController.provisionEstate)
 router.post('/provision-news', validate(provisionNewsSchema), CollectionController.provisionNews)
 
+// Экраны страниц-шаблонов коллекций сервиса — для полей медиа по экранам (до '/:id')
+router.get('/screens/:kind', CollectionController.screens)
+
 // CRUD коллекций
 router.get('/', CollectionController.getAll)
 router.get('/:id', CollectionController.getById)

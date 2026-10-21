@@ -16,6 +16,7 @@ import { applyCollectionTransforms } from '../utils/collectionTransforms'
 import { pruneCollectionItems } from '../services/collectionOutput'
 import { languageService } from '../services/LanguageService'
 import type { DeployReportTarget } from '../services/deployReport'
+import { templateScreens } from '../services/screenMedia'
 
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
 
@@ -240,6 +241,33 @@ export class CollectionController {
       created: { dataSource: dataSourceCreated, collection: collectionCreated },
     })
   }
+
+  /**
+   * GET /api/collections/screens/:kind — экраны страниц-шаблонов коллекций
+   * сервиса (estate | news). По ним админка сервиса показывает поля медиа
+   * слайда по экранам. Коллекция сервиса — та, чей источник ходит по пути
+   * пресета провижна (`/api/complexes`, `/api/news`).
+   */
+  screens = asyncHandler(async (req: Request, res: Response) => {
+    const preset = PROVISION_PRESETS[req.params.kind as keyof typeof PROVISION_PRESETS]
+    if (!preset) throw new NotFoundError('Неизвестный сервис')
+    const servicePath = preset.path.split('?')[0]
+    const collections = await this.getRepository().find({ relations: ['dataSource'] })
+    const templateIds = collections
+      .filter((c) => String((c.dataSource?.config as { url?: unknown } | undefined)?.url ?? '').includes(servicePath))
+      .map((c) => c.templatePageId)
+    if (templateIds.length === 0) {
+      res.json({ screens: [] })
+      return
+    }
+    // Только экраны шаблона, без всей структуры страницы.
+    const rows: Array<{ breakpoints: unknown }> = await this.getPageRepository()
+      .createQueryBuilder('p')
+      .select(`p.structure->'metadata'->'breakpoints'`, 'breakpoints')
+      .where('p.id IN (:...ids)', { ids: templateIds })
+      .getRawMany()
+    res.json({ screens: templateScreens(rows.map((r) => r.breakpoints)) })
+  })
 
   /** POST /api/collections/provision-estate — страницы проектов из estate-service. */
   provisionEstate = asyncHandler(async (req: Request, res: Response) => {

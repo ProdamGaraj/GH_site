@@ -1083,3 +1083,78 @@ describe('CarouselRuntime: подписи точек (доступность)', 
     expect(dotsAt()[1].getAttribute('aria-label')).toBe('Второй кадр')
   })
 })
+
+describe('CarouselRuntime: медиа слайда по экранам (data-screen-attrs)', () => {
+  const BREAKPOINTS = [
+    { id: 'desktop-hd', width: 1440, boundary: null },
+    { id: 'tablet', width: 768, boundary: 1439 },
+    { id: 'mobile', width: 375, boundary: 767 },
+  ]
+  const setViewport = (width: number) => {
+    Object.defineProperty(window, 'innerWidth', { value: width, configurable: true, writable: true })
+  }
+  const screens = (map: Record<string, Record<string, string>>) => JSON.stringify(map).replace(/"/g, '&quot;')
+  const slides = (attrs: string) => `
+    <div data-carousel="true" data-carousel-autoplay="0" data-carousel-infinite="false">
+      <div data-carousel-track="true">
+        <div data-carousel-slide="true" data-slide-video="/wide.mp4" data-screen-key="s1" data-screen-attrs="${attrs}"></div>
+        <div data-carousel-slide="true" data-slide-video="/b.mp4"></div>
+      </div>
+    </div>`
+  let load: jest.SpyInstance
+
+  beforeEach(() => {
+    ;(window as any).__ghBreakpoints = BREAKPOINTS
+    jest.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve())
+    jest.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined)
+    load = jest.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined)
+  })
+  afterEach(() => {
+    jest.restoreAllMocks()
+    delete (window as any).__ghBreakpoints
+    setViewport(1024)
+    document.body.innerHTML = ''
+  })
+
+  const first = () => document.querySelector<HTMLElement>('[data-screen-key="s1"]')!
+
+  it('телефон: фото вместо видео — атрибут пустой, плеер не создаётся; исходное значение сохранено', async () => {
+    setViewport(390)
+    await boot(slides(screens({ 'data-slide-video': { mobile: '' } })))
+    expect(first().getAttribute('data-slide-video')).toBe('')
+    expect(first().querySelector('video')).toBeNull()
+    expect(JSON.parse(first().getAttribute('data-screen-base')!)).toEqual({ 'data-slide-video': '/wide.mp4' })
+  })
+
+  it('экран без своего значения берёт значение экрана шире; шире всех — исходное', async () => {
+    setViewport(390)
+    await boot(slides(screens({ 'data-slide-video': { tablet: '/mid.mp4' } })))
+    expect(first().getAttribute('data-slide-video')).toBe('/mid.mp4')
+    setViewport(1600)
+    window.dispatchEvent(new Event('resize'))
+    expect(first().getAttribute('data-slide-video')).toBe('/wide.mp4')
+  })
+
+  it('смена экрана у созданного видео: новый файл и перезагрузка; на экране без видео плеер убирается', async () => {
+    setViewport(1600)
+    await boot(slides(screens({ 'data-slide-video': { tablet: '/mid.mp4', mobile: '' } })))
+    const video = first().querySelector('video')!
+    expect(video.querySelector('source')!.getAttribute('src')).toBe('/wide.mp4')
+
+    setViewport(1000)
+    window.dispatchEvent(new Event('resize'))
+    expect(first().querySelector('video source')!.getAttribute('src')).toBe('/mid.mp4')
+    expect(load).toHaveBeenCalled()
+
+    setViewport(390)
+    window.dispatchEvent(new Event('resize'))
+    expect(first().querySelector('video')).toBeNull()
+  })
+
+  it('без data-screen-attrs слайд как раньше', async () => {
+    setViewport(390)
+    await boot(slides('').replace(' data-screen-key="s1" data-screen-attrs=""', ' data-screen-key="s1"'))
+    expect(first().getAttribute('data-slide-video')).toBe('/wide.mp4')
+    expect(first().hasAttribute('data-screen-base')).toBe(false)
+  })
+})

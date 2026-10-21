@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Boxes } from 'lucide-react'
 import { blockApi } from '@/shared/api'
 import { resolveMediaUrl } from '@/shared/api/mediaApi'
+import type { TemplateScreen } from '@/shared/api/collectionApi'
 import { cn } from '@/shared/utils'
 import { BlockPicker } from '@/features/editor/components/BlockPicker'
 import {
@@ -9,16 +10,19 @@ import {
   blockSlideUrl,
   focusAt,
   isVideoUrl,
+  plainSlide,
   readGallery,
   slidePosition,
+  withScreen,
   withUrls,
   writeGallery,
   type GalleryItem,
   type SlideFit,
+  type SlideFocus,
   type SlideSettings,
   type SlideTheme,
 } from './gallerySlides'
-import { MediaListField, MediaThumb } from './mediaFields'
+import { MediaField, MediaListField, MediaThumb } from './mediaFields'
 
 /**
  * Галерея слайдов ЖК: ссылки по одной на строку (как раньше) и кадрирование
@@ -97,7 +101,12 @@ export const GallerySlidesField: React.FC<{
   withTheme?: boolean
   /** Слайд-блок из библиотеки CMS (`block:<id>`); его разворачивает CMS при публикации. */
   withBlocks?: boolean
-}> = ({ label, hint, value, onChange, frames = FRAMES, withTheme = false, withBlocks = false }) => {
+  /**
+   * Экраны страницы-шаблона: у слайда-файла — своё медиа для каждого экрана
+   * (публикация пишет его в @media). Нет экранов — поля не показываются.
+   */
+  screens?: readonly TemplateScreen[]
+}> = ({ label, hint, value, onChange, frames = FRAMES, withTheme = false, withBlocks = false, screens = [] }) => {
   const slides = readGallery(value)
   const [pickerOpen, setPickerOpen] = useState(false)
   const blockNames = useBlockNames(withBlocks && slides.some((s) => blockIdOf(s.url)))
@@ -132,7 +141,7 @@ export const GallerySlidesField: React.FC<{
             forcedMode="linked"
             onPick={({ block }) => {
               setPickerOpen(false)
-              onChange(writeGallery([...slides, { url: blockSlideUrl(block.id), focus: null, fit: 'cover', theme: null }]))
+              onChange(writeGallery([...slides, plainSlide(blockSlideUrl(block.id))]))
             }}
           />
         </>
@@ -160,6 +169,9 @@ export const GallerySlidesField: React.FC<{
             ) : (
               <SlideFramingRow key={`${i}:${slide.url}`} index={i} slide={slide} frames={frames} onChange={(patch) => update(i, patch)}>
                 {theme}
+                {screens.length > 0 && (
+                  <SlideScreens index={i} slide={slide} screens={screens} onChange={(next) => update(i, next)} />
+                )}
               </SlideFramingRow>
             )
           })}
@@ -195,6 +207,40 @@ const ThemeSwitch: React.FC<{ index: number; value: SlideTheme | null; onChange:
   </div>
 )
 
+/**
+ * Превью с точкой фокуса: клик ставит точку, которая останется в кадре. В
+ * режиме «целиком» кадр виден полностью — точка не нужна.
+ */
+const FocusThumb: React.FC<{
+  url: string
+  focus: SlideFocus | null
+  contain: boolean
+  onPick: (focus: SlideFocus) => void
+  testId: string
+  className?: string
+}> = ({ url, focus, contain, onPick, testId, className }) => (
+  <div
+    role="button"
+    tabIndex={-1}
+    aria-label="Точка фокуса"
+    title={contain ? 'В режиме «Целиком» кадр виден полностью' : 'Клик — точка, которая останется в кадре'}
+    onClick={(event) => {
+      if (!contain) onPick(focusAt(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect()))
+    }}
+    className={cn('relative shrink-0 select-none', contain ? 'cursor-default opacity-60' : 'cursor-crosshair', className)}
+    data-testid={testId}
+  >
+    <MediaThumb src={resolveMediaUrl(url)} video={isVideoUrl(url)} className="block w-full h-auto rounded" />
+    {!contain && (
+      <span
+        className="absolute w-3 h-3 -ml-1.5 -mt-1.5 rounded-full border-2 border-white bg-primary-500 shadow pointer-events-none"
+        style={{ left: `${focus?.x ?? 50}%`, top: `${focus?.y ?? 50}%` }}
+        data-testid={`${testId}-dot`}
+      />
+    )}
+  </div>
+)
+
 const SlideFramingRow: React.FC<{
   index: number
   slide: SlideSettings
@@ -206,31 +252,16 @@ const SlideFramingRow: React.FC<{
   const contain = slide.fit === 'contain'
   const src = resolveMediaUrl(slide.url)
 
-  const pickFocus = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (contain) return
-    onChange({ focus: focusAt(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect()) })
-  }
-
   return (
     <div className="flex gap-3 items-start rounded-md border border-gray-200 p-2" data-testid={`slide-${index}`}>
-      <div
-        role="button"
-        tabIndex={-1}
-        aria-label="Точка фокуса"
-        title={contain ? 'В режиме «Целиком» кадр виден полностью' : 'Клик — точка, которая останется в кадре'}
-        onClick={pickFocus}
-        className={cn('relative w-28 shrink-0 select-none', contain ? 'cursor-default opacity-60' : 'cursor-crosshair')}
-        data-testid={`focus-${index}`}
-      >
-        <MediaThumb src={src} video={isVideoUrl(slide.url)} className="block w-full h-auto rounded" />
-        {!contain && (
-          <span
-            className="absolute w-3 h-3 -ml-1.5 -mt-1.5 rounded-full border-2 border-white bg-primary-500 shadow pointer-events-none"
-            style={{ left: `${slide.focus?.x ?? 50}%`, top: `${slide.focus?.y ?? 50}%` }}
-            data-testid={`focus-dot-${index}`}
-          />
-        )}
-      </div>
+      <FocusThumb
+        url={slide.url}
+        focus={slide.focus}
+        contain={contain}
+        onPick={(focus) => onChange({ focus })}
+        testId={`focus-${index}`}
+        className="w-28"
+      />
 
       <div className="flex-1 min-w-0 space-y-2">
         <div className="text-xs text-gray-500 truncate" title={slide.url}>
@@ -270,6 +301,63 @@ const SlideFramingRow: React.FC<{
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * Своё медиа слайда для экранов страницы-шаблона, от широкого к узкому.
+ * Экран без своего медиа берёт медиа экрана шире, самый широкий — основное
+ * (так же решает публикация). Вписывание и тема шапки — общие для слайда.
+ */
+const SlideScreens: React.FC<{
+  index: number
+  slide: SlideSettings
+  screens: readonly TemplateScreen[]
+  onChange: (slide: SlideSettings) => void
+}> = ({ index, slide, screens, onChange }) => {
+  const ordered = [...screens].sort((a, b) => b.width - a.width)
+  const own = ordered.filter((screen) => slide.screens[screen.id]).length
+  const contain = slide.fit === 'contain'
+  return (
+    <details className="rounded border border-gray-200 bg-gray-50/60" open={own > 0} data-testid={`screens-${index}`}>
+      <summary className="cursor-pointer select-none px-2 py-1 text-xs text-gray-600">
+        Медиа по экранам{' '}
+        <span className="text-gray-400">· своё у {own} из {ordered.length}</span>
+      </summary>
+      <div className="space-y-2 p-2">
+        {ordered.map((screen, at) => {
+          const value = slide.screens[screen.id]
+          const wider = ordered.slice(0, at).reverse().find((w) => slide.screens[w.id])
+          const inherited = wider ? `как у «${wider.name}»` : 'как основное'
+          return (
+            <div key={screen.id} data-testid={`screen-${index}-${screen.id}`}>
+              <MediaField
+                label={`${screen.name} · ${screen.width} px`}
+                hint={value ? undefined : `пусто — ${inherited}`}
+                kind="any"
+                value={value?.url ?? ''}
+                onChange={(url) =>
+                  onChange(withScreen(slide, screen.id, url ? { url, focus: value && value.url === url ? value.focus : null } : null))
+                }
+              />
+              {value && !contain && (
+                <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
+                  <FocusThumb
+                    url={value.url}
+                    focus={value.focus}
+                    contain={false}
+                    onPick={(focus) => onChange(withScreen(slide, screen.id, { ...value, focus }))}
+                    testId={`screen-focus-${index}-${screen.id}`}
+                    className="w-20"
+                  />
+                  Точка фокуса на этом экране
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </details>
   )
 }
 

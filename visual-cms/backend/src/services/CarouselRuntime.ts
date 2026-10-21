@@ -409,6 +409,69 @@ ${BREAKPOINT_RUNTIME_JS}
       state.dots = [];
     }
 
+    // --- Значения по экранам: data-screen-attrs = {атрибут: {экран: значение}} ---
+    // Пишет деплой коллекций (screenMedia.ts): например, своё видео слайда для
+    // телефона или фото вместо видео ('' — видео на этом экране нет). Экран без
+    // значения берёт значение экрана шире; ни у одного нет — исходное значение.
+    // Ставится до создания видео и заново при смене экрана. Фон и позицию
+    // кадра по экранам даёт CSS страницы (@media по data-screen-key).
+    function applyScreenAttrs(el) {
+      var raw = el.getAttribute && el.getAttribute('data-screen-attrs');
+      if (!raw) return false;
+      var map;
+      try { map = JSON.parse(raw); } catch (e) { return false; }
+      if (!map || typeof map !== 'object') return false;
+      // Исходные значения — в атрибуте, а не в свойстве элемента: копии крайних
+      // слайдов (cloneNode) должны унести их с собой.
+      var base = {};
+      try { base = JSON.parse(el.getAttribute('data-screen-base') || '{}') || {}; } catch (e) { base = {}; }
+      var w = ghViewportWidth();
+      var bps = ghBreakpoints();
+      var changed = false;
+      var baseChanged = false;
+      Object.keys(map).forEach(function(attr){
+        var byScreen = map[attr] || {};
+        if (typeof base[attr] !== 'string') { base[attr] = el.getAttribute(attr) || ''; baseChanged = true; }
+        var bp = ghBreakpointAt(bps, w, function(b){ return typeof byScreen[b.id] === 'string'; });
+        var value = bp ? byScreen[bp.id] : base[attr];
+        if ((el.getAttribute(attr) || '') !== value) { el.setAttribute(attr, value); changed = true; }
+      });
+      if (baseChanged) el.setAttribute('data-screen-base', JSON.stringify(base));
+      return changed;
+    }
+
+    // Точка фокуса видео = позиции фона слайда. Встроенная — обычный слайд; у
+    // слайда с медиа по экранам позицию экрана задаёт CSS — берём вычисленную.
+    function videoFocus(slide) {
+      if (slide.hasAttribute && slide.hasAttribute('data-screen-key')) {
+        return window.getComputedStyle(slide).backgroundPosition || 'center';
+      }
+      return slide.style.backgroundPosition || 'center';
+    }
+
+    // Экран сменился (поворот, окно): значения экрана, а у уже созданного
+    // видео — файл и кадр. На этом экране видео нет — плеер убираем, виден фон.
+    function syncScreenMedia() {
+      var all = track.querySelectorAll('[data-screen-attrs], [data-screen-key]');
+      for (var i = 0; i < all.length; i++) {
+        var slide = all[i];
+        var changed = applyScreenAttrs(slide);
+        var v = slide.querySelector('video[data-carousel-video="true"]');
+        if (!v) continue;
+        if (changed) {
+          var url = slide.getAttribute('data-slide-video') || '';
+          if (!url) { v.parentNode.removeChild(v); continue; }
+          var src = v.querySelector('source');
+          if (src && src.getAttribute('src') !== url) {
+            src.setAttribute('src', url);
+            try { v.load(); } catch (e) {}
+            if (state.slides[state.index] === slide) playSlideVideo(slide);
+          }
+        }
+        v.style.objectPosition = videoFocus(slide);
+      }
+    }
+
     // --- Видео-фоны слайдов: data-slide-video="<url>" ---
     // Постером служит background-image слайда (виден, пока видео не проиграется).
     // Видео создаётся лениво при первом показе слайда; muted+loop+playsinline —
@@ -433,8 +496,8 @@ ${BREAKPOINT_RUNTIME_JS}
         var fit = slide.getAttribute('data-slide-fit') || 'cover';
         // Точка фокуса видео = фокусу постера: background-position из вёрстки слайда.
         // Берём инлайн, а не computed: у слайда без фона computed даёт «0% 0%»
-        // и прижал бы видео к углу вместо центра.
-        var focus = slide.style.backgroundPosition || 'center';
+        // и прижал бы видео к углу вместо центра (кроме слайда с медиа по экранам).
+        var focus = videoFocus(slide);
         v.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:' + fit +
           ';object-position:' + focus + ';pointer-events:none;z-index:0;';
         var s = document.createElement('source');
@@ -703,6 +766,7 @@ ${BREAKPOINT_RUNTIME_JS}
     function rebuild() {
       if (wrapTimer !== null) { clearTimeout(wrapTimer); wrapTimer = null; }
       state.slides = getSlides();
+      syncScreenMedia();
       syncControls(state.slides.length);
       syncSwipe();
       syncClones();
@@ -809,6 +873,7 @@ ${BREAKPOINT_RUNTIME_JS}
 
     // Экран меняется при повороте телефона и изменении окна.
     window.addEventListener('resize', syncSwipe);
+    window.addEventListener('resize', syncScreenMedia);
 
     rebuild();
 

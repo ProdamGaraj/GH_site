@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { isMapIcon } from '../services/mapIcons'
+import { SCREEN_ID_RE } from '../services/mediaSlides'
 
 /** Переводы: { uz: {field: value}, en: {field: value} }. Значения свободны
  *  (string | string[] | объект) — контроллер сериализует по типу поля. */
@@ -59,13 +60,24 @@ const planGroupingSchema = z
  * точкой фокуса (проценты кадра), вписыванием и темой шапки над слайдом.
  * Ссылка `block:<id>` — слайд-блок из библиотеки CMS. См. services/mediaSlides.ts.
  */
+const slideFocusSchema = z.object({ x: z.number().min(0).max(100), y: z.number().min(0).max(100) })
+
+/** Своё медиа слайда для экрана шаблона; ключ — id брейкпоинта (`mobile`). */
+const slideScreensSchema = z
+  .record(
+    z.string().regex(SCREEN_ID_RE),
+    z.object({ url: z.string().min(1).max(500), focus: slideFocusSchema.optional() }),
+  )
+  .refine((screens) => Object.keys(screens).length <= 12, { message: 'Не больше 12 экранов у слайда' })
+
 export const galleryItemSchema = z.union([
   z.string().max(500),
   z.object({
     url: z.string().min(1).max(500),
-    focus: z.object({ x: z.number().min(0).max(100), y: z.number().min(0).max(100) }).optional(),
+    focus: slideFocusSchema.optional(),
     fit: z.enum(['cover', 'contain']).optional(),
     theme: z.enum(['dark', 'light']).optional(),
+    screens: slideScreensSchema.optional(),
   }),
 ])
 

@@ -36,12 +36,24 @@ import { findAssetsByStorageUuids, storageUuidOf } from './mediaAssetLookup'
 import { pruneCollectionItems, writeCollectionManifest } from './collectionOutput'
 import { isDeployReportTarget, reportCollectionDeploy } from './deployReport'
 import { applyPublishedSeo, notFoundHtml, robotsTxt } from './publishedSeo'
+import { ScreenMediaCollector, applyScreenVariant, itemForScreen, screenIdsOf } from './screenMedia'
 
 // Папка для публикации - используем переменную окружения или путь относительно /app
 const PUBLIC_DIR = process.env.PUBLIC_SITE_DIR || '/app/public-site'
 const PUBLIC_SITE_URL = process.env.PUBLIC_SITE_URL || 'https://localhost'
 /** Тестовый стенд: robots.txt закрывает сайт целиком (боевой — не задаёт). */
 const PUBLIC_SITE_NOINDEX = /^(1|true|yes)$/i.test(process.env.PUBLIC_SITE_NOINDEX || '')
+
+/**
+ * Контекст подстановки данных в шаблон: `item` — элемент коллекции, `$` —
+ * текущий элемент повтора, `screens` — сборщик медиа по экранам (нет — копия
+ * шаблона под отдельный экран, её разницу собирает вызывающий).
+ */
+interface SubstituteContext {
+  item: any
+  $: any
+  screens?: ScreenMediaCollector
+}
 
 export interface DeployResult {
   success: boolean
@@ -1905,7 +1917,14 @@ export class DeployService {
   private substituteItemData(structure: any, item: any): any {
     const enrichedItem = this.enrichItemForCollections(item)
     const node = JSON.parse(JSON.stringify(structure))
-    this.substituteNode(node, { item: enrichedItem, $: enrichedItem })
+    const screens = new ScreenMediaCollector()
+    this.substituteNode(node, { item: enrichedItem, $: enrichedItem, screens })
+    // Медиа элементов повтора по экранам (item._responsive) — правила в CSS страницы.
+    const css = screens.css(node.metadata?.breakpoints)
+    if (css) {
+      const own = typeof node.metadata?.globalCss === 'string' ? node.metadata.globalCss : ''
+      node.metadata = { ...(node.metadata ?? {}), globalCss: own ? `${own}\n\n${css}` : css }
+    }
     return node
   }
 
@@ -1964,7 +1983,7 @@ export class DeployService {
     return { ...item, __allFiles: deduped }
   }
 
-  private substituteNode(node: any, ctx: { item: any; $: any }): void {
+  private substituteNode(node: any, ctx: SubstituteContext): void {
     if (!node || typeof node !== 'object') return
 
     // Repeater: разворачиваем children по массиву из source
@@ -2004,7 +2023,7 @@ export class DeployService {
    * (src, href, alt…) и styles.properties (backgroundImage, CSS-переменные).
    * Без рекурсии по детям — её ведут вызывающие.
    */
-  private substituteOwnValues(node: any, ctx: { item: any; $: any }): void {
+  private substituteOwnValues(node: any, ctx: SubstituteContext): void {
     if (typeof node.content === 'string') {
       node.content = this.replaceTemplateVars(node.content, ctx)
     }
@@ -2024,7 +2043,7 @@ export class DeployService {
     }
   }
 
-  private expandRepeaterNode(node: any, ctx: { item: any; $: any }): void {
+  private expandRepeaterNode(node: any, ctx: SubstituteContext): void {
     const cfg = node._repeat as { source: string; offset?: number; limit?: number }
     delete node._repeat
 
@@ -2064,7 +2083,16 @@ export class DeployService {
       const sliced = arr.slice(offset, cfg.limit != null ? offset + cfg.limit : undefined)
       for (const arrItem of sliced) {
         const clone = JSON.parse(JSON.stringify(template))
-        this.substituteNode(clone, { item: ctx.item, $: arrItem })
+        this.substituteNode(clone, { item: ctx.item, $: arrItem, screens: ctx.screens })
+        // Элемент со значениями по экранам: копия под каждый экран, разница —
+        // в CSS страницы и в карту атрибутов узла (services/screenMedia.ts).
+        if (ctx.screens) {
+          for (const screenId of screenIdsOf(arrItem)) {
+            const variant = JSON.parse(JSON.stringify(template))
+            this.substituteNode(variant, { item: ctx.item, $: itemForScreen(arrItem, screenId) })
+            applyScreenVariant(clone, variant, screenId, ctx.screens)
+          }
+        }
         clones.push(clone)
       }
     }
@@ -2076,7 +2104,7 @@ export class DeployService {
     return node?.attributes?.['data-carousel-static'] === 'true'
   }
 
-  private replaceTemplateVars(str: string, ctx: { item: any; $: any }): string {
+  private replaceTemplateVars(str: string, ctx: SubstituteContext): string {
     // {{item.field.subfield}} — берёт из item
     // {{$.field}} — берёт из текущего элемента массива (внутри _repeat)
     // {{$}}       — сам элемент массива, когда он примитив. Без этой формы
