@@ -29,7 +29,9 @@ export function publishedFiles(
 ): string[] {
   const rel = isHome ? 'index.html' : path.join(slug, 'index.html')
   const files = [path.join(siteDir, rel), ...languageCodes.map((code) => path.join(siteDir, code, rel))]
-  if (!isHome) files.push(path.join(siteDir, `${slug}.html`))
+  // Плоский legacy-файл <slug>.html. У адреса «index» это index.html в корне —
+  // вход всего сайта (распознаватель языка), он странице не принадлежит.
+  if (!isHome && slug !== 'index') files.push(path.join(siteDir, `${slug}.html`))
   return files
 }
 
@@ -165,4 +167,38 @@ export function planSiteSync<T extends PublicationCandidate>(
   const liveSlugs = new Set(deploy.map((p) => p.slug))
   const cleanup = pages.filter((p) => p.status !== 'published' && !liveSlugs.has(p.slug) && !isHome(p))
   return { deploy, cleanup }
+}
+
+/** Адреса главной по старому соглашению — до выбора главной в настройках сайта. */
+export const HOME_SLUGS: readonly string[] = ['index', 'home']
+
+/**
+ * Главная ли страница — корень сайта (/ru/), которую нельзя снять.
+ *
+ *  - у сайта выбрана главная (Site.homepageId) — только она;
+ *  - главная не выбрана — по старому соглашению адрес index/home;
+ *  - страница без сайта главной не бывает. Она выкладывается в ту же папку,
+ *    что и корневой сайт, и по соглашению index/home перезаписывала бы его
+ *    главную, а снять её было нельзя: импорт index.html давал адрес «index».
+ */
+export function isHomePage(
+  page: { id: string; slug: string; siteId?: string | null },
+  site?: { homepageId?: string | null } | null,
+): boolean {
+  if (site) return site.homepageId ? page.id === site.homepageId : HOME_SLUGS.includes(page.slug)
+  // Сайт есть, но не загружен — остаётся только соглашение.
+  if (page.siteId) return HOME_SLUGS.includes(page.slug)
+  return false
+}
+
+/**
+ * Почему странице нельзя дать адрес index/home; `null` — можно. Такой адрес
+ * — только у главной сайта без выбранной главной (старое соглашение). У
+ * сайта с выбранной главной и у страницы без сайта он делал бы страницу
+ * «главной», которая ею не является.
+ */
+export function reservedSlugError(slug: unknown, site: { homepageId?: string | null } | null): string | null {
+  if (typeof slug !== 'string' || !HOME_SLUGS.includes(slug)) return null
+  if (site && !site.homepageId) return null
+  return `Адрес «${slug}» зарезервирован для главной страницы сайта — выберите другой. Главную назначают в настройках сайта.`
 }

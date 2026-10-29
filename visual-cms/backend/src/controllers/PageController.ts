@@ -7,12 +7,19 @@ import { linkedBlocksService } from '../services/LinkedBlocksService'
 import { asyncHandler, NotFoundError, AppError } from '../middleware'
 import { cacheService } from '../services/CacheService'
 import { deployService } from '../services/DeployService'
-import { addressChangeError, allowedStatusChange, initialStatus } from '../services/pagePublication'
+import { addressChangeError, allowedStatusChange, initialStatus, reservedSlugError } from '../services/pagePublication'
+import { Site } from '../models/Site'
 import { pageVariantService } from '../services/PageVariantService'
 
 const pageRepository = AppDataSource.getRepository(Page)
 const versionRepository = AppDataSource.getRepository(PageVersion)
 const blockRepository = AppDataSource.getRepository(Block)
+
+/** Сайт страницы для проверки адреса; нет сайта — null. */
+async function siteOf(siteId: unknown): Promise<Site | null> {
+  if (typeof siteId !== 'string' || !siteId) return null
+  return AppDataSource.getRepository(Site).findOne({ where: { id: siteId } })
+}
 
 export class PageController {
   getAll = asyncHandler(async (req: Request, res: Response) => {
@@ -51,6 +58,8 @@ export class PageController {
     // Опубликованной страница становится только публикацией: иначе статус
     // обещал бы адрес, по которому на сайте ничего нет.
     req.body.status = initialStatus(req.body.status)
+    const slugError = reservedSlugError(req.body.slug, await siteOf(req.body.siteId))
+    if (slugError) throw new AppError(slugError, 409, 'RESERVED_SLUG')
     const page = pageRepository.create(req.body)
     await pageRepository.save(page)
     await cacheService.invalidateByTag('pages')
@@ -85,6 +94,12 @@ export class PageController {
     // Адрес опубликованной страницы неизменен: её файлы лежат по нему.
     const addressError = addressChangeError(page, { slug: req.body.slug, siteId: req.body.siteId })
     if (addressError) throw new AppError(addressError, 409, 'PUBLISHED_ADDRESS_LOCKED')
+    // Только при смене адреса: страница, у которой index уже стоит, должна
+    // сохраняться дальше — иначе её не отредактировать до смены адреса.
+    if (req.body.slug !== undefined && req.body.slug !== page.slug) {
+      const slugError = reservedSlugError(req.body.slug, await siteOf(req.body.siteId !== undefined ? req.body.siteId : page.siteId))
+      if (slugError) throw new AppError(slugError, 409, 'RESERVED_SLUG')
+    }
 
     // Решения по изменённым linked-блокам не являются полем страницы — извлекаем до Object.assign.
     const decisions = (req.body.decisions || {}) as Record<string, 'push' | 'static' | 'revert'>

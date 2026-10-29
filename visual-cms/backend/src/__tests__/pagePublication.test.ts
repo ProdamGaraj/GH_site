@@ -10,10 +10,12 @@ import {
   allowedStatusChange,
   findPublishedSibling,
   initialStatus,
+  isHomePage,
   leftoverFiles,
   planSiteSync,
   publishedFiles,
   removePublishedFiles,
+  reservedSlugError,
   sameAddress,
   variantName,
 } from '../services/pagePublication'
@@ -189,5 +191,35 @@ describe('варианты страницы', () => {
   it('имя варианта — с порядковым номером, суффикс прежнего варианта не копится', () => {
     expect(variantName('Harizma', 1)).toBe('Harizma — вариант 2')
     expect(variantName('Harizma — вариант 2', 2)).toBe('Harizma — вариант 3')
+  })
+})
+
+describe('главная и адреса index/home', () => {
+  it('страница без сайта с адресом index — не главная: её можно снять и переименовать', () => {
+    expect(isHomePage({ id: 'p', slug: 'index', siteId: null }, null)).toBe(false)
+  })
+
+  it('выбранная главная сайта — главная, остальные с index — нет', () => {
+    const site = { homepageId: 'main' }
+    expect(isHomePage({ id: 'main', slug: 'mainpage' }, site)).toBe(true)
+    expect(isHomePage({ id: 'p', slug: 'index' }, site)).toBe(false)
+  })
+
+  it('адрес index/home: нельзя у страницы без сайта и у сайта с выбранной главной', () => {
+    expect(reservedSlugError('index', null)).toMatch(/«index» зарезервирован/)
+    expect(reservedSlugError('home', { homepageId: 'main' })).toMatch(/«home» зарезервирован/)
+  })
+
+  it('можно у сайта без выбранной главной (старое соглашение) и для обычных адресов', () => {
+    expect(reservedSlugError('index', { homepageId: null })).toBeNull()
+    expect(reservedSlugError('pokupatelyam', null)).toBeNull()
+    expect(reservedSlugError(undefined, null)).toBeNull()
+  })
+})
+
+describe('publishedFiles: адрес index', () => {
+  it('не главная с адресом index не владеет корневым index.html (вход сайта)', () => {
+    const files = publishedFiles('/site', 'index', false, ['ru'])
+    expect(files.map((f) => path.relative('/site', f).split(path.sep).join('/'))).toEqual(['index/index.html', 'ru/index/index.html'])
   })
 })

@@ -28,7 +28,7 @@ import { resolveLoadStrategy } from './dataSourceRuntime'
 import { applyCollectionTransforms } from '../utils/collectionTransforms'
 import { localizeInternalLinks, localizeNavigation, langPrefix } from './linkLocalization'
 import { generateLanguageEntryStub } from './languageEntry'
-import { findPublishedSibling, leftoverFiles, planSiteSync, publishedFiles, removePublishedFiles } from './pagePublication'
+import { findPublishedSibling, isHomePage, leftoverFiles, planSiteSync, publishedFiles, removePublishedFiles } from './pagePublication'
 import { In } from 'typeorm'
 import { MediaAsset } from '../models/MediaAsset'
 import { applyAutoHeaderThemes, slideMediaRefs } from './headerTheme'
@@ -202,16 +202,12 @@ export class DeployService {
     return Object.keys(MULLER_FONT_FILES).every((file) => fs.existsSync(path.join(dir, file)))
   }
 
-  /**
-   * Является ли страница корнем сайта (домашней). Явно выбранная домашняя
-   * (Site.homepageId) важнее legacy-конвенции slug 'index'/'home'.
-   */
+  /** Является ли страница корнем сайта (домашней) — правило в pagePublication.isHomePage. */
   private isHomePage(
-    page: { id: string; slug: string },
+    page: { id: string; slug: string; siteId?: string | null },
     site?: { homepageId?: string | null } | null,
   ): boolean {
-    if (site?.homepageId) return page.id === site.homepageId
-    return page.slug === 'index' || page.slug === 'home'
+    return isHomePage(page, site)
   }
 
   /**

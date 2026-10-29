@@ -83,6 +83,24 @@ describe('unpublishPage', () => {
     expect(svc.pageRepository.save).not.toHaveBeenCalled()
   })
 
+  it('страница без сайта с адресом index (импорт index.html) снимается; главная сайта на месте', async () => {
+    for (const rel of ['index.html', 'ru/index.html', 'uz/index.html']) put(rel)
+    for (const rel of ['ru/index/index.html', 'uz/index/index.html']) put(rel)
+    const page = { id: 'imported', slug: 'index', status: 'published', siteId: null, site: null }
+    const svc = service(page)
+
+    const result = await svc.unpublishPage('imported')
+
+    expect(result.success).toBe(true)
+    expect(page.status).toBe('draft')
+    expect(exists('ru/index/index.html')).toBe(false)
+    expect(exists('uz/index/index.html')).toBe(false)
+    // Файлы главной корневого сайта — не этой страницы.
+    expect(exists('index.html')).toBe(true)
+    expect(exists('ru/index.html')).toBe(true)
+    expect(exists('uz/index.html')).toBe(true)
+  })
+
   it('несуществующая страница — отказ без побочных эффектов', async () => {
     const svc = service(null)
     const result = await svc.unpublishPage('nope')

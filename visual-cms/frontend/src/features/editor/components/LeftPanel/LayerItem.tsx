@@ -6,6 +6,7 @@ import * as Icons from 'lucide-react'
 import { cn } from '@/shared/utils'
 import { getNodeBreakpoint, BlockNodeWithViewport } from '../../utils/variationUtils'
 import { useNavigate, useMatch } from 'react-router-dom'
+import { blockApi } from '@/shared/api'
 
 interface LayerItemProps {
   node: BlockNodeWithViewport
@@ -46,6 +47,8 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
   const pageMatch = useMatch('/editor/page/:id')
   const pageId = pageMatch?.params.id && pageMatch.params.id !== 'new' ? pageMatch.params.id : undefined
   const [isConverting, setIsConverting] = useState(false)
+  const [isCopying, setIsCopying] = useState(false)
+  const isLinked = Boolean(node.metadata?.linkedBlockId)
   
   const isExpanded = expandedNodes.has(node.id)
   
@@ -188,6 +191,26 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
     }
   }
 
+  // Узел уже экземпляр блока библиотеки: «Преобразовать в блок» ему не нужно,
+  // а отдельный блок для других мест — копия исходного (с его CSS). Страница
+  // остаётся связанной с исходным блоком и не меняется.
+  const handleCopyToLibrary = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (isCopying) return
+    const name = window.prompt('Название нового блока', `${node.metadata?.name || node.tagName || 'Блок'} — копия`)?.trim()
+    if (!name) return
+    try {
+      setIsCopying(true)
+      await blockApi.createFromElement({ name, structure: node, enableTemplate: false })
+      alert(`Блок «${name}» создан в библиотеке. Эта страница по-прежнему связана с исходным блоком.`)
+    } catch (error) {
+      console.error('Ошибка копирования блока:', error)
+      alert('Не удалось создать блок: ' + (error as Error).message)
+    } finally {
+      setIsCopying(false)
+    }
+  }
+
   // Get icon based on element type
   const getIcon = () => {
     // Special icon for html-code elements
@@ -311,7 +334,7 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
               {/* Преобразовать в блок: только в редакторе сохранённой страницы
                   (нужен pageId для записи связи) и только для ещё не связанных
                   узлов (у связанного linkedBlockId уже есть — повтор не нужен). */}
-              {level > 0 && pageId && !node.metadata?.linkedBlockId && (
+              {level > 0 && pageId && !isLinked && (
                 <button
                   onClick={handleConvertToBlock}
                   className="flex-shrink-0 p-1 hover:bg-green-50 rounded transition-colors"
@@ -322,6 +345,22 @@ export const LayerItem: React.FC<LayerItemProps> = ({ node, level, expandedNodes
                     <Icons.Loader2 size={12} className="text-green-600 animate-spin" />
                   ) : (
                     <Icons.Package size={12} className="text-green-600" />
+                  )}
+                </button>
+              )}
+
+              {level > 0 && isLinked && (
+                <button
+                  onClick={handleCopyToLibrary}
+                  className="flex-shrink-0 p-1 hover:bg-green-50 rounded transition-colors"
+                  disabled={isCopying}
+                  title="Копия в библиотеку: отдельный блок для других страниц (эта страница остаётся связанной с исходным)"
+                  aria-label="Копия в библиотеку"
+                >
+                  {isCopying ? (
+                    <Icons.Loader2 size={12} className="text-green-600 animate-spin" />
+                  ) : (
+                    <Icons.CopyPlus size={12} className="text-green-600" />
                   )}
                 </button>
               )}

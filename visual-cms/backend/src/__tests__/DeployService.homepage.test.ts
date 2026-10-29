@@ -43,10 +43,19 @@ describe('DeployService — модель домашней страницы (home
       expect(svc.isHomePage({ id: 'p-2', slug: 'home' }, site)).toBe(false)
     })
 
-    it('без homepageId — legacy-фоллбэк на slug index/home', () => {
-      expect(svc.isHomePage({ id: 'p-1', slug: 'index' }, null)).toBe(true)
-      expect(svc.isHomePage({ id: 'p-1', slug: 'home' }, undefined)).toBe(true)
+    it('у сайта нет homepageId — legacy-фоллбэк на slug index/home', () => {
+      expect(svc.isHomePage({ id: 'p-1', slug: 'index' }, {})).toBe(true)
+      expect(svc.isHomePage({ id: 'p-1', slug: 'home' }, { homepageId: null })).toBe(true)
       expect(svc.isHomePage({ id: 'p-1', slug: 'about' }, {})).toBe(false)
+    })
+
+    it('страница без сайта главной не бывает, даже с адресом index (импорт index.html)', () => {
+      expect(svc.isHomePage({ id: 'p-1', slug: 'index' }, null)).toBe(false)
+      expect(svc.isHomePage({ id: 'p-1', slug: 'home', siteId: null }, undefined)).toBe(false)
+    })
+
+    it('сайт не загружен, но siteId есть — остаётся соглашение index/home', () => {
+      expect(svc.isHomePage({ id: 'p-1', slug: 'index', siteId: 's-1' }, undefined)).toBe(true)
     })
   })
 

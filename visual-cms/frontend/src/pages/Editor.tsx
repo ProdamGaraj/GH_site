@@ -72,6 +72,7 @@ import {
   getLayoutMode,
 } from '@/features/editor/utils/dndUtils'
 import { DropValidationToast, useValidationToast } from '@/features/editor/components/DropValidationToast'
+import { importedPageSlug } from '@/features/pages/importSlug'
 
 interface EditorProps {
   type: 'page' | 'block'
@@ -316,7 +317,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
             setPageSettings(prev => ({
               ...prev,
               name: importedContent.name,
-              slug: importedContent.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+              slug: importedPageSlug(importedContent.name),
             }))
           }
           return

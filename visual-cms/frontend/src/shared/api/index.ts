@@ -115,6 +115,12 @@ export const blockApi = {
   getUsages: (id: string) => api.get<Array<{ type: 'page' | 'block'; id: string; name: string; nodePath?: string }>>(`/blocks/${id}/usages`),
   getAllWithUsages: () => api.get<Array<Block & { usages: Array<{ type: 'page' | 'block'; id: string; name: string }> }>>('/blocks/with-usages'),
   create: (data: CreateBlockDto) => api.post<Block>('/blocks', data),
+  /**
+   * Новый блок библиотеки из узла страницы. Узел — экземпляр блока
+   * библиотеки: копия берёт содержимое и CSS исходного блока, связи с ним нет.
+   */
+  createFromElement: (data: { name: string; structure: BlockNode; enableTemplate?: boolean }) =>
+    api.post<Block>('/blocks/create-from-element', data),
   // Из блока данных пропали якоря, которые используют новости, — предупреждаем.
   update: (id: string, data: UpdateBlockDto) => api.put<Block>(`/blocks/${id}`, data).then(warnLostAnchors),
   delete: (id: string) => api.delete<void>(`/blocks/${id}`),
