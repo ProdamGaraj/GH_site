@@ -17,6 +17,7 @@ import { Language } from '../models/Language'
 import { Translation } from '../models/Translation'
 import { BlockTranslation } from '../models/BlockTranslation'
 import { PageVersion } from '../models/PageVersion'
+import { BlockVersion } from '../models/BlockVersion'
 import { DeployLog } from '../models/DeployLog'
 import { Collection } from '../models/Collection'
 import { CollectionOverride } from '../models/CollectionOverride'
@@ -30,7 +31,7 @@ export const AppDataSource = new DataSource({
   url: process.env.DATABASE_URL,
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
-  entities: [Site, Page, Block, Group, DataSourceEntity, DataBinding, Template, DataSubmission, PageVariable, Form, FormDestination, FormSubmissionLog, AnalyticsEvent, AnalyticsSession, Language, Translation, BlockTranslation, PageVersion, DeployLog, Collection, CollectionOverride, MediaAsset, MediaFolder, User, MacroSyncRun],
+  entities: [Site, Page, Block, Group, DataSourceEntity, DataBinding, Template, DataSubmission, PageVariable, Form, FormDestination, FormSubmissionLog, AnalyticsEvent, AnalyticsSession, Language, Translation, BlockTranslation, PageVersion, BlockVersion, DeployLog, Collection, CollectionOverride, MediaAsset, MediaFolder, User, MacroSyncRun],
   migrations: [],
   subscribers: [],
 })

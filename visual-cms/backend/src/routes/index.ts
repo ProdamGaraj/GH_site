@@ -3,6 +3,7 @@ import sitesRouter from './sites'
 import pagesRouter from './pages'
 import versionsRouter from './versions'
 import blocksRouter from './blocks'
+import { blockVersionsRouter, deletedBlocksRouter } from './blockVersions'
 import groupsRouter from './groups'
 import deployRouter from './deploy'
 import dataSourcesRouter from './dataSources'
@@ -31,7 +32,9 @@ router.use('/collections', collectionsRouter)
 router.use('/analytics', analyticsRouter)
 router.use('/pages', pagesRouter)
 router.use('/pages/:pageId/versions', versionsRouter)
+router.use('/blocks/:blockId/versions', blockVersionsRouter)
 router.use('/blocks', blocksRouter)
+router.use('/block-versions', deletedBlocksRouter)
 router.use('/groups', groupsRouter)
 router.use('/deploy', deployRouter)
 router.use('/data-sources', dataSourcesRouter)

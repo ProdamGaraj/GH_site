@@ -430,6 +430,29 @@ export interface Group {
   updatedAt: string
 }
 
+// Block Version — состояние блока до изменения (пишет триггер базы) или снимок
+export interface BlockVersion {
+  id: string
+  blockId: string
+  version: number
+  name: string
+  structure?: BlockNode
+  source: 'update' | 'delete' | 'restore' | 'manual' | 'initial'
+  label?: string | null
+  /** Когда это состояние было сохранено. */
+  savedAt?: string | null
+  /** Когда его заменили (удалили, сделали снимок). */
+  createdAt: string
+}
+
+/** Удалённый блок — по его последней версии. */
+export interface DeletedBlock {
+  versionId: string
+  blockId: string
+  name: string
+  deletedAt: string
+}
+
 // Page Version
 export interface PageVersion {
   id: string

@@ -172,7 +172,7 @@ export const siteApi = {
 }
 
 // Types
-import type { Block, Page, BlockNode, Site, SiteSettings, PageVersion } from '@/shared/types'
+import type { Block, Page, BlockNode, Site, SiteSettings, PageVersion, BlockVersion, DeletedBlock } from '@/shared/types'
 import type { 
   DataSource, 
   DataSourcesListResponse, 
@@ -287,6 +287,19 @@ export interface UpdateSiteDto {
   status?: 'draft' | 'active' | 'archived'
   isDefault?: boolean
   homepageId?: string | null
+}
+
+// Block versions API — история блока и удалённые блоки
+export const blockVersionApi = {
+  getAll: (blockId: string) => api.get<BlockVersion[]>(`/blocks/${blockId}/versions`),
+  getById: (blockId: string, versionId: string) => api.get<BlockVersion>(`/blocks/${blockId}/versions/${versionId}`),
+  create: (blockId: string, label?: string) => api.post<BlockVersion>(`/blocks/${blockId}/versions`, { label }),
+  restore: (blockId: string, versionId: string) =>
+    api.post<{ success: boolean; block: Block; restoredFrom: string }>(`/blocks/${blockId}/versions/${versionId}/restore`),
+  updateLabel: (blockId: string, versionId: string, label: string) => api.put<BlockVersion>(`/blocks/${blockId}/versions/${versionId}`, { label }),
+  delete: (blockId: string, versionId: string) => api.delete<void>(`/blocks/${blockId}/versions/${versionId}`),
+  getDeleted: () => api.get<DeletedBlock[]>('/block-versions/deleted'),
+  restoreDeleted: (versionId: string) => api.post<Block>(`/block-versions/deleted/${versionId}/restore`),
 }
 
 // Version API

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react'
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { 
   DndContext, 
@@ -62,7 +62,7 @@ import type { DragItem, BlockNode, EditorPageSettings } from '@/shared/types'
 import { DataBindingProvider } from '@/features/dataBindings'
 import { TranslationPanel } from '@/features/translations/TranslationPanel'
 import { LanguageSettingsPanel } from '@/features/translations/LanguageSettingsPanel'
-import { VersionHistoryPanel } from '@/features/editor/components/VersionHistoryPanel'
+import { VersionHistoryPanel, blockVersions, pageVersions } from '@/features/editor/components/VersionHistoryPanel'
 import { visibleRightPanelSections } from '@/features/editor/rightPanelSections'
 
 import { 
@@ -124,6 +124,9 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
   // читаются в панели (ленте), сеттер оставлен для будущего использования.
   const [, setCurrentBlockData] = useState<any>(null)
   const [pageVersion, setPageVersion] = useState(1)
+  // История версий: у страницы — снимки, у блока — состояние до каждого изменения.
+  const pageVersionAdapter = useMemo(() => (type === 'page' && id && id !== 'new' ? pageVersions(id) : null), [type, id])
+  const blockVersionAdapter = useMemo(() => (type === 'block' && id && id !== 'new' ? blockVersions(id) : null), [type, id])
   const [pageSettings, setPageSettings] = useState<EditorPageSettings>({
     name: '',
     slug: '',
@@ -1000,10 +1003,23 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       case 'translations':
         return id ? <TranslationPanel pageId={id} /> : null
       case 'versionHistory':
-        return id ? (
+        if (id && type === 'block' && blockVersionAdapter) {
+          return (
+            <VersionHistoryPanel
+              adapter={blockVersionAdapter}
+              onRestore={async (restoredBlock) => {
+                const { loadEditor: loadEditorAction } = await import('@/features/editor/editorSlice')
+                setCurrentBlockData(restoredBlock)
+                dispatch(loadEditorAction(restoredBlock.structure))
+              }}
+              onClose={() => scrollToSection('basicSettings')}
+            />
+          )
+        }
+        return id && pageVersionAdapter ? (
           <VersionHistoryPanel
-            pageId={id}
-            currentVersion={pageVersion}
+            adapter={pageVersionAdapter}
+            currentLabel={`v${pageVersion}`}
             onRestore={async (restoredPage) => {
               const { loadEditor: loadEditorAction } = await import('@/features/editor/editorSlice')
               dispatch(loadEditorAction(restoredPage.structure))

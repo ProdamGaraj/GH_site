@@ -15,6 +15,7 @@ import {
 import { blockApi } from '@/shared/api'
 import type { BlockNode } from '@/shared/types'
 import { TemplateQuickToggle } from '@/features/blocks/components/TemplateQuickToggle'
+import { DeletedBlocks } from '@/features/blocks/components/DeletedBlocks'
 
 interface BlockUsage {
   type: 'page' | 'block'
@@ -55,7 +56,7 @@ export const BlocksList: React.FC = () => {
   }, [blocks.length])
 
   const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`Удалить блок "${name}"?`)) {
+    if (window.confirm(`Удалить блок "${name}"? Его можно будет вернуть из «Удалённые блоки».`)) {
       dispatch(deleteBlock(id))
     }
   }
@@ -80,6 +81,7 @@ export const BlocksList: React.FC = () => {
             <p className="text-gray-600 mt-1">Библиотека переиспользуемых компонентов</p>
           </div>
           <div className="flex gap-3">
+            <DeletedBlocks onRestored={() => dispatch(fetchBlocks())} />
             <Button variant="secondary" onClick={() => setShowImportModal(true)}>
               <Upload size={16} className="mr-2" />
               Импорт

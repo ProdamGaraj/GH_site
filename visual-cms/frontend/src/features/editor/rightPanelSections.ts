@@ -46,7 +46,7 @@ export const RIGHT_PANEL_SECTIONS: RightPanelSection[] = [
   { id: 'data', label: 'Привязка данных', icon: Database },
   { id: 'slides', label: 'Слайды карусели', icon: GalleryHorizontal },
   { id: 'translations', label: 'Переводы', icon: Languages, pageOnly: true, accent: 'blue' },
-  { id: 'versionHistory', label: 'История версий', icon: History, pageOnly: true, accent: 'amber' },
+  { id: 'versionHistory', label: 'История версий', icon: History, accent: 'amber' },
   { id: 'css', label: 'CSS код', icon: Code2 },
 ]
 
