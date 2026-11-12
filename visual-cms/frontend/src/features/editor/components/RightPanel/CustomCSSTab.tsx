@@ -3,7 +3,6 @@ import Editor from '@monaco-editor/react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
 import { Copy, Wand2, Trash2 } from 'lucide-react'
-import { withoutScreenResets } from '@/features/editor/utils/screenOverrides'
 import type { BlockNode } from '@/shared/types'
 
 interface CustomCSSTabProps {
@@ -20,8 +19,8 @@ export const CustomCSSTab: React.FC<CustomCSSTabProps> = ({ node }) => {
   // Синхронизация CustomCSS с полями - показываем текущие стили
   useEffect(() => {
     if (!isEditing) {
-      // Свойства, снятые на этом экране, в тексте не показываем: их тут «нет».
-      const styles = withoutScreenResets(node.styles.properties || {})
+      // Свойства, снятые на этом экране, сюда не приходят (selectSelectedNode).
+      const styles = node.styles.properties || {}
       const cssString = Object.entries(styles)
         .map(([key, value]) => {
           // Convert camelCase to kebab-case

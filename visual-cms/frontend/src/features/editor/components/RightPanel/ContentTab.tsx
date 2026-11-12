@@ -83,6 +83,8 @@ export const ContentTab: React.FC<ContentTabProps> = ({ node }) => {
       nodeId: node.id,
       properties: { [property]: value },
       breakpoint: viewport,
+      // Очищенное поле на экране остаётся пустым, а не возвращает основное значение.
+      unsetInherited: true,
     }))
   }
 

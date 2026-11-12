@@ -32,6 +32,8 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
       nodeId: node.id,
       properties: updates,
       breakpoint: viewport,
+      // Очищенное поле на экране остаётся пустым, а не возвращает основное значение.
+      unsetInherited: true,
     }))
   }
 
@@ -361,6 +363,7 @@ export const PositioningTab: React.FC<PositioningTabProps> = ({ node }) => {
               nodeId: node.id,
               properties: updates,
               breakpoint: viewport,
+              unsetInherited: true,
             }))
           }}
           className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm text-gray-900"

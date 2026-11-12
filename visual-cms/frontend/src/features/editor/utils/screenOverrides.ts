@@ -40,6 +40,18 @@ export function withoutScreenResets<T extends Record<string, unknown>>(propertie
 }
 
 /**
+ * Узел для панелей настроек: снятые на экране свойства убраны, поэтому поле
+ * такого свойства пустое, а не показывает служебное значение сброса. Канвас
+ * берёт узел из эффективного дерева как есть — ему сброс нужен для отрисовки.
+ * Без снятых свойств возвращает тот же узел.
+ */
+export function hideScreenResets<T extends BlockNode>(node: T): T {
+  const properties = node.styles?.properties as Record<string, unknown> | undefined
+  if (!properties || !Object.values(properties).includes(SCREEN_STYLE_RESET)) return node
+  return { ...node, styles: { ...node.styles, properties: withoutScreenResets(properties) } } as T
+}
+
+/**
  * Обход записей одного breakpoint'а в порядке деплоя: правки узла → его
  * specificChildren этого экрана (рекурсивно) → children.
  */

@@ -5,7 +5,7 @@ import type { RootState } from '@/app/store'
 import { blockApi, pageApi, type CreateBlockDto } from '@/shared/api'
 import { cleanForLibrary } from '@/features/editor/utils/libraryClean'
 import { findNodeInTree, normalizeLegacyRootOverrides } from '@/features/editor/utils/variationUtils'
-import { adoptStrayOverrides, SCREEN_STYLE_RESET } from '@/features/editor/utils/screenOverrides'
+import { adoptStrayOverrides, hideScreenResets, SCREEN_STYLE_RESET } from '@/features/editor/utils/screenOverrides'
 import { ensureNodeShape } from '@/features/editor/utils/nodeShape'
 import { bgUrlPatch, composeBgStack } from '@/features/media/responsiveMediaMatrix.utils'
 import {
@@ -651,11 +651,13 @@ const editorSlice = createSlice({
       customCSS?: string
       breakpoint?: string
       /**
-       * Только для экранной правки. Пустое значение обычно значит «убрать правку
-       * экрана» — тогда свойство снова берётся из основной версии (или с более
-       * широкого экрана). С этим флагом такое свойство снимается на экране
-       * совсем: если после удаления правки оно всё ещё приходит сверху,
-       * записывается сброс (SCREEN_STYLE_RESET).
+       * Только для экранной правки: пользователь очистил свойство (значение '').
+       * Без флага очистка лишь убирает правку экрана — свойство снова берётся из
+       * основной версии или с более широкого экрана, и поле «не очищается».
+       * С флагом свойство снимается на экране совсем: если после удаления
+       * правки оно всё ещё приходит сверху, записывается сброс
+       * (SCREEN_STYLE_RESET). Действует только на '' — undefined/null остаются
+       * служебной уборкой (например, снятие padding при правке paddingTop).
        */
       unsetInherited?: boolean
     }>) => {
@@ -736,7 +738,7 @@ const editorSlice = createSlice({
           )?.styles?.properties as Record<string, unknown> | undefined
           const resets: Record<string, string> = {}
           for (const [key, value] of Object.entries(properties)) {
-            if (value !== '' && value !== null && value !== undefined) continue
+            if (value !== '') continue
             const inherited = effective?.[key]
             if (inherited === undefined || inherited === null || inherited === '') continue
             if (inherited === SCREEN_STYLE_RESET) continue
@@ -1835,9 +1837,11 @@ export const selectSelectedNode = (state: RootState) => {
   const { rootNode, selectedNodeId, viewport, editMode, breakpoints } = state.editor
   if (!rootNode || !selectedNodeId) return null
   
-  // Ищем узел в эффективном дереве (с учётом вариаций)
+  // Ищем узел в эффективном дереве (с учётом вариаций). Панелям отдаём узел
+  // без снятых на экране свойств — их поля должны быть пустыми.
   const breakpoint = viewport === 'base' ? null : viewport
-  return findNodeInTree(rootNode, selectedNodeId, breakpoint, editMode, breakpoints)
+  const node = findNodeInTree(rootNode, selectedNodeId, breakpoint, editMode, breakpoints)
+  return node ? hideScreenResets(node) : null
 }
 export const selectIsDirty = (state: RootState) => state.editor.isDirty
 export const selectCanUndo = (state: RootState) => state.editor.historyIndex > 0
