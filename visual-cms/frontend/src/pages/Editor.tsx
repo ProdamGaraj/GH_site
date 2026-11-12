@@ -995,7 +995,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
       case 'animations':
         return <AnimationsPanel />
       case 'scripts':
-        return <ScriptsPanel />
+        return <ScriptsPanel editorType={type} />
       case 'data':
         return <DataPanel pageId={type === 'page' ? id : undefined} libraryBlockId={type === 'block' ? id : undefined} />
       case 'slides':
@@ -1037,7 +1037,7 @@ export const Editor: React.FC<EditorProps> = ({ type }) => {
           />
         ) : null
       case 'css':
-        return <CSSPanel />
+        return <CSSPanel editorType={type} />
       default:
         return null
     }

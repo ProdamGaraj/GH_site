@@ -1,0 +1,15 @@
+# Installed by deploy/scripts/install.sh (@USER@ / @CMS_DIR@ are substituted).
+[Unit]
+Description=Visual CMS daily backup (databases, media, published site)
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=@USER@
+WorkingDirectory=@CMS_DIR@
+ExecStart=/bin/bash @CMS_DIR@/deploy/scripts/backup.sh full
+TimeoutStartSec=3h
+Nice=10
+IOSchedulingClass=idle

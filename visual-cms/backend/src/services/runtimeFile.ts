@@ -6,7 +6,7 @@
  * не перезапускает бэкенд, и без этого деплой вшивал бы старую версию.
  *
  * В проде файлы лежат рядом со скомпилированным кодом — их копирует
- * Dockerfile.prod (tsc переносит только .ts).
+ * deploy/node/Dockerfile (tsc переносит только .ts).
  */
 import * as fs from 'fs'
 import * as path from 'path'

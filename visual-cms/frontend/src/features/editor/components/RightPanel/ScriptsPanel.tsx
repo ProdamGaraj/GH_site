@@ -2,9 +2,10 @@ import React from 'react'
 import { useAppSelector } from '@/app/hooks'
 import { selectSelectedNode } from '@/features/editor/editorSlice'
 import { ScriptsTab } from './ScriptsTab'
-import { GlobalAssetEditor } from './GlobalAssetEditor'
+import { GlobalAssetEditor, LinkedBlockAssetEditor, type AssetScope } from './GlobalAssetEditor'
 
-export const ScriptsPanel: React.FC = () => {
+/** @param editorType — см. CSSPanel: «JS блока» только в редакторе страницы. */
+export const ScriptsPanel: React.FC<{ editorType?: AssetScope }> = ({ editorType }) => {
   const selectedNode = useAppSelector(selectSelectedNode)
 
   if (!selectedNode) {
@@ -22,7 +23,8 @@ export const ScriptsPanel: React.FC = () => {
       </div>
       <div className="flex-1 overflow-y-auto pl-2 pr-2">
         <ScriptsTab node={selectedNode} />
-        <GlobalAssetEditor field="globalJs" />
+        {editorType === 'page' && <LinkedBlockAssetEditor field="globalJs" />}
+        <GlobalAssetEditor field="globalJs" scope={editorType} />
       </div>
     </div>
   )

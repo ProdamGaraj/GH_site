@@ -2,9 +2,14 @@ import React from 'react'
 import { useAppSelector } from '@/app/hooks'
 import { selectSelectedNode } from '@/features/editor/editorSlice'
 import { CustomCSSTab } from './CustomCSSTab'
-import { GlobalAssetEditor } from './GlobalAssetEditor'
+import { GlobalAssetEditor, LinkedBlockAssetEditor, type AssetScope } from './GlobalAssetEditor'
 
-export const CSSPanel: React.FC = () => {
+/**
+ * @param editorType — что открыто в редакторе. «CSS блока» для linked-блоков
+ * показывается только в редакторе страницы: в редакторе блока правка вложенного
+ * блока легла бы в устаревшую копию внутри внешнего блока и потерялась бы.
+ */
+export const CSSPanel: React.FC<{ editorType?: AssetScope }> = ({ editorType }) => {
   const selectedNode = useAppSelector(selectSelectedNode)
 
   if (!selectedNode) {
@@ -22,7 +27,8 @@ export const CSSPanel: React.FC = () => {
       </div>
       <div className="flex-1 overflow-y-auto pl-2 pr-2">
         <CustomCSSTab node={selectedNode} />
-        <GlobalAssetEditor field="globalCss" />
+        {editorType === 'page' && <LinkedBlockAssetEditor field="globalCss" />}
+        <GlobalAssetEditor field="globalCss" scope={editorType} />
       </div>
     </div>
   )

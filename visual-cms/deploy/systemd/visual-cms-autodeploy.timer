@@ -1,0 +1,12 @@
+# Installed by deploy/scripts/install.sh.
+[Unit]
+Description=Check for new commits and deploy them every minute
+
+[Timer]
+OnBootSec=2min
+# Counted from the END of the previous run: runs never overlap.
+OnUnitInactiveSec=1min
+Unit=visual-cms-autodeploy.service
+
+[Install]
+WantedBy=timers.target

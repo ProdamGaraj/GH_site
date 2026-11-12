@@ -1,0 +1,2 @@
+# Resolve `source` paths relative to the script, wherever shellcheck is run from.
+source-path=SCRIPTDIR

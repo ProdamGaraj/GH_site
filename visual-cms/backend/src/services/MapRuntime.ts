@@ -7,7 +7,7 @@
  * [data-map]: обычные страницы лишний скрипт не тащат.
  *
  * В проде файл должен лежать рядом со скомпилированным кодом — его копирует
- * Dockerfile.prod (tsc переносит только .ts).
+ * deploy/node/Dockerfile (tsc переносит только .ts).
  */
 import { runtimeScript } from './runtimeFile'
 

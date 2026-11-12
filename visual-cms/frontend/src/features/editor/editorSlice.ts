@@ -15,6 +15,7 @@ import {
   insertNodeIntoTree,
 } from '@/features/editor/utils/treeUtils'
 import { getLayoutMode } from '@/features/editor/utils/dndUtils'
+import { setLinkedBlockAsset, type BlockAssetField } from '@/features/editor/utils/linkedBlockAssets'
 
 interface DragState {
   isDragging: boolean
@@ -532,6 +533,23 @@ const editorSlice = createSlice({
       }
       
       state.rootNode = updateInNode(state.rootNode)
+      state.isDirty = true
+    },
+
+    /**
+     * Общий CSS/JS библиотечного блока из редактора страницы: пишет во ВСЕ вставки
+     * блока на странице (CSS принадлежит блоку, не вставке). В библиотеку правка
+     * попадает на сохранении — через окно решений (linkedBlockDiff на бэкенде).
+     * Как и updateNode (правка по нажатию клавиш), историю не пушит.
+     */
+    updateLinkedBlockAsset: (state, action: PayloadAction<{
+      linkedBlockId: string
+      field: BlockAssetField
+      value: string
+    }>) => {
+      if (!state.rootNode) return
+      const { linkedBlockId, field, value } = action.payload
+      state.rootNode = setLinkedBlockAsset(state.rootNode as BlockNode, linkedBlockId, field, value)
       state.isDirty = true
     },
 
@@ -1642,6 +1660,7 @@ export const {
   loadEditor,
   createNewEditor,
   selectNode,
+  updateLinkedBlockAsset,
   hoverNode,
   addNode,
   insertPreparedNode,

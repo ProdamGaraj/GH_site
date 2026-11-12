@@ -109,3 +109,7 @@ describe('DeployService.ensureUniqueSlug', () => {
     expect(errors).toHaveLength(2)
   })
 })
+
+// Файл — модуль, а не глобальный скрипт: иначе одноимённые `const DeployService`
+// в соседних тестах конфликтуют при общем `tsc --noEmit`.
+export {}

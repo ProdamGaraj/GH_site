@@ -56,3 +56,10 @@ map-assets/*
 !map-assets/README.md
 # Скриншоты scripts/map/check-project-map.js.
 map-check/
+
+# Production server state (deploy/scripts): auto-deploy state, .env copies made
+# by secrets.sh, Let's Encrypt webroot. Backups live in visual-cms/backups/
+# (ignored in the root .gitignore).
+.deploy/
+.env.bak-*
+certbot-www/

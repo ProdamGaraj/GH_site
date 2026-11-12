@@ -21,6 +21,14 @@
  * У ВЛОЖЕННЫХ узлов таких overlay-полей нет — они копируются из library побайтно,
  * поэтому сравниваются целиком (включая id/attributes).
  *
+ * Исключение из «metadata игнорируем»: общий CSS/JS блока (`metadata.globalCss` /
+ * `globalJs`). Это контент блока (правится из редактора страницы панелью «CSS
+ * блока»), а не overlay — без сравнения правка молча терялась бы при сохранении.
+ * Сравниваем на корне и на обычных вложенных узлах; на корне ВЛОЖЕННОГО
+ * linked-инстанса — нет: его ассеты принадлежат его собственному блоку и
+ * сравниваются отдельным diff'ом этого инстанса (в library внешнего блока там
+ * может лежать устаревшая развёрнутая копия — ложное «изменён»).
+ *
  * Модуль чистый (без БД/DOM) — чтобы покрывать golden-фикстурами.
  */
 
@@ -34,6 +42,11 @@ export type LinkedChangeKind =
   | 'child-added'
   | 'child-removed'
   | 'reorder'
+  | 'globalCss'
+  | 'globalJs'
+
+/** Общие ассеты блока в metadata, которые являются контентом (см. шапку модуля). */
+export const BLOCK_ASSET_KEYS = ['globalCss', 'globalJs'] as const
 
 export interface LinkedChange {
   kind: LinkedChangeKind
@@ -99,6 +112,18 @@ function compareNodes(instance: any, library: any, path: string, isRoot: boolean
   // На корне attributes — это overlay placeholder'а поверх library, не правка контента.
   if (!isRoot && !deepEqual(instance.attributes ?? null, library.attributes ?? null)) {
     changes.push({ kind: 'attributes', path, label: `${path}: изменены атрибуты` })
+  }
+
+  // Корень вложенного linked-инстанса — ассеты его собственного блока (см. шапку).
+  const isNestedLinkedRoot = !isRoot && Boolean(instance.metadata?.linkedBlockId)
+  if (!isNestedLinkedRoot) {
+    for (const key of BLOCK_ASSET_KEYS) {
+      // '' и отсутствие — одно и то же: редактор пишет undefined при очистке поля.
+      if ((instance.metadata?.[key] || '') !== (library.metadata?.[key] || '')) {
+        const what = key === 'globalCss' ? 'CSS' : 'JS'
+        changes.push({ kind: key, path, label: `${path}: изменён общий ${what} блока` })
+      }
+    }
   }
 
   const instChildren: any[] = Array.isArray(instance.children) ? instance.children : []

@@ -1,0 +1,8 @@
+# Build context of deploy/web/Dockerfile is visual-cms/ — send only what the
+# image needs (public-site, backups, node_modules and other services stay out).
+*
+!frontend/
+!deploy/web/
+frontend/node_modules
+frontend/dist
+frontend/dump.txt

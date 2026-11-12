@@ -576,3 +576,121 @@ describe('LinkedBlocksService', () => {
     })
   })
 })
+
+/**
+ * Общий CSS/JS блока живёт только в библиотеке: при чтении metadata инстанса
+ * берётся из library, поэтому копия в placeholder'е никем не читается. Схлопывание
+ * её срезает; 'static' сохраняет (блок отделён — CSS теперь его собственный);
+ * 'push' уносит новый CSS/JS в библиотеку.
+ */
+describe('LinkedBlocksService — общий CSS/JS блока при сохранении страницы', () => {
+  let service: LinkedBlocksService
+  const repo: any = (AppDataSource as any).getRepository()
+
+  beforeEach(() => {
+    service = new LinkedBlocksService()
+    repo.find.mockReset()
+    repo.find.mockResolvedValue([])
+    repo.save.mockReset()
+    repo.save.mockImplementation((x: any) => Promise.resolve(x))
+  })
+
+  const makePage = (): any => ({
+    id: 'root',
+    metadata: { globalCss: '.page{}', globalJs: 'page()' },
+    children: [
+      {
+        id: 'lead-inst',
+        tagName: 'section',
+        attributes: { class: 'lead-card' },
+        metadata: { linkedBlockId: 'lib-lead', name: 'CallMeBlock', globalCss: '.lead-card{color:blue}', globalJs: 'lead()' },
+        children: [{ id: 'c1', tagName: 'p', content: 'Подберём квартиру', metadata: {}, children: [] }],
+      },
+    ],
+  })
+
+  it.each([['revert'], ['без решения']])('%s: placeholder без globalCss/globalJs, прочая metadata цела', (decision) => {
+    const decisions: Record<string, any> = decision === 'revert' ? { 'lead-inst': 'revert' } : {}
+    const { structure, libraryWrites } = service.applyLinkedDecisions(makePage(), decisions)
+    const ph = structure.children[0]
+    expect(libraryWrites).toHaveLength(0)
+    expect(ph.children).toEqual([])
+    expect(ph.metadata.globalCss).toBeUndefined()
+    expect(ph.metadata.globalJs).toBeUndefined()
+    expect(ph.metadata.linkedBlockId).toBe('lib-lead')
+    expect(ph.metadata.name).toBe('CallMeBlock')
+    expect(ph.attributes.class).toBe('lead-card')
+  })
+
+  it("'push': новый CSS/JS уходит в библиотеку, на странице — placeholder без копии", () => {
+    const { structure, libraryWrites } = service.applyLinkedDecisions(makePage(), { 'lead-inst': 'push' })
+    expect(libraryWrites).toHaveLength(1)
+    expect(libraryWrites[0].blockId).toBe('lib-lead')
+    expect(libraryWrites[0].structure.metadata.globalCss).toBe('.lead-card{color:blue}')
+    expect(libraryWrites[0].structure.metadata.globalJs).toBe('lead()')
+    expect(libraryWrites[0].structure.metadata.linkedBlockId).toBeUndefined()
+    expect(structure.children[0].metadata.globalCss).toBeUndefined()
+    expect(structure.children[0].metadata.globalJs).toBeUndefined()
+  })
+
+  it("'static': отделённый блок сохраняет свой CSS/JS", () => {
+    const { structure } = service.applyLinkedDecisions(makePage(), { 'lead-inst': 'static' })
+    const node = structure.children[0]
+    expect(node.metadata.linkedBlockId).toBeUndefined()
+    expect(node.metadata.globalCss).toBe('.lead-card{color:blue}')
+    expect(node.metadata.globalJs).toBe('lead()')
+  })
+
+  it('CSS/JS самой страницы (корень, не linked) не трогается', () => {
+    const { structure } = service.applyLinkedDecisions(makePage(), {})
+    expect(structure.metadata.globalCss).toBe('.page{}')
+    expect(structure.metadata.globalJs).toBe('page()')
+  })
+
+  it('не мутирует входную структуру', () => {
+    const input = makePage()
+    service.applyLinkedDecisions(input, {})
+    expect(input.children[0].metadata.globalCss).toBe('.lead-card{color:blue}')
+    expect(input.children[0].metadata.globalJs).toBe('lead()')
+  })
+
+  it("syncBlockToAllPages чистит устаревшие копии CSS/JS в placeholder'ах других страниц", async () => {
+    const page = {
+      id: 'p1',
+      name: 'P1',
+      slug: 'p1',
+      structure: {
+        id: 'r',
+        children: [{ id: 'ph', metadata: { linkedBlockId: 'lib-lead', globalCss: '.stale{}', globalJs: 'stale()' }, children: [] }],
+      },
+    }
+    repo.find.mockResolvedValue([page])
+    await service.syncBlockToAllPages('lib-lead', { id: 'lib', children: [] })
+    const saved = repo.save.mock.calls.map((c: any[]) => c[0]).find((p: any) => p.id === 'p1')
+    expect(saved).toBeDefined()
+    const ph = saved.structure.children[0]
+    expect(ph.metadata.linkedBlockId).toBe('lib-lead')
+    expect(ph.metadata.globalCss).toBeUndefined()
+    expect(ph.metadata.globalJs).toBeUndefined()
+  })
+
+  it('preflight: правка CSS блока на странице попадает в список изменённых', async () => {
+    repo.find.mockResolvedValueOnce([
+      {
+        id: 'lib-lead',
+        name: 'CallMeBlock',
+        structure: {
+          id: 'lib-root',
+          tagName: 'section',
+          attributes: { class: 'lead-card' },
+          metadata: { name: 'CallMeBlock', globalCss: '.lead-card{color:red}', globalJs: 'lead()' },
+          children: [{ id: 'c1', tagName: 'p', content: 'Подберём квартиру', metadata: {}, children: [] }],
+        },
+      },
+    ])
+    const result = await service.detectChangedLinkedInstances(makePage())
+    expect(result).toHaveLength(1)
+    expect(result[0].instanceId).toBe('lead-inst')
+    expect(result[0].changes.map((c) => c.kind)).toEqual(['globalCss'])
+  })
+})

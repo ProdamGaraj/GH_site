@@ -1,0 +1,13 @@
+# Installed by deploy/scripts/install.sh.
+[Unit]
+Description=Daily Visual CMS backup
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=10min
+# Missed while the server was off → run at next boot.
+Persistent=true
+Unit=visual-cms-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -255,7 +255,7 @@ export type LinkedDecision = 'push' | 'static' | 'revert'
 
 /** Один тип изменения внутри linked-инстанса (для отображения в модалке). */
 export interface LinkedChange {
-  kind: 'content' | 'styles' | 'tagName' | 'layoutMode' | 'attributes' | 'variations' | 'child-added' | 'child-removed' | 'reorder'
+  kind: 'content' | 'styles' | 'tagName' | 'layoutMode' | 'attributes' | 'variations' | 'child-added' | 'child-removed' | 'reorder' | 'globalCss' | 'globalJs'
   path: string
   label: string
 }

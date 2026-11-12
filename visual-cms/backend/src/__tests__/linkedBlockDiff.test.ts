@@ -210,3 +210,91 @@ describe('diffLinkedInstance', () => {
     expect(result.changed).toBe(false)
   })
 })
+
+/**
+ * Общий CSS/JS блока (metadata.globalCss/globalJs) — контент блока, который правится
+ * из редактора страницы («CSS блока» / «JS блока»). Без сравнения правка молча
+ * терялась: инстанс считался неизменённым и схлопывался в placeholder.
+ */
+describe('diffLinkedInstance — общий CSS/JS блока', () => {
+  const withAssets = (meta: Record<string, any>): any => {
+    const lib = libraryFooter()
+    lib.metadata = { ...lib.metadata, ...meta }
+    return lib
+  }
+  const instanceOf = (lib: any, meta: Record<string, any> = {}): any => ({
+    ...JSON.parse(JSON.stringify(lib)),
+    id: 'placeholder-footer-id',
+    metadata: { ...lib.metadata, linkedBlockId: 'lib-footer-root', ...meta },
+  })
+
+  it('CSS/JS корня совпадают с библиотекой → НЕ изменён', () => {
+    const lib = withAssets({ globalCss: '.footer{color:red}', globalJs: 'init()' })
+    expect(diffLinkedInstance(instanceOf(lib), lib).changed).toBe(false)
+  })
+
+  it('изменён CSS корня → ровно одно изменение kind=globalCss', () => {
+    const lib = withAssets({ globalCss: '.footer{color:red}' })
+    const result = diffLinkedInstance(instanceOf(lib, { globalCss: '.footer{color:blue}' }), lib)
+    expect(result.changed).toBe(true)
+    expect(result.changes).toHaveLength(1)
+    expect(result.changes[0].kind).toBe('globalCss')
+    expect(result.changes[0].label).toContain('CSS блока')
+  })
+
+  it('изменён JS корня → kind=globalJs', () => {
+    const lib = withAssets({ globalJs: 'a()' })
+    const result = diffLinkedInstance(instanceOf(lib, { globalJs: 'b()' }), lib)
+    expect(result.changes.map((c) => c.kind)).toEqual(['globalJs'])
+    expect(result.changes[0].label).toContain('JS блока')
+  })
+
+  it('CSS добавлен блоку, у которого его не было → изменён', () => {
+    const lib = libraryFooter()
+    const result = diffLinkedInstance(instanceOf(lib, { globalCss: '.x{}' }), lib)
+    expect(result.changes.map((c) => c.kind)).toEqual(['globalCss'])
+  })
+
+  it('CSS очищен (undefined) при непустом в библиотеке → изменён', () => {
+    const lib = withAssets({ globalCss: '.x{}' })
+    const result = diffLinkedInstance(instanceOf(lib, { globalCss: undefined }), lib)
+    expect(result.changes.map((c) => c.kind)).toEqual(['globalCss'])
+  })
+
+  it("'' и отсутствие поля — одно и то же → НЕ изменён (в обе стороны)", () => {
+    const libEmpty = withAssets({ globalCss: '', globalJs: '' })
+    expect(diffLinkedInstance(instanceOf(libraryFooter()), libEmpty).changed).toBe(false)
+    expect(diffLinkedInstance(instanceOf(libEmpty), libraryFooter()).changed).toBe(false)
+  })
+
+  it('изменены и CSS, и JS → два изменения', () => {
+    const lib = withAssets({ globalCss: 'a{}', globalJs: 'a()' })
+    const result = diffLinkedInstance(instanceOf(lib, { globalCss: 'b{}', globalJs: 'b()' }), lib)
+    expect(result.changes.map((c) => c.kind).sort()).toEqual(['globalCss', 'globalJs'])
+  })
+
+  it('прочие поля metadata корня (name/locked) по-прежнему игнорируются', () => {
+    const lib = withAssets({ globalCss: 'a{}' })
+    const inst = instanceOf(lib, { name: 'Другое имя', locked: true })
+    expect(diffLinkedInstance(inst, lib).changed).toBe(false)
+  })
+
+  it('изменён CSS обычного вложенного узла → изменён', () => {
+    const lib = libraryFooter()
+    lib.children[0].metadata = { globalCss: 'p{}' }
+    const inst = instanceOf(lib)
+    inst.children[0].metadata = { globalCss: 'p{color:red}' }
+    const result = diffLinkedInstance(inst, lib)
+    expect(result.changes.map((c) => c.kind)).toEqual(['globalCss'])
+    expect(result.changes[0].path).toContain('p')
+  })
+
+  it('вложенный linked-блок с другим CSS НЕ помечает внешний блок (у него свой diff)', () => {
+    // В library внешнего блока лежит устаревшая развёрнутая копия вложенного блока.
+    const lib = libraryFooter()
+    lib.children[0].metadata = { linkedBlockId: 'nested-block', globalCss: '.old{}', globalJs: 'old()' }
+    const inst = instanceOf(lib)
+    inst.children[0].metadata = { linkedBlockId: 'nested-block', globalCss: '.new{}', globalJs: 'new()' }
+    expect(diffLinkedInstance(inst, lib).changed).toBe(false)
+  })
+})

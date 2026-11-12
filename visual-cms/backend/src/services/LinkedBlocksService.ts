@@ -10,7 +10,7 @@ import { AppDataSource } from '../config/database'
 import { Block } from '../models/Block'
 import { Page } from '../models/Page'
 import { In } from 'typeorm'
-import { diffLinkedInstance, LinkedChange } from './linkedBlockDiff'
+import { BLOCK_ASSET_KEYS, diffLinkedInstance, LinkedChange } from './linkedBlockDiff'
 
 /** Решение пользователя по одному изменённому linked-инстансу. */
 export type LinkedDecision = 'push' | 'static' | 'revert'
@@ -292,9 +292,18 @@ export class LinkedBlocksService {
    * Схлопывает один узел в placeholder: children: [], variations.specificChildren: [].
    * id/attributes/metadata (включая linkedBlockId и карусель-маркеры) сохраняются.
    * Полная структура подставляется при чтении через _applyLinkedBlocks.
+   *
+   * Исключение — общий CSS/JS блока (metadata.globalCss/globalJs): он живёт только
+   * в библиотеке (при чтении metadata берётся из library), а копия в placeholder'е
+   * никем не читается и лишь вводит в заблуждение (выглядит как «CSS страницы»).
    */
   private _collapseNodeToPlaceholder(node: any): any {
     const cleaned: any = { ...node, children: [] }
+    if (cleaned.metadata) {
+      const metadata = { ...cleaned.metadata }
+      for (const key of BLOCK_ASSET_KEYS) delete metadata[key]
+      cleaned.metadata = metadata
+    }
     if (cleaned.variations) {
       cleaned.variations = Object.fromEntries(
         Object.entries(cleaned.variations).map(([bpId, variation]: [string, any]) => [

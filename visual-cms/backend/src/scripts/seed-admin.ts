@@ -5,6 +5,10 @@
  *
  * Идемпотентно: если пользователь с таким username уже есть — ничего не делает.
  * Сам прогоняет миграции, поэтому работает даже до первого старта сервера.
+ *
+ * --reset-password: если пользователь есть — выставить ему ADMIN_PASSWORD и
+ * включить (ротация пароля админа; в проде — `deploy/scripts/secrets.sh admin`):
+ *   docker compose exec backend node dist/scripts/seed-admin.js --reset-password
  */
 import dotenv from 'dotenv'
 import { AppDataSource } from '../config/database'
@@ -34,12 +38,20 @@ async function main(): Promise<void> {
 
     const repo = AppDataSource.getRepository(User)
     const existing = await repo.findOne({ where: { username } })
+    const passwordHash = await authService.hashPassword(password)
+
     if (existing) {
-      console.log(`[seed-admin] User '${username}' already exists — nothing to do`)
+      if (!process.argv.includes('--reset-password')) {
+        console.log(`[seed-admin] User '${username}' already exists — nothing to do`)
+        return
+      }
+      existing.passwordHash = passwordHash
+      existing.isActive = true
+      await repo.save(existing)
+      console.log(`[seed-admin] Password for '${username}' reset`)
       return
     }
 
-    const passwordHash = await authService.hashPassword(password)
     const user = repo.create({ username, passwordHash, role: 'admin', isActive: true })
     await repo.save(user)
     console.log(`[seed-admin] Admin user '${username}' created`)

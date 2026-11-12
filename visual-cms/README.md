@@ -113,6 +113,12 @@ npm run docker:down  # остановить инфраструктуру
 npm run deploy:all   # деплой всех сайтов (scripts/deploy-all.js)
 ```
 
+## Прод-развёртывание
+
+Сервер, `docker-compose.production.yml`, автодеплой, бэкапы, секреты —
+см. [DEPLOY.md](DEPLOY.md). `docker-compose.yml` и `nginx-public.*.conf` —
+только для разработки.
+
 ## Технологии
 
 Frontend: React 18, TypeScript, Redux Toolkit, @dnd-kit, Monaco Editor,

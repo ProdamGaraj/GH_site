@@ -1,0 +1,127 @@
+# =============================================================================
+# CI for visual-cms. Every push to master and every PR:
+#   - type check + tests of the 4 packages,
+#   - deploy scripts: shellcheck + their test suite,
+#   - production stack: build all images, start them exactly like a server
+#     (fresh install path), run the end-to-end smoke test.
+# The server's auto-deploy can wait for these checks: DEPLOY_REQUIRE_CI=1
+# (visual-cms/DEPLOY.md §6). No path filters on purpose — a commit without
+# check runs would never be deployed in that mode.
+# =============================================================================
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: visual-cms
+
+jobs:
+  node-services:
+    name: ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, estate-service, news-service]
+    defaults:
+      run:
+        working-directory: visual-cms/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: visual-cms/${{ matrix.service }}/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Type check (sources and tests)
+        run: npx tsc --noEmit -p .
+      - name: Production build
+        run: npm run build
+      - name: Tests
+        run: npx jest --ci
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: visual-cms/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: visual-cms/frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Type check + production build
+        run: npm run build
+      - name: Tests
+        run: npx vitest run
+
+  deploy-scripts:
+    name: deploy scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck -x -S warning deploy/scripts/*.sh deploy/scripts/test/run.sh
+      - name: Tests (stubbed docker)
+        run: bash deploy/scripts/test/run.sh
+
+  production-stack:
+    name: production stack (build + boot + smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare a server-like environment
+        run: |
+          cp .env.example .env
+          sed -i 's/^SITE_DOMAIN=.*/SITE_DOMAIN=localhost/' .env
+          bash deploy/scripts/secrets.sh init
+          docker volume create visual-cms_postgres-data
+          docker volume create visual-cms_minio-data
+          mkdir -p ssl public-site map-assets certbot-www
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1 -subj "/CN=localhost" \
+            -keyout ssl/server.key -out ssl/server.crt
+          sudo chown -R 1000:1000 public-site
+      - name: Build images
+        run: docker compose build
+      - name: Start (healthchecks must pass)
+        run: docker compose up -d --wait --wait-timeout 300
+      - name: Smoke test through nginx
+        run: SMOKE_INSECURE=1 bash deploy/scripts/smoke.sh --login
+      - name: Runtime image contents
+        run: |
+          docker compose exec -T backend sh -c '
+            set -e
+            ls dist/migrations/*.sql >/dev/null
+            test -f dist/services/runtime/map-runtime.js
+            test -f dist/services/runtime/news-feed-runtime.js
+            test -f dist/controllers/analytics-tracker.js
+            test ! -d dist/__tests__
+            node -e "require(\"sharp\"); require(\"bcrypt\"); require(\"better-sqlite3\")"
+          '
+          docker compose exec -T estate-service sh -c 'ls dist/migrations/*.sql >/dev/null'
+          docker compose exec -T news-service sh -c 'ls dist/migrations/*.sql >/dev/null'
+      - name: Backup and restore round trip
+        run: |
+          bash deploy/scripts/backup.sh full
+          dir=$(ls -1d backups/*-full | tail -1)
+          ls -l "$dir"
+          bash deploy/scripts/restore.sh "$dir" --yes
+          SMOKE_INSECURE=1 bash deploy/scripts/smoke.sh --login
+      - name: Logs on failure
+        if: failure()
+        run: docker compose ps -a && docker compose logs --no-color --tail 200

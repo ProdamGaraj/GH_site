@@ -20,6 +20,30 @@ const IV_LENGTH = 16
 const AUTH_TAG_LENGTH = 16
 const SALT_LENGTH = 32
 
+/**
+ * Особое значение для ротации ключа: «данные зашифрованы встроенным dev-ключом».
+ * Так шифровал каждый стенд, где ENCRYPTION_KEY не был задан (NODE_ENV=development).
+ * Используется только скриптом rotate-encryption-key (OLD_ENCRYPTION_KEY=dev-fallback).
+ */
+export const DEV_FALLBACK_KEY_SPEC = 'dev-fallback'
+
+/** Встроенный dev-ключ (НЕ ДЛЯ PRODUCTION). Соль отличается от боевой — так исторически. */
+const deriveDevFallbackKey = (): Buffer =>
+  crypto.scryptSync('default-dev-key-not-for-production', 'salt', 32)
+
+/** 32-байтовый ключ AES из строки ENCRYPTION_KEY (scrypt). */
+export const deriveEncryptionKey = (raw: string): Buffer =>
+  crypto.scryptSync(raw, 'visual-cms-salt', 32)
+
+/**
+ * Ключ по «спецификации»: значение ENCRYPTION_KEY или DEV_FALLBACK_KEY_SPEC.
+ * Пустая строка — ошибка: молча шифровать пустым ключом нельзя.
+ */
+export const resolveEncryptionKey = (spec: string): Buffer => {
+  if (!spec) throw new Error('Encryption key spec is empty')
+  return spec === DEV_FALLBACK_KEY_SPEC ? deriveDevFallbackKey() : deriveEncryptionKey(spec)
+}
+
 // Ключ шифрования из переменной окружения
 const getEncryptionKey = (): Buffer => {
   const key = process.env.ENCRYPTION_KEY
@@ -27,12 +51,11 @@ const getEncryptionKey = (): Buffer => {
     // В development используем fallback ключ (НЕ ДЛЯ PRODUCTION!)
     if (process.env.NODE_ENV === 'development') {
       logger.warn('Using default encryption key. Set ENCRYPTION_KEY in production!')
-      return crypto.scryptSync('default-dev-key-not-for-production', 'salt', 32)
+      return deriveDevFallbackKey()
     }
     throw new Error('ENCRYPTION_KEY environment variable is required')
   }
-  // Derive a 32-byte key from the provided key using scrypt
-  return crypto.scryptSync(key, 'visual-cms-salt', 32)
+  return deriveEncryptionKey(key)
 }
 
 /**
@@ -78,10 +101,10 @@ export type StoredCredentials = EncryptedData | EnvReference | SecretsReference
  */
 export class CredentialsManager {
   /**
-   * Шифрует значение с использованием AES-256-GCM
+   * Шифрует значение с использованием AES-256-GCM.
+   * key — явный ключ (ротация); по умолчанию ключ из ENCRYPTION_KEY.
    */
-  static encrypt(value: string): EncryptedData {
-    const key = getEncryptionKey()
+  static encrypt(value: string, key: Buffer = getEncryptionKey()): EncryptedData {
     const iv = crypto.randomBytes(IV_LENGTH)
     
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv)
@@ -100,10 +123,10 @@ export class CredentialsManager {
   }
 
   /**
-   * Расшифровывает значение
+   * Расшифровывает значение. Чужой ключ → исключение (проверка auth tag GCM).
+   * key — явный ключ (ротация); по умолчанию ключ из ENCRYPTION_KEY.
    */
-  static decrypt(data: EncryptedData): string {
-    const key = getEncryptionKey()
+  static decrypt(data: EncryptedData, key: Buffer = getEncryptionKey()): string {
     const iv = Buffer.from(data.iv, 'base64')
     const authTag = Buffer.from(data.authTag, 'base64')
     

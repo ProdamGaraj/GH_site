@@ -6,9 +6,10 @@
 node_modules/
 **/node_modules/
 
-# --- Lockfiles (по решению владельца в гите не держим) ---
-package-lock.json
-**/package-lock.json
+# --- Lockfiles ---
+# package-lock.json IS committed (decision 2026-11-09): production images and CI
+# run `npm ci`, which needs them — every deploy and rollback gets exactly the
+# tested dependency versions. Refresh: visual-cms/deploy/scripts/refresh-lockfile.sh.
 yarn.lock
 pnpm-lock.yaml
 
@@ -57,8 +58,6 @@ visual-cms/backend/fix_rce.js
 visual-cms/backend/fix_rce2.js
 visual-cms/backend/fix_rce3.js
 
-# jest.config.js бэкенда намеренно не в гите (генерится/локальный)
-visual-cms/backend/jest.config.js
 
 # --- Сгенерированная статика / крупные бинарники / исходный сайт ---
 visual-cms/public-site/*

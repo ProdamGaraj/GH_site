@@ -1,0 +1,296 @@
+# =============================================================================
+# Visual CMS — PRODUCTION stack (standalone; NOT layered on docker-compose.yml).
+#
+#   cp .env.example .env && deploy/scripts/secrets.sh init   # once per server
+#   docker compose up -d --build --wait                        # .env sets COMPOSE_FILE
+#
+# Full guide: DEPLOY.md. All settings and secrets come from .env (gitignored).
+#
+# Differences from the dev stack (docker-compose.yml):
+#   - compiled code in images (no bind-mounted sources, no nodemon/Vite dev, no
+#     npm install at start); the CMS is static files inside the web image;
+#   - only nginx (web) is published; Postgres/Redis/MinIO/services are internal;
+#   - every secret is required from .env — no defaults, compose refuses to start;
+#   - restart policies, healthchecks, memory limits, log rotation.
+# =============================================================================
+
+name: visual-cms
+
+x-defaults: &defaults
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
+x-node-service: &node-service
+  <<: *defaults
+  # tini as PID 1: forwards SIGTERM to node and reaps zombies.
+  init: true
+  # Matches the `node` user of the image; ./public-site must be owned by it
+  # (deploy/scripts/lib.sh fix_permissions runs before every deploy).
+  user: "1000:1000"
+
+services:
+  # ---------------------------------------------------------------- nginx
+  web:
+    <<: *defaults
+    build:
+      context: .
+      dockerfile: deploy/web/Dockerfile
+    image: visual-cms-prod/web:latest
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      # Only these names are substituted in deploy/web/templates/*.template.
+      NGINX_ENVSUBST_FILTER: "^(SITE_DOMAIN|SITE_DOMAIN_ALIASES|ROBOTS_TAG|HSTS|MEDIA_CACHE_MAX_SIZE|ESTATE_WRITE_TOKEN|NEWS_WRITE_TOKEN)$$"
+      SITE_DOMAIN: ${SITE_DOMAIN:?set SITE_DOMAIN in .env}
+      SITE_DOMAIN_ALIASES: ${SITE_DOMAIN_ALIASES:-}
+      ROBOTS_TAG: ${ROBOTS_TAG:-}
+      # Unset → 1 year. Set HSTS= (empty) on a host without a trusted certificate.
+      HSTS: ${HSTS-max-age=31536000}
+      MEDIA_CACHE_MAX_SIZE: ${MEDIA_CACHE_MAX_SIZE:-10g}
+      ESTATE_WRITE_TOKEN: ${ESTATE_WRITE_TOKEN:?run deploy/scripts/secrets.sh init}
+      NEWS_WRITE_TOKEN: ${NEWS_WRITE_TOKEN:?run deploy/scripts/secrets.sh init}
+    volumes:
+      - ./public-site:/usr/share/nginx/html:ro
+      - ./map-assets:/usr/share/nginx/map:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./certbot-www:/var/www/certbot:ro
+      - nginx-cache:/var/cache/nginx
+    # No depends_on: the published site is static and must stay up even when the
+    # backend is down (upstreams are resolved per request).
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  # -------------------------------------------------------------- backend
+  backend:
+    <<: *node-service
+    build:
+      context: ./backend
+      dockerfile: ../deploy/node/Dockerfile
+      args:
+        # bcrypt / better-sqlite3 / sharp: native build fallback + libvips.
+        BUILD_APK: "python3 make g++ vips-dev"
+        RUNTIME_APK: "vips"
+    image: visual-cms-prod/backend:latest
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cms_user}:${POSTGRES_PASSWORD:?run deploy/scripts/secrets.sh init}@postgres:5432/visual_cms
+      REDIS_URL: redis://:${REDIS_PASSWORD:?run deploy/scripts/secrets.sh init}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:?run deploy/scripts/secrets.sh init}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?run deploy/scripts/secrets.sh init}
+      COOKIE_SECURE: "true"
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?run deploy/scripts/secrets.sh init}
+      PUBLIC_SITE_URL: https://${SITE_DOMAIN}
+      PREVIEW_ASSET_ORIGIN: https://${SITE_DOMAIN}
+      PUBLIC_SITE_NOINDEX: ${PUBLIC_SITE_NOINDEX:-false}
+      PUBLIC_SITE_DIR: /app/public-site
+      PUBLIC_MEDIA_URL: /media
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:?run deploy/scripts/secrets.sh init}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?run deploy/scripts/secrets.sh init}
+      S3_BUCKET: cms-media
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
+      # Internal hosts that resolve to private IPs and are otherwise blocked by
+      # the SSRF guard (exact hostnames, comma-separated).
+      SSRF_ALLOWED_HOSTS: api.macrocrm.gh.uz,estate-service,news-service
+      ESTATE_SERVICE_URL: http://estate-service:5100
+      ESTATE_WRITE_TOKEN: ${ESTATE_WRITE_TOKEN}
+      NEWS_SERVICE_URL: http://news-service:5200
+      NEWS_WRITE_TOKEN: ${NEWS_WRITE_TOKEN}
+      # MacroCRM sync (optional: without MACRO_TOKEN the sync button answers 503).
+      MACRO_BASE_URL: ${MACRO_BASE_URL:-https://api.macrocrm.gh.uz/v2}
+      MACRO_TOKEN: ${MACRO_TOKEN:-}
+      MACRO_APP_ID: ${MACRO_APP_ID:-}
+      MACRO_SYNC_COLLECTIONS: ${MACRO_SYNC_COLLECTIONS:-}
+      MACRO_SYNC_MEDIA_SITE_ID: ${MACRO_SYNC_MEDIA_SITE_ID:-}
+      MACRO_SYNC_MEDIA_FOLDER_ID: ${MACRO_SYNC_MEDIA_FOLDER_ID:-}
+      # Form e-mail destinations (optional).
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+    volumes:
+      - ./public-site:/app/public-site
+      - backend-backups:/app/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      # 200 only when the DB answers (routes/health.ts).
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5000/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1536m
+
+  # ------------------------------------------------------- estate-service
+  estate-service:
+    <<: *node-service
+    build:
+      context: ./estate-service
+      dockerfile: ../deploy/node/Dockerfile
+    image: visual-cms-prod/estate-service:latest
+    environment:
+      NODE_ENV: production
+      PORT: "5100"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cms_user}:${POSTGRES_PASSWORD}@postgres:5432/estate
+      ESTATE_WRITE_TOKEN: ${ESTATE_WRITE_TOKEN}
+      CORS_ORIGINS: https://${SITE_DOMAIN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5100/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+
+  # --------------------------------------------------------- news-service
+  news-service:
+    <<: *node-service
+    build:
+      context: ./news-service
+      dockerfile: ../deploy/node/Dockerfile
+    image: visual-cms-prod/news-service:latest
+    environment:
+      NODE_ENV: production
+      PORT: "5200"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cms_user}:${POSTGRES_PASSWORD}@postgres:5432/news
+      NEWS_WRITE_TOKEN: ${NEWS_WRITE_TOKEN}
+      CORS_ORIGINS: https://${SITE_DOMAIN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5200/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+
+  # ------------------------------------------------------------- postgres
+  # Three databases under one role: visual_cms (created here), estate and news
+  # (created by the services on first start).
+  postgres:
+    <<: *defaults
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cms_user}
+      # Used ONLY when the volume is initialised. Changing it later requires
+      # `deploy/scripts/secrets.sh apply-db-password` (ALTER ROLE).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: visual_cms
+      POSTGRES_INITDB_ARGS: --encoding=UTF-8 --lc-collate=C --lc-ctype=C.UTF-8
+      LANG: C.UTF-8
+    command: ["postgres", "-c", "shared_buffers=512MB"]
+    shm_size: 256m
+    stop_grace_period: 60s
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d visual_cms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  # ---------------------------------------------------------------- redis
+  # Pure cache (CacheService): no persistence, LRU eviction.
+  redis:
+    <<: *defaults
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no",
+              "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru",
+              "--requirepass", "${REDIS_PASSWORD}"]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+
+  # ---------------------------------------------------------------- minio
+  minio:
+    <<: *defaults
+    # Built from source: minio/minio is gone from Docker Hub (see the Dockerfile).
+    # Pinned to the release the test stand runs, so its data volume is reused as is.
+    build:
+      context: deploy/minio
+    image: visual-cms-prod/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    # Console only on the server's loopback: open via `ssh -L 9001:127.0.0.1:9001`.
+    ports:
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+volumes:
+  # External = `docker compose down -v` cannot delete them. Same names as the
+  # dev/test stack, so an existing server keeps its data. Created by
+  # deploy/scripts/install.sh on a fresh server.
+  postgres-data:
+    external: true
+    name: visual-cms_postgres-data
+  minio-data:
+    external: true
+    name: visual-cms_minio-data
+  # Disposable: media cache and backend JSON safety copies.
+  nginx-cache: {}
+  backend-backups: {}
