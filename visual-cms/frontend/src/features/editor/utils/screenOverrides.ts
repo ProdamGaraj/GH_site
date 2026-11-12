@@ -121,8 +121,25 @@ export function resolveScreenOverrides(
   return resolved
 }
 
+/**
+ * Правка узла на ОДНОМ экране — без каскада с других экранов: все записи этого
+ * breakpoint'а, кто бы их ни держал, слитые в порядке деплоя. Это то, что
+ * деплой эмитит для узла внутри @media данного экрана.
+ */
+export function resolveOwnScreenOverride(
+  root: BlockNode,
+  nodeId: string,
+  breakpointId: string,
+): ScreenOverride | undefined {
+  let merged: ScreenOverride | undefined
+  forEachOverride(root, breakpointId, (_holder, targetId, override) => {
+    if (targetId === nodeId) merged = mergeScreenOverride(merged, override)
+  })
+  return merged
+}
+
 /** Родитель узла в базовом дереве (правки пишутся в его variations). */
-function findBaseParent(node: BlockNode, childId: string): BlockNode | null {
+export function findBaseParent(node: BlockNode, childId: string): BlockNode | null {
   for (const child of node.children || []) {
     if (child.id === childId) return node
     const found = findBaseParent(child, childId)

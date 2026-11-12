@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 /**
- * Вкладка CSS на экране: удалённая строка свойства основной версии не должна
- * возвращаться после «Применить». Реальный editor-reducer; Monaco заменён
- * обычным textarea.
+ * Вкладка «CSS код»: основная версия + блок @media на каждый экран — всегда,
+ * какой бы экран ни был открыт на канвасе. Реальный editor-reducer; Monaco
+ * заменён обычным textarea.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import editorReducer, {
@@ -17,7 +17,6 @@ import editorReducer, {
   setViewport,
 } from '@/features/editor/editorSlice'
 import { useAppSelector } from '@/app/hooks'
-import { SCREEN_STYLE_RESET } from '@/features/editor/utils/screenOverrides'
 import type { BlockNode } from '@/shared/types'
 
 vi.mock('@monaco-editor/react', () => ({
@@ -43,10 +42,37 @@ const n = (id: string, overrides: Partial<BlockNode> = {}): BlockNode =>
 
 const tree = (): BlockNode =>
   n('page', {
-    children: [n('promo', { styles: { properties: { display: 'flex', gridTemplateColumns: '250px 1fr' } } })],
+    variations: { tablet: { inheritedOverrides: { promo: { styles: { display: 'grid' } } } } },
+    children: [
+      n('promo', { styles: { properties: { display: 'flex', gridTemplateColumns: '250px 1fr' } } }),
+      n('other', { styles: { properties: { color: 'red' } } }),
+    ],
   })
 
-function setup(bp: string | null) {
+// Экраны редактора по умолчанию: FHD 1920, HD 1440, Tablet 768, Mobile 375.
+const FULL = [
+  '  display: flex;',
+  '  grid-template-columns: 250px 1fr;',
+  '',
+  '/* Desktop FHD (1920px) */',
+  '@media (min-width: 1920px) {',
+  '}',
+  '',
+  '/* Desktop HD (1440px) */',
+  '@media (max-width: 1919px) {',
+  '}',
+  '',
+  '/* Tablet (768px) */',
+  '@media (max-width: 1439px) {',
+  '  display: grid;',
+  '}',
+  '',
+  '/* Mobile (375px) */',
+  '@media (max-width: 767px) {',
+  '}',
+].join('\n')
+
+function setup(bp: string | null, selected = 'promo') {
   const store = configureStore({ reducer: { editor: editorReducer } })
   store.dispatch(loadEditor(tree()))
   if (bp) {
@@ -54,11 +80,11 @@ function setup(bp: string | null) {
     store.dispatch(setEditMode('responsive'))
     store.dispatch(setActiveEditBreakpoint(bp))
   }
-  store.dispatch(selectNode('promo'))
+  store.dispatch(selectNode(selected))
   return store
 }
 
-// Как в панели: вкладка получает выбранный узел с итоговыми стилями экрана.
+// Как в панели: вкладка получает выбранный узел.
 const Harness = () => {
   const node = useAppSelector(selectSelectedNode)
   return node ? <CustomCSSTab node={node} /> : null
@@ -68,69 +94,126 @@ const mount = (store: ReturnType<typeof setup>) =>
   render(<Provider store={store}><Harness /></Provider>)
 
 const text = () => (screen.getByLabelText('css') as HTMLTextAreaElement).value
+const type = (css: string) => fireEvent.change(screen.getByLabelText('css'), { target: { value: css } })
 const apply = (css: string) => {
-  fireEvent.change(screen.getByLabelText('css'), { target: { value: css } })
+  type(css)
   fireEvent.click(screen.getByText('Применить'))
 }
-const tabletEntry = (store: ReturnType<typeof setup>) =>
-  store.getState().editor.rootNode!.variations?.tablet?.inheritedOverrides?.promo
+const root = (store: ReturnType<typeof setup>) => store.getState().editor.rootNode!
+const promoBase = (store: ReturnType<typeof setup>) => root(store).children[0].styles.properties
+const screenEntry = (store: ReturnType<typeof setup>, bp: string) =>
+  root(store).variations?.[bp]?.inheritedOverrides?.promo
 
-describe('CustomCSSTab на экране', () => {
+describe('CustomCSSTab — основная версия и экраны одним текстом', () => {
   afterEach(() => cleanup())
 
-  it('показывает стили основной версии', () => {
-    mount(setup('tablet'))
-    expect(text()).toBe('  display: flex;\n  grid-template-columns: 250px 1fr;')
+  it('основной режим: показывает основную версию и блоки всех экранов', () => {
+    mount(setup(null))
+    expect(text()).toBe(FULL)
   })
 
-  it('удалённая строка основной версии не возвращается после «Применить»', () => {
+  it('на любом экране текст тот же: основная версия не смешана с правками экрана', () => {
+    for (const bp of ['tablet', 'mobile', 'desktop-fhd']) {
+      mount(setup(bp))
+      expect(text()).toBe(FULL)
+      cleanup()
+    }
+  })
+
+  it('правка блока экрана пишется в этот экран, даже когда открыт другой', () => {
+    const store = setup('mobile')
+    mount(store)
+    apply(FULL.replace('  display: grid;', '  display: block;\n  gap: 4px;'))
+
+    expect(screenEntry(store, 'tablet')).toEqual({ styles: { display: 'block', gap: '4px' } })
+    expect(screenEntry(store, 'mobile')).toBeUndefined()
+    expect(promoBase(store)).toEqual({ display: 'flex', gridTemplateColumns: '250px 1fr' })
+    expect(store.getState().editor.isDirty).toBe(true)
+  })
+
+  it('правка основной версии с экрана меняет основную версию, а не экран', () => {
     const store = setup('tablet')
     mount(store)
-    apply('  display: flex;')
+    apply(FULL.replace('  grid-template-columns: 250px 1fr;\n', ''))
 
-    expect(text()).toBe('  display: flex;')
-    expect(tabletEntry(store)?.styles).toMatchObject({ gridTemplateColumns: SCREEN_STYLE_RESET })
-    // Основная версия не тронута.
-    expect(store.getState().editor.rootNode!.children[0].styles.properties).toEqual({
-      display: 'flex',
-      gridTemplateColumns: '250px 1fr',
-    })
+    expect(promoBase(store)).toEqual({ display: 'flex' })
+    expect(screenEntry(store, 'tablet')).toEqual({ styles: { display: 'grid' } })
+    // Удалённая строка не возвращается.
+    expect(text()).not.toContain('grid-template-columns')
   })
 
-  it('повторное «Применить» без правок ничего не возвращает', () => {
+  it('строка, удалённая из блока экрана, снимает правку и не возвращается', () => {
     const store = setup('tablet')
     mount(store)
-    apply('  display: flex;')
-    apply('  display: flex;')
-    expect(text()).toBe('  display: flex;')
+    apply(FULL.replace('  display: grid;\n', ''))
+
+    expect(screenEntry(store, 'tablet')).toBeUndefined()
+    expect(text()).toBe(FULL.replace('  display: grid;\n', ''))
   })
 
-  it('удалённое свойство можно вернуть, вписав строку заново', () => {
+  it('свойство можно убрать на одном экране сбросом revert', () => {
     const store = setup('tablet')
     mount(store)
-    apply('  display: flex;')
-    apply('  display: flex;\n  grid-template-columns: 1fr 1fr;')
+    apply(FULL.replace('  display: grid;', '  display: grid;\n  grid-template-columns: revert;'))
 
-    expect(text()).toContain('grid-template-columns: 1fr 1fr;')
-    expect(tabletEntry(store)?.styles).toMatchObject({ gridTemplateColumns: '1fr 1fr' })
+    expect(screenEntry(store, 'tablet')).toEqual({ styles: { display: 'grid', gridTemplateColumns: 'revert' } })
+    expect(promoBase(store).gridTemplateColumns).toBe('250px 1fr')
+    expect(text()).toContain('  grid-template-columns: revert;')
   })
 
-  it('изменённое значение пишется правкой экрана', () => {
-    const store = setup('tablet')
-    mount(store)
-    apply('  display: grid;\n  grid-template-columns: 250px 1fr;')
-    expect(tabletEntry(store)?.styles).toMatchObject({ display: 'grid' })
-    expect(text()).toContain('display: grid;')
-  })
-
-  it('основной режим: удалённая строка удаляется из узла, сбросов нет', () => {
+  it('ошибка разбора: ничего не применяется, текст и сообщение остаются', () => {
     const store = setup(null)
     mount(store)
-    apply('  display: flex;')
+    const broken = `${FULL}\n@media (max-width: 900px) {\n  color: red;\n}`
+    apply(broken)
 
-    const root = store.getState().editor.rootNode!
-    expect(root.children[0].styles.properties).toEqual({ display: 'flex' })
-    expect(root.variations).toBeUndefined()
-    expect(text()).toBe('  display: flex;')
+    expect(screen.getByText(/Нет экрана с условием @media \(max-width: 900px\)/)).toBeTruthy()
+    expect(text()).toBe(broken)
+    expect(promoBase(store)).toEqual({ display: 'flex', gridTemplateColumns: '250px 1fr' })
+    expect(store.getState().editor.isDirty).toBe(false)
+  })
+
+  it('после исправления ошибки текст применяется и сообщение исчезает', () => {
+    const store = setup(null)
+    mount(store)
+    apply('color red')
+    expect(screen.getByText(/не удалось разобрать/)).toBeTruthy()
+
+    apply('  color: red;')
+    expect(screen.queryByText(/не удалось разобрать/)).toBeNull()
+    expect(promoBase(store)).toEqual({ color: 'red' })
+  })
+
+  it('«Применить» без правок не помечает страницу изменённой', () => {
+    const store = setup('tablet')
+    mount(store)
+    fireEvent.click(screen.getByText('Применить'))
+    expect(store.getState().editor.isDirty).toBe(false)
+  })
+
+  it('«Форматировать» приводит текст к каноническому виду', () => {
+    mount(setup(null))
+    type('display:flex;grid-template-columns:250px 1fr\n@media (max-width:1439px){display:grid}')
+    fireEvent.click(screen.getByTitle('Форматировать'))
+    expect(text()).toBe(FULL)
+  })
+
+  it('выбор другого элемента сбрасывает несохранённый текст прежнего', () => {
+    const store = setup(null)
+    mount(store)
+    type('  display: block;')
+    act(() => {
+      store.dispatch(selectNode('other'))
+    })
+    expect(text().startsWith('  color: red;')).toBe(true)
+  })
+
+  it('корень страницы: только свойства, без блоков экранов', () => {
+    const store = setup('tablet', 'page')
+    mount(store)
+    expect(text()).toBe('')
+    apply('  color: blue;')
+    expect(root(store).styles.properties).toEqual({ color: 'blue' })
+    expect(text()).toBe('  color: blue;')
   })
 })

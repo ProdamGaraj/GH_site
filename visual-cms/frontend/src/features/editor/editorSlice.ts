@@ -6,6 +6,7 @@ import { blockApi, pageApi, type CreateBlockDto } from '@/shared/api'
 import { cleanForLibrary } from '@/features/editor/utils/libraryClean'
 import { findNodeInTree, normalizeLegacyRootOverrides } from '@/features/editor/utils/variationUtils'
 import { adoptStrayOverrides, hideScreenResets, SCREEN_STYLE_RESET } from '@/features/editor/utils/screenOverrides'
+import { applyNodeCss, type CssDeclarations } from '@/features/editor/utils/nodeCss'
 import { ensureNodeShape } from '@/features/editor/utils/nodeShape'
 import { bgUrlPatch, composeBgStack } from '@/features/media/responsiveMediaMatrix.utils'
 import {
@@ -791,6 +792,25 @@ const editorSlice = createSlice({
       state.isDirty = true
     },
     
+    /**
+     * CSS элемента одним действием (вкладка «CSS код»): стили основной версии и
+     * стили каждого экрана заменяются целиком. Не зависит от режима и текущего
+     * экрана — текст редактора адресует их явно. Историю не пушит (как
+     * updateNodeStyles).
+     */
+    setNodeCss: (state, action: PayloadAction<{
+      nodeId: string
+      base: CssDeclarations
+      screens: Record<string, CssDeclarations>
+    }>) => {
+      if (!state.rootNode) return
+      const { nodeId, base, screens } = action.payload
+      const next = applyNodeCss(state.rootNode as BlockNode, nodeId, { base, screens })
+      if (next === state.rootNode) return
+      state.rootNode = next
+      state.isDirty = true
+    },
+
     updateLayoutMode: (state, action: PayloadAction<{
       id: string
       mode: LayoutMode
@@ -1707,6 +1727,7 @@ export const {
   insertPreparedNode,
   updateNode,
   updateNodeStyles,
+  setNodeCss,
   setNodeMediaOverride,
   updateLayoutMode,
   deleteNode,

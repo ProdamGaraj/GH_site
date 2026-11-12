@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import Editor from '@monaco-editor/react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
-import { updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
+import { setNodeCss, selectRootNode, selectBreakpoints } from '@/features/editor/editorSlice'
+import { formatNodeCss, parseNodeCss, readNodeCss } from '@/features/editor/utils/nodeCss'
 import { Copy, Wand2, Trash2 } from 'lucide-react'
 import type { BlockNode } from '@/shared/types'
 
@@ -9,28 +10,37 @@ interface CustomCSSTabProps {
   node: BlockNode
 }
 
+/**
+ * CSS элемента: стили основной версии и блок `@media` на каждый экран — всегда
+ * все экраны, независимо от того, какой открыт на канвасе. «Применить» пишет
+ * каждую часть на своё место (см. utils/nodeCss.ts).
+ */
 export const CustomCSSTab: React.FC<CustomCSSTabProps> = ({ node }) => {
   const dispatch = useAppDispatch()
-  const viewport = useAppSelector(selectViewport)
+  const rootNode = useAppSelector(selectRootNode)
+  const breakpoints = useAppSelector(selectBreakpoints)
   const [cssText, setCssText] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Синхронизация CustomCSS с полями - показываем текущие стили
+  // Читаем из дерева, а не из `node`: тот уже слит с правками текущего экрана,
+  // а здесь основная версия и экраны показываются раздельно.
+  const model = useMemo(
+    () => (rootNode ? readNodeCss(rootNode, node.id, breakpoints) : { base: {}, screens: [] }),
+    [rootNode, node.id, breakpoints],
+  )
+  const storeText = useMemo(() => formatNodeCss(model), [model])
+
+  // Выбрали другой элемент — несохранённый текст прежнего к нему не относится.
   useEffect(() => {
-    if (!isEditing) {
-      // Свойства, снятые на этом экране, сюда не приходят (selectSelectedNode).
-      const styles = node.styles.properties || {}
-      const cssString = Object.entries(styles)
-        .map(([key, value]) => {
-          // Convert camelCase to kebab-case
-          const cssKey = key.replace(/([A-Z])/g, '-$1').toLowerCase()
-          return `  ${cssKey}: ${value};`
-        })
-        .join('\n')
-      setCssText(cssString)
-    }
-  }, [node.styles.properties, isEditing])
+    setIsEditing(false)
+    setError(null)
+  }, [node.id])
+
+  // Синхронизация с деревом, пока пользователь не правит текст.
+  useEffect(() => {
+    if (!isEditing) setCssText(storeText)
+  }, [storeText, isEditing])
 
   // Копировать CSS
   const copyCSS = useCallback(() => {
@@ -44,85 +54,31 @@ export const CustomCSSTab: React.FC<CustomCSSTabProps> = ({ node }) => {
     setError(null)
   }, [])
 
-  // Форматировать CSS
+  // Форматировать CSS: разбор и вывод в каноническом виде (при ошибках — не трогаем).
   const formatCSS = useCallback(() => {
-    try {
-      const lines = cssText.split('\n').filter(line => line.trim())
-      const formatted = lines.map(line => {
-        const match = line.match(/([^:]+):([^;]+);?/)
-        if (match) {
-          const key = match[1].trim()
-          const value = match[2].trim()
-          return `  ${key}: ${value};`
-        }
-        return line
-      }).join('\n')
-      setCssText(formatted)
-    } catch {
-      // Игнорируем ошибки форматирования
+    const parsed = parseNodeCss(cssText, model.screens)
+    if (parsed.errors.length > 0) {
+      setError(parsed.errors.join('\n'))
+      return
     }
-  }, [cssText])
+    setCssText(formatNodeCss({
+      base: parsed.base,
+      screens: model.screens.map(screen => ({ ...screen, styles: parsed.screens[screen.id] || {} })),
+    }))
+    setIsEditing(true)
+    setError(null)
+  }, [cssText, model.screens])
 
   const handleApplyCSS = () => {
-    try {
-      // Parse CSS text into object
-      const lines = cssText.split('\n').filter(line => line.trim())
-      const newStyles: Record<string, string> = {}
-
-      lines.forEach(line => {
-        const match = line.match(/([^:]+):([^;]+);?/)
-        if (match) {
-          const key = match[1].trim()
-          const value = match[2].trim()
-          
-          // Skip empty values
-          if (!value) {
-            return
-          }
-          
-          // Convert kebab-case to camelCase
-          const camelKey = key.replace(/-([a-z])/g, (g) => g[1].toUpperCase())
-          newStyles[camelKey] = value
-        }
-      })
-
-      // Получаем все текущие ключи, чтобы удалить те, которых нет в новом CSS
-      const currentKeys = Object.keys(node.styles.properties || {})
-      const newKeys = Object.keys(newStyles)
-      
-      // Создаем объект для удаления старых ключей
-      const keysToDelete = currentKeys.filter(key => !newKeys.includes(key))
-      const deleteStyles: Record<string, string> = {}
-      keysToDelete.forEach(key => {
-        deleteStyles[key] = '' // Пустое значение удалит свойство
-      })
-
-      // Сначала удаляем старые свойства, затем устанавливаем новые.
-      // unsetInherited: текст редактора — полный набор стилей узла на этом
-      // экране, поэтому удалённая строка должна исчезнуть, даже если свойство
-      // пришло из основной версии (иначе оно «возвращалось» после «Применить»).
-      if (Object.keys(deleteStyles).length > 0) {
-        dispatch(updateNodeStyles({
-          nodeId: node.id,
-          properties: deleteStyles as any,
-          breakpoint: viewport,
-          unsetInherited: true,
-        }))
-      }
-
-      dispatch(updateNodeStyles({
-        nodeId: node.id,
-        properties: newStyles as any,
-        breakpoint: viewport,
-      }))
-      
-      // Stop editing mode after successful apply
-      setIsEditing(false)
-      setError(null)
-    } catch (err) {
-      console.error('Error parsing CSS:', err)
-      setError('Ошибка в CSS синтаксисе')
+    const parsed = parseNodeCss(cssText, model.screens)
+    if (parsed.errors.length > 0) {
+      // Ничего не применяем: частичная запись потеряла бы неразобранные строки.
+      setError(parsed.errors.join('\n'))
+      return
     }
+    dispatch(setNodeCss({ nodeId: node.id, base: parsed.base, screens: parsed.screens }))
+    setIsEditing(false)
+    setError(null)
   }
 
   return (
@@ -200,17 +156,19 @@ export const CustomCSSTab: React.FC<CustomCSSTabProps> = ({ node }) => {
         
         {/* Error message */}
         {error && (
-          <p className="mt-2 text-xs text-red-500">{error}</p>
+          <p className="mt-2 text-xs text-red-500 whitespace-pre-line">{error}</p>
         )}
         
         <p className="text-xs text-gray-500 mt-2">
-          Формат: <code className="bg-gray-100 px-1 rounded">property: value;</code> — нажмите "Применить" для сохранения
+          Сверху — основная версия, ниже — блок <code className="bg-gray-100 px-1 rounded">@media</code> для каждого экрана.
+          Формат: <code className="bg-gray-100 px-1 rounded">property: value;</code> — нажмите "Применить" для сохранения.
+          Чтобы убрать свойство на экране, впишите в его блок <code className="bg-gray-100 px-1 rounded">property: revert;</code>
         </p>
       </div>
 
       {/* Current Styles Preview */}
       <div>
-        <h4 className="text-xs font-medium text-gray-700 mb-2">Текущие стили (JSON)</h4>
+        <h4 className="text-xs font-medium text-gray-700 mb-2">Итоговые стили на текущем экране (JSON)</h4>
         <pre className="bg-gray-50 border border-gray-200 rounded p-3 text-xs overflow-auto max-h-[200px] text-gray-900">
           {JSON.stringify(node.styles.properties, null, 2)}
         </pre>
