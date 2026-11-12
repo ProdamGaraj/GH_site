@@ -98,9 +98,10 @@ export const Canvas: React.FC<CanvasProps> = ({
     return getEffectiveTree(
       rootNode,
       viewport === 'base' ? null : viewport,
-      editMode
+      editMode,
+      breakpoints,
     )
-  }, [rootNode, viewport, editMode])
+  }, [rootNode, viewport, editMode, breakpoints])
 
   // Общий CSS (страница + блоки) для живого превью. Применяется так же, как на деплое,
   // — поэтому правила @media/:hover/@keyframes из globalCss видны прямо в канвасе.

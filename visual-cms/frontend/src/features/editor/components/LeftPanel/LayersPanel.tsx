@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { useAppSelector } from '@/app/hooks'
-import { selectRootNode, selectViewport, selectEditMode, selectSelectedNodeId } from '@/features/editor/editorSlice'
+import { selectRootNode, selectViewport, selectEditMode, selectSelectedNodeId, selectBreakpoints } from '@/features/editor/editorSlice'
 import { LayerItem } from './LayerItem'
 import { getEffectiveTree } from '@/features/editor/utils/variationUtils'
 import type { BlockNodeWithViewport } from '@/features/editor/utils/variationUtils'
@@ -31,6 +31,7 @@ export const LayersPanel: React.FC = () => {
   const rootNode = useAppSelector(selectRootNode)
   const viewport = useAppSelector(selectViewport)
   const editMode = useAppSelector(selectEditMode)
+  const breakpoints = useAppSelector(selectBreakpoints)
   const selectedNodeId = useAppSelector(selectSelectedNodeId)
   
   // Разделяем ручное и автоматическое разворачивание
@@ -47,8 +48,8 @@ export const LayersPanel: React.FC = () => {
     if (!rootNode) return null
     // В режиме responsive показываем дерево с вариациями для активного viewport
     const breakpoint = viewport === 'base' ? null : viewport
-    return getEffectiveTree(rootNode, breakpoint, editMode)
-  }, [rootNode, viewport, editMode])
+    return getEffectiveTree(rootNode, breakpoint, editMode, breakpoints)
+  }, [rootNode, viewport, editMode, breakpoints])
 
   // Инициализация: разворачиваем только первый уровень (в auto, чтобы работал автоколлапс)
   useEffect(() => {

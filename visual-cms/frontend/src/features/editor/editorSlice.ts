@@ -5,6 +5,7 @@ import type { RootState } from '@/app/store'
 import { blockApi, pageApi, type CreateBlockDto } from '@/shared/api'
 import { cleanForLibrary } from '@/features/editor/utils/libraryClean'
 import { findNodeInTree, normalizeLegacyRootOverrides } from '@/features/editor/utils/variationUtils'
+import { adoptStrayOverrides } from '@/features/editor/utils/screenOverrides'
 import { ensureNodeShape } from '@/features/editor/utils/nodeShape'
 import { bgUrlPatch, composeBgStack } from '@/features/media/responsiveMediaMatrix.utils'
 import {
@@ -598,6 +599,9 @@ const editorSlice = createSlice({
       }
 
       // Экранный оверрайд — в variations владельца (родитель, либо сам root).
+      // Сначала собираем к владельцу «чужие» записи узла: иначе деплой взял бы
+      // более позднюю из них, и правка не подействовала бы.
+      state.rootNode = adoptStrayOverrides(state.rootNode as BlockNode, nodeId, breakpoint)
       const isRoot = state.rootNode.id === nodeId
       const owner = isRoot ? state.rootNode : findParentNode(state.rootNode, nodeId)
       if (!owner) return
@@ -661,6 +665,10 @@ const editorSlice = createSlice({
       
       // В responsive режиме для не-root узлов сохраняем override в родителе
       if (targetBreakpoint && isResponsiveMode && parentNode && !isRootNode) {
+        // «Чужие» записи узла на этом экране собираем к родителю — иначе более
+        // поздняя из них перебила бы правку на деплое (и на канвасе).
+        state.rootNode = adoptStrayOverrides(state.rootNode as BlockNode, nodeId, targetBreakpoint)
+
         // Обрабатываем свойства: формируем обновлённые стили
         const updateOverrideInParent = (current: BlockNode): BlockNode => {
           if (current.id === parentNode.id) {
@@ -866,12 +874,11 @@ const editorSlice = createSlice({
         }
         
         if (findInBaseTree(state.rootNode)) {
-          // Элемент в базовом дереве — скрываем через override у РОДИТЕЛЯ.
-          // Рендер (getEffectiveTree) читает inheritedOverrides из variations
-          // непосредственного родителя (как updateNodeStyles/setNodeMediaOverride);
-          // запись в root делала «удаление» тихим no-op для всех элементов
-          // глубже первого уровня. Легаси-записи в root чинит
-          // normalizeLegacyRootOverrides при загрузке.
+          // Элемент в базовом дереве — скрываем через override у РОДИТЕЛЯ
+          // (владелец записи, как в updateNodeStyles/setNodeMediaOverride).
+          // «Чужие» записи узла сначала собираем к родителю: более поздняя из
+          // них с заданным display вернула бы узел на деплое.
+          state.rootNode = adoptStrayOverrides(state.rootNode as BlockNode, nodeId, breakpointId)
           const owner = state.rootNode.id === nodeId
             ? null
             : (findParentNode(state.rootNode, nodeId) || state.rootNode)
@@ -1793,12 +1800,12 @@ export const selectClipboard = (state: RootState) => state.editor.clipboard
 export const selectRootNode = (state: RootState) => state.editor.rootNode
 export const selectSelectedNodeId = (state: RootState) => state.editor.selectedNodeId
 export const selectSelectedNode = (state: RootState) => {
-  const { rootNode, selectedNodeId, viewport, editMode } = state.editor
+  const { rootNode, selectedNodeId, viewport, editMode, breakpoints } = state.editor
   if (!rootNode || !selectedNodeId) return null
   
   // Ищем узел в эффективном дереве (с учётом вариаций)
   const breakpoint = viewport === 'base' ? null : viewport
-  return findNodeInTree(rootNode, selectedNodeId, breakpoint, editMode)
+  return findNodeInTree(rootNode, selectedNodeId, breakpoint, editMode, breakpoints)
 }
 export const selectIsDirty = (state: RootState) => state.editor.isDirty
 export const selectCanUndo = (state: RootState) => state.editor.historyIndex > 0

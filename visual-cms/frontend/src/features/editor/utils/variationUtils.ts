@@ -1,4 +1,6 @@
 import type { BlockNode } from '@/shared/types'
+import type { BreakpointLike } from './breakpointRanges'
+import { resolveScreenOverrides, type ScreenOverride } from './screenOverrides'
 
 // Интерфейс для узла с информацией о viewport
 export interface BlockNodeWithViewport extends BlockNode {
@@ -18,13 +20,63 @@ function markChildrenWithViewport(node: BlockNodeWithViewport, viewportId: strin
 }
 
 /**
+ * Накладывает итоговые экранные правки на дерево. Скрытые узлы выпадают из
+ * дерева (как `display: none` на сайте); к узлу добавляются его
+ * specificChildren выбранного экрана.
+ */
+function applyScreenOverrides(
+  node: BlockNode,
+  breakpointId: string,
+  overrides: Map<string, ScreenOverride>,
+): BlockNodeWithViewport {
+  const visible = (child: BlockNode): boolean => !overrides.get(child.id)?.hidden
+
+  const children = (node.children || [])
+    .filter(visible)
+    .map(child => applyScreenOverrides(child, breakpointId, overrides))
+  const specificChildren = (node.variations?.[breakpointId]?.specificChildren || [])
+    .filter(visible)
+    .map(child => applyScreenOverrides(child, breakpointId, overrides))
+
+  const result = {
+    ...node,
+    _viewportId: null,
+    children: [...children, ...specificChildren],
+  } as BlockNodeWithViewport
+
+  const override = overrides.get(node.id)
+  if (!override) return result
+
+  return {
+    ...result,
+    styles: {
+      ...result.styles,
+      properties: {
+        ...(result.styles?.properties || {}),
+        ...override.styles,
+      },
+    },
+    attributes: {
+      ...result.attributes,
+      ...override.attributes,
+    },
+    content: override.content !== undefined ? override.content : result.content,
+  }
+}
+
+/**
  * Получить эффективное дерево для конкретного брейкпоинта
  * Объединяет базовое дерево с вариациями
+ *
+ * В адаптивном режиме экранные правки применяются так же, как на деплое
+ * (см. screenOverrides.ts): по id узла из любого места дерева и с каскадом
+ * экранов. `breakpoints` нужен для каскада; без него берётся только сам экран.
  */
 export function getEffectiveTree(
   baseNode: BlockNode,
   breakpointId: string | null,
-  editMode: 'base' | 'responsive'
+  editMode: 'base' | 'responsive',
+  breakpoints?: BreakpointLike[],
 ): BlockNodeWithViewport {
   // В base режиме показываем все элементы (базовые + специфичные для всех брейкпоинтов)
   if (editMode === 'base' || !breakpointId) {
@@ -58,69 +110,11 @@ export function getEffectiveTree(
     } as BlockNodeWithViewport
   }
 
-  // Получаем вариацию для текущего брейкпоинта
-  const variation = baseNode.variations?.[breakpointId]
-  
-  if (!variation) {
-    // Нет вариации - но всё равно рекурсивно обрабатываем children
-    // (у них могут быть свои вариации)
-    const processedChildren = (baseNode.children || []).map(child => 
-      getEffectiveTree(child, breakpointId, editMode)
-    )
-    return {
-      ...baseNode,
-      _viewportId: null,
-      children: processedChildren
-    } as BlockNodeWithViewport
-  }
-
-  // Применяем переопределения к базовым элементам
-  const processedChildren = (baseNode.children || [])
-    .map(child => {
-      const override = variation.inheritedOverrides?.[child.id]
-      
-      // Если элемент скрыт в этой вариации
-      if (override?.hidden) {
-        return null
-      }
-      
-      // Рекурсивно обрабатываем дочерние элементы
-      const processedChild = getEffectiveTree(child, breakpointId, editMode)
-      
-      // Применяем переопределения стилей и атрибутов
-      if (override) {
-        return {
-          ...processedChild,
-          styles: {
-            ...processedChild.styles,
-            properties: {
-              ...(processedChild.styles?.properties || {}),
-              ...override.styles,
-            },
-          },
-          attributes: {
-            ...processedChild.attributes,
-            ...override.attributes,
-          },
-          content: override.content !== undefined ? override.content : processedChild.content,
-        }
-      }
-      
-      return processedChild
-    })
-    .filter((child): child is BlockNodeWithViewport => child !== null)
-
-  // Добавляем специфичные для брейкпоинта элементы
-  // Рекурсивно обрабатываем их тоже (у них могут быть свои children)
-  const specificChildren = (variation.specificChildren || []).map(child => 
-    getEffectiveTree(child, breakpointId, editMode)
+  return applyScreenOverrides(
+    baseNode,
+    breakpointId,
+    resolveScreenOverrides(baseNode, breakpointId, breakpoints),
   )
-
-  return {
-    ...baseNode,
-    _viewportId: null,
-    children: [...processedChildren, ...specificChildren],
-  } as BlockNodeWithViewport
 }
 
 /**
@@ -218,10 +212,10 @@ export function getNodeBreakpoint(
 
 /**
  * Миграция легаси-данных: старый deleteNode писал hidden-override удаляемого
- * элемента ВСЕГДА в variations корня, а рендер (getEffectiveTree) читает
- * inheritedOverrides только из variations непосредственного родителя. Такие
- * записи для не-прямых детей корня — мёртвый груз: элемент оставался видимым
- * в редакторе, но скрывался на деплое (StyleGenerator читает всё дерево).
+ * элемента ВСЕГДА в variations корня, тогда как владелец записи — родитель
+ * узла (туда пишут updateNodeStyles/setNodeMediaOverride/deleteNode).
+ * Рендер теперь показывает и такие записи (см. screenOverrides.ts), но держим
+ * их у законного владельца, чтобы у узла была одна запись на экран.
  *
  * Переносим каждый root-override к фактическому родителю узла. Если у родителя
  * уже есть свой override — родительский приоритетнее (мержим поверх).
@@ -285,22 +279,25 @@ export function normalizeLegacyRootOverrides(root: BlockNode): BlockNode {
 
 /**
  * Найти узел в дереве (включая вариации)
+ *
+ * Эффективное дерево считается ОДИН раз от корня: экранные правки адресуют узлы
+ * по id из любого места дерева, поэтому пересчёт от поддерева потерял бы записи,
+ * лежащие выше или сбоку.
  */
 export function findNodeInTree(
   node: BlockNode,
   nodeId: string,
   breakpointId: string | null,
-  editMode: 'base' | 'responsive'
+  editMode: 'base' | 'responsive',
+  breakpoints?: BreakpointLike[],
 ): BlockNode | null {
-  // Получаем эффективное дерево
-  const effectiveNode = getEffectiveTree(node, breakpointId, editMode)
-  
-  if (effectiveNode.id === nodeId) return effectiveNode
-  
-  for (const child of effectiveNode.children) {
-    const found = findNodeInTree(child, nodeId, breakpointId, editMode)
-    if (found) return found
+  const find = (current: BlockNodeWithViewport): BlockNode | null => {
+    if (current.id === nodeId) return current
+    for (const child of current.children) {
+      const found = find(child)
+      if (found) return found
+    }
+    return null
   }
-  
-  return null
+  return find(getEffectiveTree(node, breakpointId, editMode, breakpoints))
 }
