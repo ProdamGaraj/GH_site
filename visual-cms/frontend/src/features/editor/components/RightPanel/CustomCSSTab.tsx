@@ -3,6 +3,7 @@ import Editor from '@monaco-editor/react'
 import { useAppDispatch, useAppSelector } from '@/app/hooks'
 import { updateNodeStyles, selectViewport } from '@/features/editor/editorSlice'
 import { Copy, Wand2, Trash2 } from 'lucide-react'
+import { withoutScreenResets } from '@/features/editor/utils/screenOverrides'
 import type { BlockNode } from '@/shared/types'
 
 interface CustomCSSTabProps {
@@ -19,7 +20,8 @@ export const CustomCSSTab: React.FC<CustomCSSTabProps> = ({ node }) => {
   // Синхронизация CustomCSS с полями - показываем текущие стили
   useEffect(() => {
     if (!isEditing) {
-      const styles = node.styles.properties || {}
+      // Свойства, снятые на этом экране, в тексте не показываем: их тут «нет».
+      const styles = withoutScreenResets(node.styles.properties || {})
       const cssString = Object.entries(styles)
         .map(([key, value]) => {
           // Convert camelCase to kebab-case
@@ -96,12 +98,16 @@ export const CustomCSSTab: React.FC<CustomCSSTabProps> = ({ node }) => {
         deleteStyles[key] = '' // Пустое значение удалит свойство
       })
 
-      // Сначала удаляем старые свойства, затем устанавливаем новые
+      // Сначала удаляем старые свойства, затем устанавливаем новые.
+      // unsetInherited: текст редактора — полный набор стилей узла на этом
+      // экране, поэтому удалённая строка должна исчезнуть, даже если свойство
+      // пришло из основной версии (иначе оно «возвращалось» после «Применить»).
       if (Object.keys(deleteStyles).length > 0) {
         dispatch(updateNodeStyles({
           nodeId: node.id,
           properties: deleteStyles as any,
           breakpoint: viewport,
+          unsetInherited: true,
         }))
       }
 

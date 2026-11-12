@@ -22,6 +22,24 @@ import { applicableBreakpointIds, type BreakpointLike } from './breakpointRanges
 export type ScreenOverride = NonNullable<BlockNodeVariation['inheritedOverrides']>[string]
 
 /**
+ * Значение «свойство на этом экране снято». Экранная правка умеет только
+ * перебивать, поэтому убрать свойство, пришедшее из основной версии или с более
+ * широкого экрана, можно лишь записав сброс: `revert` возвращает значение
+ * браузера по умолчанию, как если бы свойство не задавали. Деплой эмитит его
+ * как обычное значение (`display: revert !important`), канвас — инлайном.
+ */
+export const SCREEN_STYLE_RESET = 'revert'
+
+/** Свойства узла без снятых на экране — то, что показываем как «заданные стили». */
+export function withoutScreenResets<T extends Record<string, unknown>>(properties: T | undefined): Partial<T> {
+  const visible: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(properties || {})) {
+    if (value !== SCREEN_STYLE_RESET) visible[key] = value
+  }
+  return visible as Partial<T>
+}
+
+/**
  * Обход записей одного breakpoint'а в порядке деплоя: правки узла → его
  * specificChildren этого экрана (рекурсивно) → children.
  */

@@ -5,7 +5,7 @@ import type { RootState } from '@/app/store'
 import { blockApi, pageApi, type CreateBlockDto } from '@/shared/api'
 import { cleanForLibrary } from '@/features/editor/utils/libraryClean'
 import { findNodeInTree, normalizeLegacyRootOverrides } from '@/features/editor/utils/variationUtils'
-import { adoptStrayOverrides } from '@/features/editor/utils/screenOverrides'
+import { adoptStrayOverrides, SCREEN_STYLE_RESET } from '@/features/editor/utils/screenOverrides'
 import { ensureNodeShape } from '@/features/editor/utils/nodeShape'
 import { bgUrlPatch, composeBgStack } from '@/features/media/responsiveMediaMatrix.utils'
 import {
@@ -650,10 +650,18 @@ const editorSlice = createSlice({
       properties?: Partial<CSSProperties>
       customCSS?: string
       breakpoint?: string
+      /**
+       * Только для экранной правки. Пустое значение обычно значит «убрать правку
+       * экрана» — тогда свойство снова берётся из основной версии (или с более
+       * широкого экрана). С этим флагом такое свойство снимается на экране
+       * совсем: если после удаления правки оно всё ещё приходит сверху,
+       * записывается сброс (SCREEN_STYLE_RESET).
+       */
+      unsetInherited?: boolean
     }>) => {
       if (!state.rootNode) return
       
-      const { nodeId, properties, customCSS, breakpoint } = action.payload
+      const { nodeId, properties, customCSS, breakpoint, unsetInherited } = action.payload
       
       // Определяем режим обновления
       const isResponsiveMode = state.editMode === 'responsive' && state.activeEditBreakpoint
@@ -670,51 +678,75 @@ const editorSlice = createSlice({
         state.rootNode = adoptStrayOverrides(state.rootNode as BlockNode, nodeId, targetBreakpoint)
 
         // Обрабатываем свойства: формируем обновлённые стили
-        const updateOverrideInParent = (current: BlockNode): BlockNode => {
-          if (current.id === parentNode.id) {
-            const variations = current.variations || {}
-            const variation = variations[targetBreakpoint] || {}
-            const inheritedOverrides = variation.inheritedOverrides || {}
-            const currentOverride = inheritedOverrides[nodeId] || {}
-            const currentOverrideStyles = currentOverride.styles || {}
-            
-            // Обрабатываем удаление пустых значений
-            const updatedOverrideStyles = { ...currentOverrideStyles }
-            if (properties) {
-              Object.entries(properties).forEach(([key, value]) => {
-                if (value === '' || value === null || value === undefined) {
-                  delete updatedOverrideStyles[key]
-                } else {
-                  updatedOverrideStyles[key] = value
-                }
-              })
-            }
-            
-            return {
-              ...current,
-              variations: {
-                ...variations,
-                [targetBreakpoint]: {
-                  ...variation,
-                  inheritedOverrides: {
-                    ...inheritedOverrides,
-                    [nodeId]: {
-                      ...currentOverride,
-                      styles: updatedOverrideStyles,
+        const writeOverride = (properties: Partial<CSSProperties> | undefined) => {
+          const updateOverrideInParent = (current: BlockNode): BlockNode => {
+            if (current.id === parentNode.id) {
+              const variations = current.variations || {}
+              const variation = variations[targetBreakpoint] || {}
+              const inheritedOverrides = variation.inheritedOverrides || {}
+              const currentOverride = inheritedOverrides[nodeId] || {}
+              const currentOverrideStyles = currentOverride.styles || {}
+              
+              // Обрабатываем удаление пустых значений
+              const updatedOverrideStyles = { ...currentOverrideStyles }
+              if (properties) {
+                Object.entries(properties).forEach(([key, value]) => {
+                  if (value === '' || value === null || value === undefined) {
+                    delete updatedOverrideStyles[key]
+                  } else {
+                    updatedOverrideStyles[key] = value
+                  }
+                })
+              }
+              
+              return {
+                ...current,
+                variations: {
+                  ...variations,
+                  [targetBreakpoint]: {
+                    ...variation,
+                    inheritedOverrides: {
+                      ...inheritedOverrides,
+                      [nodeId]: {
+                        ...currentOverride,
+                        styles: updatedOverrideStyles,
+                      },
                     },
                   },
                 },
-              },
+                children: current.children.map(updateOverrideInParent),
+              }
+            }
+            return {
+              ...current,
               children: current.children.map(updateOverrideInParent),
             }
           }
-          return {
-            ...current,
-            children: current.children.map(updateOverrideInParent),
+          
+          return updateOverrideInParent
+        }
+
+        state.rootNode = writeOverride(properties)(state.rootNode)
+
+        // Свойства, которые просили убрать, но они всё ещё приходят из основной
+        // версии или с более широкого экрана, — снимаем на этом экране сбросом.
+        if (unsetInherited && properties) {
+          const effective = findNodeInTree(
+            state.rootNode as BlockNode, nodeId, targetBreakpoint, 'responsive', state.breakpoints,
+          )?.styles?.properties as Record<string, unknown> | undefined
+          const resets: Record<string, string> = {}
+          for (const [key, value] of Object.entries(properties)) {
+            if (value !== '' && value !== null && value !== undefined) continue
+            const inherited = effective?.[key]
+            if (inherited === undefined || inherited === null || inherited === '') continue
+            if (inherited === SCREEN_STYLE_RESET) continue
+            resets[key] = SCREEN_STYLE_RESET
+          }
+          if (Object.keys(resets).length > 0) {
+            state.rootNode = writeOverride(resets as Partial<CSSProperties>)(state.rootNode)
           }
         }
-        
-        state.rootNode = updateOverrideInParent(state.rootNode)
+
         state.isDirty = true
         return
       }
