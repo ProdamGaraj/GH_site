@@ -5,6 +5,11 @@
  * столбик круглых кнопок-каналов (телефон, Telegram, Instagram), сама кнопка
  * превращается в крестик. Закрывается крестиком, клавишей Esc и нажатием мимо.
  *
+ * Свёрнутая кнопка по очереди показывает значки: чат, затем каждый канал из
+ * меню (берутся из самих кнопок-каналов — добавленный в редакторе канал тоже
+ * попадёт в круг). Пауза, пока виджет раскрыт, под курсором, в фокусе, вкладка
+ * скрыта или посетитель просил меньше анимации.
+ *
  * Оформление — из дизайна сайта: золото `#fdb82a` с переливом, как у кнопок
  * «Получить консультацию», тёмный `#15181d`, шрифт страницы.
  *
@@ -21,9 +26,17 @@ import { StructureNode, makeNode } from './choiceToPlanTypes'
 export const CONTACT_WIDGET_NAME = 'Contact widget'
 export const CONTACT_WIDGET_ATTR = 'data-contact-widget'
 
+/** Каналы, для которых в CSS есть значок. */
+export const CHANNEL_KEYS = ['phone', 'telegram', 'instagram', 'whatsapp', 'email', 'youtube'] as const
+
+/** Как часто свёрнутая кнопка меняет значок, мс. */
+export const ICON_ROTATE_MS = 2500
+/** Длительность угасания значка перед сменой, мс (как transition в CSS). */
+export const ICON_SWAP_MS = 180
+
 export interface ContactChannel {
   /** Имя канала — суффикс класса значка. */
-  key: 'phone' | 'telegram' | 'instagram' | 'whatsapp' | 'email' | 'youtube'
+  key: (typeof CHANNEL_KEYS)[number]
   href: string
   /** Подпись слева от кнопки и текст для экранных читалок. */
   label: string
@@ -246,7 +259,13 @@ export const CONTACT_WIDGET_CSS = `/* ==========================================
 }
 
 .gh-contacts-toggle::before {
-  transition: transform .26s cubic-bezier(.2, .8, .2, 1);
+  transition: transform .26s cubic-bezier(.2, .8, .2, 1), opacity .18s ease;
+}
+
+/* Смена значка у свёрнутой кнопки: старый гаснет, новый появляется. */
+.gh-contacts-toggle.is-swapping::before {
+  opacity: 0;
+  transform: scale(.55);
 }
 
 .gh-contacts.is-open .gh-contacts-toggle::before {
@@ -266,13 +285,14 @@ export const CONTACT_WIDGET_CSS = `/* ==========================================
 /* ---------- значки ---------- */
 
 ${iconRule('.gh-contacts-toggle', CONTACT_ICONS.chat)}
+${CHANNEL_KEYS.map((key) => iconRule(`.gh-contacts-item--${key}`, CONTACT_ICONS[key])).join('\n')}
+
+/* Свёрнутая кнопка по очереди показывает значки каналов из меню (data-icon ставит скрипт). */
+${CHANNEL_KEYS.map((key) => iconRule(`.gh-contacts-toggle[data-icon="${key}"]`, CONTACT_ICONS[key])).join('\n')}
+
+/* Раскрыт — крестик, какой бы значок ни показывался до этого. */
+${iconRule('.gh-contacts.is-open .gh-contacts-toggle[data-icon]', CONTACT_ICONS.close)}
 ${iconRule('.gh-contacts.is-open .gh-contacts-toggle', CONTACT_ICONS.close)}
-${iconRule('.gh-contacts-item--phone', CONTACT_ICONS.phone)}
-${iconRule('.gh-contacts-item--telegram', CONTACT_ICONS.telegram)}
-${iconRule('.gh-contacts-item--instagram', CONTACT_ICONS.instagram)}
-${iconRule('.gh-contacts-item--whatsapp', CONTACT_ICONS.whatsapp)}
-${iconRule('.gh-contacts-item--email', CONTACT_ICONS.email)}
-${iconRule('.gh-contacts-item--youtube', CONTACT_ICONS.youtube)}
 
 /* ---------- телефон ---------- */
 
@@ -364,6 +384,62 @@ export const CONTACT_WIDGET_JS = `(function () {
     var toggle = opened.querySelector(".gh-contacts-toggle");
     if (toggle) toggle.focus();
   });
+
+  // ---- Значок свёрнутой кнопки: чат, затем по очереди каналы из меню ----
+
+  var KNOWN = ${JSON.stringify(CHANNEL_KEYS)};
+  var ROTATE_MS = ${ICON_ROTATE_MS};
+  var SWAP_MS = ${ICON_SWAP_MS};
+
+  // Значки по порядку: чат и каналы меню (без повторов и без каналов, у которых нет значка).
+  function iconsOf(widget) {
+    var icons = ["chat"];
+    var items = widget.querySelectorAll(".gh-contacts-item");
+    for (var i = 0; i < items.length; i++) {
+      var m = (items[i].className || "").match(/gh-contacts-item--([a-z]+)/);
+      if (m && KNOWN.indexOf(m[1]) !== -1 && icons.indexOf(m[1]) === -1) icons.push(m[1]);
+    }
+    return icons;
+  }
+
+  function matches(el, selector) {
+    try {
+      return el.matches(selector);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function reducedMotion() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+
+  // Не мешаем: раскрыт, под курсором или в фокусе — значок стоит.
+  function paused(widget) {
+    return widget.classList.contains(OPEN) || matches(widget, ":hover") || matches(widget, ":focus-within");
+  }
+
+  function rotate(widget) {
+    var toggle = widget.querySelector(".gh-contacts-toggle");
+    if (!toggle) return;
+    var icons = iconsOf(widget);
+    if (icons.length < 2) return;
+    var current = icons.indexOf(toggle.getAttribute("data-icon") || "chat");
+    var next = icons[(current + 1) % icons.length];
+    toggle.classList.add("is-swapping");
+    setTimeout(function () {
+      toggle.setAttribute("data-icon", next);
+      toggle.classList.remove("is-swapping");
+    }, SWAP_MS);
+  }
+
+  setInterval(function () {
+    if (document.hidden || reducedMotion()) return;
+    var widgets = document.querySelectorAll(ROOT);
+    for (var i = 0; i < widgets.length; i++) {
+      if (!paused(widgets[i])) rotate(widgets[i]);
+    }
+  }, ROTATE_MS);
 })();
 `
 
@@ -421,6 +497,7 @@ export function buildContactWidgetBlock(channels: ContactChannel[] = DEFAULT_CHA
           'aria-expanded': 'false',
           'data-label-open': 'Связаться с нами',
           'data-label-close': 'Закрыть',
+          'data-icon': 'chat',
         },
       }),
     ],

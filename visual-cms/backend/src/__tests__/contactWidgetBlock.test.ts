@@ -7,7 +7,10 @@
 jest.mock('../config/database', () => ({ AppDataSource: { getRepository: () => ({}) } }))
 
 import {
+  CHANNEL_KEYS,
   CONTACT_ICONS,
+  ICON_ROTATE_MS,
+  ICON_SWAP_MS,
   CONTACT_WIDGET_ATTR,
   CONTACT_WIDGET_CSS,
   CONTACT_WIDGET_JS,
@@ -70,6 +73,7 @@ describe('buildContactWidgetBlock — структура', () => {
       'aria-label': 'Связаться с нами',
       'data-label-open': 'Связаться с нами',
       'data-label-close': 'Закрыть',
+      'data-icon': 'chat',
     })
   })
 
@@ -118,6 +122,20 @@ describe('CSS блока', () => {
     expect(CONTACT_WIDGET_CSS).toContain(`.gh-contacts.is-open .gh-contacts-toggle::before { -webkit-mask-image: ${CONTACT_ICONS.close}`)
   })
 
+  it('свёрнутая кнопка умеет показать значок любого канала; раскрытая — крестик поверх него', () => {
+    for (const key of CHANNEL_KEYS) {
+      expect(CONTACT_WIDGET_CSS).toContain(`.gh-contacts-toggle[data-icon="${key}"]::before { -webkit-mask-image: ${CONTACT_ICONS[key]}`)
+    }
+    // Правило крестика сильнее правила значка канала (больше классов) и идёт после него.
+    const close = CONTACT_WIDGET_CSS.indexOf(`.gh-contacts.is-open .gh-contacts-toggle[data-icon]::before { -webkit-mask-image: ${CONTACT_ICONS.close}`)
+    expect(close).toBeGreaterThan(CONTACT_WIDGET_CSS.lastIndexOf('.gh-contacts-toggle[data-icon="'))
+    expect(CONTACT_WIDGET_CSS).toMatch(/\.gh-contacts-toggle\.is-swapping::before \{[^}]*opacity: 0/)
+  })
+
+  it('JS и CSS знают одни и те же каналы', () => {
+    expect(CONTACT_WIDGET_JS).toContain(`var KNOWN = ${JSON.stringify(CHANNEL_KEYS)};`)
+  })
+
   it('значки — корректные SVG в data-адресе, без символов, ломающих CSS', () => {
     for (const icon of Object.values(CONTACT_ICONS)) {
       expect(icon).toMatch(/^url\("data:image\/svg\+xml,%3Csvg [^"]+%3C\/svg%3E"\)$/)
@@ -142,15 +160,18 @@ describe('CSS блока', () => {
 })
 
 describe('JS блока — раскрытие и закрытие', () => {
-  function mount(count = 1): HTMLElement[] {
+  function mount(count = 1, channels: string[] = ['telegram']): HTMLElement[] {
+    const links = channels
+      .map((key) => `<a class="gh-contacts-item gh-contacts-item--${key}" href="#${key}"><span class="gh-contacts-label">${key}</span></a>`)
+      .join('')
     document.body.innerHTML =
       '<main id="page">страница</main>' +
       Array.from({ length: count })
         .map(
           () =>
             `<div class="gh-contacts" ${CONTACT_WIDGET_ATTR}>` +
-            '<div class="gh-contacts-list"><a class="gh-contacts-item" href="#tg"><span class="gh-contacts-label">Telegram</span></a></div>' +
-            '<button type="button" class="gh-contacts-toggle" aria-expanded="false" aria-label="Связаться с нами" data-label-open="Связаться с нами" data-label-close="Закрыть"></button>' +
+            `<div class="gh-contacts-list">${links}</div>` +
+            '<button type="button" class="gh-contacts-toggle" aria-expanded="false" aria-label="Связаться с нами" data-label-open="Связаться с нами" data-label-close="Закрыть" data-icon="chat"></button>' +
             '</div>',
         )
         .join('')
@@ -159,12 +180,120 @@ describe('JS блока — раскрытие и закрытие', () => {
 
   const toggleOf = (widget: HTMLElement) => widget.querySelector<HTMLElement>('.gh-contacts-toggle')!
   const isOpen = (widget: HTMLElement) => widget.classList.contains('is-open')
+  const iconOf = (widget: HTMLElement) => toggleOf(widget).getAttribute('data-icon')
+
+  // Таймер смены значков общий и запущен при подключении скрипта: шагаем ровно до его срабатывания.
+  let installedAt = 0
+  const toNextTick = () => jest.advanceTimersByTime(ICON_ROTATE_MS - ((Date.now() - installedAt) % ICON_ROTATE_MS))
+  /** Один шаг круга: срабатывание таймера и угасание старого значка. */
+  const rotateOnce = () => {
+    toNextTick()
+    jest.advanceTimersByTime(ICON_SWAP_MS)
+  }
 
   beforeAll(() => {
+    jest.useFakeTimers()
+    installedAt = Date.now()
     // Скрипт вешает обработчики на документ один раз — как на странице.
     // eslint-disable-next-line no-eval
     window.eval(CONTACT_WIDGET_JS)
     window.eval(CONTACT_WIDGET_JS) // повторное подключение (два экземпляра блока) ничего не ломает
+  })
+
+  afterAll(() => {
+    jest.useRealTimers()
+  })
+
+  describe('значок свёрнутой кнопки', () => {
+    afterEach(() => {
+      delete (window as any).matchMedia
+      delete (document as any).hidden
+    })
+
+    it('по кругу: чат, затем каждый канал меню в его порядке', () => {
+      const [widget] = mount(1, ['phone', 'telegram', 'instagram'])
+      const seen = [iconOf(widget)]
+      for (let i = 0; i < 4; i++) {
+        rotateOnce()
+        seen.push(iconOf(widget))
+      }
+      expect(seen).toEqual(['chat', 'phone', 'telegram', 'instagram', 'chat'])
+    })
+
+    it('смена плавная: сначала старый значок гаснет, потом ставится новый', () => {
+      const [widget] = mount(1, ['phone'])
+      toNextTick()
+      expect(toggleOf(widget).classList.contains('is-swapping')).toBe(true)
+      expect(iconOf(widget)).toBe('chat')
+      jest.advanceTimersByTime(ICON_SWAP_MS)
+      expect(toggleOf(widget).classList.contains('is-swapping')).toBe(false)
+      expect(iconOf(widget)).toBe('phone')
+    })
+
+    it('канал, добавленный в редакторе, тоже в круге; повторы и каналы без значка пропускаются', () => {
+      const [widget] = mount(1, ['whatsapp', 'whatsapp', 'vk', 'email'])
+      const seen: Array<string | null> = []
+      for (let i = 0; i < 3; i++) {
+        rotateOnce()
+        seen.push(iconOf(widget))
+      }
+      expect(seen).toEqual(['whatsapp', 'email', 'chat'])
+    })
+
+    it('раскрыт — значок стоит (видно крестик); после закрытия круг продолжается', () => {
+      const [widget] = mount(1, ['phone', 'telegram'])
+      rotateOnce()
+      expect(iconOf(widget)).toBe('phone')
+
+      toggleOf(widget).click()
+      rotateOnce()
+      rotateOnce()
+      expect(iconOf(widget)).toBe('phone')
+      expect(toggleOf(widget).classList.contains('is-swapping')).toBe(false)
+
+      toggleOf(widget).click()
+      toggleOf(widget).blur()
+      rotateOnce()
+      expect(iconOf(widget)).toBe('telegram')
+    })
+
+    it('кнопка в фокусе (клавиатура) — значок стоит', () => {
+      const [widget] = mount(1, ['phone'])
+      toggleOf(widget).focus()
+      rotateOnce()
+      expect(iconOf(widget)).toBe('chat')
+      toggleOf(widget).blur()
+      rotateOnce()
+      expect(iconOf(widget)).toBe('phone')
+    })
+
+    it('вкладка скрыта или просили меньше анимации — значок стоит', () => {
+      const [widget] = mount(1, ['phone'])
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+      rotateOnce()
+      expect(iconOf(widget)).toBe('chat')
+      delete (document as any).hidden
+
+      ;(window as any).matchMedia = (query: string) => ({ matches: query.includes('reduce') })
+      rotateOnce()
+      expect(iconOf(widget)).toBe('chat')
+    })
+
+    it('каналов нет — остаётся чат', () => {
+      const [widget] = mount(1, [])
+      rotateOnce()
+      rotateOnce()
+      expect(iconOf(widget)).toBe('chat')
+      expect(toggleOf(widget).classList.contains('is-swapping')).toBe(false)
+    })
+
+    it('несколько виджетов и виджет, добавленный позже, — меняются все', () => {
+      mount(0)
+      rotateOnce()
+      const widgets = mount(2, ['phone'])
+      rotateOnce()
+      expect(widgets.map(iconOf)).toEqual(['phone', 'phone'])
+    })
   })
 
   it('кнопка раскрывает и сворачивает; состояние и подпись — для читалок', () => {
