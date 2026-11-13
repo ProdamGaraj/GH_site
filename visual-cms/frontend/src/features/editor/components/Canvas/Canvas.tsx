@@ -7,6 +7,7 @@ import { DropIndicatorOverlay, DropTargetHighlight } from './DropIndicatorOverla
 import { getEffectiveTree } from '../../utils/variationUtils'
 import { collectTreeGlobalCss, collectTreeGlobalJs } from '../../utils/exportUtils'
 import { compileMediaForWidth } from '../../utils/compileCanvasMedia'
+import { convertViewportUnits } from '../../utils/viewportUnits'
 import { useCanvasBaseCss } from '../../hooks/useCanvasBaseCss'
 
 interface CanvasProps {
@@ -125,14 +126,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   //  2) пересчитываем vw/vh в px от той же базы (ширина брейкпоинта и видимая высота).
   const displayGlobalCss = useMemo(() => {
     if (!globalCss || editMode !== 'responsive' || !currentBreakpoint) return globalCss
-    let css = compileMediaForWidth(globalCss, currentBreakpoint.width)
-    if (effectiveScreenHeight) {
-      css = css.replace(/(\d*\.?\d+)(?:s|d|l)?vh\b/g, (_m, num) =>
-        `${(parseFloat(num) / 100) * effectiveScreenHeight}px`)
-    }
-    css = css.replace(/(\d*\.?\d+)(?:s|d|l)?vw\b/g, (_m, num) =>
-      `${(parseFloat(num) / 100) * currentBreakpoint.width}px`)
-    return css
+    const css = compileMediaForWidth(globalCss, currentBreakpoint.width)
+    return convertViewportUnits(css, { width: currentBreakpoint.width, height: effectiveScreenHeight })
   }, [globalCss, editMode, currentBreakpoint, effectiveScreenHeight])
 
   // Опционально выполняем общий JS прямо в холсте (тумблер). Скрипт вставляется живым

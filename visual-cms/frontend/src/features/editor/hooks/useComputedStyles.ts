@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useAppSelector } from '@/app/hooks'
 import { selectViewport, selectBreakpoints, selectEffectiveBrowserOffset } from '../editorSlice'
+import { convertViewportUnits } from '../utils/viewportUnits'
 import type { BlockNode } from '@/shared/types'
 
 export const useComputedStyles = (node: BlockNode): React.CSSProperties => {
@@ -21,41 +22,19 @@ export const useComputedStyles = (node: BlockNode): React.CSSProperties => {
       }
     }
 
-    // Преобразуем viewport units (vh, vw) в пиксели на основе breakpoint и browser offset
+    // Viewport-единицы (vh/vw/svh/dvh/vmin…) → px от экрана канваса: иначе браузер
+    // считает их от окна редактора (см. utils/viewportUnits.ts).
     if (currentBreakpoint) {
       // Реальная видимая высота = высота брейкпоинта − эффективный «хром» браузера
       // (константа выбранного браузера либо реальный замер в режиме «авто»).
-      const effectiveViewportHeight = currentBreakpoint.height
-        ? Math.max(1, currentBreakpoint.height - browserOffset)
-        : currentBreakpoint.height
-      
-      const convertViewportUnits = (value: string): string => {
-        if (typeof value !== 'string') return value
-        
-        // Преобразуем vh (viewport height) в пиксели с учетом browser offset
-        if (value.includes('vh') && effectiveViewportHeight) {
-          return value.replace(/(\d+\.?\d*)vh/g, (_match, num) => {
-            const pixels = (parseFloat(num) / 100) * effectiveViewportHeight
-            return `${pixels}px`
-          })
-        }
-        
-        // Преобразуем vw (viewport width) в пиксели
-        if (value.includes('vw')) {
-          return value.replace(/(\d+\.?\d*)vw/g, (_match, num) => {
-            const pixels = (parseFloat(num) / 100) * currentBreakpoint.width
-            return `${pixels}px`
-          })
-        }
-        
-        return value
+      const canvasViewport = {
+        width: currentBreakpoint.width,
+        height: currentBreakpoint.height ? Math.max(1, currentBreakpoint.height - browserOffset) : undefined,
       }
-      
-      // Применяем конвертацию ко всем свойствам
       Object.keys(baseStyles).forEach(key => {
         const value = baseStyles[key as keyof typeof baseStyles]
         if (typeof value === 'string') {
-          (baseStyles as any)[key] = convertViewportUnits(value)
+          (baseStyles as any)[key] = convertViewportUnits(value, canvasViewport)
         }
       })
     }
