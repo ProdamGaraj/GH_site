@@ -30,9 +30,9 @@ export const CONTACT_WIDGET_ATTR = 'data-contact-widget'
 export const CHANNEL_KEYS = ['phone', 'telegram', 'instagram', 'whatsapp', 'email', 'youtube'] as const
 
 /** Как часто свёрнутая кнопка меняет значок, мс. */
-export const ICON_ROTATE_MS = 1000
-/** Длительность угасания значка перед сменой, мс (как transition в CSS). */
-export const ICON_SWAP_MS = 180
+export const ICON_ROTATE_MS = 2000
+/** Длительность угасания значка перед сменой, мс (= transition opacity у ::before в CSS). */
+export const ICON_SWAP_MS = 360
 
 export interface ContactChannel {
   /** Имя канала — суффикс класса значка. */
@@ -124,7 +124,7 @@ export const CONTACT_WIDGET_CSS = `/* ==========================================
   padding: 0;
   /* Скрыт целиком: ссылки не ловят ни нажатия, ни Tab. Пропадает после того, как кнопки погаснут. */
   visibility: hidden;
-  transition: visibility 0s linear .26s;
+  transition: visibility 0s linear .52s;
 }
 
 .gh-contacts.is-open .gh-contacts-list {
@@ -173,7 +173,7 @@ export const CONTACT_WIDGET_CSS = `/* ==========================================
   backdrop-filter: blur(12px);
   opacity: 0;
   transform: translateY(14px) scale(.86);
-  transition: opacity .22s ease, transform .26s cubic-bezier(.2, .8, .2, 1), background-color .2s ease, color .2s ease;
+  transition: opacity .44s ease, transform .52s cubic-bezier(.2, .8, .2, 1), background-color .4s ease, color .4s ease;
 }
 
 .gh-contacts.is-open .gh-contacts-item {
@@ -182,11 +182,11 @@ export const CONTACT_WIDGET_CSS = `/* ==========================================
 }
 
 /* Появляются по очереди снизу вверх: ближняя к кнопке — первой. */
-.gh-contacts.is-open .gh-contacts-item:nth-last-child(2) { transition-delay: .04s; }
-.gh-contacts.is-open .gh-contacts-item:nth-last-child(3) { transition-delay: .08s; }
-.gh-contacts.is-open .gh-contacts-item:nth-last-child(4) { transition-delay: .12s; }
-.gh-contacts.is-open .gh-contacts-item:nth-last-child(5) { transition-delay: .16s; }
-.gh-contacts.is-open .gh-contacts-item:nth-last-child(n + 6) { transition-delay: .2s; }
+.gh-contacts.is-open .gh-contacts-item:nth-last-child(2) { transition-delay: .08s; }
+.gh-contacts.is-open .gh-contacts-item:nth-last-child(3) { transition-delay: .16s; }
+.gh-contacts.is-open .gh-contacts-item:nth-last-child(4) { transition-delay: .24s; }
+.gh-contacts.is-open .gh-contacts-item:nth-last-child(5) { transition-delay: .32s; }
+.gh-contacts.is-open .gh-contacts-item:nth-last-child(n + 6) { transition-delay: .4s; }
 
 .gh-contacts-item:hover,
 .gh-contacts-item:focus-visible {
@@ -209,7 +209,7 @@ export const CONTACT_WIDGET_CSS = `/* ==========================================
   white-space: nowrap;
   opacity: 0;
   transform: translate(6px, -50%);
-  transition: opacity .18s ease, transform .18s ease;
+  transition: opacity .36s ease, transform .36s ease;
   pointer-events: none;
 }
 
@@ -226,8 +226,8 @@ export const CONTACT_WIDGET_CSS = `/* ==========================================
   background-size: 220% 100%;
   color: var(--gh-contacts-ink);
   box-shadow: 0 14px 32px rgba(201, 135, 21, .42), 0 2px 6px rgba(13, 15, 18, .18);
-  animation: ghContactsShine 6s ease-in-out infinite;
-  transition: transform .2s ease, box-shadow .2s ease;
+  animation: ghContactsShine 12s ease-in-out infinite;
+  transition: transform .4s ease, box-shadow .4s ease;
 }
 
 .gh-contacts-toggle:hover,
@@ -250,7 +250,7 @@ export const CONTACT_WIDGET_CSS = `/* ==========================================
   border-radius: 50%;
   border: 2px solid var(--gh-contacts-gold);
   opacity: 0;
-  animation: ghContactsPulse 2.6s ease-out infinite;
+  animation: ghContactsPulse 5.2s ease-out infinite;
   pointer-events: none;
 }
 
@@ -259,7 +259,7 @@ export const CONTACT_WIDGET_CSS = `/* ==========================================
 }
 
 .gh-contacts-toggle::before {
-  transition: transform .26s cubic-bezier(.2, .8, .2, 1), opacity .18s ease;
+  transition: transform .52s cubic-bezier(.2, .8, .2, 1), opacity .36s ease;
 }
 
 /* Смена значка у свёрнутой кнопки: старый гаснет, новый появляется. */

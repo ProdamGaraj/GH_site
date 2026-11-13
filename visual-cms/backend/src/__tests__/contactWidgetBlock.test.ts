@@ -132,6 +132,13 @@ describe('CSS блока', () => {
     expect(CONTACT_WIDGET_CSS).toMatch(/\.gh-contacts-toggle\.is-swapping::before \{[^}]*opacity: 0/)
   })
 
+  it('скрипт меняет значок ровно тогда, когда в CSS погас старый; круг медленнее угасания', () => {
+    const fade = CONTACT_WIDGET_CSS.match(/\.gh-contacts-toggle::before \{\s*transition:[^;]*opacity (\.?\d*\.?\d+)s/)
+    expect(fade).not.toBeNull()
+    expect(Math.round(parseFloat(fade![1]) * 1000)).toBe(ICON_SWAP_MS)
+    expect(ICON_ROTATE_MS).toBeGreaterThanOrEqual(ICON_SWAP_MS * 4)
+  })
+
   it('JS и CSS знают одни и те же каналы', () => {
     expect(CONTACT_WIDGET_JS).toContain(`var KNOWN = ${JSON.stringify(CHANNEL_KEYS)};`)
   })
