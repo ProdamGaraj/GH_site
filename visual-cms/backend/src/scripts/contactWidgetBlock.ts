@@ -30,7 +30,7 @@ export const CONTACT_WIDGET_ATTR = 'data-contact-widget'
 export const CHANNEL_KEYS = ['phone', 'telegram', 'instagram', 'whatsapp', 'email', 'youtube'] as const
 
 /** Как часто свёрнутая кнопка меняет значок, мс. */
-export const ICON_ROTATE_MS = 2500
+export const ICON_ROTATE_MS = 1000
 /** Длительность угасания значка перед сменой, мс (как transition в CSS). */
 export const ICON_SWAP_MS = 180
 
