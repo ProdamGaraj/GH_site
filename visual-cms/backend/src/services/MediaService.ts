@@ -8,7 +8,7 @@ import { mediaFolderService } from './MediaFolderService'
 import { ValidationError } from '../middleware'
 import { logger } from './Logger'
 import { detectKind, extFromMime, validateSize, isInlineSafe, buildContentDisposition } from './mediaMime'
-import { buildVariantPlan } from './mediaVariants'
+import { buildVariantPlan, planVariantChanges, type VariantChanges } from './mediaVariants'
 import { topBandBrightness } from './headerTheme'
 
 /** Качество webp для оптимизированной версии и адаптивных вариантов (визуально без потерь). */
@@ -123,15 +123,7 @@ export class MediaService {
         if (plan.length > 0) {
           const built: MediaVariant[] = []
           for (const w of plan) {
-            const buf = await sharp(file.buffer, { failOn: 'none' })
-              .rotate()
-              .resize({ width: w, withoutEnlargement: true })
-              .webp({ quality: VARIANT_WEBP_QUALITY })
-              .toBuffer()
-            const vh = oh && ow ? Math.round((w * oh) / ow) : 0
-            const variantKey = `${id}.w${w}.webp`
-            await minioStorageService.putObject(variantKey, buf, 'image/webp')
-            built.push({ width: w, height: vh, storageKey: variantKey, sizeBytes: buf.length })
+            built.push(await this.storeVariant(file.buffer, id, w, ow ?? null, oh ?? null))
           }
           variants = built.length > 0 ? built : null
         }
@@ -187,6 +179,82 @@ export class MediaService {
       tags: tags && tags.length > 0 ? tags : undefined,
     })
     return this.repo().save(asset)
+  }
+
+  /** Уменьшенная webp-копия шириной `w`: создаёт файл `<uuid>.w<w>.webp` в хранилище. */
+  private async storeVariant(
+    source: Buffer,
+    storageUuid: string,
+    w: number,
+    originalWidth: number | null,
+    originalHeight: number | null,
+  ): Promise<MediaVariant> {
+    const buf = await sharp(source, { failOn: 'none' })
+      .rotate()
+      .resize({ width: w, withoutEnlargement: true })
+      .webp({ quality: VARIANT_WEBP_QUALITY })
+      .toBuffer()
+    const height = originalWidth && originalHeight ? Math.round((w * originalHeight) / originalWidth) : 0
+    const storageKey = `${storageUuid}.w${w}.webp`
+    await minioStorageService.putObject(storageKey, buf, 'image/webp')
+    return { width: w, height, storageKey, sizeBytes: buf.length }
+  }
+
+  /**
+   * Приводит размеры уже загруженной картинки к текущему плану (buildVariantPlan):
+   * недостающие создаёт из оригинала, лишние — удаляет только с `prune`
+   * (см. planVariantChanges: до передеплоя на них ссылаются страницы).
+   *
+   * `dryRun` — только посчитать, ничего не писать.
+   * Не растровая картинка, SVG и GIF (webp — лишь первый кадр) — без изменений.
+   */
+  async regenerateVariants(
+    asset: MediaAsset,
+    widths: number[],
+    opts: { prune?: boolean; dryRun?: boolean } = {},
+  ): Promise<VariantChanges> {
+    const none: VariantChanges = { create: [], remove: [] }
+    if (asset.kind !== 'image' || /^image\/(svg\+xml|gif)$/.test(asset.mimeType)) return none
+
+    const existing = asset.variants ?? []
+    // Ширина записи может быть пустой у старых файлов — тогда узнаём из оригинала.
+    let source: Buffer | null = null
+    let width = asset.width ?? null
+    let height = asset.height ?? null
+    if (!width) {
+      source = await minioStorageService.getObject(asset.storageKey)
+      const meta = await sharp(source, { failOn: 'none' }).metadata()
+      const swap = (meta.orientation ?? 1) >= 5
+      width = (swap ? meta.height : meta.width) ?? null
+      height = (swap ? meta.width : meta.height) ?? null
+    }
+
+    const plan = buildVariantPlan(width, widths)
+    const changes = planVariantChanges(existing.map((v) => v.width), plan, { prune: opts.prune })
+    if (opts.dryRun || (changes.create.length === 0 && changes.remove.length === 0)) return changes
+
+    const storageUuid = asset.storageKey.split('.')[0]
+    const created: MediaVariant[] = []
+    if (changes.create.length > 0) {
+      source = source ?? (await minioStorageService.getObject(asset.storageKey))
+      for (const w of changes.create) {
+        created.push(await this.storeVariant(source, storageUuid, w, width, height))
+      }
+    }
+
+    const removed = new Set(changes.remove)
+    const next = [...existing.filter((v) => !removed.has(v.width)), ...created].sort((a, b) => b.width - a.width)
+    // Сначала запись, потом удаление файлов: при сбое останется лишний файл,
+    // а не запись о файле, которого нет.
+    await this.repo().update(asset.id, { variants: next.length > 0 ? next : null })
+    for (const v of existing.filter((x) => removed.has(x.width))) {
+      try {
+        await minioStorageService.deleteObject(v.storageKey)
+      } catch (err: any) {
+        logger.warn(`[MediaService] failed to delete variant ${v.storageKey}`, { error: err?.message })
+      }
+    }
+    return changes
   }
 
   /**

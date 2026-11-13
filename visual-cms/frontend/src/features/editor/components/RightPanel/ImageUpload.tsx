@@ -196,7 +196,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
         <div className="flex flex-col gap-1 text-[11px] text-gray-600 border-t border-gray-100 pt-2">
           <label className="inline-flex items-center gap-1.5 cursor-pointer">
             <input type="checkbox" checked={optimize} onChange={(e) => setOptimize(e.target.checked)} />
-            Оптимизировать (без потери качества)
+            Оптимизировать (сжатая копия в WebP)
           </label>
           <label className="inline-flex items-center gap-1.5 cursor-pointer">
             <input

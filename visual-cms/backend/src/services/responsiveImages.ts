@@ -8,7 +8,8 @@
  *  - `<img>`: `src` → оптимизированная версия, плюс `srcset` из вариантов и
  *    полноразмерной версии и `sizes` по ширине файла (см. sizesFor);
  *  - CSS `url(...)` (встроенные стили, `<style>`, переменные `--image`):
- *    оригинал PNG/JPEG → оптимизированная версия.
+ *    оригинал PNG/JPEG → оптимизированная версия, а на экранах поуже —
+ *    вариант по ширине экрана (см. applyBackgroundVariants).
  *
  * `<uuid>` — uuid ХРАНИЛИЩА, не id записи MediaAsset (см. mediaAssetLookup.ts).
  * GIF и SVG не трогаем: webp-версия GIF — только первый кадр анимации, у SVG
@@ -150,9 +151,136 @@ export function swapCssMediaUrls(html: string, renditions: Map<string, MediaRend
   })
 }
 
+/**
+ * Плотность экрана, под которую подбирается размер фона. У фона нет `srcset`:
+ * браузер не выберет файл сам, а плотность в `@media` удвоила бы число правил.
+ * Берём 2 — так чётко на телефонах и ноутбуках с плотным экраном; обычный
+ * монитор получает файл с запасом, но не больше полноразмерного, как раньше.
+ */
+export const BACKGROUND_PIXEL_RATIO = 2
+
+/** Экранов уже не бывает — правило для такого размера было бы мёртвым. */
+const MIN_BACKGROUND_SCREEN = 320
+
+/** Метка блока стилей с размерами фонов (и признак, что html уже обработан). */
+const VARIANTS_STYLE_ATTR = 'data-media-variants'
+
+/** До какой ширины экрана годится вариант. */
+export interface BackgroundStep {
+  maxWidth: number
+  storageKey: string
+}
+
+/**
+ * Ступени фона: вариант шириной W годится экранам до W / плотность.
+ * По убыванию — в этом порядке идут `@media`, более узкий экран побеждает.
+ * Экран шире самой большой ступени получает полноразмерную версию.
+ */
+export function backgroundSteps(rendition: MediaRendition): BackgroundStep[] {
+  const limit = rendition.width && rendition.width > 0 ? rendition.width : Infinity
+  const byScreen = new Map<number, BackgroundStep>()
+  for (const v of rendition.variants) {
+    if (!(v.width > 0) || v.width >= limit) continue
+    const maxWidth = Math.floor(v.width / BACKGROUND_PIXEL_RATIO)
+    if (maxWidth < MIN_BACKGROUND_SCREEN || byScreen.has(maxWidth)) continue
+    byScreen.set(maxWidth, { maxWidth, storageKey: v.storageKey })
+  }
+  return Array.from(byScreen.values()).sort((a, b) => b.maxWidth - a.maxWidth)
+}
+
+/** `url(...)` целиком, с кавычками любого вида; перед ним — уже подставленная переменная. */
+const CSS_URL_TOKEN = /(var\(\s*--m-[0-9a-f]+\s*,\s*)?url\(\s*(&quot;|&#39;|"|')?([^"'()&\s]+)(&quot;|&#39;|"|')?\s*\)/gi
+
+/**
+ * Фоны и CSS-переменные с картинкой — по размеру экрана.
+ *
+ * `url(<полноразмерная>)` в стилях заменяется на
+ * `var(--m-<uuid>, url(<полноразмерная>))`, а в `<head>` добавляется блок:
+ *
+ *   @media (max-width: 512px) { :root { --m-<uuid>: url(<uuid>.w1024.webp) } }
+ *
+ * На широком экране переменная не задана — работает запасное значение, то
+ * есть прежняя полноразмерная версия. Браузер скачивает только выбранный файл.
+ *
+ * Почему переменная, а не правило на элемент:
+ *  - элементы списка (слайды, карточки) делят один `data-element-id`, а
+ *    картинки у них разные — правилом по id их не различить;
+ *  - правило с `!important` перебило бы фон, который скрипт страницы ставит
+ *    элементу сам (смена слайда, экранное медиа);
+ *  - адрес остаётся в самом стиле: скрипты, которые читают его оттуда
+ *    (увеличение фото по клику), получают полноразмерную картинку.
+ *
+ * `<script>` не трогаем: там адрес — данные, а не стиль. Без `</head>` (кусок
+ * разметки) и при повторном вызове html не меняется.
+ */
+export function applyBackgroundVariants(html: string, renditions: Map<string, MediaRendition>): string {
+  if (!html || renditions.size === 0) return html
+  if (html.includes(VARIANTS_STYLE_ATTR)) return html
+  const headEnd = html.search(/<\/head\s*>/i)
+  if (headEnd < 0) return html
+
+  /** uuid → имя переменной и её значения по ступеням. */
+  const used = new Map<string, { name: string; prefix: string; steps: BackgroundStep[] }>()
+  const takenNames = new Set<string>()
+
+  const nameFor = (uuid: string): string => {
+    const short = `--m-${uuid.slice(0, 8)}`
+    const name = takenNames.has(short) ? `--m-${uuid.replace(/-/g, '')}` : short
+    takenNames.add(name)
+    return name
+  }
+
+  const rewrite = (chunk: string): string =>
+    chunk.replace(CSS_URL_TOKEN, (whole, wrapped: string | undefined, open: string | undefined, url: string, close: string | undefined) => {
+      if (wrapped || open !== close) return whole
+      const ref = parseMediaUrl(url)
+      if (!ref) return whole
+      const rendition = renditions.get(ref.uuid)
+      if (!rendition) return whole
+      // Только полноразмерные версии: вариант, выбранный вручную, не подменяем.
+      const file = `${ref.uuid}.${ref.rest}`.toLowerCase()
+      const isFullSize =
+        file === rendition.storageKey.toLowerCase() || file === (rendition.optimizedKey ?? '').toLowerCase()
+      if (!isFullSize || NO_VARIANTS_EXT.test(ref.rest.split('.').pop() ?? '')) return whole
+
+      let entry = used.get(ref.uuid)
+      if (!entry) {
+        const steps = backgroundSteps(rendition)
+        if (steps.length === 0) return whole
+        entry = { name: nameFor(ref.uuid), prefix: ref.prefix, steps }
+        used.set(ref.uuid, entry)
+      }
+      return `var(${entry.name}, ${whole})`
+    })
+
+  // Нечётные куски — <script>…</script>, их пропускаем.
+  const out = html
+    .split(/(<script\b[\s\S]*?<\/script\s*>)/gi)
+    .map((chunk, i) => (i % 2 === 1 ? chunk : rewrite(chunk)))
+    .join('')
+  if (used.size === 0) return html
+
+  const byScreen = new Map<number, string[]>()
+  for (const { name, prefix, steps } of used.values()) {
+    for (const step of steps) {
+      const list = byScreen.get(step.maxWidth) ?? []
+      list.push(`${name}:url("${prefix}${step.storageKey}")`)
+      byScreen.set(step.maxWidth, list)
+    }
+  }
+  const css = Array.from(byScreen.keys())
+    .sort((a, b) => b - a)
+    .map((maxWidth) => `@media (max-width:${maxWidth}px){:root{${byScreen.get(maxWidth)!.join(';')}}}`)
+    .join('\n')
+
+  const at = out.search(/<\/head\s*>/i)
+  return `${out.slice(0, at)}<style ${VARIANTS_STYLE_ATTR}>\n${css}\n</style>\n${out.slice(at)}`
+}
+
 /** Всё сразу: `<img>` и CSS. */
 export function optimizeMediaInHtml(html: string, renditions: Map<string, MediaRendition>): string {
-  return swapCssMediaUrls(injectResponsiveImages(html, renditions), renditions)
+  const lighter = swapCssMediaUrls(injectResponsiveImages(html, renditions), renditions)
+  return applyBackgroundVariants(lighter, renditions)
 }
 
 /** Уникальные uuid хранилища, на которые ссылается html через `/media/<uuid>.`. */

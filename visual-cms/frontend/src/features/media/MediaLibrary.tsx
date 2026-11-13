@@ -32,6 +32,8 @@ import {
   pageAfterSizeChange,
 } from './pageSize'
 import { useProjectVariantWidths } from './useProjectVariantWidths'
+import { MediaVersionsModal } from './MediaVersionsModal'
+import { hasDerivedVersions } from './mediaVersions'
 
 /** Копирование в буфер с fallback для незащищённого контекста (не https/localhost). */
 async function copyToClipboard(text: string): Promise<boolean> {
@@ -57,6 +59,9 @@ async function copyToClipboard(text: string): Promise<boolean> {
     return false
   }
 }
+
+/** Сколько уменьшенных копий бэкенд делает на картинку (DEFAULT_MAX_VARIANTS в mediaVariants.ts). */
+const MAX_VARIANTS_PER_IMAGE = 6
 
 /** Расширение файла в верхнем регистре для бейджа карточки документа. */
 function fileExt(fileName: string): string {
@@ -254,6 +259,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
   )
 
   const [moveTarget, setMoveTarget] = useState<MediaAsset | null>(null)
+  const [versionsTarget, setVersionsTarget] = useState<MediaAsset | null>(null)
   // Бамп — заставляет дерево перечитать файлы раскрытых папок после изменений.
   const [treeRefreshToken, setTreeRefreshToken] = useState(0)
 
@@ -538,7 +544,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-gray-600">
             <label className="inline-flex items-center gap-1.5 cursor-pointer">
               <input type="checkbox" checked={optimize} onChange={(e) => setOptimize(e.target.checked)} />
-              Оптимизировать (уменьшить вес без потери качества)
+              Оптимизировать (сжатая копия в WebP, оригинал сохраняется)
             </label>
             <label className="inline-flex items-center gap-1.5 cursor-pointer">
               <input
@@ -548,7 +554,9 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
               />
               Создать адаптивные размеры
               {variantWidths.length > 0 && (
-                <span className="text-gray-400">({variantWidths.length} из настроек проекта)</span>
+                <span className="text-gray-400">
+                  (до {Math.min(MAX_VARIANTS_PER_IMAGE, variantWidths.length)} копий под экраны проекта, от телефона до монитора)
+                </span>
               )}
             </label>
           </div>
@@ -645,6 +653,7 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
                   onSelect={onSelect}
                   onDelete={readOnly ? undefined : handleDelete}
                   onMove={readOnly ? undefined : (a) => setMoveTarget(a)}
+                  onShowVersions={setVersionsTarget}
                 />
               ))}
             </div>
@@ -718,6 +727,9 @@ export const MediaLibrary: React.FC<MediaLibraryProps> = ({
         onClose={() => setMoveTarget(null)}
         onPick={handleMove}
       />
+
+      {/* Версии файла: сжатая и размеры под экраны */}
+      <MediaVersionsModal asset={versionsTarget} onClose={() => setVersionsTarget(null)} onCopy={copyToClipboard} />
     </div>
   )
 }
@@ -728,9 +740,11 @@ interface MediaCardProps {
   onSelect?: (asset: MediaAsset) => void
   onDelete?: (asset: MediaAsset) => void
   onMove?: (asset: MediaAsset) => void
+  /** Показать версии файла (сжатая, размеры под экраны). */
+  onShowVersions?: (asset: MediaAsset) => void
 }
 
-const MediaCard: React.FC<MediaCardProps> = ({ asset, selectable, onSelect, onDelete, onMove }) => {
+const MediaCard: React.FC<MediaCardProps> = ({ asset, selectable, onSelect, onDelete, onMove, onShowVersions }) => {
   const url = resolveMediaUrl(asset.url)
   const thumbUrl = asset.thumbnailUrl ? resolveMediaUrl(asset.thumbnailUrl) : url
   const posterUrl = asset.posterUrl ? resolveMediaUrl(asset.posterUrl) : null
@@ -805,15 +819,19 @@ const MediaCard: React.FC<MediaCardProps> = ({ asset, selectable, onSelect, onDe
             {fileExt(asset.fileName)}
           </span>
         )}
-        {asset.variants.length > 0 && (
-          <span
-            className="absolute top-1 right-1 px-1.5 py-0.5 bg-primary-600/80 text-white text-[10px] rounded inline-flex items-center gap-0.5"
-            title={`Адаптивных размеров: ${asset.variants.length}`}
-          >
-            <Layers size={10} /> {asset.variants.length}
-          </span>
-        )}
       </div>
+      {/* Значок размеров — после картинки и поверх затемнения при наведении, чтобы по нему можно было нажать. */}
+      {asset.variants.length > 0 && (
+        <button
+          type="button"
+          onClick={onShowVersions ? () => onShowVersions(asset) : undefined}
+          className="absolute top-1 right-1 z-10 px-1.5 py-0.5 bg-primary-600/80 hover:bg-primary-700 text-white text-[10px] rounded inline-flex items-center gap-0.5"
+          title={`Адаптивных размеров: ${asset.variants.length}. Нажмите, чтобы посмотреть`}
+          aria-label={`Размеры файла ${asset.fileName}: ${asset.variants.length}`}
+        >
+          <Layers size={10} /> {asset.variants.length}
+        </button>
+      )}
       <div className="px-2 py-1.5 text-[11px] text-gray-700 truncate" title={asset.fileName}>
         {asset.title || asset.fileName}
       </div>
@@ -844,6 +862,15 @@ const MediaCard: React.FC<MediaCardProps> = ({ asset, selectable, onSelect, onDe
           {copied ? <Check size={12} /> : <Copy size={12} />}
           {copied ? 'Скопировано' : 'Копировать ссылку'}
         </button>
+        {onShowVersions && hasDerivedVersions(asset) && (
+          <button
+            type="button"
+            onClick={() => onShowVersions(asset)}
+            className="px-3 py-1.5 bg-white/90 text-gray-900 text-xs rounded shadow inline-flex items-center gap-1"
+          >
+            <Layers size={12} /> Размеры
+          </button>
+        )}
         {onMove && (
           <button
             type="button"
