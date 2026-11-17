@@ -33,6 +33,14 @@ export interface MacroHttpOptions {
   minIntervalMs?: number
   /** Сколько раз повторять 429 и 5xx. По умолчанию 4 повтора. */
   maxRetries?: number
+  /**
+   * Повторять ли 5xx. По умолчанию да — для чтения это безопасно.
+   *
+   * Создающим вызовам (заявка в CRM) — нет: 5xx не значит, что запись не
+   * создалась, и повтор мог бы задвоить заявку. 429 повторяется всегда: при
+   * нём запрос до обработки не дошёл.
+   */
+  retryServerErrors?: boolean
   /** Стартовая пауза перед повтором, мс. Дальше удваивается. */
   retryBackoffMs?: number
   fetchImpl?: typeof fetch
@@ -72,6 +80,7 @@ export class MacroHttp {
   private readonly minIntervalMs: number
   private readonly maxRetries: number
   private readonly retryBackoffMs: number
+  private readonly retryServerErrors: boolean
   private readonly fetchImpl: typeof fetch
   private readonly sleep: (ms: number) => Promise<void>
   private readonly now: () => number
@@ -95,6 +104,7 @@ export class MacroHttp {
     this.minIntervalMs = opts.minIntervalMs ?? DEFAULT_MIN_INTERVAL_MS
     this.maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES
     this.retryBackoffMs = opts.retryBackoffMs ?? DEFAULT_RETRY_BACKOFF_MS
+    this.retryServerErrors = opts.retryServerErrors ?? true
     this.fetchImpl = opts.fetchImpl ?? fetch
     this.sleep = opts.sleepImpl ?? ((ms) => new Promise((r) => setTimeout(r, ms)))
     this.now = opts.nowImpl ?? Date.now
@@ -189,7 +199,7 @@ export class MacroHttp {
 
     // 429 и 5xx — временные: ждём и повторяем. Остальные 4xx означают ошибку
     // в самом запросе, и повтор даст ровно тот же ответ.
-    if (res.status === 429 || res.status >= 500) {
+    if (res.status === 429 || (this.retryServerErrors && res.status >= 500)) {
       if (retry >= this.maxRetries) {
         const text = await res.text().catch(() => '')
         throw new MacroHttpError(res.status, path, text)

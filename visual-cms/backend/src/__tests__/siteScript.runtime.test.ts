@@ -136,22 +136,28 @@ describe('тексты на языке страницы', () => {
     expect(document.querySelector('.popup-label')!.textContent).toBe('семей с нами')
   })
 
-  it('окно консультации после отправки — «Заявка отправлена» (без опечатки)', () => {
+  it('окно консультации: форма с именем и телефоном, отправку Site JS не ведёт', () => {
     boot('<button data-consult-trigger>Консультация</button>')
     ;(document.querySelector('[data-consult-trigger]') as HTMLButtonElement).click()
     const form = document.querySelector('.consult-form') as HTMLFormElement
-    form.dispatchEvent(new Event('submit', { cancelable: true }))
-    expect(document.querySelector('.consult-submit')!.textContent).toBe('Заявка отправлена')
+    expect(form.querySelector('input[name="name"]')).not.toBeNull()
+    expect(form.querySelector('input[name="phone"]')).not.toBeNull()
+    const submit = new Event('submit', { cancelable: true })
+    form.dispatchEvent(submit)
+    // Отправку ведёт рантайм заявок генератора, Site JS событие не трогает.
+    expect(submit.defaultPrevented).toBe(false)
+    expect(document.querySelector('.consult-submit')!.textContent).toBe('Отправить')
   })
 })
 
 describe('формы и события', () => {
-  it('формы ведут себя как до сведения: заявка сохраняется в браузере (временно)', () => {
+  it('формы не обрабатывает и заявки в браузере не хранит (v3: этим занят рантайм заявок)', () => {
     boot('<form><input name="phone" value="+998901234567"><button type="submit">Отправить</button></form>')
-    ;(document.querySelector('form button') as HTMLButtonElement).click()
-    const leads = JSON.parse(localStorage.getItem('goldenHouseLeads') || '[]')
-    expect(leads).toHaveLength(1)
-    expect(leads[0].fields.phone).toBe('+998901234567')
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+    ;(document.querySelector('form button') as HTMLButtonElement).dispatchEvent(click)
+    expect(click.defaultPrevented).toBe(false)
+    expect(localStorage.getItem('goldenHouseLeads')).toBeNull()
+    expect(document.querySelector('form button')!.textContent).toBe('Отправить')
   })
 
   it('просмотр страницы уходит в dataLayer один раз', () => {

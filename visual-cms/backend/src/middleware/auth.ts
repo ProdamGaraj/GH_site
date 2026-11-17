@@ -32,6 +32,8 @@ const PUBLIC_ENDPOINTS = new Set<string>([
   'POST /api/data/fetch-with-binding',
   'POST /api/data/fetch-with-transforms',
   'POST /api/data/submit-with-binding',
+  // Заявки с сайта (формы обратного звонка, проекта, планировки) → MacroCRM
+  'POST /api/leads',
 ])
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])

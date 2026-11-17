@@ -25,13 +25,14 @@ import { MediaAsset } from '../models/MediaAsset'
 import { MediaFolder } from '../models/MediaFolder'
 import { User } from '../models/User'
 import { MacroSyncRun } from '../models/MacroSyncRun'
+import { Lead } from '../models/Lead'
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
   synchronize: false,
   logging: process.env.NODE_ENV === 'development',
-  entities: [Site, Page, Block, Group, DataSourceEntity, DataBinding, Template, DataSubmission, PageVariable, Form, FormDestination, FormSubmissionLog, AnalyticsEvent, AnalyticsSession, Language, Translation, BlockTranslation, PageVersion, BlockVersion, DeployLog, Collection, CollectionOverride, MediaAsset, MediaFolder, User, MacroSyncRun],
+  entities: [Site, Page, Block, Group, DataSourceEntity, DataBinding, Template, DataSubmission, PageVariable, Form, FormDestination, FormSubmissionLog, AnalyticsEvent, AnalyticsSession, Language, Translation, BlockTranslation, PageVersion, BlockVersion, DeployLog, Collection, CollectionOverride, MediaAsset, MediaFolder, User, MacroSyncRun, Lead],
   migrations: [],
   subscribers: [],
 })

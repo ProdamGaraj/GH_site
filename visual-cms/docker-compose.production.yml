@@ -119,6 +119,10 @@ services:
       MACRO_SYNC_COLLECTIONS: ${MACRO_SYNC_COLLECTIONS:-}
       MACRO_SYNC_MEDIA_SITE_ID: ${MACRO_SYNC_MEDIA_SITE_ID:-}
       MACRO_SYNC_MEDIA_FOLDER_ID: ${MACRO_SYNC_MEDIA_FOLDER_ID:-}
+      # Site leads -> MacroCRM estateBuy/create (same MACRO_TOKEN).
+      MACRO_LEAD_ACTION: ${MACRO_LEAD_ACTION:-buy}
+      MACRO_LEAD_CATEGORY: ${MACRO_LEAD_CATEGORY:-flat}
+      MACRO_LEAD_CHANNEL_ID: ${MACRO_LEAD_CHANNEL_ID:-}
       # Form e-mail destinations (optional).
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}

@@ -20,7 +20,7 @@ import { MigrationError } from './choiceToPlanTypes'
 export const SITE_JS_HEAD = '/* Общий скрипт сайта Golden House (Site JS), v'
 
 /** Первая строка текущей версии — по ней видно, что она уже стоит. */
-export const SITE_JS_MARKER = `${SITE_JS_HEAD}2.`
+export const SITE_JS_MARKER = `${SITE_JS_HEAD}3.`
 
 /** Начало скрипта шапки во всех найденных версиях. */
 const HEADER_START = 'function syncLogoContrast() {'
@@ -98,7 +98,7 @@ export function planSiteScript(
     // Текущая версия уже стоит.
   } else if (current.startsWith(SITE_JS_HEAD)) {
     siteJs = runtime
-    changes.push('Site JS: обновлён до новой версии (тексты окон на языке страницы, промо-окно реже, чат на телефоне)')
+    changes.push('Site JS: обновлён до новой версии (v3: формы заявок отправляет рантайм заявок CMS, а не localStorage)')
   } else if (current) {
     throw new MigrationError('В Site JS уже есть другой код — проверьте его и очистите вручную')
   } else {

@@ -23,6 +23,7 @@ import translationsRouter from './translations'
 import collectionsRouter from './collections'
 import mediaRouter from './media'
 import authRouter from './auth'
+import leadsRouter from './leads'
 
 const router = Router()
 
@@ -51,5 +52,6 @@ router.use('/languages', languagesRouter)
 router.use('/macro-sync', macroSyncRouter)
 router.use('/translations', translationsRouter)
 router.use('/media', mediaRouter)
+router.use('/leads', leadsRouter)
 
 export default router

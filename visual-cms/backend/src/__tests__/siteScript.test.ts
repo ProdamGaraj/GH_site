@@ -103,6 +103,14 @@ describe('planSiteScript', () => {
     expect(plan.changes).toEqual([expect.stringContaining('обновлён до новой версии')])
   })
 
+  it('v2 (формы в localStorage) обновляется до v3', () => {
+    const v2 = '/* Общий скрипт сайта Golden House (Site JS), v2.\n   старое */\nfunction setupCrmForms() {}'
+    const plan = planSiteScript(v2, RUNTIME, [])
+    expect(plan.siteJs).toBe(RUNTIME)
+    expect(RUNTIME.startsWith('/* Общий скрипт сайта Golden House (Site JS), v3.')).toBe(true)
+    expect(plan.changes).toEqual([expect.stringContaining('v3')])
+  })
+
   it('текущая версия уже стоит (даже с другим хвостом пробелов) — без правок', () => {
     expect(planSiteScript(`\n${RUNTIME}\n`, RUNTIME, []).changes).toEqual([])
   })

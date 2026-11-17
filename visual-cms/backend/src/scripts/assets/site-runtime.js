@@ -1,4 +1,10 @@
-/* Общий скрипт сайта Golden House (Site JS), v2.
+/* Общий скрипт сайта Golden House (Site JS), v3.
+
+   v3: формы заявок здесь больше не обрабатываются. Раньше setupCrmForms и
+   окно консультации «отправляли» заявку в localStorage браузера посетителя —
+   до менеджера она не доходила. Теперь все формы с телефоном отправляет
+   рантайм заявок, который генератор вставляет в каждую страницу
+   (backend/src/services/LeadRuntime.ts → POST /api/leads → MacroCRM).
 
    v2: тексты окон на языке страницы (ru/uz/en по <html lang>); промо-окно —
    через 35 с или после половины страницы и один раз за сессию (раньше —
@@ -13,9 +19,6 @@
 
    Что здесь:
    - trackEvent — события в window.dataLayer;
-   - setupCrmForms — формы заявок. ВРЕМЕННО, как и до сведения: заявка
-     сохраняется в localStorage браузера и на сервер не уходит. Подключение
-     к формам CMS — отдельная задача;
    - injectSupportWidgets — чат, окно консультации, промо- и exit-окна.
      Выключить плавающие окна на странице: <meta name="gh-widgets"
      content="off"> в своём HTML head страницы (настройки страницы в CMS);
@@ -25,6 +28,7 @@
    - контраст логотипа, язык, пункты меню — это делает блок Navigation (его
      версия новее; две копии перетирали друг друга на прокрутке);
    - SEO-теги — их генерирует CMS;
+   - отправка форм — рантайм заявок (services/LeadRuntime.ts), см. v3;
    - «богатый» подвал — подвал сделан блоком Footer в CMS. */
 
 function widgetsDisabled() {
@@ -45,7 +49,6 @@ const SITE_TEXT = {
     name: "Имя",
     phone: "Телефон",
     send: "Отправить",
-    sent: "Заявка отправлена",
     families: "семей с нами",
     promoText: "Golden House подберет квартиру с рассрочкой, актуальными акциями и удобной локацией в Ташкенте.",
     promoButton: "Получить подборку",
@@ -63,7 +66,6 @@ const SITE_TEXT = {
     name: "Ism",
     phone: "Telefon",
     send: "Yuborish",
-    sent: "Ariza yuborildi",
     families: "oila biz bilan",
     promoText: "Golden House Toshkentda muddatli to‘lov, dolzarb aksiyalar va qulay joylashuvga ega kvartirani tanlab beradi.",
     promoButton: "Tanlovni olish",
@@ -81,7 +83,6 @@ const SITE_TEXT = {
     name: "Name",
     phone: "Phone",
     send: "Send",
-    sent: "Request sent",
     families: "families with us",
     promoText: "Golden House will find you an apartment in Tashkent with an installment plan, current offers and a convenient location.",
     promoButton: "Get a selection",
@@ -107,49 +108,6 @@ function trackEvent(eventName, payload = {}) {
     page: location.pathname,
     lang: pageLang(),
     ...payload
-  });
-}
-
-function setupCrmForms() {
-  document.querySelectorAll("form").forEach((form) => {
-    const sendButtons = form.querySelectorAll("button, .submit, .commerce-submit");
-
-    const sendLead = () => {
-      const lead = {
-        id: `GH-${Date.now()}`,
-        page: location.pathname,
-        createdAt: new Date().toISOString(),
-        fields: Object.fromEntries(new FormData(form).entries())
-      };
-
-      const leads = JSON.parse(localStorage.getItem("goldenHouseLeads") || "[]");
-      leads.push(lead);
-      localStorage.setItem("goldenHouseLeads", JSON.stringify(leads));
-      trackEvent("crm_lead_created", lead);
-
-      const original = sendButtons[0]?.textContent;
-      sendButtons.forEach((button) => {
-        button.textContent = siteText("sent");
-      });
-
-      window.setTimeout(() => {
-        sendButtons.forEach((button) => {
-          button.textContent = original || siteText("send");
-        });
-      }, 2400);
-    };
-
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      sendLead();
-    });
-
-    sendButtons.forEach((button) => {
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        sendLead();
-      });
-    });
   });
 }
 
@@ -280,31 +238,12 @@ function injectSupportWidgets() {
     `;
     document.body.appendChild(consult);
 
-    const consultForm = consult.querySelector(".consult-form");
-    const consultSubmit = consult.querySelector(".consult-submit");
+    // Отправку формы ведёт рантайм заявок (services/LeadRuntime.ts).
     const closeConsult = () => consult.classList.remove("is-open");
 
     consult.querySelector(".consult-close").addEventListener("click", closeConsult);
     consult.addEventListener("click", (event) => {
       if (event.target === consult) closeConsult();
-    });
-
-    consultForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const lead = {
-        id: `GH-${Date.now()}`,
-        page: location.pathname,
-        createdAt: new Date().toISOString(),
-        fields: Object.fromEntries(new FormData(consultForm).entries())
-      };
-
-      const leads = JSON.parse(localStorage.getItem("goldenHouseLeads") || "[]");
-      leads.push(lead);
-      localStorage.setItem("goldenHouseLeads", JSON.stringify(leads));
-      trackEvent("crm_lead_created", lead);
-
-      consultSubmit.textContent = siteText("sent");
-      consultSubmit.disabled = true;
     });
   }
 
@@ -493,7 +432,6 @@ function initGoldenHouseRoadmap() {
 }
 
 function bootSiteRuntime() {
-  setupCrmForms();
   injectSupportWidgets();
   initGoldenHouseRoadmap();
   trackEvent("page_view");

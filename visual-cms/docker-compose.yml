@@ -73,6 +73,11 @@ services:
       # Куда класть картинки планировок в медиатеке.
       - MACRO_SYNC_MEDIA_SITE_ID=${MACRO_SYNC_MEDIA_SITE_ID:-}
       - MACRO_SYNC_MEDIA_FOLDER_ID=${MACRO_SYNC_MEDIA_FOLDER_ID:-}
+      # --- Заявки с сайта → MacroCRM estateBuy/create (тот же MACRO_TOKEN) ---
+      # action / category заявки; CHANNEL_ID — id рекламного канала «Сайт» в CRM.
+      - MACRO_LEAD_ACTION=${MACRO_LEAD_ACTION:-buy}
+      - MACRO_LEAD_CATEGORY=${MACRO_LEAD_CATEGORY:-flat}
+      - MACRO_LEAD_CHANNEL_ID=${MACRO_LEAD_CHANNEL_ID:-}
     volumes:
       - ./backend:/app
       - /app/node_modules

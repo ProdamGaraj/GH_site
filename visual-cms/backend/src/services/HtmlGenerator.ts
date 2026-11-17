@@ -10,6 +10,7 @@ import { generateMapRuntime } from './MapRuntime'
 import { generateNewsFeedRuntime } from './NewsFeedRuntime'
 import { generateResponsiveMediaRuntime } from './ResponsiveMediaRuntime'
 import { generateActiveLinkRuntime } from './ActiveLinkRuntime'
+import { generateLeadRuntime } from './LeadRuntime'
 import {
   resolveResponsiveMedia,
   generateBackgroundMediaCss,
@@ -242,6 +243,7 @@ ${generatePlanFilterRuntime(bodyContent)}
 ${generateMapRuntime(bodyContent)}
 ${generateNewsFeedRuntime(bodyContent)}
 ${generateActiveLinkRuntime()}
+${generateLeadRuntime(lang, Boolean(options.analyticsPageId))}
 ${options.analyticsPageId ? `  <script src="/api/analytics/tracker.js" data-page-id="${options.analyticsPageId}" defer></script>\n` : ''}
 ${authoredJs}${scripts ? `<script>\n${scripts}\n</script>` : ''}
 ${siteCustomBodyEnd ? siteCustomBodyEnd + '\n' : ''}${customBodyEndHtml ? customBodyEndHtml + '\n' : ''}</body>

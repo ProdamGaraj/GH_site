@@ -19,7 +19,14 @@
  *
  * Публикует API для скриптов блоков:
  *   window.ghLightbox.open(images, index) / .close()
- *   window.ghPlanModal.open(card) / .close()
+ *   window.ghPlanModal.open(card) / .close() / .current()
+ *
+ * Заявка по планировке. «Получить консультацию» раньше закрывало окно и
+ * листало к общей форме внизу страницы: клиент терял, о какой планировке
+ * спрашивал, и в заявку она не попадала. Теперь кнопка раскрывает форму прямо
+ * в окне (data-lead-kind="plan"); отправляет её рантайм заявок
+ * (services/LeadRuntime.ts), карточку берёт через ghPlanModal.current().
+ * Стили формы — здесь (PLAN_LEAD_CSS): это новый элемент, в CSS блоков его нет.
  */
 
 /** Есть ли на странице галерея-карусель, которую разворачивает лайтбокс. */
@@ -58,6 +65,10 @@ export interface OverlayLabels {
   floorUnknown: string
   deadlineUnknown: string
   planDescription: string
+  /** Форма заявки в окне планировки. */
+  leadName: string
+  leadPhone: string
+  leadSubmit: string
 }
 
 const OVERLAY_LABELS: Record<string, OverlayLabels> = {
@@ -69,6 +80,7 @@ const OVERLAY_LABELS: Record<string, OverlayLabels> = {
     floorUnknown: 'Этаж уточняется',
     deadlineUnknown: 'Срок уточняется',
     planDescription: ' — планировка с продуманными жилыми зонами и доступом к инфраструктуре проекта.',
+    leadName: 'Ваше имя', leadPhone: 'Телефон', leadSubmit: 'Отправить заявку',
   },
   uz: {
     close: 'Yopish', viewImage: 'Rasmni ko‘rish', prevView: 'Oldingi rakurs', nextView: 'Keyingi rakurs',
@@ -78,6 +90,7 @@ const OVERLAY_LABELS: Record<string, OverlayLabels> = {
     floorUnknown: 'Qavat aniqlanmoqda',
     deadlineUnknown: 'Muddat aniqlanmoqda',
     planDescription: ' — puxta o‘ylangan yashash zonalari va loyiha infratuzilmasiga kirish imkoniga ega reja.',
+    leadName: 'Ismingiz', leadPhone: 'Telefon', leadSubmit: 'Ariza yuborish',
   },
   en: {
     close: 'Close', viewImage: 'Image preview', prevView: 'Previous view', nextView: 'Next view',
@@ -87,6 +100,7 @@ const OVERLAY_LABELS: Record<string, OverlayLabels> = {
     floorUnknown: 'Floor to be confirmed',
     deadlineUnknown: 'Date to be confirmed',
     planDescription: ' — a layout with well-planned living areas and access to the project infrastructure.',
+    leadName: 'Your name', leadPhone: 'Phone', leadSubmit: 'Send request',
   },
 }
 
@@ -125,9 +139,26 @@ const PLAN_MODAL_MARKUP = (L: OverlayLabels) => `
           <span><b id="planModalDeadline"></b>${L.deadline}</span>
         </div>
         <button class="plan-modal-cta" type="button">${L.cta}</button>
+        <div class="plan-modal-lead" id="planModalLead" hidden>
+          <form class="plan-modal-lead-form" data-lead-kind="plan" novalidate>
+            <input type="text" name="name" placeholder="${L.leadName}" aria-label="${L.leadName}" autocomplete="name">
+            <input type="tel" name="phone" placeholder="+998 __ ___ __ __" aria-label="${L.leadPhone}" autocomplete="tel" required>
+            <button class="plan-modal-cta plan-modal-submit" type="submit">${L.leadSubmit}</button>
+          </form>
+        </div>
       </div>
     </div>
   </div>`
+
+/** Форма заявки в окне планировки — новый элемент, в CSS блоков проекта его нет. */
+const PLAN_LEAD_CSS = `<style data-plan-lead>
+.plan-modal-lead[hidden]{display:none}
+.plan-modal-lead-form{display:grid;gap:10px;margin-top:16px}
+.plan-modal-lead-form input:not(.gh-lead-hp){width:100%;min-height:48px;box-sizing:border-box;border:1px solid rgba(21,24,29,.14);border-radius:13px;background:#fff;color:#15181d;padding:0 14px;font:inherit;font-weight:700;outline:0}
+.plan-modal-lead-form input:focus{border-color:rgba(253,184,42,.85);box-shadow:0 0 0 4px rgba(253,184,42,.18)}
+.plan-modal-lead-form .plan-modal-submit{width:100%;min-height:54px;margin-top:2px;border:1px solid rgba(255,255,255,.34);border-radius:999px;background:linear-gradient(115deg,#fdb82a 0%,#ffe08a 24%,#c98715 46%,#fdb82a 68%,#fff2b8 100%);background-size:240% 240%;color:#fff;font-weight:900;cursor:pointer}
+.plan-modal-lead-form .plan-modal-submit:disabled{opacity:.8;cursor:default}
+</style>`
 
 const RUNTIME_JS = (L: OverlayLabels) => `<script>
 (function () {
@@ -170,6 +201,28 @@ const RUNTIME_JS = (L: OverlayLabels) => `<script>
   var media = document.getElementById('planModalMedia');
   var plans = [];
   var planAt = 0;
+  var currentCard = null;
+  var cta = modal ? modal.querySelector('.plan-modal-cta') : null;
+  var lead = document.getElementById('planModalLead');
+
+  /** Окно планировки открывается с кнопкой консультации, форма свёрнута. */
+  function resetLead() {
+    if (!lead) return;
+    lead.hidden = true;
+    // display, а не hidden: CSS блока задаёт кнопке display и перебил бы hidden.
+    if (cta) cta.style.display = '';
+    var form = lead.querySelector('form');
+    if (form) form.reset();
+    var status = lead.querySelector('.gh-lead-status');
+    if (status) { status.textContent = ''; status.classList.remove('is-error'); }
+  }
+  function showLead() {
+    if (!lead) return;
+    lead.hidden = false;
+    if (cta) cta.style.display = 'none';
+    var first = lead.querySelector('input[name="name"]');
+    if (first) first.focus();
+  }
 
   function drawPlan() {
     if (!media || !plans.length) return;
@@ -192,6 +245,8 @@ const RUNTIME_JS = (L: OverlayLabels) => `<script>
   function openPlan(card) {
     if (!modal || !card) return;
     closeLightbox();
+    currentCard = card;
+    resetLead();
     // Содержимое берём из самой карточки: она уже отрисована на деплое,
     // второго источника данных для модалки заводить не нужно. Каждое поле —
     // из своего помеченного узла или атрибута карточки, а не разбором текста:
@@ -250,11 +305,13 @@ const RUNTIME_JS = (L: OverlayLabels) => `<script>
     on(document.getElementById('planModalPrev'), function () { movePlan(-1); });
     on(document.getElementById('planModalNext'), function () { movePlan(1); });
     modal.addEventListener('click', function (e) { if (e.target === modal) closePlan(); });
-    var cta = modal.querySelector('.plan-modal-cta');
-    if (cta) cta.addEventListener('click', function () {
+    if (cta) cta.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (lead) { showLead(); return; }
+      // Разметка без формы (старый деплой) — как раньше, к форме страницы.
       closePlan();
-      var lead = document.getElementById('lead');
-      if (lead && lead.scrollIntoView) lead.scrollIntoView({ behavior: 'smooth' });
+      var pageLead = document.getElementById('lead');
+      if (pageLead && pageLead.scrollIntoView) pageLead.scrollIntoView({ behavior: 'smooth' });
     });
   }
 
@@ -267,6 +324,9 @@ const RUNTIME_JS = (L: OverlayLabels) => `<script>
     }
     if (modal && modal.classList.contains('is-open')) {
       if (e.key === 'Escape') closePlan();
+      // Стрелки в поле формы двигают курсор, а не листают ракурсы.
+      var typing = e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || '');
+      if (typing) return;
       if (e.key === 'ArrowLeft') movePlan(-1);
       if (e.key === 'ArrowRight') movePlan(1);
     }
@@ -282,7 +342,7 @@ const RUNTIME_JS = (L: OverlayLabels) => `<script>
   }
 
   window.ghLightbox = { open: openLightbox, close: closeLightbox };
-  window.ghPlanModal = { open: openPlan, close: closePlan };
+  window.ghPlanModal = { open: openPlan, close: closePlan, current: function () { return currentCard; } };
 })();
 </script>`
 
@@ -298,7 +358,7 @@ export function generateComplexOverlays(bodyHtml: string, lang?: string): string
   const L = overlayLabels(lang)
   const parts: string[] = []
   if (gallery) parts.push(LIGHTBOX_MARKUP(L))
-  if (apartments) parts.push(PLAN_MODAL_MARKUP(L))
+  if (apartments) parts.push(PLAN_MODAL_MARKUP(L), PLAN_LEAD_CSS)
   parts.push(RUNTIME_JS(L))
   return parts.join('\n')
 }
