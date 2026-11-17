@@ -1,8 +1,8 @@
 /**
  * @jest-environment jsdom
  *
- * Общий скрипт сайта (Site JS) в браузере: виджеты создаются один раз,
- * выключатель страницы работает, формы ведут себя как до сведения.
+ * Общий скрипт сайта (Site JS) в браузере: плавающих окон нет, формы не
+ * трогает, события и дорожная карта работают.
  */
 import * as fs from 'fs'
 import * as path from 'path'
@@ -33,120 +33,37 @@ afterEach(() => {
   document.documentElement.removeAttribute('lang')
 })
 
-const promoVisible = () => document.querySelector('.promo-popup')!.classList.contains('is-visible')
+describe('плавающих окон нет (v4: на сайте только кнопка контактов — блок CMS)', () => {
+  const FLOATING = ['.chat-widget', '.chat-button', '.promo-popup', '.exit-popup', '.consult-backdrop', '#gh-widget-style']
 
-/** Высота страницы и прокрутка для jsdom (сам он раскладку не считает). */
-function scrollTo(y: number, pageHeight = 3000): void {
-  Object.defineProperty(document.documentElement, 'scrollHeight', { configurable: true, value: pageHeight })
-  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 })
-  Object.defineProperty(window, 'scrollY', { configurable: true, value: y })
-  window.dispatchEvent(new Event('scroll'))
-}
-
-describe('виджеты', () => {
-  it('чат, окно консультации и промо-окно — по одному', () => {
+  it('при загрузке и спустя время ничего не всплывает', () => {
     boot()
-    expect(count('.chat-widget')).toBe(1)
-    expect(count('.consult-backdrop')).toBe(1)
-    expect(count('.promo-popup')).toBe(1)
-  })
-
-  it('промо-окно — через 35 с, не сразу', () => {
-    boot()
-    jest.advanceTimersByTime(34000)
-    expect(promoVisible()).toBe(false)
-    jest.advanceTimersByTime(1000)
-    expect(promoVisible()).toBe(true)
-  })
-
-  it('промо-окно — раньше, если прокрутили половину страницы', () => {
-    boot()
-    scrollTo(1000) // прокручиваемо 2200, половина — 1100
-    expect(promoVisible()).toBe(false)
-    scrollTo(1100)
-    expect(promoVisible()).toBe(true)
-  })
-
-  it('показанное промо-окно больше в этой сессии не появляется (даже если его не нажимали)', () => {
-    boot()
-    jest.advanceTimersByTime(35000)
-    expect(sessionStorage.getItem('promoPopupShown')).toBe('true')
-    document.body.innerHTML = ''
-    boot()
-    expect(count('.promo-popup')).toBe(0)
-  })
-
-  it('при открытом меню промо-окно ждёт: не показывается и не тратит показ', () => {
-    boot()
-    document.body.classList.add('gnav-menu-open')
-    jest.advanceTimersByTime(35000)
-    expect(promoVisible()).toBe(false)
+    jest.advanceTimersByTime(120000)
+    for (const sel of FLOATING) expect(count(sel)).toBe(0)
     expect(sessionStorage.getItem('promoPopupShown')).toBeNull()
-    document.body.classList.remove('gnav-menu-open')
-    scrollTo(2000)
-    expect(promoVisible()).toBe(true)
   })
 
-  it('чат прячется при открытом меню и окне консультации (стиль), на телефоне — круглая кнопка', () => {
+  it('ни прокрутка, ни уход курсора вверх окон не открывают', () => {
     boot()
-    const css = document.querySelector('#gh-widget-style')!.textContent!
-    expect(css).toContain('body.gnav-menu-open .chat-widget')
-    expect(css).toContain('body:has(.consult-backdrop.is-open) .chat-widget')
-    expect(css).toMatch(/max-width:680px\)\{[^@]*\.chat-button\{width:52px;height:52px/)
-    expect(document.querySelector('.chat-button .chat-label')!.textContent).toBe('Чат-бот')
+    Object.defineProperty(document.documentElement, 'scrollHeight', { configurable: true, value: 3000 })
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 2500 })
+    window.dispatchEvent(new Event('scroll'))
+    document.dispatchEvent(new MouseEvent('mouseleave', { clientY: 0 }))
+    for (const sel of FLOATING) expect(count(sel)).toBe(0)
   })
 
-  it('выключатель страницы убирает плавающие окна, окно консультации остаётся для кнопок', () => {
-    boot('<button data-consult-trigger>Консультация</button>', '<meta name="gh-widgets" content="off">')
-    expect(count('.chat-widget')).toBe(0)
-    expect(count('.promo-popup')).toBe(0)
-    expect(count('.consult-backdrop')).toBe(1)
-    ;(document.querySelector('[data-consult-trigger]') as HTMLButtonElement).click()
-    expect(document.querySelector('.consult-backdrop')!.classList.contains('is-open')).toBe(true)
+  it('кнопку контактов на странице не трогает и не прячет', () => {
+    boot('<div class="contact-widget"><button class="contact-widget-button">Контакты</button></div>')
+    expect(count('.contact-widget-button')).toBe(1)
+    expect((document.querySelector('.contact-widget') as HTMLElement).style.display).toBe('')
   })
 
-  it('выключатель без учёта регистра и пробелов; другое значение — окна на месте', () => {
-    boot('', '<meta name="gh-widgets" content=" OFF ">')
-    expect(count('.chat-widget')).toBe(0)
-    document.body.innerHTML = ''
-    boot('', '<meta name="gh-widgets" content="on">')
-    expect(count('.chat-widget')).toBe(1)
-  })
-
-})
-
-describe('тексты на языке страницы', () => {
-  it('узбекская страница — окна по-узбекски', () => {
-    document.documentElement.setAttribute('lang', 'uz')
-    boot()
-    expect(document.querySelector('.chat-panel h3')!.textContent).toBe('Onlayn maslahat')
-    expect(document.querySelector('#consultTitle')!.textContent).toBe('Maslahat olish')
-    expect(document.querySelector('.consult-submit')!.textContent).toBe('Yuborish')
-    expect(document.querySelector('.promo-popup .popup-close')!.textContent).toBe('Keyinroq')
-    expect(document.body.innerHTML).not.toMatch(/[А-Яа-яЁё]{3,}/)
-  })
-
-  it('английская — по-английски; неизвестный язык — основной (русский)', () => {
-    document.documentElement.setAttribute('lang', 'en-US')
-    boot()
-    expect(document.querySelector('.popup-label')!.textContent).toBe('families with us')
-    document.body.innerHTML = ''
-    document.documentElement.setAttribute('lang', 'kz')
-    boot()
-    expect(document.querySelector('.popup-label')!.textContent).toBe('семей с нами')
-  })
-
-  it('окно консультации: форма с именем и телефоном, отправку Site JS не ведёт', () => {
-    boot('<button data-consult-trigger>Консультация</button>')
-    ;(document.querySelector('[data-consult-trigger]') as HTMLButtonElement).click()
-    const form = document.querySelector('.consult-form') as HTMLFormElement
-    expect(form.querySelector('input[name="name"]')).not.toBeNull()
-    expect(form.querySelector('input[name="phone"]')).not.toBeNull()
-    const submit = new Event('submit', { cancelable: true })
-    form.dispatchEvent(submit)
-    // Отправку ведёт рантайм заявок генератора, Site JS событие не трогает.
-    expect(submit.defaultPrevented).toBe(false)
-    expect(document.querySelector('.consult-submit')!.textContent).toBe('Отправить')
+  it('в коде нет ни текстов, ни функций окон', () => {
+    for (const gone of ['injectSupportWidgets', 'Чат-бот', 'Не уходите без консультации', 'promo-popup', 'exit-popup',
+      'consult-backdrop', 'closeGoldenHousePopups']) {
+      // Шапка-комментарий рассказывает, что убрано, — проверяем только код.
+      expect(RUNTIME.slice(RUNTIME.indexOf('*/') + 2)).not.toContain(gone)
+    }
   })
 })
 
