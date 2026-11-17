@@ -1,8 +1,8 @@
 /**
  * @jest-environment jsdom
  *
- * Заявка из окна планировки: «Получить консультацию» раскрывает форму в окне
- * (раньше закрывала окно и листала к общей форме — планировка терялась).
+ * Заявка из окна планировки: форма видна сразу, без кнопки «Получить
+ * консультацию» (раньше та листала к общей форме, потом раскрывала форму).
  */
 import { generateComplexOverlays, overlayLabels } from '../services/ComplexOverlaysRuntime'
 
@@ -30,34 +30,34 @@ function cleanup(): void {
 }
 
 const lead = () => document.getElementById('planModalLead') as HTMLElement
-const cta = () => document.querySelector('.plan-modal-cta') as HTMLButtonElement
+const form = () => lead().querySelector('form') as HTMLFormElement
 const cards = () => Array.from(document.querySelectorAll('.apartment-card')) as HTMLElement[]
 
 afterEach(cleanup)
 
 describe('форма заявки в окне планировки', () => {
-  it('в разметке: форма вида plan с именем и телефоном, свёрнута; стили формы рядом', () => {
+  it('в разметке: форма вида plan с именем и телефоном, видна сразу; стили формы рядом', () => {
     expect(generateComplexOverlays(CARD('p1', 'x'), 'ru')).toContain('data-plan-lead')
     mount()
-    const form = lead().querySelector('form') as HTMLFormElement
-    expect(form.getAttribute('data-lead-kind')).toBe('plan')
-    expect(form.querySelector('input[name="name"]')).not.toBeNull()
-    expect((form.querySelector('input[name="phone"]') as HTMLInputElement).type).toBe('tel')
-    expect(form.querySelector('button[type="submit"]')!.textContent).toBe('Отправить заявку')
-    expect(lead().hidden).toBe(true)
+    expect(form().getAttribute('data-lead-kind')).toBe('plan')
+    expect(form().querySelector('input[name="name"]')).not.toBeNull()
+    expect((form().querySelector('input[name="phone"]') as HTMLInputElement).type).toBe('tel')
+    expect(form().querySelector('button[type="submit"]')!.textContent).toBe('Отправить заявку')
+    expect(lead().hidden).toBe(false)
   })
 
-  it('«Получить консультацию» раскрывает форму, прячет кнопку и не листает страницу', () => {
+  it('кнопки «Получить консультацию» нет ни на одном языке', () => {
+    for (const lang of ['ru', 'uz', 'en']) {
+      const out = generateComplexOverlays(CARD('p1', 'x'), lang)
+      expect(out).not.toContain('Получить консультацию')
+      expect(out).not.toContain('Maslahat olish')
+      expect(out).not.toContain('Get a consultation')
+    }
     mount()
-    const scroll = jest.fn()
-    ;(document.getElementById('lead') as any).scrollIntoView = scroll
-    ;(window as any).ghPlanModal.open(cards()[0])
-    cta().click()
-    expect(lead().hidden).toBe(false)
-    expect(cta().style.display).toBe('none')
-    expect(document.activeElement).toBe(lead().querySelector('input[name="name"]'))
-    expect(document.getElementById('planModal')!.classList.contains('is-open')).toBe(true)
-    expect(scroll).not.toHaveBeenCalled()
+    // Единственная кнопка с классом CTA — отправка формы (стиль из CSS блока).
+    const ctas = Array.from(document.querySelectorAll('.plan-modal-cta'))
+    expect(ctas).toHaveLength(1)
+    expect(ctas[0].getAttribute('type')).toBe('submit')
   })
 
   it('current() — карточка, по которой открыто окно', () => {
@@ -69,20 +69,20 @@ describe('форма заявки в окне планировки', () => {
     expect((window as any).ghPlanModal.current()).toBe(cards()[0])
   })
 
-  it('следующая планировка открывается с кнопкой, форма свёрнута и очищена, статус стёрт', () => {
+  it('открытие планировки сбрасывает форму (reset — по нему рантайм заявок применяет память), статус стёрт', () => {
     mount()
     ;(window as any).ghPlanModal.open(cards()[0])
-    cta().click()
-    const phone = lead().querySelector('input[name="phone"]') as HTMLInputElement
+    const phone = form().querySelector('input[name="phone"]') as HTMLInputElement
     phone.value = '901234567'
     const status = document.createElement('p')
     status.className = 'gh-lead-extra gh-lead-status is-error'
     status.textContent = 'Проверьте номер'
-    lead().appendChild(status)
+    form().appendChild(status)
+    const resets = jest.fn()
+    form().addEventListener('reset', resets)
 
     ;(window as any).ghPlanModal.open(cards()[1])
-    expect(lead().hidden).toBe(true)
-    expect(cta().style.display).toBe('')
+    expect(resets).toHaveBeenCalledTimes(1)
     expect(phone.value).toBe('')
     expect(status.textContent).toBe('')
     expect(status.classList.contains('is-error')).toBe(false)
@@ -94,8 +94,7 @@ describe('форма заявки в окне планировки', () => {
     card.setAttribute('data-plan-images', '/a.webp|/b.webp')
     ;(window as any).ghPlanModal.open(card)
     const media = document.getElementById('planModalMedia')!
-    cta().click()
-    const input = lead().querySelector('input[name="name"]')!
+    const input = form().querySelector('input[name="name"]')!
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
     expect(media.style.getPropertyValue('--modal-image')).toContain('/a.webp')
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
@@ -107,21 +106,7 @@ describe('форма заявки в окне планировки', () => {
     ['en', 'Send request'],
   ])('подписи формы на языке страницы: %s', (lang, submit) => {
     mount(lang)
-    expect(lead().querySelector('button[type="submit"]')!.textContent).toBe(submit)
-    expect(lead().querySelector('input[name="name"]')!.getAttribute('placeholder')).toBe(overlayLabels(lang).leadName)
-  })
-
-  it('старая разметка без формы — кнопка по-прежнему ведёт к форме страницы', () => {
-    mount()
-    lead().remove()
-    // Рантайм ищет форму при запуске — перезапускаем на разметке без неё.
-    // eslint-disable-next-line no-new-func
-    new Function(runtimeOf(generateComplexOverlays(CARD('p1', 'x'), 'ru')))()
-    const scroll = jest.fn()
-    ;(document.getElementById('lead') as any).scrollIntoView = scroll
-    ;(window as any).ghPlanModal.open(cards()[0])
-    cta().click()
-    expect(scroll).toHaveBeenCalled()
-    expect(document.getElementById('planModal')!.classList.contains('is-open')).toBe(false)
+    expect(form().querySelector('button[type="submit"]')!.textContent).toBe(submit)
+    expect(form().querySelector('input[name="name"]')!.getAttribute('placeholder')).toBe(overlayLabels(lang).leadName)
   })
 })

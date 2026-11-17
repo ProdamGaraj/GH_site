@@ -4,7 +4,7 @@
  * Оверлеи (лайтбокс галереи и модалка планировки) инжектирует генератор, а не
  * блок структуры. Система переводов их не видит: в `page.structure` этих узлов
  * нет, поэтому на узбекской версии страницы они оставались русскими —
- * «Планировка», «Класс», «Получить консультацию» посреди узбекского текста.
+ * «Планировка», «Класс», «Отправить заявку» посреди узбекского текста.
  */
 import { generateComplexOverlays, overlayLabels } from '../services/ComplexOverlaysRuntime'
 
@@ -49,10 +49,10 @@ describe('generateComplexOverlays', () => {
   it('на узбекской странице подписи узбекские, кириллицы в разметке нет', () => {
     const out = generateComplexOverlays(BODY, 'uz')
     expect(out).toContain('Reja')
-    expect(out).toContain('Maslahat olish')
+    expect(out).toContain('Ariza yuborish')
     expect(out).toContain('Sinf')
     expect(out).not.toContain('Планировка')
-    expect(out).not.toContain('Получить консультацию')
+    expect(out).not.toContain('Отправить заявку')
     expect(out).not.toContain('</b>Класс<')
     expect(out).toContain('</b>Sinf<')
   })
@@ -66,7 +66,7 @@ describe('generateComplexOverlays', () => {
   it('без языка остаётся русский — поведение существующих страниц не меняется', () => {
     const out = generateComplexOverlays(BODY)
     expect(out).toContain('Планировка')
-    expect(out).toContain('Получить консультацию')
+    expect(out).toContain('Отправить заявку')
   })
 
   it('aria-подписи тоже локализованы — их читает скринридер', () => {

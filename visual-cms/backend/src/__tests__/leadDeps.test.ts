@@ -10,8 +10,11 @@ import {
   leadCrmConfigFromEnv,
   macroLeadSender,
   MACRO_LEAD_PATH,
+  typeormLeadStore,
 } from '../services/leads/leadDeps'
 import { MacroHttp, MacroHttpError } from '../services/MacroHttp'
+import type { Repository } from 'typeorm'
+import type { Lead } from '../models/Lead'
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -116,5 +119,39 @@ describe('MacroHttp: retryServerErrors', () => {
       new MacroHttp({ ...opts, fetchImpl: limited, retryServerErrors: false }).post('/x', {})
     ).resolves.toEqual({ ok: 2 })
     expect(limited).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('typeormLeadStore.findRecent', () => {
+  /** Конструктор запроса-регистратор: какие условия ушли в SQL. */
+  function recordingRepo() {
+    const wheres: Array<[string, Record<string, unknown>]> = []
+    const qb: Record<string, unknown> = {}
+    const add = (sql: string, params: Record<string, unknown>) => {
+      wheres.push([sql, params])
+      return qb
+    }
+    Object.assign(qb, { where: add, andWhere: add, orderBy: () => qb, getOne: async () => null })
+    const repo = { createQueryBuilder: () => qb } as unknown as Repository<Lead>
+    return { repo, wheres }
+  }
+  const since = new Date('2026-11-17T00:00:00Z')
+
+  it('с id планировки — по планировке из исходной заявки, без привязки к странице', async () => {
+    const { repo, wheres } = recordingRepo()
+    await typeormLeadStore(repo).findRecent({ phone: '+998901234567', kind: 'plan', since, pagePath: '/ru/x/', planId: 'p1' })
+    expect(wheres).toEqual([
+      ['lead.phone = :phone', { phone: '+998901234567' }],
+      ['lead.kind = :kind', { kind: 'plan' }],
+      ['lead.createdAt >= :since', { since }],
+      [`lead.input -> 'plan' ->> 'id' = :planId`, { planId: 'p1' }],
+    ])
+  })
+
+  it('без планировки — по странице', async () => {
+    const { repo, wheres } = recordingRepo()
+    await typeormLeadStore(repo).findRecent({ phone: '+998901234567', kind: 'callback', since, pagePath: '/ru/', planId: null })
+    expect(wheres[3]).toEqual(['lead.pagePath = :pagePath', { pagePath: '/ru/' }])
+    expect(wheres).toHaveLength(4)
   })
 })

@@ -17,6 +17,17 @@
  *      «Спасибо»), строка согласия на языке страницы и поле-ловушка для ботов.
  *      Внутри формы и во всю ширину: формы сайта — сетки, а элемент рядом с
  *      формой стал бы лишней колонкой секции (так было на главной).
+ *   4. Память контакта (`ghContact`): после УСПЕШНОЙ заявки имя и телефон
+ *      запоминаются на 30 дней. Во всех формах с телефоном поля имени и
+ *      телефона тогда скрыты (значения в них подставлены), вместо них —
+ *      «Иван, +998 90 *** 45 67 · Изменить»: следующая заявка — одним нажатием.
+ *      Номер замаскирован: на общем компьютере следующий посетитель не видит
+ *      чужой номер целиком. «Изменить» показывает поля.
+ *      Там же — планировки, по которым заявка уже ушла (сутки): окно такой
+ *      планировки вместо формы говорит «заявка отправлена». Сервер держит то
+ *      же правило (LeadService, PLAN_REPEAT_WINDOW_MS) — на случай очищенного
+ *      браузера. Память применяется при загрузке и после каждого сброса формы
+ *      (окно планировки сбрасывает форму, открывая другую планировку).
  *
  * Превью в CMS (нет analyticsPageId — тот же признак, что у трекера
  * аналитики): заявки НЕ отправляются и путь не пишется, форма показывает
@@ -29,6 +40,10 @@
 
 export interface LeadLabels {
   consent: string
+  /** Ссылка «Изменить» у запомненного контакта. */
+  change: string
+  /** Окно планировки, по которой заявка уже отправлена. */
+  planSent: string
   sending: string
   sent: string
   thanks: string
@@ -41,6 +56,8 @@ export interface LeadLabels {
 const LEAD_LABELS: Record<string, LeadLabels> = {
   ru: {
     consent: 'Нажимая кнопку, вы соглашаетесь на обработку персональных данных и звонок менеджера.',
+    change: 'Изменить',
+    planSent: 'Заявка по этой планировке отправлена. Менеджер свяжется с вами в ближайшее время.',
     sending: 'Отправляем…',
     sent: 'Заявка отправлена',
     thanks: 'Спасибо! Менеджер свяжется с вами в ближайшее время.',
@@ -51,6 +68,8 @@ const LEAD_LABELS: Record<string, LeadLabels> = {
   },
   uz: {
     consent: 'Tugmani bosish orqali siz shaxsiy maʼlumotlaringiz qayta ishlanishiga va menejer qo‘ng‘irog‘iga rozilik bildirasiz.',
+    change: 'O‘zgartirish',
+    planSent: 'Ushbu reja bo‘yicha ariza yuborildi. Menejer tez orada siz bilan bog‘lanadi.',
     sending: 'Yuborilmoqda…',
     sent: 'Ariza yuborildi',
     thanks: 'Rahmat! Menejer tez orada siz bilan bog‘lanadi.',
@@ -61,6 +80,8 @@ const LEAD_LABELS: Record<string, LeadLabels> = {
   },
   en: {
     consent: 'By clicking the button, you agree to the processing of your personal data and a call from our manager.',
+    change: 'Change',
+    planSent: 'Your request for this floor plan has been sent. Our manager will contact you shortly.',
     sending: 'Sending…',
     sent: 'Request sent',
     thanks: 'Thank you! Our manager will contact you shortly.',
@@ -79,6 +100,12 @@ export function leadLabels(lang?: string): LeadLabels {
 
 /** Ключ пути клиента в localStorage. */
 export const JOURNEY_KEY = 'ghJourney'
+/** Ключ памяти контакта (имя, телефон, отправленные планировки). */
+export const CONTACT_KEY = 'ghContact'
+/** Сколько помнить имя и телефон. */
+export const CONTACT_TTL_DAYS = 30
+/** Сколько помнить отправленную планировку — как PLAN_REPEAT_WINDOW_MS сервера. */
+export const PLAN_SENT_TTL_HOURS = 24
 
 const LEAD_CSS = `<style data-gh-leads>
 .gh-lead-extra{grid-column:1/-1;flex:1 0 100%;width:100%;box-sizing:border-box;text-align:left}
@@ -86,6 +113,13 @@ const LEAD_CSS = `<style data-gh-leads>
 .gh-lead-status{margin:2px 0 0;font-size:14px;font-weight:700;line-height:1.4}
 .gh-lead-status:empty{display:none}
 .gh-lead-status.is-error{color:#d93025}
+.gh-lead-field-hidden{display:none!important}
+.gh-lead-known{margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;min-height:48px;box-sizing:border-box;font-size:15px;font-weight:700;line-height:1.4}
+.gh-lead-known .gh-lead-change{all:unset;display:inline!important;width:auto!important;height:auto!important;min-height:0!important;padding:0!important;margin:0!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important;animation:none!important;color:inherit!important;font-size:13px!important;font-weight:700!important;line-height:1.4!important;text-decoration:underline!important;opacity:.75;cursor:pointer}
+.gh-lead-known .gh-lead-change::before,.gh-lead-known .gh-lead-change::after{content:none!important;display:none!important}
+.gh-lead-known .gh-lead-change:hover,.gh-lead-known .gh-lead-change:focus-visible{opacity:1}
+.gh-lead-known .gh-lead-change:focus-visible{outline:2px solid currentColor!important;outline-offset:2px}
+form.gh-lead-done>:not(.gh-lead-status){display:none!important}
 .gh-lead-hp{position:absolute!important;left:-10000px!important;top:auto!important;width:1px!important;height:1px!important;overflow:hidden!important;opacity:0!important}
 </style>`
 
@@ -102,6 +136,9 @@ const RUNTIME_JS = (config: { live: boolean; labels: LeadLabels }) => `<script>
   var MAX_PAGES = 30;
   var MAX_PLANS = 20;
   var HP_NAME = 'website';
+  var CONTACT = '${CONTACT_KEY}';
+  var CONTACT_TTL_MS = ${CONTACT_TTL_DAYS} * 24 * 60 * 60 * 1000;
+  var PLAN_SENT_MS = ${PLAN_SENT_TTL_HOURS} * 60 * 60 * 1000;
 
   /* ── Хранилище: в приватном режиме localStorage может бросать ── */
   function readJourney() {
@@ -305,6 +342,112 @@ const RUNTIME_JS = (config: { live: boolean; labels: LeadLabels }) => `<script>
     return snap;
   }
 
+  /* ── Память контакта ── */
+  /** Живые записи: контакт моложе 30 дней, планировки моложе суток. */
+  function readContact() {
+    var c = null;
+    try { c = JSON.parse(localStorage.getItem(CONTACT) || 'null'); } catch (e) { c = null; }
+    if (!c || typeof c !== 'object') c = {};
+    var now = Date.now();
+    var out = { plans: {} };
+    if (typeof c.phone === 'string' && phoneOk(c.phone) && c.savedAt && now - c.savedAt < CONTACT_TTL_MS) {
+      out.phone = c.phone;
+      out.name = typeof c.name === 'string' ? c.name : '';
+      out.savedAt = c.savedAt;
+    }
+    var plans = c.plans && typeof c.plans === 'object' ? c.plans : {};
+    Object.keys(plans).forEach(function (id) {
+      if (typeof plans[id] === 'number' && now - plans[id] < PLAN_SENT_MS) out.plans[id] = plans[id];
+    });
+    return out;
+  }
+  function rememberLead(payload) {
+    var c = readContact();
+    c.phone = payload.phone;
+    c.name = payload.name || '';
+    c.savedAt = Date.now();
+    if (payload.plan && payload.plan.id) c.plans[payload.plan.id] = Date.now();
+    try { localStorage.setItem(CONTACT, JSON.stringify(c)); } catch (e) { /* без памяти — заполнят снова */ }
+  }
+
+  /** «+998 90 *** 45 67»: видно начало и последние 4 цифры. */
+  function maskPhone(value) {
+    var d = String(value || '').replace(/\\D/g, '');
+    if (d.length === 9) d = '998' + d;
+    if (d.length < 7) return String(value || '');
+    var tail = d.slice(-4);
+    var head = d.length === 12 && d.indexOf('998') === 0 ? '+998 ' + d.slice(3, 5) : '+' + d.slice(0, d.length - 7);
+    return head + ' *** ' + tail.slice(0, 2) + ' ' + tail.slice(2);
+  }
+
+  function currentPlanId() {
+    var card = window.ghPlanModal && window.ghPlanModal.current ? window.ghPlanModal.current() : null;
+    return card ? (card.getAttribute('data-plan-type') || '').trim() : '';
+  }
+
+  function setFieldsHidden(fields, hidden) {
+    fields.forEach(function (f) { if (f) f.classList.toggle('gh-lead-field-hidden', hidden); });
+  }
+
+  /**
+   * Память в форме: запомненный контакт вместо полей и «уже отправлено» для
+   * планировки. Только на опубликованном сайте: в превью редактора контакт
+   * показывать незачем.
+   */
+  function applyMemory(form) {
+    if (!CONFIG.live || !isLeadForm(form)) return;
+    decorate(form);
+    var c = readContact();
+
+    var planId = kindOf(form) === 'plan' ? currentPlanId() : '';
+    var done = !!(planId && c.plans[planId]);
+    form.classList.toggle('gh-lead-done', done);
+    if (done) setStatus(form, L.planSent, false);
+
+    var name = form.querySelector('input[name="name"]');
+    var phone = phoneInput(form);
+    var known = form.querySelector('.gh-lead-known');
+    // Посетитель уже ввёл другое — не прячем его ввод за чужой маской.
+    var typedOther = (phone && phone.value && phone.value !== c.phone) || (name && name.value && name.value !== c.name);
+    if (!c.phone || typedOther || form.getAttribute('data-lead-edit') === '1') {
+      if (known) known.parentNode.removeChild(known);
+      setFieldsHidden([name, phone], false);
+      return;
+    }
+    if (name && !name.value) name.value = c.name;
+    if (phone && !phone.value) phone.value = c.phone;
+    setFieldsHidden([name, phone], true);
+    if (!known) {
+      known = document.createElement('p');
+      known.className = 'gh-lead-known';
+      var who = document.createElement('span');
+      who.className = 'gh-lead-who';
+      var change = document.createElement('button');
+      change.type = 'button';
+      change.className = 'gh-lead-change';
+      change.textContent = L.change;
+      known.appendChild(who);
+      known.appendChild(change);
+      var first = name || phone;
+      first.parentNode.insertBefore(known, first);
+    }
+    // textContent: имя ввёл посетитель — никакого HTML.
+    known.querySelector('.gh-lead-who').textContent = (c.name ? c.name + ', ' : '') + maskPhone(c.phone);
+  }
+
+  function applyMemoryAll() {
+    var forms = document.querySelectorAll('form');
+    for (var i = 0; i < forms.length; i++) applyMemory(forms[i]);
+  }
+
+  /** «Изменить»: поля снова видны (с запомненными значениями), фокус в телефон. */
+  function editContact(form) {
+    form.setAttribute('data-lead-edit', '1');
+    applyMemory(form);
+    var phone = phoneInput(form);
+    if (phone) phone.focus();
+  }
+
   function buildPayload(form, kind) {
     var data = new FormData(form);
     var fields = {};
@@ -357,6 +500,8 @@ const RUNTIME_JS = (config: { live: boolean; labels: LeadLabels }) => `<script>
       return;
     }
     if (!CONFIG.live) { setStatus(form, L.preview, false); return; }
+    // Эта планировка уже отправлена (форма спрятана, но Enter/скрипт — мимо).
+    if (form.classList.contains('gh-lead-done')) return;
 
     flushTime();
     var payload = buildPayload(form, kind);
@@ -364,14 +509,31 @@ const RUNTIME_JS = (config: { live: boolean; labels: LeadLabels }) => `<script>
     setButtons(form, L.sending, true);
     setStatus(form, '', false);
 
+    var sentPlan = kind === 'plan' ? currentPlanId() : '';
     var done = function (ok, message) {
       form.removeAttribute('data-lead-busy');
+      // Пока заявка шла, в окне открыли другую планировку: итог — про прошлую.
+      // Запоминаем её, а форму новой не трогаем (там уже может быть ввод).
+      if (kind === 'plan' && currentPlanId() !== sentPlan) {
+        if (ok) rememberLead(payload);
+        setButtons(form, null, false);
+        applyMemoryAll();
+        return;
+      }
       if (ok) {
+        rememberLead(payload);
         // Сначала сброс: он стирает статус (обработчик reset), потом «Спасибо».
+        // После сброса память вернёт контакт (и «отправлено» для планировки).
         form.reset();
         setButtons(form, L.sent, true);
         setStatus(form, L.thanks, false);
-        window.setTimeout(function () { setButtons(form, null, false); }, 4000);
+        // Остальные формы страницы (форма проекта под окном планировки) —
+        // сразу с запомненным контактом, без перезагрузки.
+        applyMemoryAll();
+        window.setTimeout(function () {
+          // Уже ушла следующая заявка — её «Отправляем…» не трогаем.
+          if (form.getAttribute('data-lead-busy') !== '1') setButtons(form, null, false);
+        }, 4000);
         try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: 'lead_sent', leadKind: kind, page: location.pathname }); } catch (e) { /* ignore */ }
       } else {
         setButtons(form, null, false);
@@ -393,9 +555,18 @@ const RUNTIME_JS = (config: { live: boolean; labels: LeadLabels }) => `<script>
   }
 
   /* ── События ── */
-  // Форму сбросили (повторное открытие окна консультации) — старый статус не нужен.
+  // Форму сбросили (после отправки; окно планировки — открывая другую
+  // планировку): старый статус и режим правки не нужны. Память — после
+  // сброса: событие reset приходит ДО очистки полей.
   document.addEventListener('reset', function (event) {
-    if (isLeadForm(event.target)) setStatus(event.target, '', false);
+    var form = event.target;
+    if (!isLeadForm(form)) return;
+    setStatus(form, '', false);
+    // «Заявка отправлена» на кнопке — про прошлую заявку (окно планировки:
+    // следующая планировка открыта раньше, чем кнопка вернулась сама).
+    if (form.getAttribute('data-lead-busy') !== '1') setButtons(form, null, false);
+    form.removeAttribute('data-lead-edit');
+    window.setTimeout(function () { applyMemory(form); }, 0);
   });
 
   document.addEventListener('submit', function (event) {
@@ -410,6 +581,11 @@ const RUNTIME_JS = (config: { live: boolean; labels: LeadLabels }) => `<script>
     if (!target || !target.closest) return;
     var button = target.closest('button, input[type="submit"]');
     var form = button && button.form ? button.form : button && button.closest('form');
+    if (button && isLeadForm(form) && button.classList.contains('gh-lead-change')) {
+      event.preventDefault();
+      editContact(form);
+      return;
+    }
     if (button && isLeadForm(form)) {
       var type = (button.getAttribute('type') || 'submit').toLowerCase();
       var looksLikeSend = type === 'submit' || button.classList.contains('submit') || button.classList.contains('commerce-submit');
@@ -444,8 +620,9 @@ const RUNTIME_JS = (config: { live: boolean; labels: LeadLabels }) => `<script>
     window.addEventListener('pagehide', flushTime);
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', decorateAll);
-  else decorateAll();
+  function boot() { decorateAll(); applyMemoryAll(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
 })();
 </script>`
 

@@ -2,7 +2,15 @@
  * Приём заявки: сначала база, потом CRM; лид не теряется ни при сбое
  * каталога, ни при сбое CRM, повтор той же заявки не плодит дублей.
  */
-import { LeadService, LeadValidationError, crmIdOf, DUPLICATE_WINDOW_MS, STALE_PENDING_MS, type LeadStore } from '../services/leads/LeadService'
+import {
+  LeadService,
+  LeadValidationError,
+  crmIdOf,
+  DUPLICATE_WINDOW_MS,
+  PLAN_REPEAT_WINDOW_MS,
+  STALE_PENDING_MS,
+  type LeadStore,
+} from '../services/leads/LeadService'
 import { EMPTY_CONTEXT, type LeadContext } from '../services/leads/leadPayload'
 import { leadInputSchema, type LeadInput } from '../schemas/lead.schema'
 import type { Lead } from '../models/Lead'
@@ -14,9 +22,13 @@ function memoryStore() {
   const rows: Lead[] = []
   let seq = 0
   const store: LeadStore = {
-    async findRecent(phone, kind, pagePath, since) {
+    async findRecent({ phone, kind, since, pagePath, planId }) {
       const hits = rows.filter(
-        (r) => r.phone === phone && r.kind === kind && r.pagePath === pagePath && r.createdAt >= since
+        (r) =>
+          r.phone === phone &&
+          r.kind === kind &&
+          r.createdAt >= since &&
+          (planId ? (r.input as { plan?: { id?: string } }).plan?.id === planId : r.pagePath === pagePath)
       )
       return hits[hits.length - 1] ?? null
     },
@@ -140,6 +152,57 @@ describe('LeadService.submit', () => {
     rows[0].createdAt = new Date(NOW.getTime() - DUPLICATE_WINDOW_MS - 1)
     await service.submit(input(), meta)
     expect(rows).toHaveLength(2)
+  })
+
+  describe('заявки по планировкам', () => {
+    const plan = (id: string, path = '/ru/complex/assalom-dostlik/') =>
+      input({ kind: 'plan', plan: { id, title: id }, page: { path, lang: 'ru' } })
+
+    it('другая планировка (даже похожая) — отдельная заявка, обе уходят в CRM', async () => {
+      const { service, rows, sendToCrm } = setup()
+      const a = await service.submit(plan('1k-38'), meta)
+      const b = await service.submit(plan('1k-39'), meta)
+      expect([a.status, b.status]).toEqual(['accepted', 'accepted'])
+      if (a.status !== 'accepted' || b.status !== 'accepted') throw new Error('unreachable')
+      await Promise.all([a.delivery, b.delivery])
+      expect(rows).toHaveLength(2)
+      expect(sendToCrm).toHaveBeenCalledTimes(2)
+    })
+
+    it('та же планировка с того же телефона — повтор целые сутки, на любой языковой версии страницы', async () => {
+      const { service, rows } = setup()
+      const first = await service.submit(plan('1k-38'), meta)
+      if (first.status !== 'accepted') throw new Error('unreachable')
+      rows[0].createdAt = new Date(NOW.getTime() - PLAN_REPEAT_WINDOW_MS + 60_000)
+      expect(await service.submit(plan('1k-38', '/uz/complex/assalom-dostlik/'), meta)).toEqual({
+        status: 'duplicate',
+        id: first.id,
+      })
+      expect(rows).toHaveLength(1)
+    })
+
+    it('через сутки ту же планировку можно запросить снова', async () => {
+      const { service, rows } = setup()
+      await service.submit(plan('1k-38'), meta)
+      rows[0].createdAt = new Date(NOW.getTime() - PLAN_REPEAT_WINDOW_MS - 1)
+      expect((await service.submit(plan('1k-38'), meta)).status).toBe('accepted')
+      expect(rows).toHaveLength(2)
+    })
+
+    it('та же планировка с другого телефона — новая заявка', async () => {
+      const { service, rows } = setup()
+      await service.submit(plan('1k-38'), meta)
+      await service.submit(input({ kind: 'plan', plan: { id: '1k-38' }, phone: '+998 91 000 00 00' }), meta)
+      expect(rows).toHaveLength(2)
+    })
+
+    it('окно без id карточки (старая разметка) — обычное правило: страница и 2 минуты', async () => {
+      const { service, rows } = setup()
+      await service.submit(input({ kind: 'plan' }), meta)
+      expect((await service.submit(input({ kind: 'plan' }), meta)).status).toBe('duplicate')
+      rows[0].createdAt = new Date(NOW.getTime() - DUPLICATE_WINDOW_MS - 1)
+      expect((await service.submit(input({ kind: 'plan' }), meta)).status).toBe('accepted')
+    })
   })
 
   it('каталог упал — заявка уходит без домов, в логе предупреждение', async () => {

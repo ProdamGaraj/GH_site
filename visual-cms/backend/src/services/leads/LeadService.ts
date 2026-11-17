@@ -2,7 +2,8 @@
  * Приём заявок с сайта и доставка в MacroCRM.
  *
  * Порядок важен:
- *   1. проверка (ловушка для ботов, телефон, повтор той же заявки);
+ *   1. проверка (ловушка для ботов, телефон, повтор той же заявки — см.
+ *      repeatQuery);
  *   2. контекст из каталога (дома проекта, планировка) — сбой не мешает заявке;
  *   3. запись в таблицу leads со статусом pending;
  *   4. ответ браузеру — не дожидаясь CRM (она может отвечать десятки секунд);
@@ -26,12 +27,31 @@ import {
 
 /** Повтор той же заявки (двойной клик, «не отправилось?») в пределах окна — не новая заявка. */
 export const DUPLICATE_WINDOW_MS = 2 * 60 * 1000
+/**
+ * Заявка по той же планировке с того же телефона — повтор целые сутки:
+ * второй раз из того же окна её не отправить. Другая планировка (даже очень
+ * похожая — у каждой карточки свой id) — новая заявка.
+ */
+export const PLAN_REPEAT_WINDOW_MS = 24 * 60 * 60 * 1000
 /** pending старше этого считается зависшим (процесс умер до отправки). */
 export const STALE_PENDING_MS = 5 * 60 * 1000
 const MAX_ERROR_LENGTH = 1000
 
+/**
+ * Что считать повтором. С `planId` — та же планировка на любой странице
+ * (ru/uz/en-версии одной страницы проекта — одна планировка); без него — та же
+ * страница.
+ */
+export interface RepeatQuery {
+  phone: string
+  kind: LeadKind
+  since: Date
+  pagePath: string
+  planId: string | null
+}
+
 export interface LeadStore {
-  findRecent(phone: string, kind: LeadKind, pagePath: string, since: Date): Promise<Lead | null>
+  findRecent(query: RepeatQuery): Promise<Lead | null>
   create(data: Partial<Lead>): Promise<Lead>
   update(id: string, patch: Partial<Lead>): Promise<void>
   /** failed любого возраста и pending старше `stalePendingBefore`, старые первыми. */
@@ -96,8 +116,7 @@ export class LeadService {
     if (!phone) throw new LeadValidationError('phone', 'Некорректный номер телефона')
 
     const pagePath = input.page.path
-    const since = new Date(this.now().getTime() - DUPLICATE_WINDOW_MS)
-    const recent = await this.deps.store.findRecent(phone, input.kind, pagePath, since)
+    const recent = await this.deps.store.findRecent(this.repeatQuery(input, phone))
     if (recent) return { status: 'duplicate', id: recent.id }
 
     const ctx = await this.context(input)
@@ -156,6 +175,19 @@ export class LeadService {
       if ((await this.deliver(lead)) === 'sent') sent++
     }
     return { tried: leads.length, sent }
+  }
+
+  /** Повтор: та же планировка за сутки или та же форма страницы за 2 минуты. */
+  private repeatQuery(input: LeadInput, phone: string): RepeatQuery {
+    const planId = input.kind === 'plan' ? (input.plan?.id || '').trim() || null : null
+    const window = planId ? PLAN_REPEAT_WINDOW_MS : DUPLICATE_WINDOW_MS
+    return {
+      phone,
+      kind: input.kind,
+      since: new Date(this.now().getTime() - window),
+      pagePath: input.page.path,
+      planId,
+    }
   }
 
   private async context(input: LeadInput): Promise<LeadContext> {

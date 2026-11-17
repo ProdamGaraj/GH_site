@@ -4,7 +4,7 @@
  * Рантайм заявок в браузере: какие формы считаются заявками, что уходит в
  * POST /api/leads, путь клиента по сайту и поведение при ошибках и в превью.
  */
-import { generateLeadRuntime, JOURNEY_KEY, leadLabels } from '../services/LeadRuntime'
+import { CONTACT_KEY, generateLeadRuntime, JOURNEY_KEY, leadLabels } from '../services/LeadRuntime'
 
 type FetchMock = jest.Mock<Promise<{ ok: boolean; status: number }>, [string, RequestInit]>
 
@@ -173,15 +173,18 @@ describe('отправка', () => {
     expect(form.querySelector('button')!.textContent).toBe(leadLabels('ru').sending)
 
     await flush()
-    expect(form.querySelector('button')!.textContent).toBe('Заявка отправлена')
-    expect((form.querySelector('button') as HTMLButtonElement).disabled).toBe(true)
+    expect(form.querySelector('button.submit')!.textContent).toBe('Заявка отправлена')
+    expect((form.querySelector('button.submit') as HTMLButtonElement).disabled).toBe(true)
     expect(statusOf(form)).toBe(leadLabels('ru').thanks)
-    expect((form.querySelector('[name="phone"]') as HTMLInputElement).value).toBe('')
+    // Форма сброшена, номер вернулся из памяти — скрытым, за маской.
+    const phone = form.querySelector('[name="phone"]') as HTMLInputElement
+    expect(phone.value).toBe('+998 90 123 45 67')
+    expect(phone.classList.contains('gh-lead-field-hidden')).toBe(true)
     expect((window as any).dataLayer).toContainEqual({ event: 'lead_sent', leadKind: 'callback', page: '/ru/' })
 
     jest.advanceTimersByTime(4000)
-    expect(form.querySelector('button')!.textContent).toBe('Получить консультацию')
-    expect((form.querySelector('button') as HTMLButtonElement).disabled).toBe(false)
+    expect(form.querySelector('button.submit')!.textContent).toBe('Получить консультацию')
+    expect((form.querySelector('button.submit') as HTMLButtonElement).disabled).toBe(false)
   })
 
   it('форма проекта: вид project и выбранный проект в полях', () => {
@@ -459,5 +462,239 @@ describe('фильтры и окно планировки', () => {
     fill(document.querySelector('form')!, { phone: '901234567' })
     click(document.querySelector('form button')!)
     expect(sent().plan).toEqual({ title: 'Студия' })
+  })
+})
+
+describe('память контакта', () => {
+  const contact = () => JSON.parse(localStorage.getItem(CONTACT_KEY) || 'null')
+  const known = (form: Element) => form.querySelector('.gh-lead-known') as HTMLElement | null
+  const field = (form: Element, name: string) => form.querySelector(`[name="${name}"]`) as HTMLInputElement
+  const DAY = 24 * 60 * 60 * 1000
+
+  function remember(over: Record<string, unknown> = {}): void {
+    localStorage.setItem(
+      CONTACT_KEY,
+      JSON.stringify({ name: 'Иван', phone: '+998 90 123 45 67', savedAt: Date.now(), plans: {}, ...over })
+    )
+  }
+
+  /** Отправить заполненную форму и дождаться ответа и применения памяти. */
+  async function submit(form: HTMLFormElement, values: Record<string, string> = {}): Promise<void> {
+    fill(form, values)
+    click(form.querySelector('button[type="submit"], button.submit')!)
+    await flush()
+    jest.advanceTimersByTime(0)
+  }
+
+  it('после успешной заявки: имя и телефон запомнены, поля скрыты, вместо них маска и «Изменить»', async () => {
+    mount(CALLBACK)
+    const form = document.querySelector('form')!
+    await submit(form, { name: 'Иван', phone: '+998 90 123 45 67' })
+    expect(contact()).toMatchObject({ name: 'Иван', phone: '+998 90 123 45 67', savedAt: Date.now() })
+    expect(known(form)!.querySelector('.gh-lead-who')!.textContent).toBe('Иван, +998 90 *** 45 67')
+    expect(known(form)!.querySelector('button')!.textContent).toBe('Изменить')
+    expect(field(form, 'phone').classList.contains('gh-lead-field-hidden')).toBe(true)
+    expect(field(form, 'name').classList.contains('gh-lead-field-hidden')).toBe(true)
+    // Маска стоит на месте полей, а не в конце формы.
+    expect(known(form)!.nextElementSibling).toBe(field(form, 'name'))
+    // «Спасибо» после отправки остаётся.
+    expect(statusOf(form)).toBe(leadLabels('ru').thanks)
+  })
+
+  it('следующая заявка — одним нажатием: значения уже в скрытых полях', async () => {
+    remember()
+    mount(CALLBACK)
+    const form = document.querySelector('form')!
+    expect(field(form, 'phone').value).toBe('+998 90 123 45 67')
+    click(form.querySelector('button.submit')!)
+    expect(sent()).toMatchObject({ name: 'Иван', phone: '+998 90 123 45 67' })
+  })
+
+  it('работает во всех формах с телефоном на странице', () => {
+    remember()
+    mount(`${CALLBACK}
+      <form class="commerce-form"><input name="name"><input name="phone" type="tel">
+        <select name="object"><option>Офис</option></select>
+        <button type="button" class="commerce-submit">Отправить</button></form>
+      <form class="calc"><input name="sum"><button type="button">Рассчитать</button></form>`)
+    const forms = document.querySelectorAll('form')
+    expect(known(forms[0])).not.toBeNull()
+    expect(known(forms[1])).not.toBeNull()
+    expect(known(forms[2])).toBeNull()
+  })
+
+  it('после заявки другие формы страницы сразу с контактом; форма, где уже вводят другое, не тронута', async () => {
+    mount(`${CALLBACK}${CALLBACK}${CALLBACK}`)
+    const [first, second, third] = Array.from(document.querySelectorAll('form'))
+    fill(third, { name: 'Анна' })
+    await submit(first, { name: 'Иван', phone: '901234567' })
+    expect(known(second)!.textContent).toContain('Иван, +998 90 *** 45 67')
+    expect(known(third)).toBeNull()
+    expect(field(third, 'name').value).toBe('Анна')
+  })
+
+  it('без имени — только маска телефона; 9 цифр без кода страны — с +998', () => {
+    remember({ name: '', phone: '901234567' })
+    mount(CALLBACK)
+    expect(document.querySelector('.gh-lead-who')!.textContent).toBe('+998 90 *** 45 67')
+  })
+
+  it('имя выводится текстом, не разметкой', () => {
+    remember({ name: '<img src=x onerror=alert(1)>' })
+    mount(CALLBACK)
+    const who = document.querySelector('.gh-lead-who')!
+    expect(who.querySelector('img')).toBeNull()
+    expect(who.textContent).toContain('<img')
+  })
+
+  it('«Изменить»: поля видны с запомненными значениями, фокус в телефон, ничего не отправлено', () => {
+    remember()
+    mount(CALLBACK)
+    const form = document.querySelector('form')!
+    const event = click(form.querySelector('.gh-lead-change')!)
+    expect(event.defaultPrevented).toBe(true)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(known(form)).toBeNull()
+    expect(field(form, 'phone').classList.contains('gh-lead-field-hidden')).toBe(false)
+    expect(field(form, 'phone').value).toBe('+998 90 123 45 67')
+    expect(document.activeElement).toBe(field(form, 'phone'))
+  })
+
+  it('после правки и отправки запоминается новый контакт, маска возвращается', async () => {
+    remember()
+    mount(CALLBACK)
+    const form = document.querySelector('form')!
+    click(form.querySelector('.gh-lead-change')!)
+    await submit(form, { name: 'Анна', phone: '+998 91 765 43 21' })
+    expect(contact()).toMatchObject({ name: 'Анна', phone: '+998 91 765 43 21' })
+    expect(form.querySelector('.gh-lead-who')!.textContent).toBe('Анна, +998 91 *** 43 21')
+  })
+
+  it('неудачная отправка ничего не запоминает', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 500 })
+    mount(CALLBACK)
+    await submit(document.querySelector('form')!, { name: 'Иван', phone: '901234567' })
+    expect(contact()).toBeNull()
+    expect(known(document.querySelector('form')!)).toBeNull()
+  })
+
+  it('через 30 дней контакт забыт; битая запись не ломает форму', () => {
+    remember({ savedAt: Date.now() - 30 * DAY - 1 })
+    mount(CALLBACK)
+    expect(known(document.querySelector('form')!)).toBeNull()
+    document.body.innerHTML = ''
+    delete (window as any).__ghLeads
+    localStorage.setItem(CONTACT_KEY, '{oops')
+    expect(() => mount(CALLBACK)).not.toThrow()
+    expect(known(document.querySelector('form')!)).toBeNull()
+  })
+
+  it('превью CMS: память не показывается', () => {
+    remember()
+    mount(CALLBACK, { live: false })
+    expect(known(document.querySelector('form')!)).toBeNull()
+    expect(field(document.querySelector('form')!, 'phone').value).toBe('')
+  })
+
+  describe('окно планировки', () => {
+    const PLANS = `
+      <article class="apartment-card" data-plan-type="1k-38"><h3>1-комн. 38 м²</h3></article>
+      <article class="apartment-card" data-plan-type="1k-39"><h3>1-комн. 39 м²</h3></article>
+      <form data-lead-kind="plan"><input name="name"><input name="phone" type="tel">
+        <button type="submit">Отправить заявку</button></form>`
+    let current: Element | null = null
+    const cards = () => document.querySelectorAll('.apartment-card')
+    /** Как ComplexOverlaysRuntime: другая планировка — форма сбрасывается. */
+    function openPlan(index: number): HTMLFormElement {
+      current = cards()[index]
+      const form = document.querySelector('form')!
+      form.reset()
+      jest.advanceTimersByTime(0)
+      return form
+    }
+
+    beforeEach(() => {
+      current = null
+      ;(window as any).ghPlanModal = { current: () => current }
+    })
+
+    it('отправленная планировка: вместо формы — «заявка отправлена», повторно не уходит', async () => {
+      mount(PLANS)
+      const form = openPlan(0)
+      await submit(form, { name: 'Иван', phone: '901234567' })
+      expect(contact().plans).toEqual({ '1k-38': Date.now() })
+      expect(form.classList.contains('gh-lead-done')).toBe(true)
+      expect(statusOf(form)).toBe(leadLabels('ru').planSent)
+
+      fetchMock.mockClear()
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('другая (даже похожая) планировка — форма снова доступна, с запомненным контактом', async () => {
+      mount(PLANS)
+      await submit(openPlan(0), { name: 'Иван', phone: '901234567' })
+      const form = openPlan(1)
+      expect(form.classList.contains('gh-lead-done')).toBe(false)
+      expect(statusOf(form)).toBe('')
+      expect(form.querySelector('.gh-lead-who')!.textContent).toBe('Иван, +998 90 *** 45 67')
+      fetchMock.mockClear()
+      click(form.querySelector('button[type="submit"]')!)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      // И обратно к первой — снова «отправлена».
+      expect(openPlan(0).classList.contains('gh-lead-done')).toBe(true)
+    })
+
+    it('следующая планировка, открытая сразу, — кнопка снова «Отправить заявку», не «Заявка отправлена»', async () => {
+      mount(PLANS)
+      await submit(openPlan(0), { phone: '901234567' })
+      const button = document.querySelector('form button[type="submit"]') as HTMLButtonElement
+      expect(button.textContent).toBe(leadLabels('ru').sent)
+      openPlan(1)
+      expect(button.textContent).toBe('Отправить заявку')
+      expect(button.disabled).toBe(false)
+    })
+
+    it('таймер прошлой заявки не трогает кнопку следующей, пока та в пути', async () => {
+      mount(PLANS)
+      await submit(openPlan(0), { phone: '901234567' })
+      fetchMock.mockImplementation(() => new Promise(() => undefined))
+      const form = openPlan(1)
+      click(form.querySelector('button[type="submit"]')!)
+      jest.advanceTimersByTime(4000)
+      expect(form.querySelector('button[type="submit"]')!.textContent).toBe(leadLabels('ru').sending)
+    })
+
+    it('ответ пришёл, когда уже открыта другая планировка: прошлая запомнена, новая форма не тронута', async () => {
+      let respond!: (r: { ok: boolean; status: number }) => void
+      fetchMock.mockImplementation(() => new Promise((r) => (respond = r)))
+      mount(PLANS)
+      const form = openPlan(0)
+      fill(form, { name: 'Иван', phone: '901234567' })
+      click(form.querySelector('button[type="submit"]')!)
+      openPlan(1)
+      fill(form, { name: 'Анна' })
+      respond({ ok: true, status: 201 })
+      await flush()
+      jest.advanceTimersByTime(0)
+      expect(contact().plans).toEqual({ '1k-38': Date.now() })
+      const button = form.querySelector('button[type="submit"]') as HTMLButtonElement
+      expect(button.textContent).toBe('Отправить заявку')
+      expect(button.disabled).toBe(false)
+      expect(statusOf(form)).toBe('')
+      expect(form.classList.contains('gh-lead-done')).toBe(false)
+      expect(field(form, 'name').value).toBe('Анна')
+      // Введённое не прячется за маской запомненного «Ивана».
+      expect(field(form, 'name').classList.contains('gh-lead-field-hidden')).toBe(false)
+      expect(known(form)).toBeNull()
+      expect(openPlan(0).classList.contains('gh-lead-done')).toBe(true)
+    })
+
+    it('отметка живёт сутки (как правило сервера), потом планировку можно запросить снова', () => {
+      remember({ plans: { '1k-38': Date.now() - 24 * 60 * 60 * 1000 - 1, '1k-39': Date.now() - 1000 } })
+      mount(PLANS)
+      expect(openPlan(0).classList.contains('gh-lead-done')).toBe(false)
+      expect(openPlan(1).classList.contains('gh-lead-done')).toBe(true)
+    })
   })
 })

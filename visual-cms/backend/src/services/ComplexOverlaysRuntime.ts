@@ -21,11 +21,14 @@
  *   window.ghLightbox.open(images, index) / .close()
  *   window.ghPlanModal.open(card) / .close() / .current()
  *
- * Заявка по планировке. «Получить консультацию» раньше закрывало окно и
- * листало к общей форме внизу страницы: клиент терял, о какой планировке
- * спрашивал, и в заявку она не попадала. Теперь кнопка раскрывает форму прямо
- * в окне (data-lead-kind="plan"); отправляет её рантайм заявок
- * (services/LeadRuntime.ts), карточку берёт через ghPlanModal.current().
+ * Заявка по планировке. Раньше «Получить консультацию» закрывало окно и
+ * листало к общей форме внизу страницы (планировка терялась), потом —
+ * раскрывало форму в окне. Теперь кнопки нет: форма (data-lead-kind="plan")
+ * видна сразу под фактами планировки. Отправляет её рантайм заявок
+ * (services/LeadRuntime.ts), карточку берёт через ghPlanModal.current(); он же
+ * подставляет запомненные имя и телефон и не даёт отправить ту же планировку
+ * второй раз. При открытии окна форма сбрасывается (событие reset) — по нему
+ * рантайм заявок заново применяет память к новой планировке.
  * Стили формы — здесь (PLAN_LEAD_CSS): это новый элемент, в CSS блоков его нет.
  */
 
@@ -61,7 +64,6 @@ export interface OverlayLabels {
   projectClass: string
   floor: string
   deadline: string
-  cta: string
   floorUnknown: string
   deadlineUnknown: string
   planDescription: string
@@ -76,7 +78,7 @@ const OVERLAY_LABELS: Record<string, OverlayLabels> = {
     close: 'Закрыть', viewImage: 'Просмотр изображения', prevView: 'Предыдущий ракурс', nextView: 'Следующий ракурс',
     prevImage: 'Предыдущее изображение', nextImage: 'Следующее изображение',
     plan: 'Планировка', project: 'Проект', projectClass: 'Класс', floor: 'Этаж',
-    deadline: 'Срок сдачи', cta: 'Получить консультацию',
+    deadline: 'Срок сдачи',
     floorUnknown: 'Этаж уточняется',
     deadlineUnknown: 'Срок уточняется',
     planDescription: ' — планировка с продуманными жилыми зонами и доступом к инфраструктуре проекта.',
@@ -86,7 +88,7 @@ const OVERLAY_LABELS: Record<string, OverlayLabels> = {
     close: 'Yopish', viewImage: 'Rasmni ko‘rish', prevView: 'Oldingi rakurs', nextView: 'Keyingi rakurs',
     prevImage: 'Oldingi rasm', nextImage: 'Keyingi rasm',
     plan: 'Reja', project: 'Loyiha', projectClass: 'Sinf', floor: 'Qavat',
-    deadline: 'Topshirish muddati', cta: 'Maslahat olish',
+    deadline: 'Topshirish muddati',
     floorUnknown: 'Qavat aniqlanmoqda',
     deadlineUnknown: 'Muddat aniqlanmoqda',
     planDescription: ' — puxta o‘ylangan yashash zonalari va loyiha infratuzilmasiga kirish imkoniga ega reja.',
@@ -96,7 +98,7 @@ const OVERLAY_LABELS: Record<string, OverlayLabels> = {
     close: 'Close', viewImage: 'Image preview', prevView: 'Previous view', nextView: 'Next view',
     prevImage: 'Previous image', nextImage: 'Next image',
     plan: 'Floor plan', project: 'Project', projectClass: 'Class', floor: 'Floor',
-    deadline: 'Completion', cta: 'Get a consultation',
+    deadline: 'Completion',
     floorUnknown: 'Floor to be confirmed',
     deadlineUnknown: 'Date to be confirmed',
     planDescription: ' — a layout with well-planned living areas and access to the project infrastructure.',
@@ -138,8 +140,7 @@ const PLAN_MODAL_MARKUP = (L: OverlayLabels) => `
           <span><b id="planModalFloor"></b>${L.floor}</span>
           <span><b id="planModalDeadline"></b>${L.deadline}</span>
         </div>
-        <button class="plan-modal-cta" type="button">${L.cta}</button>
-        <div class="plan-modal-lead" id="planModalLead" hidden>
+        <div class="plan-modal-lead" id="planModalLead">
           <form class="plan-modal-lead-form" data-lead-kind="plan" novalidate>
             <input type="text" name="name" placeholder="${L.leadName}" aria-label="${L.leadName}" autocomplete="name">
             <input type="tel" name="phone" placeholder="+998 __ ___ __ __" aria-label="${L.leadPhone}" autocomplete="tel" required>
@@ -152,7 +153,6 @@ const PLAN_MODAL_MARKUP = (L: OverlayLabels) => `
 
 /** Форма заявки в окне планировки — новый элемент, в CSS блоков проекта его нет. */
 const PLAN_LEAD_CSS = `<style data-plan-lead>
-.plan-modal-lead[hidden]{display:none}
 .plan-modal-lead-form{display:grid;gap:10px;margin-top:16px}
 .plan-modal-lead-form input:not(.gh-lead-hp){width:100%;min-height:48px;box-sizing:border-box;border:1px solid rgba(21,24,29,.14);border-radius:13px;background:#fff;color:#15181d;padding:0 14px;font:inherit;font-weight:700;outline:0}
 .plan-modal-lead-form input:focus{border-color:rgba(253,184,42,.85);box-shadow:0 0 0 4px rgba(253,184,42,.18)}
@@ -202,26 +202,15 @@ const RUNTIME_JS = (L: OverlayLabels) => `<script>
   var plans = [];
   var planAt = 0;
   var currentCard = null;
-  var cta = modal ? modal.querySelector('.plan-modal-cta') : null;
   var lead = document.getElementById('planModalLead');
 
-  /** Окно планировки открывается с кнопкой консультации, форма свёрнута. */
+  /** Новая планировка — чистая форма: ввод и статус прошлой стираются. */
   function resetLead() {
     if (!lead) return;
-    lead.hidden = true;
-    // display, а не hidden: CSS блока задаёт кнопке display и перебил бы hidden.
-    if (cta) cta.style.display = '';
     var form = lead.querySelector('form');
     if (form) form.reset();
     var status = lead.querySelector('.gh-lead-status');
     if (status) { status.textContent = ''; status.classList.remove('is-error'); }
-  }
-  function showLead() {
-    if (!lead) return;
-    lead.hidden = false;
-    if (cta) cta.style.display = 'none';
-    var first = lead.querySelector('input[name="name"]');
-    if (first) first.focus();
   }
 
   function drawPlan() {
@@ -305,14 +294,6 @@ const RUNTIME_JS = (L: OverlayLabels) => `<script>
     on(document.getElementById('planModalPrev'), function () { movePlan(-1); });
     on(document.getElementById('planModalNext'), function () { movePlan(1); });
     modal.addEventListener('click', function (e) { if (e.target === modal) closePlan(); });
-    if (cta) cta.addEventListener('click', function (e) {
-      e.stopPropagation();
-      if (lead) { showLead(); return; }
-      // Разметка без формы (старый деплой) — как раньше, к форме страницы.
-      closePlan();
-      var pageLead = document.getElementById('lead');
-      if (pageLead && pageLead.scrollIntoView) pageLead.scrollIntoView({ behavior: 'smooth' });
-    });
   }
 
   document.addEventListener('keydown', function (e) {

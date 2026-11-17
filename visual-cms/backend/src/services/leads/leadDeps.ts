@@ -8,7 +8,7 @@
  *   MACRO_LEAD_CHANNEL_ID  — id рекламного канала «Сайт» в CRM (необязательно);
  *   ESTATE_SERVICE_URL     — каталог, по умолчанию http://estate-service:5100.
  */
-import { LessThan, MoreThanOrEqual, type Repository } from 'typeorm'
+import { LessThan, type Repository } from 'typeorm'
 import { AppDataSource } from '../../config/database'
 import { Lead } from '../../models/Lead'
 import { MacroHttp } from '../MacroHttp'
@@ -34,11 +34,17 @@ export function leadCrmConfigFromEnv(env: Env): LeadCrmConfig {
 
 export function typeormLeadStore(repo: Repository<Lead>): LeadStore {
   return {
-    findRecent: (phone, kind, pagePath, since) =>
-      repo.findOne({
-        where: { phone, kind, pagePath, createdAt: MoreThanOrEqual(since) },
-        order: { createdAt: 'DESC' },
-      }),
+    findRecent: ({ phone, kind, since, pagePath, planId }) => {
+      const qb = repo
+        .createQueryBuilder('lead')
+        .where('lead.phone = :phone', { phone })
+        .andWhere('lead.kind = :kind', { kind })
+        .andWhere('lead.createdAt >= :since', { since })
+      // id планировки лежит в исходной заявке (input.plan.id) — без отдельной колонки.
+      if (planId) qb.andWhere(`lead.input -> 'plan' ->> 'id' = :planId`, { planId })
+      else qb.andWhere('lead.pagePath = :pagePath', { pagePath })
+      return qb.orderBy('lead.createdAt', 'DESC').getOne()
+    },
     create: (data) => repo.save(repo.create(data)),
     update: async (id, patch) => {
       await repo.update({ id }, patch as Parameters<typeof repo.update>[1])
