@@ -25,6 +25,7 @@ import { mapComplexStats, type ProjectStats } from './ProjectStatsAggregator'
 import { CredentialsManager } from './CredentialsManager'
 import { secureDataSourceService, FetchConfig, AuthConfig } from './SecureDataSourceService'
 import { resolveLoadStrategy } from './dataSourceRuntime'
+import { runtimeErrorAction, runtimeOutputTrigger, runtimeSuccessAction } from './requests/outputRuntime'
 import { applyCollectionTransforms } from '../utils/collectionTransforms'
 import { localizeInternalLinks, localizeNavigation, langPrefix } from './linkLocalization'
 import { generateLanguageEntryStub } from './languageEntry'
@@ -3351,26 +3352,20 @@ export class DeployService {
             return {
               blockId: actualBlockId,
               type: 'output',
+              // Сайт отправляет на /api/data/submit только id привязки и данные;
+              // адрес, метод и авторизацию сервер берёт из сохранённой привязки.
+              bindingId: binding.id,
               sourceAlias: binding.dataSource?.name || '',
               outputConfig: {
-                trigger: outputConfig.trigger === 'formSubmit' ? 'submit' : 'click',
-                method: outputConfig.method || outputConfig.endpoint?.method || 'POST',
-                endpoint: outputConfig.endpoint?.path || outputConfig.endpointPath,
-                payloadMappings: outputConfig.payloadMappings?.map((pm: any) => ({
-                  sourceField: pm.sourceField,
-                  targetField: pm.targetField,
-                  type: pm.type || 'direct',
-                  value: pm.value
-                })),
-                onSuccess: outputConfig.onSuccess?.[0] ? {
-                  action: outputConfig.onSuccess[0].type === 'showMessage' ? 'message' : 'redirect',
-                  value: outputConfig.onSuccess[0].config?.message || outputConfig.onSuccess[0].config?.url
-                } : undefined,
-                onError: outputConfig.onError ? {
-                  action: 'message',
-                  value: outputConfig.onError.showMessage,
-                  retryCount: outputConfig.onError.retryAttempts
-                } : undefined
+                trigger: runtimeOutputTrigger(outputConfig.trigger),
+                // Только чтобы найти поля без name (старый маппинг). Куда и что
+                // отправлять — сервер (шаблон запроса привязки); адрес, метод и
+                // константы маппинга на страницу не попадают.
+                payloadMappings: outputConfig.payloadMappings
+                  ?.filter((pm: any) => pm.type !== 'static' && pm.sourceField)
+                  .map((pm: any) => ({ sourceField: pm.sourceField, type: 'direct' })),
+                onSuccess: runtimeSuccessAction(outputConfig.onSuccess),
+                onError: runtimeErrorAction(outputConfig.onError),
               }
             }
           }

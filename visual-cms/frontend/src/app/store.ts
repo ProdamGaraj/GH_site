@@ -8,7 +8,6 @@ import dataBindingsReducer from '@/features/dataBindings/dataBindingsSlice'
 import computedValuesReducer from '@/features/dataBindings/computedValuesSlice'
 import templatesReducer from '@/features/templates/templatesSlice'
 import variablesReducer from '@/features/variables/variablesSlice'
-import formsReducer from '@/features/forms/formsSlice'
 import analyticsReducer from '@/features/analytics/analyticsSlice'
 import translationsReducer from '@/features/translations/translationsSlice'
 import sitesReducer from '@/features/sites/sitesSlice'
@@ -31,7 +30,6 @@ export const store = configureStore({
     templates: templatesReducer,
     variables: variablesReducer,
     analytics: analyticsReducer,
-    forms: formsReducer,
     translations: translationsReducer,
   },
 })

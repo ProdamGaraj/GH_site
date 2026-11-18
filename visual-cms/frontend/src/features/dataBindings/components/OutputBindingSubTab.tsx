@@ -28,13 +28,16 @@ import type {
   DataBinding,
   CreateDataBindingRequest,
   OutputBindingConfig,
-  FieldMapping,
   ValidationRule,
   SuccessAction,
   ErrorAction,
   ButtonStates,
 } from '@/shared/types/dataBinding'
-import { EndpointConfigEditor, DEFAULT_OUTPUT_ENDPOINT_CONFIG } from './EndpointConfigEditor'
+import { DEFAULT_OUTPUT_ENDPOINT_CONFIG } from './EndpointConfigEditor'
+import { RequestSpecEditor } from '../request/RequestSpecEditor'
+import { ResponseSpecEditor } from '../request/ResponseSpecEditor'
+import { defaultRequestSpec } from '../request/requestModel'
+import { requestApi } from '@/shared/api/requestApi'
 import {
   Send,
   Plus,
@@ -111,12 +114,12 @@ const ERROR_ACTION_OPTIONS: Array<{ value: ErrorAction['action']; label: string 
 
 // ─── Sub-sections ──────────────────────────────────────────────
 
-type Section = 'trigger' | 'endpoint' | 'mapping' | 'validation' | 'response'
+type Section = 'trigger' | 'endpoint' | 'answer' | 'validation' | 'response'
 
 const SECTIONS: Array<{ id: Section; label: string; icon: React.ReactNode }> = [
   { id: 'trigger', label: 'Триггер', icon: <Zap size={14} /> },
   { id: 'endpoint', label: 'Запрос', icon: <Globe size={14} /> },
-  { id: 'mapping', label: 'Маппинг', icon: <Link size={14} /> },
+  { id: 'answer', label: 'Ответ', icon: <Link size={14} /> },
   { id: 'validation', label: 'Валидация', icon: <Shield size={14} /> },
   { id: 'response', label: 'Действия', icon: <CheckCircle size={14} /> },
 ]
@@ -124,6 +127,7 @@ const SECTIONS: Array<{ id: Section; label: string; icon: React.ReactNode }> = [
 // ─── Default configs ───────────────────────────────────────────
 
 const DEFAULT_OUTPUT_CONFIG: OutputBindingConfig = {
+  request: defaultRequestSpec(),
   trigger: 'submit',
   endpoint: DEFAULT_OUTPUT_ENDPOINT_CONFIG,
   payloadMappings: [],
@@ -339,6 +343,24 @@ export const OutputBindingSubTab: React.FC<OutputBindingSubTabProps> = ({ blockI
   const linkedDataSource = useAppSelector(
     selectedBinding ? selectDataSourceById(selectedBinding.dataSourceId) : () => undefined
   )
+
+  // Старая привязка без request: сервер отдаёт её запрос, прочитанный из
+  // старого вида (тот же адаптер, что на сайте). Без изменений до сохранения.
+  useEffect(() => {
+    if (!selectedBindingId || config.request) return
+    let alive = true
+    requestApi
+      .effective(selectedBindingId)
+      .then((r) => {
+        if (alive && r.request) setConfig((prev) => (prev.request ? prev : { ...prev, request: r.request ?? undefined }))
+      })
+      .catch((err) => console.error('Failed to load binding request:', err))
+    return () => {
+      alive = false
+    }
+  }, [selectedBindingId, config.request])
+
+  const formFieldNames = formFields.map(f => f.name)
 
   // ─── Handlers ──────────────────────────────────────────────────
 
@@ -631,18 +653,24 @@ export const OutputBindingSubTab: React.FC<OutputBindingSubTabProps> = ({ blockI
               <TriggerSection config={config} onChange={updateConfig} />
             )}
             {activeSection === 'endpoint' && (
-              <div className="space-y-3">
-                <p className="text-xs text-gray-500">Настройте конкретный endpoint для отправки данных</p>
-                <EndpointConfigEditor
-                  value={config.endpoint || DEFAULT_OUTPUT_ENDPOINT_CONFIG}
-                  onChange={(endpoint) => updateConfig({ endpoint })}
-                  showBody={true}
+              config.request ? (
+                <RequestSpecEditor
+                  key={selectedBinding.id}
+                  value={config.request}
+                  onChange={(request) => updateConfig({ request })}
+                  dataSourceId={selectedBinding.dataSourceId}
+                  sourceType={linkedDataSource?.type ?? selectedBinding.dataSource?.type ?? ''}
                   baseUrl={linkedDataSource ? (linkedDataSource.config as any)?.url : undefined}
+                  formFieldNames={formFieldNames}
                 />
-              </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-gray-500 py-4">
+                  <Loader2 size={14} className="animate-spin" /> Загрузка запроса привязки...
+                </div>
+              )
             )}
-            {activeSection === 'mapping' && (
-              <MappingSection config={config} onChange={updateConfig} formFields={formFields} />
+            {activeSection === 'answer' && config.request && (
+              <ResponseSpecEditor value={config.request} onChange={(request) => updateConfig({ request })} />
             )}
             {activeSection === 'validation' && (
               <ValidationSection config={config} onChange={updateConfig} />
@@ -764,138 +792,6 @@ const TriggerSection: React.FC<SectionProps> = ({ config, onChange }) => {
           <p className="text-[10px] text-purple-600 mt-1">
             Вызывайте: <code className="bg-purple-100 px-1 rounded">window.dispatchEvent(new CustomEvent('...'))</code>
           </p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Mapping ───────────────────────────────────────────────────
-
-const MappingSection: React.FC<SectionProps> = ({ config, onChange, formFields = [] }) => {
-  const mappings = config.payloadMappings || []
-
-  const addMapping = () => {
-    onChange({
-      payloadMappings: [...mappings, { id: crypto.randomUUID(), sourceField: '', targetProperty: '' }],
-    })
-  }
-
-  const updateMapping = (index: number, updates: Partial<FieldMapping>) => {
-    const updated = mappings.map((m, i) => (i === index ? { ...m, ...updates } : m))
-    onChange({ payloadMappings: updated })
-  }
-
-  const removeMapping = (index: number) => {
-    onChange({ payloadMappings: mappings.filter((_, i) => i !== index) })
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs font-medium text-gray-700">Маппинг полей</p>
-          <p className="text-[10px] text-gray-500">Укажите, какие поля отправлять и под какими именами</p>
-        </div>
-        <button
-          onClick={addMapping}
-          className="flex items-center gap-1 px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors"
-        >
-          <Plus size={12} /> Поле
-        </button>
-      </div>
-
-      {formFields.length > 0 && (
-        <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-[10px] text-blue-700">
-            Найдено полей в форме: <strong>{formFields.length}</strong>
-            {' '}({formFields.map(f => f.name).join(', ')})
-          </p>
-        </div>
-      )}
-
-      {mappings.length === 0 ? (
-        <div className="p-4 bg-gray-50 rounded-lg text-center">
-          <p className="text-xs text-gray-500">Маппинг не задан — все поля формы будут отправлены как есть</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {mappings.map((mapping, index) => (
-            <div key={index} className="p-3 border border-gray-200 rounded-lg bg-white space-y-2">
-              <div className="flex gap-2 items-center">
-                <div className="flex-1">
-                  <label className="block text-[10px] text-gray-500 mb-0.5">Поле формы</label>
-                  <select
-                    value={mapping.sourceField === '__custom' ? '__custom' : mapping.sourceField}
-                    onChange={e => {
-                      if (e.target.value === '__custom') {
-                        updateMapping(index, { sourceField: '__custom' })
-                      } else {
-                        updateMapping(index, { 
-                          sourceField: e.target.value, 
-                          targetProperty: mapping.targetProperty || e.target.value 
-                        })
-                      }
-                    }}
-                    className="w-full px-2 py-1.5 text-xs text-gray-900 border border-gray-300 rounded bg-white"
-                  >
-                    <option value="">-- Выберите поле --</option>
-                    {formFields.length > 0 && formFields.map(field => (
-                      <option key={field.name} value={field.name}>
-                        {field.label || field.name} ({field.type})
-                      </option>
-                    ))}
-                    {formFields.length > 0 && <option value="" disabled>──────────</option>}
-                    <option value="__custom">✏️ Ввести вручную...</option>
-                  </select>
-                  {mapping.sourceField === '__custom' && (
-                    <input
-                      type="text"
-                      placeholder="Введите имя поля..."
-                      onChange={e => updateMapping(index, { sourceField: e.target.value, targetProperty: mapping.targetProperty || e.target.value })}
-                      className="w-full px-2 py-1.5 text-xs border border-orange-300 rounded mt-1 focus:ring-2 focus:ring-orange-500"
-                      autoFocus
-                    />
-                  )}
-                </div>
-                <span className="text-gray-400 mt-4">→</span>
-                <div className="flex-1">
-                  <label className="block text-[10px] text-gray-500 mb-0.5">В payload</label>
-                  <input
-                    type="text"
-                    value={mapping.targetProperty}
-                    onChange={e => updateMapping(index, { targetProperty: e.target.value })}
-                    placeholder="fieldName"
-                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded bg-white text-gray-700"
-                  />
-                </div>
-                <button
-                  onClick={() => removeMapping(index)}
-                  className="mt-4 p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Payload preview */}
-      {mappings.length > 0 && (
-        <div className="p-3 bg-gray-900 rounded-lg">
-          <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1">Превью payload</div>
-          <pre className="text-green-400 text-xs overflow-auto max-h-32">
-            {JSON.stringify(
-              Object.fromEntries(
-                mappings
-                  .filter(m => m.sourceField && m.targetProperty)
-                  .map(m => [m.targetProperty, `<${m.sourceField}>`])
-              ),
-              null,
-              2,
-            )}
-          </pre>
         </div>
       )}
     </div>

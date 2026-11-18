@@ -1,3 +1,4 @@
+import type { RequestSpec } from './requestSpec'
 /**
  * Data Binding Types
  * ���� ��� ������� �������� ������ � ������
@@ -222,6 +223,11 @@ export interface ButtonStates {
  * ����������� �������� �������� (������ ������)
  */
 export interface OutputBindingConfig {
+  /**
+   * Запрос привязки: шаблон, ответ странице (см. docs/request-pipeline-architecture.md).
+   * Нет — старый вид (endpoint + payloadMappings); сервер читает его сам.
+   */
+  request?: RequestSpec
   trigger: 'submit' | 'click' | 'change' | 'blur' | 'interval' | 'custom'
   endpoint?: EndpointConfig        // Конфигурация конкретного запроса (path, method, headers)
   payloadMappings: FieldMapping[] // Маппинг полей блока -> поля запроса

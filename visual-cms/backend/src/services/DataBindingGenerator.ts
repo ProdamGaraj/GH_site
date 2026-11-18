@@ -43,13 +43,10 @@ export interface DataBindingConfig {
   }
   outputConfig?: {
     trigger: 'submit' | 'click' | 'change' | 'blur' | 'interval' | 'custom'
-    method: 'POST' | 'PUT' | 'PATCH' | 'DELETE'
-    endpoint?: string
+    /** Только поиск полей без name (старый маппинг); состав запроса задаёт сервер. */
     payloadMappings?: Array<{
       sourceField: string
-      targetField: string
-      type: 'direct' | 'static' | 'computed'
-      value?: string
+      type: 'direct'
     }>
     validations?: Array<{
       field: string
@@ -1151,6 +1148,13 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     
     const config = binding.outputConfig;
     const form = element.closest('form') || element.querySelector('form');
+
+    // Форму с привязкой ведёт только привязка: метка для рантайма заявок
+    // (LeadRuntime) — он слушает submit на document и такие формы пропускает,
+    // иначе одна форма уходила бы дважды или не уходила совсем. Наш обработчик
+    // DOMContentLoaded зарегистрирован раньше (этот скрипт выше по странице),
+    // поэтому метка стоит до того, как LeadRuntime оформит формы.
+    if (form) form.setAttribute('data-output-binding', binding.bindingId || '');
     
     if (config.trigger === 'submit' || config.trigger === 'click') {
       // Для submit/click — НЕ вешаем на весь блок, иначе клик на input вызовет отправку
@@ -1213,57 +1217,27 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         }
       }
       
-      // Получаем endpoint
-      var configEndpoint = config.endpoint || '';
-      var dataSource = _dataSources.find(function(ds) {
-        return ds.alias === binding.sourceAlias;
-      });
-      var dsBaseUrl = dataSource ? dataSource.endpoint : '';
-      
-      // Собираем итоговый endpoint
-      var endpoint;
-      if (configEndpoint.startsWith('http://') || configEndpoint.startsWith('https://')) {
-        // Абсолютный URL — используем как есть
-        endpoint = configEndpoint;
-      } else if (configEndpoint && dsBaseUrl) {
-        // Есть путь + базовый URL — склеиваем
-        var base = dsBaseUrl.endsWith('/') ? dsBaseUrl.slice(0, -1) : dsBaseUrl;
-        var sub = configEndpoint.startsWith('/') ? configEndpoint : '/' + configEndpoint;
-        endpoint = base + sub;
-      } else if (configEndpoint.startsWith('/')) {
-        // Абсолютный путь без базового URL — используем как есть
-        endpoint = configEndpoint;
-      } else if (configEndpoint) {
-        // Относительный путь, но нет источника данных — пробуем /api/ prefix
-        endpoint = '/api/' + configEndpoint;
-      } else if (dsBaseUrl) {
-        // Нет пути в конфиге, но есть URL источника данных
-        endpoint = dsBaseUrl;
-      } else {
-        // Ничего не указано — fallback
-        endpoint = '/api/data/submit';
+      // Отправка ВСЕГДА через наш сервер: браузер знает только id привязки.
+      // Адрес внешнего сервиса, метод, тело и токен сервер берёт из сохранённой
+      // привязки (POST /api/data/submit → RequestPipeline).
+      if (!binding.bindingId) {
+        console.error('[OutputBinding] Нет id привязки у блока', binding.blockId, '— страницу нужно передеплоить');
+        setButtonState(button, 'error');
+        handleErrorAction(element, config.onError, { message: 'Форма не настроена. Сообщите администратору сайта.' });
+        return;
       }
-      
-      console.log('[OutputBinding] Sending to endpoint:', endpoint);
-      
-      // Определяем формат тела запроса
-      // Если endpoint — это прямой API (не /api/data/submit), отправляем payload напрямую
-      var requestBody;
-      if (endpoint === '/api/data/submit') {
-        requestBody = {
-          dataSourceId: binding.sourceAlias,
-          data: payload,
-          blockId: binding.blockId,
-          trigger: config.trigger,
-        };
-      } else {
-        // Прямой API-эндпоинт — отправляем поля payload в корне body
-        requestBody = payload;
-      }
-      
-      // Отправляем запрос
-      const response = await fetch(endpoint, {
-        method: config.method || 'POST',
+      var TRIGGERS = { submit: 'form_submit', click: 'button_click', change: 'input_change', blur: 'input_blur', interval: 'interval', custom: 'custom_event' };
+      var visit = visitContext();
+      var requestBody = {
+        outputBindingId: binding.bindingId,
+        data: payload,
+        page: visit.page,
+        visitor: visit.visitor,
+      };
+      if (TRIGGERS[config.trigger]) requestBody.trigger = TRIGGERS[config.trigger];
+
+      const response = await fetch('/api/data/submit', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -1279,10 +1253,16 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
         // Сервер вернул не JSON (возможно HTML ошибку)
         var text = await response.text();
         console.error('[OutputBinding] Server returned non-JSON response:', text.substring(0, 200));
-        result = { success: false, error: { message: 'Сервер вернул некорректный ответ (не JSON). Проверьте endpoint: ' + endpoint } };
+        result = { status: 'failed', error: { message: 'Сервер вернул некорректный ответ (не JSON)' } };
       }
       
-      if (response.ok && result.success) {
+      if (response.ok && result.status === 'done') {
+        // Разрешённые привязкой поля ответа → переменная страницы (её читают
+        // привязки «Получение» с источником page-variable) + событие для своего JS.
+        if (result.variable && result.data !== undefined) window.$var(result.variable, result.data);
+        document.dispatchEvent(new CustomEvent('vcms:response', {
+          detail: { bindingId: binding.bindingId, blockId: binding.blockId, status: result.status, data: result.data },
+        }));
         setButtonState(button, 'success');
         handleSuccessAction(element, config.onSuccess, result);
         
@@ -1299,6 +1279,53 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
     }
   }
   
+  // Поле формы по имени из старого маппинга: name → data-element-name →
+  // контейнер с data-element-name → placeholder.
+  function findMappedInput(element, sourceField) {
+    var input = element.querySelector('[name="' + sourceField + '"]');
+    if (input) return input;
+    var wanted = sourceField.toLowerCase();
+    var allInputs = element.querySelectorAll('input, select, textarea');
+    for (var i = 0; i < allInputs.length; i++) {
+      if ((allInputs[i].getAttribute('data-element-name') || '').toLowerCase().indexOf(wanted) !== -1) return allInputs[i];
+    }
+    var containers = element.querySelectorAll('[data-element-name]');
+    for (var j = 0; j < containers.length; j++) {
+      if ((containers[j].getAttribute('data-element-name') || '').toLowerCase().indexOf(wanted) === -1) continue;
+      var nested = containers[j].querySelector('input, select, textarea');
+      if (!nested && /^(INPUT|SELECT|TEXTAREA)$/.test(containers[j].tagName)) nested = containers[j];
+      if (nested) return nested;
+    }
+    return element.querySelector('[placeholder*="' + sourceField + '" i]');
+  }
+
+  // Страница и визит для шаблона запроса ({{page.*}}, {{visitor.*}}).
+  function visitContext() {
+    var utm = {};
+    try {
+      var query = new URLSearchParams(location.search);
+      ['source', 'medium', 'campaign', 'content', 'term'].forEach(function(key) {
+        var value = query.get('utm_' + key);
+        if (value) utm[key] = value.slice(0, 200);
+      });
+      // Метки визита, сохранённые рантаймом заявок (пришёл по ссылке с UTM раньше).
+      if (!Object.keys(utm).length) {
+        var journey = JSON.parse(localStorage.getItem('ghJourney') || '{}');
+        if (journey && journey.utm) utm = journey.utm;
+      }
+    } catch (e) { /* localStorage недоступен */ }
+    var visitor = { referrer: (document.referrer || '').slice(0, 500) };
+    if (Object.keys(utm).length) visitor.utm = utm;
+    return {
+      page: {
+        path: location.pathname.slice(0, 500),
+        lang: (document.documentElement.lang || '').slice(0, 10),
+        title: (document.title || '').slice(0, 300),
+      },
+      visitor: visitor,
+    };
+  }
+
   // Сбор данных payload
   function collectPayload(element, form, mappings) {
     const payload = {};
@@ -1311,66 +1338,15 @@ export function generateDataBindingRuntime(config: PageDataConfig): string {
       });
     }
     
-    // Применяем маппинги
+    // Старые привязки с маппингом: значения ищем и по имени элемента
+    // (поля без name). Ключ — имя поля-источника: переименование, константы
+    // и состав тела запроса задаёт сервер (шаблон запроса привязки).
     if (mappings) {
       mappings.forEach(function(m) {
-        var fieldKey = m.targetField || m.sourceField;
-        
-        if (m.type === 'direct') {
-          // 1. Ищем по атрибуту name
-          var input = element.querySelector('[name="' + m.sourceField + '"]');
-          
-          // 2. Ищем по data-element-name (напр. "Name Input" для sourceField "name")
-          if (!input) {
-            var allInputs = element.querySelectorAll('input, select, textarea');
-            for (var i = 0; i < allInputs.length; i++) {
-              var elName = (allInputs[i].getAttribute('data-element-name') || '').toLowerCase();
-              if (elName.indexOf(m.sourceField.toLowerCase()) !== -1) {
-                input = allInputs[i];
-                break;
-              }
-            }
-          }
-          
-          // 3. Ищем по data-element-name у родительского контейнера
-          if (!input) {
-            var containers = element.querySelectorAll('[data-element-name]');
-            for (var j = 0; j < containers.length; j++) {
-              var cName = (containers[j].getAttribute('data-element-name') || '').toLowerCase();
-              if (cName.indexOf(m.sourceField.toLowerCase()) !== -1) {
-                var nested = containers[j].querySelector('input, select, textarea');
-                if (!nested && (containers[j].tagName === 'INPUT' || containers[j].tagName === 'SELECT' || containers[j].tagName === 'TEXTAREA')) {
-                  nested = containers[j];
-                }
-                if (nested) {
-                  input = nested;
-                  break;
-                }
-              }
-            }
-          }
-          
-          // 4. Ищем по placeholder
-          if (!input) {
-            var byPlaceholder = element.querySelector('[placeholder*="' + m.sourceField + '" i]');
-            if (byPlaceholder) input = byPlaceholder;
-          }
-          
-          if (input) {
-            payload[fieldKey] = input.value;
-            console.log('[OutputBinding] Collected field "' + fieldKey + '" =', input.value);
-          } else {
-            console.warn('[OutputBinding] Could not find input for sourceField "' + m.sourceField + '"');
-          }
-        } else if (m.type === 'static') {
-          payload[fieldKey] = m.value;
-        } else if (m.type === 'computed' && m.value) {
-          try {
-            payload[fieldKey] = eval(m.value);
-          } catch (e) {
-            console.error('Computed field error:', e);
-          }
-        }
+        if (m.type === 'static' || !m.sourceField || payload[m.sourceField] !== undefined) return;
+        var input = findMappedInput(element, m.sourceField);
+        if (input) payload[m.sourceField] = input.value;
+        else console.warn('[OutputBinding] Could not find input for sourceField "' + m.sourceField + '"');
       });
     }
     

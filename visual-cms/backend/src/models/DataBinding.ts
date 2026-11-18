@@ -1,3 +1,4 @@
+import type { RequestSpec } from '../services/requests/spec'
 import { 
   Entity, 
   PrimaryGeneratedColumn, 
@@ -259,6 +260,12 @@ export interface ValidationRule {
  * Конфигурация OUTPUT биндинга
  */
 export interface OutputBindingConfig {
+  /**
+   * Запрос привязки (шаблон, ответ странице, доставка) — см.
+   * docs/request-pipeline-architecture.md. Нет — старый вид (endpoint +
+   * payloadMappings), сервер читает его адаптером legacyRequestSpec.
+   */
+  request?: RequestSpec
   endpoint?: EndpointConfig        // Конфигурация конкретного запроса (path, method, headers)
   method?: 'POST' | 'PUT' | 'PATCH' | 'DELETE'  // @deprecated — используйте endpoint.method
   endpointPath?: string       // @deprecated — используйте endpoint.path

@@ -4,7 +4,7 @@
  */
 import express, { Express } from 'express'
 import request from 'supertest'
-import { requireAuth } from '../middleware/auth'
+import { readEditorSession, requireAuth } from '../middleware/auth'
 import { errorHandler } from '../middleware/errorHandler'
 import { authService } from '../services/AuthService'
 import { AUTH_COOKIE_NAME, CSRF_COOKIE_NAME } from '../config/auth'
@@ -16,6 +16,11 @@ function buildApp(): Express {
 
   // Публичный (в allowlist) — без cookie
   app.post('/api/data/submit', (_req, res) => res.json({ ok: true }))
+  // Бывшие публичные: принимают конфиг источника / отдают сырой ответ API
+  app.post('/api/data/fetch', (_req, res) => res.json({ ok: true }))
+  app.post('/api/data/fetch-with-binding', (_req, res) => res.json({ ok: true }))
+  app.post('/api/data/submit-with-binding', (_req, res) => res.json({ ok: true }))
+  app.post('/api/data/fetch-with-transforms', (_req, res) => res.json({ ok: true }))
   // Публичный GET-скрипт трекера
   app.get('/api/analytics/tracker.js', (_req, res) => res.json({ ok: true }))
   // Админский GET
@@ -108,5 +113,64 @@ describe('requireAuth middleware', () => {
         .send({})
       expect(res.status).toBe(401)
     })
+  })
+})
+
+describe('эндпоинты данных: что доступно сайтам без логина', () => {
+  const app = buildApp()
+
+  it.each(['/api/data/fetch', '/api/data/fetch-with-binding', '/api/data/submit-with-binding'])(
+    '%s — только с сессией (401 без cookie)',
+    async (path) => {
+      expect((await request(app).post(path).send({})).status).toBe(401)
+    },
+  )
+
+  it('/api/data/fetch-with-transforms остаётся публичным (чтение по сохранённой привязке)', async () => {
+    expect((await request(app).post('/api/data/fetch-with-transforms').send({})).status).toBe(200)
+  })
+})
+
+describe('readEditorSession — сессия редактора на публичном эндпоинте', () => {
+  function sessionOf(build: (r: request.Test) => request.Test, method: 'get' | 'post' = 'post') {
+    const app = express()
+    app.use(express.json())
+    app[method]('/probe', (req, res) => res.json({ session: readEditorSession(req) }))
+    return build(request(app)[method]('/probe')).then((res) => res.body.session)
+  }
+
+  it('без cookie — null', async () => {
+    expect(await sessionOf((r) => r.send({}))).toBeNull()
+  })
+
+  it('валидный токен + совпавший CSRF — пользователь', async () => {
+    const session = await sessionOf((r) =>
+      r.set('Cookie', [`${AUTH_COOKIE_NAME}=${validToken()}`, `${CSRF_COOKIE_NAME}=c1`]).set('X-CSRF-Token', 'c1').send({}),
+    )
+    expect(session).toEqual({ id: 'u1', username: 'admin', role: 'admin' })
+  })
+
+  it('мутация без CSRF — null (cookie одной мало)', async () => {
+    expect(
+      await sessionOf((r) => r.set('Cookie', [`${AUTH_COOKIE_NAME}=${validToken()}`, `${CSRF_COOKIE_NAME}=c1`]).send({})),
+    ).toBeNull()
+  })
+
+  it('мутация с чужим CSRF — null', async () => {
+    expect(
+      await sessionOf((r) =>
+        r.set('Cookie', [`${AUTH_COOKIE_NAME}=${validToken()}`, `${CSRF_COOKIE_NAME}=c1`]).set('X-CSRF-Token', 'c2').send({}),
+      ),
+    ).toBeNull()
+  })
+
+  it('GET — CSRF не нужен', async () => {
+    expect(await sessionOf((r) => r.set('Cookie', [`${AUTH_COOKIE_NAME}=${validToken()}`]), 'get')).toMatchObject({ id: 'u1' })
+  })
+
+  it('невалидный токен — null, без исключения', async () => {
+    expect(
+      await sessionOf((r) => r.set('Cookie', [`${AUTH_COOKIE_NAME}=bad`, `${CSRF_COOKIE_NAME}=c1`]).set('X-CSRF-Token', 'c1').send({})),
+    ).toBeNull()
   })
 })

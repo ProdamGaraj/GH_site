@@ -15,7 +15,6 @@ import variablesRouter from './variables'
 import templateTestRouter from './template-test'
 import previewRouter from './preview'
 import mockRouter from './mock'
-import formsRouter from './forms'
 import analyticsRouter from './analytics'
 import languagesRouter from './languages'
 import macroSyncRouter from './macroSync'
@@ -47,7 +46,6 @@ router.use('/variables', variablesRouter)
 router.use('/template-test', templateTestRouter)
 router.use('/preview', previewRouter)
 router.use('/mock', mockRouter)
-router.use('/forms', formsRouter)
 router.use('/languages', languagesRouter)
 router.use('/macro-sync', macroSyncRouter)
 router.use('/translations', translationsRouter)

@@ -698,3 +698,20 @@ describe('память контакта', () => {
     })
   })
 })
+
+describe('формы с привязкой данных', () => {
+  const BINDING = '11111111-1111-4111-8111-111111111111'
+  const withAttr = (attr: string) => CALLBACK.replace('<form class="lead-form">', `<form class="lead-form" ${attr}>`)
+
+  it('HTTP-привязка (data-output-binding): форму не оформляем и заявку не шлём — её ведёт привязка', () => {
+    mount(withAttr(`data-output-binding="${BINDING}"`))
+    const form = document.querySelector('form')!
+    expect(form.querySelector('.gh-lead-status')).toBeNull()
+    expect(form.querySelector('.gh-lead-consent')).toBeNull()
+    fill(form, { phone: '901234567' })
+    const submit = new Event('submit', { bubbles: true, cancelable: true })
+    form.dispatchEvent(submit)
+    expect(submit.defaultPrevented).toBe(false)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})

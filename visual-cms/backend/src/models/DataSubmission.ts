@@ -39,7 +39,7 @@ export type SubmissionTrigger =
 /**
  * HTTP методы для отправки
  */
-export type SubmissionMethod = 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+export type SubmissionMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 @Entity('data_submissions')
 @Index(['dataSourceId', 'createdAt'])

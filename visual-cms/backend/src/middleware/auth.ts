@@ -26,12 +26,14 @@ const PUBLIC_ENDPOINTS = new Set<string>([
   'GET /api/analytics/tracker.js',
   'POST /api/analytics/track',
   'POST /api/analytics/heartbeat',
-  // Данные для боевых сайтов: отправка форм и получение фидов
+  // Данные для боевых сайтов: отправка форм (только по сохранённой привязке,
+  // см. routes/dataSubmit.ts) и чтение данных по сохранённой привязке.
+  // НЕ публичны: /api/data/fetch (принимает конфиг источника из запроса —
+  // URL, БД, с подстановкой сохранённого токена), /fetch-with-binding и
+  // /submit-with-binding (отдают сырой ответ внешнего API) — их зовёт только
+  // редактор, с сессией.
   'POST /api/data/submit',
-  'POST /api/data/fetch',
-  'POST /api/data/fetch-with-binding',
   'POST /api/data/fetch-with-transforms',
-  'POST /api/data/submit-with-binding',
   // Заявки с сайта (формы обратного звонка, проекта, планировки) → MacroCRM
   'POST /api/leads',
 ])
@@ -53,6 +55,34 @@ function safeEqual(a: string, b: string): boolean {
   const bb = Buffer.from(b)
   if (ab.length !== bb.length) return false
   return crypto.timingSafeEqual(ab, bb)
+}
+
+/** CSRF double-submit: заголовок совпадает с cookie. */
+function csrfMatches(req: Request): boolean {
+  const headerToken = req.get(CSRF_HEADER_NAME)
+  const cookieToken = readCookie(req, CSRF_COOKIE_NAME)
+  return Boolean(headerToken && cookieToken && safeEqual(headerToken, cookieToken))
+}
+
+export type EditorSession = NonNullable<Request['user']>
+
+/**
+ * Сессия редактора на ПУБЛИЧНОМ эндпоинте (requireAuth её там не разбирает).
+ * Валидный JWT из cookie + для мутаций совпавший CSRF; иначе null — запрос
+ * считается анонимным. Без CSRF cookie одной мало: чужой сайт, открытый у
+ * залогиненного редактора, не должен получить права редактора.
+ */
+export function readEditorSession(req: Request): EditorSession | null {
+  const token = readCookie(req, AUTH_COOKIE_NAME)
+  if (!token) return null
+  let payload
+  try {
+    payload = authService.verifyToken(token)
+  } catch {
+    return null
+  }
+  if (MUTATING_METHODS.has(req.method) && !csrfMatches(req)) return null
+  return { id: payload.sub, username: payload.username, role: payload.role }
 }
 
 /**
@@ -93,9 +123,7 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
 
   // 2) CSRF (double-submit) для запросов, меняющих состояние
   if (MUTATING_METHODS.has(req.method)) {
-    const headerToken = req.get(CSRF_HEADER_NAME)
-    const cookieToken = readCookie(req, CSRF_COOKIE_NAME)
-    if (!headerToken || !cookieToken || !safeEqual(headerToken, cookieToken)) {
+    if (!csrfMatches(req)) {
       throw new AuthorizationError('CSRF token mismatch')
     }
   }

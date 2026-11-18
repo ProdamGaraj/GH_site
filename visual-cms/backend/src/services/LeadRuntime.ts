@@ -235,7 +235,13 @@ const RUNTIME_JS = (config: { live: boolean; labels: LeadLabels }) => `<script>
 
   /* ── Формы заявок ── */
   function phoneInput(form) { return form.querySelector('input[name="phone"], input[type="tel"]'); }
-  function isLeadForm(form) { return !!(form && form.tagName === 'FORM' && phoneInput(form)); }
+  /**
+   * Форма заявки: <form> с телефоном, кроме форм с HTTP-привязкой
+   * (data-output-binding — их ведёт рантайм привязок данных).
+   */
+  function isLeadForm(form) {
+    return !!(form && form.tagName === 'FORM' && !form.hasAttribute('data-output-binding') && phoneInput(form));
+  }
 
   function kindOf(form) {
     var explicit = form.getAttribute('data-lead-kind');

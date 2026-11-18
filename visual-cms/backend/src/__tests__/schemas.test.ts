@@ -26,7 +26,7 @@ import {
   createFormSchema, updateFormSchema,
   createDestinationSchema, updateDestinationSchema, submitFormSchema
 } from '../schemas/form.schema'
-import { submitDataSchema } from '../schemas/dataSubmit.schema'
+import { publicSubmitSchema } from '../schemas/dataSubmit.schema'
 import { renderTemplateSchema } from '../schemas/templateTest.schema'
 import { submitApplicationSchema } from '../schemas/mock.schema'
 
@@ -361,39 +361,29 @@ describe('form.schema', () => {
 })
 
 describe('dataSubmit.schema', () => {
-  describe('submitDataSchema', () => {
-    it('accepts minimal valid input', () => {
-      const r = submitDataSchema.safeParse({ data: { key: 'value' } })
+  describe('publicSubmitSchema', () => {
+    const id = '11111111-1111-4111-8111-111111111111'
+    it('принимает id привязки, данные, триггер, страницу и визит', () => {
+      const r = publicSubmitSchema.safeParse({
+        outputBindingId: id,
+        data: { q: 'x' },
+        trigger: 'form_submit',
+        page: { path: '/ru/', lang: 'ru', title: 'Главная' },
+        visitor: { referrer: 'https://google.com', utm: { source: 'ig' } },
+      })
       expect(r.success).toBe(true)
-      if (r.success) {
-        expect(r.data.method).toBe('POST')
-        expect(r.data.trigger).toBe('api_call')
-        expect(r.data.isRetry).toBe(false)
-        expect(r.data.attemptNumber).toBe(1)
+    })
+    it('все триггеры', () => {
+      for (const trigger of ['form_submit', 'button_click', 'input_change', 'input_blur', 'interval', 'custom_event', 'api_call']) {
+        expect(publicSubmitSchema.safeParse({ outputBindingId: id, data: {}, trigger }).success).toBe(true)
       }
     })
-    it('rejects missing data', () => {
-      expect(submitDataSchema.safeParse({}).success).toBe(false)
+    it('лишние поля и в странице, и в визите — отказ', () => {
+      expect(publicSubmitSchema.safeParse({ outputBindingId: id, data: {}, page: { path: '/', url: 'x' } }).success).toBe(false)
+      expect(publicSubmitSchema.safeParse({ outputBindingId: id, data: {}, visitor: { ip: '1.1.1.1' } }).success).toBe(false)
     })
-    it('accepts all HTTP methods', () => {
-      for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
-        expect(submitDataSchema.safeParse({ data: {}, method }).success).toBe(true)
-      }
-    })
-    it('rejects GET method', () => {
-      expect(submitDataSchema.safeParse({ data: {}, method: 'GET' }).success).toBe(false)
-    })
-    it('accepts all trigger types', () => {
-      const triggers = ['form_submit', 'button_click', 'input_change', 'input_blur', 'interval', 'custom_event', 'api_call']
-      for (const trigger of triggers) {
-        expect(submitDataSchema.safeParse({ data: {}, trigger }).success).toBe(true)
-      }
-    })
-    it('rejects invalid endpoint url', () => {
-      expect(submitDataSchema.safeParse({ data: {}, endpoint: 'not-a-url' }).success).toBe(false)
-    })
-    it('accepts valid endpoint url', () => {
-      expect(submitDataSchema.safeParse({ data: {}, endpoint: 'https://api.example.com/submit' }).success).toBe(true)
+    it('длинный путь страницы — отказ', () => {
+      expect(publicSubmitSchema.safeParse({ outputBindingId: id, data: {}, page: { path: 'x'.repeat(501) } }).success).toBe(false)
     })
   })
 })
